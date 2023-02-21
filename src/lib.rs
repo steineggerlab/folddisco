@@ -1,3 +1,8 @@
 //! # About project
 //!
-//! FoldMotif is a tool for finding discontinuous motifs in protein structures.
+//! Motifsearch is a tool for finding discontinuous motifs in protein structures.
+
+pub mod geometry;
+pub mod index;
+pub mod structure;
+pub mod utils;

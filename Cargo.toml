@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Hyunbin Kim <khb7840@gmail.com>", "Rachel Kim <seamustard52@gmail.com>"]
 description = "A bioinformatics tool for finding discontinuous motifs in protein structures"
-repository = "https://github.com/steineggerlab/foldmotif"
+repository = "https://github.com/steineggerlab/motifsearch"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

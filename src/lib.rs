@@ -6,3 +6,4 @@ pub mod geometry;
 pub mod index;
 pub mod structure;
 pub mod utils;
+pub mod controller;

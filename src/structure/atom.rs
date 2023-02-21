@@ -1,19 +1,19 @@
 pub struct Atom {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
     pub atom_name: [u8; 4],
     pub atom_serial: u64,
     pub res_name: [u8; 4],
     pub res_serial: u64,
     pub chain: u8,
-    pub b_factor: f64,
+    pub b_factor: f32,
 }
 
 impl Atom {
     pub fn new(
-        x: f64, y: f64, z: f64, atom_name: [u8; 4], atom_serial: u64,
-        res_name: [u8; 4], res_serial: u64, chain: u8, b_factor: f64
+        x: f32, y: f32, z: f32, atom_name: [u8; 4], atom_serial: u64,
+        res_name: [u8; 4], res_serial: u64, chain: u8, b_factor: f32
     ) -> Atom {
         Atom {
             x: x, y: y, z: z,
@@ -26,9 +26,9 @@ impl Atom {
 
 #[derive(Debug, Clone)]
 pub struct CoordinateVector {
-    pub x: Vec<f64>,
-    pub y: Vec<f64>,
-    pub z: Vec<f64>,
+    pub x: Vec<f32>,
+    pub y: Vec<f32>,
+    pub z: Vec<f32>,
     pub size: usize,
 }
 
@@ -41,7 +41,7 @@ pub struct AtomVector {
     pub res_name: Vec<[u8; 4]>,
     pub res_serial: Vec<u64>,
     pub chain: Vec<u8>,
-    pub b_factor: Vec<f64>,
+    pub b_factor: Vec<f32>,
 }
 
 impl AtomVector {
@@ -63,9 +63,9 @@ impl AtomVector {
     }
 
     pub fn push(
-        &mut self, atom_name: [u8; 4], x: f64, y: f64, z: f64,
+        &mut self, atom_name: [u8; 4], x: f32, y: f32, z: f32,
         atom_serial: u64, res_name: [u8; 4], res_serial: u64,
-        chain: u8, b_factor: f64
+        chain: u8, b_factor: f32
     ) {
         self.atom_name.push(atom_name);
         self.coordinates.x.push(x);

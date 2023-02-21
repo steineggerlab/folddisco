@@ -1,2 +1,2 @@
 pub mod alloc;
-pub mod table;
+pub mod builder;

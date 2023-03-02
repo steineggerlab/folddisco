@@ -1,2 +1,2 @@
 # Motifsearch
-
+.DS_Store

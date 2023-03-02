@@ -1,4 +1,6 @@
 //!
+pub mod pdb;
+pub mod parser;
 
 #[derive(Debug)]
 pub enum StructureFileFormat {
@@ -9,4 +11,6 @@ pub enum StructureFileFormat {
     Unknown,
 }
 
-pub mod pdb;
+// pub trait Parse {
+
+// }

@@ -2,3 +2,4 @@
 //!
 
 pub mod discretizer;
+pub mod calculator;

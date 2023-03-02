@@ -1,44 +1,58 @@
-use std::fs;
-use std::io;
+use std::fs::File;
 use std::path::Path;
+use std::io::{self, BufRead, BufReader};
 
-use super::super::core::Structure;
-use super::StructureFileFormat;
+use super::super::core::*;
+use super::*;
+use super::parser::*;
 
 /// A PDB reader
 #[derive(Debug)]
 pub struct Reader<R: io::Read> {
     /// The underlying reader
-    reader: R,
-    /// The current line number
-    line_number: usize,
-    /// The current line
-    line: String,
+    pub reader: R,
     ///
-    input_type: StructureFileFormat,
+    pub input_type: StructureFileFormat,
 }
 
-impl Reader<fs::File> {
-    pub fn new(file: fs::File) -> Self {
+// ??? trait Read -> impl Read for __ ???
+impl Reader<File> {
+    pub fn new(file: File) -> Self {
         Reader {
             reader: file,
-            line_number: 0,
-            line: String::new(),
             input_type: StructureFileFormat::Unknown,
         }
     }
 
     /// Read from a file path
-    pub fn from_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> io::Result<Self> {
-        fs::File::open(&path)
+    pub fn from_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<Self, &'static str> {
+        File::open(&path)
             .map(Reader::new)
-            .map_err(|e| io::Error::new(e.kind(), format!("{}: {:?}", e, path)))
+            .map_err(|e| "temporary error message")
     }
 
-    /// Return structure.
-    pub fn parse(&self) -> Result<Structure, String> {
-        todo!()
-    }
+     pub fn read_structure(&self) ->  Result<Structure, &str> {
+        let reader = BufReader::new(&self.reader);
+        let mut structure = Structure::new();// revise
+        let mut record = (b' ',0);
+
+        // Reading each line of PDB, parse and build atomvector.
+        for (idx, line) in reader.lines().enumerate() {
+            if let Ok(atomline) = line {
+                match &atomline[..6] {
+                    "ATOM  " => { 
+                        let atom = parse_line(&atomline);
+                        &structure.update(atom, &mut record);
+                    },
+                    _ => continue,
+                }
+            } else { 
+                return Err("temporary error message");
+            }; 
+        }
+        // println!("{structure:?}");
+        Ok(structure)
+     }
 
 }
 

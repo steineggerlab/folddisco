@@ -168,7 +168,7 @@ impl CompactStructure {
         let cb2 = self.get_CB(idx2) ;  
         if ca1.is_some() && cb1.is_some() && ca2.is_some() &&  cb2.is_some() {
             // let angle = ca1.unwrap().calc_dihedral(&ca2.unwrap(), &cb1.unwrap(), &cb2.unwrap());
-            let angle = cb1.unwrap().calc_dihedral(&ca2.unwrap(), &ca1.unwrap(), &cb2.unwrap());
+            let angle = ca1.unwrap().calc_angle(&cb1.unwrap(), &ca2.unwrap(), &cb2.unwrap());
             Some(angle)
         } else {None}
     }

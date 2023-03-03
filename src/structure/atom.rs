@@ -21,38 +21,19 @@ impl Calculate for Coordinate {
         dist
     }
     
-    fn calc_dihedral(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate) -> f32 {
-        // code referred from pdbtbx
-        // https://github.com/douweschulte/pdbtbx
+    fn calc_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate) -> f32 {
 
         let (a,b,c,d) = (self, atom2, atom3, atom4);
         // Form vectors
-        let ba = [a.x - b.x, a.y - b.y, a.z - b.z];
-        let bc = [c.x - b.x, c.y - b.y, c.z - b.z];
-        let cb = [b.x - c.x, b.y - c.y, b.z - c.z];
-        let cd = [d.x - c.x, d.y - c.y, d.z - c.z];
-
-        // Form two normal vectors via cross products
-        let n1 = [
-            ba[1] * bc[2] - ba[2] * bc[1],
-            ba[2] * bc[0] - ba[0] * bc[2],
-            ba[0] * bc[1] - ba[1] * bc[0],
-        ];
-        let n2 = [
-            cb[1] * cd[2] - cb[2] * cd[1],
-            cb[2] * cd[0] - cb[0] * cd[2],
-            cb[0] * cd[1] - cb[1] * cd[0],
-        ];
-
-        // calculate abs of vecs
-        let abs_n1 = n1.iter().fold(0.0, |acc, x| acc + (x * x)).sqrt();
-        let abs_n2 = n2.iter().fold(0.0, |acc, x| acc + (x * x)).sqrt();
-
-        let dot = n1
-            .iter()
-            .zip(n2.iter())
-            .fold(0.0, |acc, (a, b)| acc + (a * b));
-        (dot / (abs_n1 * abs_n2)).acos().to_degrees()
+        let v1 = (b.x-a.x, b.y-a.y, b.z-a.z);   // vector 1
+        let v2 = (d.x-c.x, d.y-c.y, d.z-c.z);   // vector 2
+        let dot = v1.0*v2.0 + v1.1*v2.1 + v1.2*v2.2; // dot product
+        let v1_len = (v1.0.powf(2.0) + v1.1.powf(2.0) + v1.2.powf(2.0)).sqrt(); // length of vector 1
+        let v2_len = (v2.0.powf(2.0) + v2.1.powf(2.0) + v2.2.powf(2.0)).sqrt(); // length of vector 2
+        let cos = dot / (v1_len * v2_len); // cos of angle
+        let radian = cos.acos(); // angle in radians
+        let degree = radian.to_degrees(); // angle in degrees
+        degree
     }
 }
 

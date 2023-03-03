@@ -16,8 +16,11 @@ pub fn Run() {
 
     let a1_ca = compact.get_CA(161).unwrap();
     let a1_cb = compact.get_CA(5).unwrap();
-    
-    println!("{:?}",a1_ca.calc_distance(&a1_cb));
-    println!("{:?}", compact.get_distance(161, 5));
-    println!("{:?}", compact.get_angle(161,5));
+
+    let dist = compact.get_distance(161, 5).unwrap();
+    let angle = compact.get_angle(161,5).unwrap();
+    let hashvalue = geometry::hash::HashValue::perfect_hash(dist, angle);
+    println!("dist:{}, angle:{}", dist, angle);
+    println!("{:?}", hashvalue);
+    println!("reverse hash(dist,angle): {:?}", hashvalue.reverse_hash());
 }

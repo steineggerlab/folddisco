@@ -19,7 +19,7 @@ impl Structure {
             num_chains : 0,
             chains : Vec::new(),
             atom_vector : AtomVector::new(),
-            num_atoms : 0, 
+            num_atoms : 0,
             num_residues : 0,
         }
     }
@@ -38,7 +38,7 @@ impl Structure {
         self.num_atoms += 1;
 
         self.atom_vector.push_atom(atom);
-    
+
     }
 
     pub fn to_compact(&self) -> CompactStructure {
@@ -60,9 +60,9 @@ pub struct CarbonCoordinateVector {
 
 impl CarbonCoordinateVector {
     pub fn new() -> Self {
-        CarbonCoordinateVector { 
-            x:  Vec::new(), 
-            y: Vec::new(), 
+        CarbonCoordinateVector {
+            x:  Vec::new(),
+            y: Vec::new(),
             z: Vec::new() }
     }
 }
@@ -73,13 +73,13 @@ pub struct CompactStructure {
     pub chains: Vec<u8>,
     pub num_residues : usize,
     pub residues: Vec<u64>,
-    pub CA_vector: CarbonCoordinateVector,
-    pub CB_vector: CarbonCoordinateVector,
+    pub ca_vector: CarbonCoordinateVector,
+    pub cb_vector: CarbonCoordinateVector,
 }
 
 impl CompactStructure {
     pub fn build(origin: &Structure) -> CompactStructure {
-        
+
         let model = &origin.atom_vector;
 
         let mut res_vec: Vec<u64> = Vec::new();
@@ -125,47 +125,47 @@ impl CompactStructure {
             }
         }
 
-        CompactStructure { 
-            num_chains: origin.num_chains, 
-            chains: origin.chains.clone(), 
-            num_residues: origin.num_residues, 
+        CompactStructure {
+            num_chains: origin.num_chains,
+            chains: origin.chains.clone(),
+            num_residues: origin.num_residues,
             residues: res_vec,
-            CA_vector: ca_vec, 
-            CB_vector: cb_vec,
+            ca_vector: ca_vec,
+            cb_vector: cb_vec,
         }
     }
 
-    pub fn get_CA(&self, idx: usize) -> Option<Coordinate> {
-        let x =  self.CA_vector.x.get(idx).unwrap_or(&None);
-        let y =  self.CA_vector.y.get(idx).unwrap_or(&None);
-        let z =  self.CA_vector.z.get(idx).unwrap_or(&None);
+    pub fn get_ca(&self, idx: usize) -> Option<Coordinate> {
+        let x =  self.ca_vector.x.get(idx).unwrap_or(&None);
+        let y =  self.ca_vector.y.get(idx).unwrap_or(&None);
+        let z =  self.ca_vector.z.get(idx).unwrap_or(&None);
         if x.is_some() && y.is_some() && z.is_some() {
             Some(Coordinate::build(x,y,z))
         } else { None }
     }
 
-    pub fn get_CB(&self, idx: usize) -> Option<Coordinate> {
-        let x =  self.CB_vector.x.get(idx).unwrap_or(&None);
-        let y =  self.CB_vector.y.get(idx).unwrap_or(&None);
-        let z =  self.CB_vector.z.get(idx).unwrap_or(&None);
+    pub fn get_cb(&self, idx: usize) -> Option<Coordinate> {
+        let x =  self.cb_vector.x.get(idx).unwrap_or(&None);
+        let y =  self.cb_vector.y.get(idx).unwrap_or(&None);
+        let z =  self.cb_vector.z.get(idx).unwrap_or(&None);
         if x.is_some() && y.is_some() && z.is_some() {
             Some(Coordinate::build(x,y,z))
         } else { None }
     }
 
     pub fn get_distance(&self, idx1: usize, idx2:usize) -> Option<f32> {
-        let ca1 = self.get_CA(idx1) ;
-        let ca2 = self.get_CA(idx2);
+        let ca1 = self.get_ca(idx1) ;
+        let ca2 = self.get_ca(idx2);
         if ca1.is_some() && ca2.is_some() {
             let dist = ca1.unwrap().calc_distance(&ca2.unwrap());
             Some(dist)
         } else {None}
     }
     pub fn get_angle(&self, idx1: usize, idx2:usize) -> Option<f32> {
-        let ca1 = self.get_CA(idx1) ;
-        let cb1 = self.get_CB(idx1) ; 
-        let ca2 = self.get_CA(idx2) ; 
-        let cb2 = self.get_CB(idx2) ;  
+        let ca1 = self.get_ca(idx1) ;
+        let cb1 = self.get_cb(idx1) ;
+        let ca2 = self.get_ca(idx2) ;
+        let cb2 = self.get_cb(idx2) ;
         if ca1.is_some() && cb1.is_some() && ca2.is_some() &&  cb2.is_some() {
             // let angle = ca1.unwrap().calc_dihedral(&ca2.unwrap(), &cb1.unwrap(), &cb2.unwrap());
             let angle = ca1.unwrap().calc_angle(&cb1.unwrap(), &ca2.unwrap(), &cb2.unwrap());

@@ -20,7 +20,7 @@ impl Calculate for Coordinate {
         let dist = (dx * dx + dy * dy + dz * dz).sqrt();
         dist
     }
-    
+
     fn calc_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate) -> f32 {
 
         let (a,b,c,d) = (self, atom2, atom3, atom4);
@@ -45,7 +45,7 @@ pub struct Atom {
     pub z: f32,
     pub atom_name: [u8;4],
     pub atom_serial: u64,
-    pub res_name: [u8;3],     
+    pub res_name: [u8;3],
     pub res_serial: u64,
     pub chain: u8,
     pub b_factor: f32,
@@ -57,7 +57,7 @@ impl Atom {
         res_name: [u8;3], res_serial: u64, chain: u8, b_factor: f32
     ) -> Atom {
         Atom {
-            x, y,z, 
+            x, y,z,
             atom_name, atom_serial,
             res_name, res_serial,
             chain, b_factor,
@@ -151,12 +151,24 @@ impl AtomVector {
         }
     }
 
-    pub fn is_CA(&self, index: usize) -> bool {
+    pub fn is_ca(&self, index: usize) -> bool {
         &self.atom_name[index] == b" CA "
     }
 
-    pub fn is_CB(&self, index: usize) -> bool {
+    pub fn is_cb(&self, index: usize) -> bool {
         &self.atom_name[index] == b" CB "
+    }
+
+    pub fn is_c(&self, index: usize) -> bool {
+        &self.atom_name[index] == b" C  "
+    }
+
+    pub fn is_n(&self, index: usize) -> bool {
+        &self.atom_name[index] == b" N  "
+    }
+
+    pub fn is_backbone(&self, index: usize) -> bool {
+        self.is_ca(index) || self.is_c(index) || self.is_n(index)
     }
 
     pub fn get_coordinates(&self, index: usize) -> Coordinate {

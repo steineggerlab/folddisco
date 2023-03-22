@@ -8,14 +8,14 @@ pub mod structure;
 pub mod utils;
 pub mod controller;
 
-pub fn Run() {
+pub fn run() {
     use crate::utils::calculator::Calculate;
     let f = structure::io::pdb::Reader::from_file("data/111l_alpha.pdb").unwrap();
     let structure = &f.read_structure().unwrap();
     let compact = &structure.to_compact();
 
-    let a1_ca = compact.get_CA(161).unwrap();
-    let a1_cb = compact.get_CA(5).unwrap();
+    let a1_ca = compact.get_ca(161).unwrap();
+    let a1_cb = compact.get_ca(5).unwrap();
 
     let dist = compact.get_distance(161, 5).unwrap();
     let angle = compact.get_angle(161,5).unwrap();

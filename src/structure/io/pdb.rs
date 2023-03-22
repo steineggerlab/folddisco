@@ -28,7 +28,7 @@ impl Reader<File> {
     pub fn from_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<Self, &'static str> {
         File::open(&path)
             .map(Reader::new)
-            .map_err(|e| "temporary error message")
+            .map_err(|e| "Error opening file")
     }
 
      pub fn read_structure(&self) ->  Result<Structure, &str> {
@@ -40,15 +40,23 @@ impl Reader<File> {
         for (idx, line) in reader.lines().enumerate() {
             if let Ok(atomline) = line {
                 match &atomline[..6] {
-                    "ATOM  " => { 
+                    "ATOM  " => {
                         let atom = parse_line(&atomline);
-                        &structure.update(atom, &mut record);
+                        match atom {
+                            Ok(atom) => {
+                                structure.update(atom, &mut record);
+                            },
+                            Err(e) => { // Conversion error. Jusk skip the line.
+                                println!("Skipping line{}: {}", idx, e);
+                                continue;
+                            },
+                        }
                     },
                     _ => continue,
                 }
-            } else { 
-                return Err("temporary error message");
-            }; 
+            } else {
+                return Err("Error reading line");
+            };
         }
         // println!("{structure:?}");
         Ok(structure)

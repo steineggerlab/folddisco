@@ -4,6 +4,6 @@
 fn main() {
     use motifsearch::*;
 
-    Run();
+    run();
 
 }

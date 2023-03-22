@@ -1,4 +1,4 @@
-use super::super::atom::Atom;
+use crate::structure::atom::Atom;
 
 pub fn parse_line(line: &String) -> Result<Atom, &str> {
     // Check line length is enough to index b_factor
@@ -22,7 +22,7 @@ pub fn parse_line(line: &String) -> Result<Atom, &str> {
     match (x, y, z, atom_name, atom_serial, res_name, res_serial, b_factor) {
         (Ok(x), Ok(y), Ok(z), Ok(atom_name), Ok(atom_serial),
          Ok(res_name), Ok(res_serial), Ok(b_factor)) => {
-            Ok(Atom::build(
+            Ok(Atom::new(
                 x, y, z, atom_name, atom_serial, res_name, res_serial, chain, b_factor
             ))
         },

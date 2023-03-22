@@ -1,7 +1,15 @@
-#[derive(Debug)]
+use std::fmt;
+
+#[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(u16);
 
 impl HashValue {
+    // Constructor
+    // pub fn new(dist: u16, angle: u16) -> Self {
+    //     let hashvalue = dist << 8 | angle ;
+    //     HashValue(hashvalue)
+    // }
+
     pub fn perfect_hash(dist: f32, angle: f32) -> Self {
         let dist = dist.round() as u16;
         let angle = angle.round() as u16;
@@ -15,18 +23,15 @@ impl HashValue {
     }
 }
 
-#[derive(Debug)]
-pub struct HashCollection(pub Vec<HashValue>);
-
-impl HashCollection {
-    pub fn new() -> Self{
-        HashCollection(Vec::new())
-    }
-
-    pub fn push(&mut self, hashvalue : HashValue) {
-        self.push(hashvalue);
+impl fmt::Debug for HashValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (dist, angle) = self.reverse_hash();
+        write!(f, "HashValue({}), dist={}, angle={}", self.0, dist, angle)
     }
 }
+
+pub type HashCollection = Vec<HashValue>;
+
 
 // #[derive(Debug)]
 // pub struct GeometricHasher {

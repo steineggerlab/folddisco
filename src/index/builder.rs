@@ -1,22 +1,21 @@
 
-pub struct IndexAllocator {
-    pub lookup_table: Vec<usize>,
-    pub starting_index: usize,
-    pub size: usize,
-    pub offset_table: Vec<usize>,
-    pub big_allocation: Box<[usize]>,
+use std::hash::Hash;
+use std::cmp::{Ord, Eq};
+use crate::index::IndexTable;
+
+pub struct IndexBuilder{
 }
 
-impl IndexAllocator {
-    pub fn allocate(&self, size: usize) -> Result<usize, &'static str> {
-        // Ok(pointer)
-        // Err("Not enough space")
+pub trait Indexable: Hash + Ord + Eq {}
+
+impl IndexBuilder {
+    pub fn concat<T: Indexable>(&self, hash_vec: Vec<T>) -> IndexTable {
         todo!()
     }
-    pub fn fill(&self, pointer: usize, size: usize, value: u8) {
+    pub fn sort<T: Indexable>(&self, index_table: &mut Vec<T>) {
         todo!()
     }
-    pub fn build_offset_table(&self) {
+    pub fn diff<T: Indexable>(&self, index_table: &mut Vec<T>) {
         todo!()
     }
 }

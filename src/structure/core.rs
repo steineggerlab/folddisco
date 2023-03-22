@@ -61,7 +61,7 @@ pub struct CarbonCoordinateVector {
 impl CarbonCoordinateVector {
     pub fn new() -> Self {
         CarbonCoordinateVector {
-            x:  Vec::new(),
+            x: Vec::new(),
             y: Vec::new(),
             z: Vec::new() }
     }

@@ -28,7 +28,7 @@ impl Reader<File> {
     pub fn from_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<Self, &'static str> {
         File::open(&path)
             .map(Reader::new)
-            .map_err(|e| "Error opening file")
+            .map_err(|_e| "Error opening file")
     }
 
      pub fn read_structure(&self) ->  Result<Structure, &str> {
@@ -47,7 +47,8 @@ impl Reader<File> {
                                 structure.update(atom, &mut record);
                             },
                             Err(e) => { // Conversion error. Jusk skip the line.
-                                println!("Skipping line{}: {}", idx, e);
+                                // If verbose, print message (NOT IMPLEMENTED)
+                                // println!("Skipping line{}: {}", idx, e);
                                 continue;
                             },
                         }

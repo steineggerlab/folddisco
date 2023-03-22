@@ -1,0 +1,21 @@
+on:
+  push:
+    branches: ["master"]
+
+name: Test
+
+jobs:
+  tests_on_multi_os:
+    name: Run tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run cargo test
+        run: cargo test -v

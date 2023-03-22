@@ -4,4 +4,4 @@ pub trait Calculate {
     fn calc_angle(&self, atom2:&Self, atom3: &Self, atom4: &Self) -> f32;
 }
 
-use crate::structure::atom::Coordinate;
+// use crate::structure::atom::Coordinate;

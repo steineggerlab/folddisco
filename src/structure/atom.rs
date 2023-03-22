@@ -52,12 +52,13 @@ pub struct Atom {
 }
 
 impl Atom {
-    pub fn build(
+    // Constructor
+    pub fn new(
         x: f32, y: f32, z: f32, atom_name: [u8;4], atom_serial: u64,
         res_name: [u8;3], res_serial: u64, chain: u8, b_factor: f32
     ) -> Atom {
         Atom {
-            x, y,z,
+            x, y, z,
             atom_name, atom_serial,
             res_name, res_serial,
             chain, b_factor,

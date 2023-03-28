@@ -65,6 +65,9 @@ impl CarbonCoordinateVector {
             y: Vec::new(),
             z: Vec::new() }
     }
+    pub fn get(&self, idx: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
+        (self.x[idx], self.y[idx], self.z[idx])
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +89,12 @@ impl CompactStructure {
         let mut ca_vec = CarbonCoordinateVector::new();
         let mut cb_vec = CarbonCoordinateVector::new();
         let mut prev_res_serial: Option<u64> = None;
+
+        // IMPORTANT: @rachelse
+        // TODO: As Glycine does not have CB atom, we need to handle this case.
+        // @khb7840 I will write a function to calculate imaginary CB from
+        // O, CA, C atoms. We need to read those atoms when we iterate over
+        // atoms in the structure.
 
         for idx in 0..origin.num_atoms {
             // TODO : implement iterator for Structure.atom_vector

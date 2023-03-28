@@ -6,6 +6,11 @@ authors = ["Hyunbin Kim <khb7840@gmail.com>", "Rachel Kim <seamustard52@gmail.co
 description = "A bioinformatics tool for finding discontinuous motifs in protein structures"
 repository = "https://github.com/steineggerlab/motifsearch"
 
+
+# test optimization
+[profile.test]
+opt-level = 3
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]

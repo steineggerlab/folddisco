@@ -7,16 +7,13 @@ pub mod index;
 pub mod structure;
 pub mod utils;
 pub mod controller;
+pub mod test;
 
 pub struct MotifSearch {
     pub pdb_files: Vec<String>,
     // pub pdb_table: HashMap<index, PDB>,
     pub controller: controller::Controller,
 }
-
-
-
-
 
 pub fn run() {
     let f = structure::io::pdb::Reader::from_file("data/111l_alpha.pdb").unwrap();

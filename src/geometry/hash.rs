@@ -30,6 +30,14 @@ impl fmt::Debug for HashValue {
     }
 }
 
+impl fmt::Display for HashValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // let (dist, angle) = self.reverse_hash();
+        // write!(f, "{}\t{}\t{}", self.0, dist, angle)
+        write!(f, "{}", self.0)
+    }
+}
+
 pub type HashCollection = Vec<HashValue>;
 
 

@@ -15,9 +15,9 @@ impl IndexAllocator {
         // Err("Not enough space")
         todo!()
     }
-    pub fn fill(&self, index_table: &IndexTable) {
-        todo!()
-    }
+    // pub fn fill(&self, index_table: &IndexTable) {
+    //     todo!()
+    // }
     pub fn build_offset_table(&self) {
         todo!()
     }

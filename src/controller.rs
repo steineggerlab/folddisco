@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::geometry::hash::{HashCollection, HashValue};
 use crate::index::{IndexTable, write_index_table};
 use crate::index::builder::IndexBuilder;
@@ -9,6 +11,7 @@ pub struct Controller {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
     pub hash_collection_vec: Vec<HashCollection>,
+    pub res_pair_vec: Vec<Vec<(u64, u64)>>, // WARNING: TEMPORARY
 }
 
 impl Controller {
@@ -17,6 +20,7 @@ impl Controller {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
             hash_collection_vec: Vec::new(),
+            res_pair_vec: Vec::new(),// WARNING: TEMPORARY
         }
     }
 
@@ -28,6 +32,7 @@ impl Controller {
             let structure = pdb_reader.read_structure().expect("structure read failed");
             let compact = structure.to_compact();
             let mut hash_collector = GeometryHashCollector::new();
+            let mut res_pair_vec = Vec::new(); // WARNING: TEMPORARY
             for n in 0..compact.num_residues {
                 for m in 0..compact.num_residues {
                     if n == m {
@@ -37,10 +42,15 @@ impl Controller {
                     let angle = compact.get_angle(n, m).unwrap_or(0.0);
                     let hash_value = HashValue::perfect_hash(dist, angle);
                     hash_collector.collect_hash(hash_value);
+                    // WARNING: TEMPORARY
+                    let res1 = compact.residues[n];
+                    let res2 = compact.residues[m];
+                    res_pair_vec.push((res1, res2));
                 }
             }
-            hash_collector.remove_redundancy();
+            // hash_collector.remove_redundancy();
             self.hash_collection_vec.push(hash_collector.hash_collection);
+            self.res_pair_vec.push(res_pair_vec); // For debug
         }
     }
 
@@ -77,6 +87,23 @@ impl GeometryHashCollector {
     pub fn remove_redundancy(&mut self) {
         self.hash_collection.sort();
         self.hash_collection.dedup();
+    }
+}
+
+// Temporary function for testing
+fn _write_hash_with_res_pair(
+    hash_collection: &Vec<HashValue>,
+    res_pair_vec: &Vec<(u64, u64)>,
+    path: &str
+) {
+    let mut file = std::fs::File::create(path).expect("Unable to create file");
+    file.write_all(b"hash\tdist\tangle\tres1\tres2\n").expect("Unable to write header");
+
+    for j in 0..hash_collection.len() {
+        let hash_value = hash_collection[j];
+        let res1 = res_pair_vec[j].0;
+        let res2 = res_pair_vec[j].1;
+        file.write_all(format!("{}\t{}\t{}\n", hash_value, res1, res2).as_bytes()).expect("Unable to write data");
     }
 }
 
@@ -141,6 +168,15 @@ mod controller_tests {
         let mut controller = Controller::new(pdb_paths);
         controller.fill_numeric_id_vec();
         controller.collect_hash();
+        // Save controller hash vectors and residue pairs
+        // for i in 0..controller.hash_collection_vec.len() {
+        //     let hash_collection = controller.hash_collection_vec.get(i).expect("cannot get hash collection");
+        //     let res_pair_vec = controller.res_pair_vec.get(i).expect("cannot get residue pair vector");
+        //     _write_hash_with_res_pair(
+        //         hash_collection, &res_pair_vec,
+        //         &format!("data/homeobox_{}.tsv", i)
+        //     );
+        // }
         let index_builder = IndexBuilder::new();
         let index_table = index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
         write_index_table(&index_table, "data/homeobox_index_table.tsv");

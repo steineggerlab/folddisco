@@ -32,7 +32,9 @@ impl Controller {
             let structure = pdb_reader.read_structure().expect("structure read failed");
             let compact = structure.to_compact();
             let mut hash_collector = GeometryHashCollector::new();
+
             let mut res_pair_vec = Vec::new(); // WARNING: TEMPORARY
+
             for n in 0..compact.num_residues {
                 for m in 0..compact.num_residues {
                     if n == m {
@@ -42,6 +44,7 @@ impl Controller {
                     let angle = compact.get_angle(n, m).unwrap_or(0.0);
                     let hash_value = HashValue::perfect_hash(dist, angle);
                     hash_collector.collect_hash(hash_value);
+
                     // WARNING: TEMPORARY
                     let res1 = compact.residues[n];
                     let res2 = compact.residues[m];

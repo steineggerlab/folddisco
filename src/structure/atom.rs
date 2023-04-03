@@ -10,6 +10,46 @@ impl Coordinate {
     pub fn build(x:&Option<f32>, y:&Option<f32>, z:&Option<f32>) -> Self {
         Coordinate { x: x.unwrap() , y: y.unwrap() , z: z.unwrap()  }
     }
+    pub fn add(&self, other: &Coordinate) -> Coordinate {
+        Coordinate { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
+    }
+    pub fn sub(&self, other: &Coordinate) -> Coordinate {
+        Coordinate { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
+    }
+    pub fn dot(&self, other: &Coordinate) -> f32 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
+    pub fn cross(&self, other: &Coordinate) -> Coordinate {
+        Coordinate {
+            x: self.y * other.z - self.z * other.y,
+            y: self.z * other.x - self.x * other.z,
+            z: self.x * other.y - self.y * other.x,
+        }
+    }
+    pub fn norm(&self) -> f32 {
+        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+    }
+    pub fn normalize(&self) -> Coordinate {
+        let norm = self.norm();
+        Coordinate {
+            x: self.x / norm,
+            y: self.y / norm,
+            z: self.z / norm,
+        }
+    }
+    pub fn scale(&self, factor: f32) -> Coordinate {
+        Coordinate {
+            x: self.x * factor,
+            y: self.y * factor,
+            z: self.z * factor,
+        }
+    }
+    pub fn distance(&self, other: &Coordinate) -> f32 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        let dz = self.z - other.z;
+        (dx * dx + dy * dy + dz * dz).sqrt()
+    }
 }
 
 impl Calculate for Coordinate {

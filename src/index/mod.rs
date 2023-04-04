@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::fmt::Display;
 use std::io::Write;
+use std::sync::Arc;
 
 /// ## Index table saves the hash and the list of ids that have the same hash.
 /// - Key: hash
@@ -65,7 +66,4 @@ fn write_index_table_debug<T: Hash + Display, U: Display + Hash + Ord + Eq>(inde
     }
 }
 
-pub struct OffsetTable<T: Hash> {
-    pub offset_table: HashMap<T, usize>,
-    pub big_allocation: Box<[usize]>,
-}
+pub struct OffsetTable<T: Hash>(pub HashMap<T, usize>);

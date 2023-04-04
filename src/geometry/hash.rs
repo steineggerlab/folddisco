@@ -1,4 +1,5 @@
 use std::fmt;
+// use std::hash::Hasher;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(u16);
@@ -55,5 +56,19 @@ pub type HashCollection = Vec<HashValue>;
 //             distances: distances,
 //             hashvalue: Vec::new(),
 //         }
+//     }
+// }
+
+// impl Hasher for HashValue {
+//     fn finish(&self) -> u64 {
+//         self.0 as u64
+//     }
+
+//     fn write(&mut self, _bytes: &[u8]) {
+        
+//     }
+
+//     fn write_u64(&mut self, i: u64) {
+//         self.0 = i as u16;
 //     }
 // }

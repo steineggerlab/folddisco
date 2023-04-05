@@ -1,5 +1,8 @@
+// Module: index
+// Declare inner modules
 pub mod alloc;
 pub mod builder;
+
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::fmt::Display;
@@ -64,6 +67,39 @@ fn write_index_table_debug<T: Hash + Display, U: Display + Hash + Ord + Eq>(inde
         // Write text file
         file.write_all(line.as_bytes()).expect("Unable to write data");
     }
+}
+
+
+pub fn query_single<T: Hash + Eq, U: Hash + Eq + Clone >(index_table: &IndexTable<T, U>, query: &T) -> Option<Vec<U>> {
+    match index_table.get(query) {
+        Some(x) => Some(x.clone()),
+        None => None,
+    }
+}
+
+pub fn query_multiple<T: Hash + Eq, U: Hash + Eq + Clone>(index_table: &IndexTable<T, U>, queries: &[T]) -> Option<Vec<U>> {
+    // query_multiple returns the intersection of the results of the queries
+    // TODO: Generated. NEEDS TESTING
+    let mut result: Option<Vec<U>> = None;
+    for query in queries {
+        let query_result = query_single(index_table, query);
+        match query_result {
+            Some(x) => {
+                match result {
+                    Some(y) => {
+                        result = Some(x.iter().filter(|&x| y.contains(x)).cloned().collect());
+                    }
+                    None => {
+                        result = Some(x);
+                    }
+                }
+            }
+            None => {
+                return None;
+            }
+        }
+    }
+    result
 }
 
 pub struct OffsetTable<T: Hash>(pub HashMap<T, usize>);

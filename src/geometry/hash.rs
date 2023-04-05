@@ -11,6 +11,10 @@ impl HashValue {
     //     HashValue(hashvalue)
     // }
 
+    pub fn from_u16(hashvalue: u16) -> Self {
+        HashValue(hashvalue)
+    }
+
     pub fn perfect_hash(dist: f32, angle: f32) -> Self {
         let dist = dist.round() as u16;
         let angle = angle.round() as u16;
@@ -65,7 +69,7 @@ pub type HashCollection = Vec<HashValue>;
 //     }
 
 //     fn write(&mut self, _bytes: &[u8]) {
-        
+
 //     }
 
 //     fn write_u64(&mut self, i: u64) {

@@ -9,3 +9,19 @@ pub fn load_homeobox_toy() -> Vec<String> {
         "data/homeobox/1ba5--.pdb".to_string(),
     }
 }
+
+pub fn load_yeast_proteome() -> Vec<String> {
+    // Load all pdbs in data/yeast
+    let mut pdb_paths = Vec::new();
+    let paths = std::fs::read_dir("data/yeast").expect("Unable to read yeast proteome");
+    for path in paths {
+        let path = path.expect("Unable to read path");
+        let path = path.path();
+        let path = path.to_str().expect("Unable to convert path to string");
+        // If the path is a pdb file, add it to the list
+        if path.ends_with(".pdb") {
+            pdb_paths.push(path.to_string());
+        }
+    }
+    pdb_paths
+}

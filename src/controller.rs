@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::geometry::hash::{HashCollection, HashValue};
-use crate::index::{IndexTable, write_index_table};
+use crate::index::IndexTable;
 use crate::index::builder::IndexBuilder;
 use crate::structure::io::pdb::Reader as PDBReader;
 use crate::structure::core::CompactStructure;
@@ -112,6 +112,8 @@ fn _write_hash_with_res_pair(
 
 #[cfg(test)]
 mod controller_tests {
+    use crate::index::IndexTablePrinter;
+
     use super::*;
 
     #[test]
@@ -182,7 +184,8 @@ mod controller_tests {
         // }
         let index_builder = IndexBuilder::new();
         let index_table = index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
-        write_index_table(&index_table, "data/homeobox_index_table.tsv");
+        let table_printer = IndexTablePrinter::Text;
+        table_printer.print(&index_table, "data/homeobox_index_table.tsv"); // TODO: Change this to work
     }
 
 }

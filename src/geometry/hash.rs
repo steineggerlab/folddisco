@@ -1,4 +1,5 @@
 use std::fmt;
+// use std::hash::Hasher;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(u16);
@@ -9,6 +10,10 @@ impl HashValue {
     //     let hashvalue = dist << 8 | angle ;
     //     HashValue(hashvalue)
     // }
+
+    pub fn from_u16(hashvalue: u16) -> Self {
+        HashValue(hashvalue)
+    }
 
     pub fn perfect_hash(dist: f32, angle: f32) -> Self {
         let dist = dist.round() as u16;
@@ -55,5 +60,19 @@ pub type HashCollection = Vec<HashValue>;
 //             distances: distances,
 //             hashvalue: Vec::new(),
 //         }
+//     }
+// }
+
+// impl Hasher for HashValue {
+//     fn finish(&self) -> u64 {
+//         self.0 as u64
+//     }
+
+//     fn write(&mut self, _bytes: &[u8]) {
+
+//     }
+
+//     fn write_u64(&mut self, i: u64) {
+//         self.0 = i as u16;
 //     }
 // }

@@ -1,10 +1,8 @@
 
 use std::hash::Hash;
 use std::cmp::{Ord, Eq};
-use crate::index::{IndexTable, write_index_table};
-
-pub struct IndexBuilder{
-}
+use crate::index::IndexTable;
+pub struct IndexBuilder{}
 
 // pub trait Hashable: Hash + Ord + Eq + Clone {}
 
@@ -29,7 +27,7 @@ impl IndexBuilder {
 #[cfg(test)]
 mod index_builder_tests {
     use super::*;
-    use crate::test::load_homeobox_toy;
+    use crate::{test::load_homeobox_toy, index::IndexTablePrinter};
 
     #[test]
     fn test_concat() {
@@ -56,7 +54,8 @@ mod index_builder_tests {
         assert_eq!(index_table[&1010], vec![2, 4]);
         assert_eq!(index_table[&1011], vec![5]);
 
-        write_index_table(&index_table, "data/index_table_test.txt");
+        let table_printer: IndexTablePrinter = IndexTablePrinter::Text;
+        table_printer.print(&index_table, "data/index_table_test.txt");
     }
 
 }

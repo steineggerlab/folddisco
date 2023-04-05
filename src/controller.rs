@@ -1,11 +1,11 @@
 use std::io::Write;
 
 use crate::geometry::hash::{HashCollection, HashValue};
-use crate::index::{IndexTable, write_index_table};
+use crate::index::*;
 use crate::index::builder::IndexBuilder;
 use crate::structure::io::pdb::Reader as PDBReader;
 use crate::structure::core::CompactStructure;
-use crate::test::load_homeobox_toy;
+
 
 pub struct Controller {
     pub path_vec: Vec<String>,
@@ -27,7 +27,6 @@ impl Controller {
     pub fn collect_hash(&mut self) {
         for i in 0..self.path_vec.len() {
             let pdb_path = &self.path_vec[i];
-            println!("reading pdb file: {}", pdb_path);
             let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
             let structure = pdb_reader.read_structure().expect("structure read failed");
             let compact = structure.to_compact();
@@ -36,7 +35,7 @@ impl Controller {
             let mut res_pair_vec = Vec::new(); // WARNING: TEMPORARY
 
             for n in 0..compact.num_residues {
-                for m in 0..compact.num_residues {
+                for m in n..compact.num_residues {
                     if n == m {
                         continue;
                     }
@@ -55,6 +54,8 @@ impl Controller {
             self.hash_collection_vec.push(hash_collector.hash_collection);
             self.res_pair_vec.push(res_pair_vec); // For debug
         }
+        // TEMPORARY
+        println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
     }
 
     pub fn fill_numeric_id_vec(&mut self) {
@@ -112,6 +113,8 @@ fn _write_hash_with_res_pair(
 
 #[cfg(test)]
 mod controller_tests {
+    use crate::index::IndexTablePrinter;
+    use crate::test::{load_homeobox_toy, load_yeast_proteome};
     use super::*;
 
     #[test]
@@ -182,7 +185,30 @@ mod controller_tests {
         // }
         let index_builder = IndexBuilder::new();
         let index_table = index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
-        write_index_table(&index_table, "data/homeobox_index_table.tsv");
+        let table_printer = IndexTablePrinter::Text;
+        table_printer.print(&index_table, "data/homeobox_index_table.tsv"); // TODO: Change this to work
     }
+
+    #[test]
+    fn test_querying() {
+        let pdb_paths: Vec<String> = load_yeast_proteome();
+        let mut controller = Controller::new(pdb_paths);
+        controller.fill_numeric_id_vec();
+        controller.collect_hash();
+        let index_builder = IndexBuilder::new();
+        let index_table = index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
+        let query: HashValue = HashValue::from_u16(3158u16);
+        let result = query_single(&index_table, &query);
+        println!("{:?}", result);
+        let queries: [HashValue; 3] = [
+            HashValue::from_u16(3158u16),
+            HashValue::from_u16(3679u16),
+            HashValue::from_u16(1650u16),
+        ];
+        let result = query_multiple(&index_table, &queries);
+        println!("{:?}", result);
+    }
+
+
 
 }

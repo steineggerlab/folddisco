@@ -1,16 +1,19 @@
-
-use std::hash::Hash;
-use std::cmp::{Ord, Eq};
 use crate::index::IndexTable;
-pub struct IndexBuilder{}
+use std::cmp::{Eq, Ord};
+use std::hash::Hash;
+pub struct IndexBuilder {}
 
 // pub trait Hashable: Hash + Ord + Eq + Clone {}
 
 impl IndexBuilder {
     pub fn new() -> IndexBuilder {
-        IndexBuilder{}
+        IndexBuilder {}
     }
-    pub fn concat<T: Hash + Ord + Eq + Clone, U: Clone + Copy>(&self, id_vec: &Vec<U>, hash_collection_vec: &Vec<Vec<T>>) -> IndexTable<T, U> {
+    pub fn concat<T: Hash + Ord + Eq + Clone, U: Clone + Copy>(
+        &self,
+        id_vec: &Vec<U>,
+        hash_collection_vec: &Vec<Vec<T>>,
+    ) -> IndexTable<T, U> {
         let mut index_table = IndexTable::new();
         for i in 0..hash_collection_vec.len() {
             let hash_collection = &hash_collection_vec[i];
@@ -27,11 +30,11 @@ impl IndexBuilder {
 #[cfg(test)]
 mod index_builder_tests {
     use super::*;
-    use crate::{test::load_homeobox_toy, index::IndexTablePrinter};
+    use crate::{index::IndexTablePrinter, test::load_homeobox_toy};
 
     #[test]
     fn test_concat() {
-        let index_builder = IndexBuilder{};
+        let index_builder = IndexBuilder {};
         let id_vec: Vec<u16> = vec![1, 2, 3, 4, 5];
         let hash_collection_vec: Vec<Vec<u16>> = vec![
             vec![1000, 1001, 1002, 1003, 1004],
@@ -57,5 +60,4 @@ mod index_builder_tests {
         let table_printer: IndexTablePrinter = IndexTablePrinter::Text;
         table_printer.print(&index_table, "data/index_table_test.txt");
     }
-
 }

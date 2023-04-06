@@ -15,7 +15,7 @@ opt-level = 3
 
 [[bin]]
 name = "motifsearch"
-path = "src/main.rs"
+path = "src/cli/main.rs"
 
 
 

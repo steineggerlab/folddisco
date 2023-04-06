@@ -1,10 +1,10 @@
 use std::fs::File;
-use std::path::Path;
 use std::io::{self, BufRead, BufReader};
+use std::path::Path;
 
 use super::super::core::*;
-use super::*;
 use super::parser::*;
+use super::*;
 
 /// A PDB reader
 #[derive(Debug)]
@@ -31,10 +31,10 @@ impl Reader<File> {
             .map_err(|_e| "Error opening file")
     }
 
-     pub fn read_structure(&self) ->  Result<Structure, &str> {
+    pub fn read_structure(&self) -> Result<Structure, &str> {
         let reader = BufReader::new(&self.reader);
-        let mut structure = Structure::new();// revise
-        let mut record = (b' ',0);
+        let mut structure = Structure::new(); // revise
+        let mut record = (b' ', 0);
 
         // Reading each line of PDB, parse and build atomvector.
         for (idx, line) in reader.lines().enumerate() {
@@ -45,14 +45,15 @@ impl Reader<File> {
                         match atom {
                             Ok(atom) => {
                                 structure.update(atom, &mut record);
-                            },
-                            Err(e) => { // Conversion error. Jusk skip the line.
+                            }
+                            Err(e) => {
+                                // Conversion error. Jusk skip the line.
                                 // If verbose, print message (NOT IMPLEMENTED)
                                 // println!("Skipping line{}: {}", idx, e);
                                 continue;
-                            },
+                            }
                         }
-                    },
+                    }
                     _ => continue,
                 }
             } else {
@@ -61,7 +62,5 @@ impl Reader<File> {
         }
         // println!("{structure:?}");
         Ok(structure)
-     }
-
+    }
 }
-

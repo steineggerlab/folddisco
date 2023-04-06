@@ -61,11 +61,13 @@ impl Discretizer {
     pub fn new(raw_vec: Vec<f32>, n_bins: u32) -> Result<Discretizer, &'static str> {
         let disc_param_result = get_disc_params_from_vec(&raw_vec, n_bins);
         match disc_param_result {
-            Ok(disc_params) => return Ok(Discretizer {
-                disc_params,
-                raw_vec,
-                disc_vec: Vec::new(),
-            }),
+            Ok(disc_params) => {
+                return Ok(Discretizer {
+                    disc_params,
+                    raw_vec,
+                    disc_vec: Vec::new(),
+                })
+            }
             Err(e) => return Err(e),
         }
     }
@@ -78,7 +80,6 @@ impl Discretizer {
         continuize_u32_vec(&self.disc_vec, &self.disc_params)
     }
 }
-
 
 /* Functions for Discretizer */
 
@@ -230,6 +231,4 @@ mod tests {
     //         disc.discretize();
     //     });
     // }
-
 }
-

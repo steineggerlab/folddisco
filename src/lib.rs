@@ -2,12 +2,13 @@
 //!
 //! Motifsearch is a tool for finding discontinuous motifs in protein structures.
 
+pub mod cli;
+pub mod controller;
 pub mod geometry;
 pub mod index;
 pub mod structure;
-pub mod utils;
-pub mod controller;
 pub mod test;
+pub mod utils;
 
 pub struct MotifSearch {
     pub pdb_files: Vec<String>,
@@ -24,7 +25,7 @@ pub fn run() {
     let _a1_cb = compact.get_ca(5).unwrap();
 
     let dist = compact.get_distance(161, 5).unwrap();
-    let angle = compact.get_angle(161,5).unwrap();
+    let angle = compact.get_angle(161, 5).unwrap();
     let hashvalue = geometry::hash::HashValue::perfect_hash(dist, angle);
     println!("original dist:{}, angle:{}", dist, angle);
     println!("{:?}", hashvalue);

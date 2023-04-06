@@ -5,9 +5,9 @@ pub struct Atom {
     pub x: f32,
     pub y: f32,
     pub z: f32,
-    pub atom_name: [u8;4],
+    pub atom_name: [u8; 4],
     pub atom_serial: u64,
-    pub res_name: [u8;3],
+    pub res_name: [u8; 3],
     pub res_serial: u64,
     pub chain: u8,
     pub b_factor: f32,
@@ -16,14 +16,26 @@ pub struct Atom {
 impl Atom {
     // Constructor
     pub fn new(
-        x: f32, y: f32, z: f32, atom_name: [u8;4], atom_serial: u64,
-        res_name: [u8;3], res_serial: u64, chain: u8, b_factor: f32
+        x: f32,
+        y: f32,
+        z: f32,
+        atom_name: [u8; 4],
+        atom_serial: u64,
+        res_name: [u8; 3],
+        res_serial: u64,
+        chain: u8,
+        b_factor: f32,
     ) -> Atom {
         Atom {
-            x, y, z,
-            atom_name, atom_serial,
-            res_name, res_serial,
-            chain, b_factor,
+            x,
+            y,
+            z,
+            atom_name,
+            atom_serial,
+            res_name,
+            res_serial,
+            chain,
+            b_factor,
         }
     }
     pub fn new_empty() -> Atom {
@@ -31,9 +43,9 @@ impl Atom {
             x: 0.0,
             y: 0.0,
             z: 0.0,
-            atom_name: [0;4],
+            atom_name: [0; 4],
             atom_serial: 0,
-            res_name: [0;3],
+            res_name: [0; 3],
             res_serial: 0,
             chain: 0,
             b_factor: 0.0,
@@ -73,9 +85,16 @@ impl AtomVector {
     }
 
     pub fn push(
-        &mut self, atom_name: [u8; 4], x: f32, y: f32, z: f32,
-        atom_serial: u64, res_name: [u8; 3], res_serial: u64,
-        chain: u8, b_factor: f32
+        &mut self,
+        atom_name: [u8; 4],
+        x: f32,
+        y: f32,
+        z: f32,
+        atom_serial: u64,
+        res_name: [u8; 3],
+        res_serial: u64,
+        chain: u8,
+        b_factor: f32,
     ) {
         self.atom_name.push(atom_name);
         self.coordinates.x.push(x);
@@ -147,12 +166,11 @@ impl AtomVector {
         }
     }
 
-    pub fn get_res_serial(&self, index:usize) -> u64 {
+    pub fn get_res_serial(&self, index: usize) -> u64 {
         self.res_serial[index]
     }
 
     pub fn len(&self) -> usize {
         self.coordinates.size
     }
-
 }

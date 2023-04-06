@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::index::IndexTable;
+use std::collections::HashMap;
 
 pub struct IndexAllocator {
     pub lookup_table: Vec<usize>,

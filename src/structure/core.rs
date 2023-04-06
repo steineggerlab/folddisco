@@ -1,13 +1,13 @@
-use crate::utils::calculator::Calculate;
-use crate::structure::coordinate::{Coordinate, approx_cb};
 use crate::structure::atom::{Atom, AtomVector};
+use crate::structure::coordinate::{approx_cb, Coordinate};
+use crate::utils::calculator::Calculate;
 
 /// Structure is the main data structure for storing the information of a protein structure.
 #[derive(Debug)]
 pub struct Structure {
     pub num_chains: usize,
     pub chains: Vec<u8>,
-    pub atom_vector : AtomVector,
+    pub atom_vector: AtomVector,
     // pub atom_vectors: Vec<AtomVector>, // ???왜 AtomVector이 아닌 Vec<AtomVector>???
     pub num_atoms: usize,
     pub num_residues: usize,
@@ -16,15 +16,15 @@ pub struct Structure {
 impl Structure {
     pub fn new() -> Structure {
         Structure {
-            num_chains : 0,
-            chains : Vec::new(),
-            atom_vector : AtomVector::new(),
-            num_atoms : 0,
-            num_residues : 0,
+            num_chains: 0,
+            chains: Vec::new(),
+            atom_vector: AtomVector::new(),
+            num_atoms: 0,
+            num_residues: 0,
         }
     }
 
-    pub fn update(&mut self, atom : Atom, record: &mut (u8, u64) ) {
+    pub fn update(&mut self, atom: Atom, record: &mut (u8, u64)) {
         // record store previous chain ID and residue serial
         if record.0 != atom.chain {
             self.chains.push(atom.chain);
@@ -38,7 +38,6 @@ impl Structure {
         self.num_atoms += 1;
 
         self.atom_vector.push_atom(atom);
-
     }
 
     fn _fill_gly_cbeta(&mut self) {
@@ -62,7 +61,7 @@ impl Structure {
                             gly_c = Atom::new_empty();
                             gly_o = Atom::new_empty();
                         }
-                    },
+                    }
                     None => (),
                 }
                 match self.atom_vector.atom_name.get(i) {
@@ -76,18 +75,16 @@ impl Structure {
                     continue;
                 } else {
                     let cbeta_coord = approx_cb(
-                        &gly_ca.get_coordinate(), &gly_n.get_coordinate(), &gly_c.get_coordinate()
+                        &gly_ca.get_coordinate(),
+                        &gly_n.get_coordinate(),
+                        &gly_c.get_coordinate(),
                     );
                     // // Make new cbeta atom
                     // let cbeta_atom = Atom::new(cbeta_coord.x, cbeta_coord.y, cbeta_coord.z, b"CB  ", b"GLY", gly_ca.chain, gly_ca.res_serial, gly_ca.res_name, );
-
                 }
             }
-
         }
     }
-
-
 
     pub fn to_compact(&self) -> CompactStructure {
         CompactStructure::build(self)
@@ -96,7 +93,6 @@ impl Structure {
     // pub fn count_chains() {}
     // pub fn count_atoms() {}
     // pub fn count_residues() {}
-
 }
 
 #[derive(Debug, Clone)]
@@ -111,7 +107,8 @@ impl CarbonCoordinateVector {
         CarbonCoordinateVector {
             x: Vec::new(),
             y: Vec::new(),
-            z: Vec::new() }
+            z: Vec::new(),
+        }
     }
     pub fn get(&self, idx: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
         (self.x[idx], self.y[idx], self.z[idx])
@@ -122,7 +119,7 @@ impl CarbonCoordinateVector {
 pub struct CompactStructure {
     pub num_chains: usize,
     pub chains: Vec<u8>,
-    pub num_residues : usize,
+    pub num_residues: usize,
     pub residues: Vec<u64>,
     pub ca_vector: CarbonCoordinateVector,
     pub cb_vector: CarbonCoordinateVector,
@@ -130,7 +127,6 @@ pub struct CompactStructure {
 
 impl CompactStructure {
     pub fn build(origin: &Structure) -> CompactStructure {
-
         let model = &origin.atom_vector;
 
         let mut res_vec: Vec<u64> = Vec::new();
@@ -187,40 +183,50 @@ impl CompactStructure {
     }
 
     pub fn get_ca(&self, idx: usize) -> Option<Coordinate> {
-        let x =  self.ca_vector.x.get(idx).unwrap_or(&None);
-        let y =  self.ca_vector.y.get(idx).unwrap_or(&None);
-        let z =  self.ca_vector.z.get(idx).unwrap_or(&None);
+        let x = self.ca_vector.x.get(idx).unwrap_or(&None);
+        let y = self.ca_vector.y.get(idx).unwrap_or(&None);
+        let z = self.ca_vector.z.get(idx).unwrap_or(&None);
         if x.is_some() && y.is_some() && z.is_some() {
-            Some(Coordinate::build(x,y,z))
-        } else { None }
+            Some(Coordinate::build(x, y, z))
+        } else {
+            None
+        }
     }
 
     pub fn get_cb(&self, idx: usize) -> Option<Coordinate> {
-        let x =  self.cb_vector.x.get(idx).unwrap_or(&None);
-        let y =  self.cb_vector.y.get(idx).unwrap_or(&None);
-        let z =  self.cb_vector.z.get(idx).unwrap_or(&None);
+        let x = self.cb_vector.x.get(idx).unwrap_or(&None);
+        let y = self.cb_vector.y.get(idx).unwrap_or(&None);
+        let z = self.cb_vector.z.get(idx).unwrap_or(&None);
         if x.is_some() && y.is_some() && z.is_some() {
-            Some(Coordinate::build(x,y,z))
-        } else { None }
+            Some(Coordinate::build(x, y, z))
+        } else {
+            None
+        }
     }
 
-    pub fn get_distance(&self, idx1: usize, idx2:usize) -> Option<f32> {
-        let ca1 = self.get_ca(idx1) ;
+    pub fn get_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
+        let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
         if ca1.is_some() && ca2.is_some() {
             let dist = ca1.unwrap().calc_distance(&ca2.unwrap());
             Some(dist)
-        } else {None}
+        } else {
+            None
+        }
     }
-    pub fn get_angle(&self, idx1: usize, idx2:usize) -> Option<f32> {
-        let ca1 = self.get_ca(idx1) ;
-        let cb1 = self.get_cb(idx1) ;
-        let ca2 = self.get_ca(idx2) ;
-        let cb2 = self.get_cb(idx2) ;
-        if ca1.is_some() && cb1.is_some() && ca2.is_some() &&  cb2.is_some() {
+    pub fn get_angle(&self, idx1: usize, idx2: usize) -> Option<f32> {
+        let ca1 = self.get_ca(idx1);
+        let cb1 = self.get_cb(idx1);
+        let ca2 = self.get_ca(idx2);
+        let cb2 = self.get_cb(idx2);
+        if ca1.is_some() && cb1.is_some() && ca2.is_some() && cb2.is_some() {
             // let angle = ca1.unwrap().calc_dihedral(&ca2.unwrap(), &cb1.unwrap(), &cb2.unwrap());
-            let angle = ca1.unwrap().calc_angle(&cb1.unwrap(), &ca2.unwrap(), &cb2.unwrap());
+            let angle = ca1
+                .unwrap()
+                .calc_angle(&cb1.unwrap(), &ca2.unwrap(), &cb2.unwrap());
             Some(angle)
-        } else {None}
+        } else {
+            None
+        }
     }
 }

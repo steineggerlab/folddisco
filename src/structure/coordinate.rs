@@ -11,14 +11,26 @@ impl Coordinate {
     pub fn new(x: f32, y: f32, z: f32) -> Coordinate {
         Coordinate { x, y, z }
     }
-    pub fn build(x:&Option<f32>, y:&Option<f32>, z:&Option<f32>) -> Self {
-        Coordinate { x: x.unwrap() , y: y.unwrap() , z: z.unwrap()  }
+    pub fn build(x: &Option<f32>, y: &Option<f32>, z: &Option<f32>) -> Self {
+        Coordinate {
+            x: x.unwrap(),
+            y: y.unwrap(),
+            z: z.unwrap(),
+        }
     }
     pub fn add(&self, other: &Coordinate) -> Coordinate {
-        Coordinate { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
+        Coordinate {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        }
     }
     pub fn sub(&self, other: &Coordinate) -> Coordinate {
-        Coordinate { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
+        Coordinate {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+        }
     }
     pub fn dot(&self, other: &Coordinate) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
@@ -57,7 +69,7 @@ impl Coordinate {
 }
 
 impl Calculate for Coordinate {
-    fn calc_distance(&self, other: &Coordinate) -> f32{
+    fn calc_distance(&self, other: &Coordinate) -> f32 {
         let dx = self.x - other.x;
         let dy = self.y - other.y;
         let dz = self.z - other.z;
@@ -66,12 +78,11 @@ impl Calculate for Coordinate {
     }
 
     fn calc_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate) -> f32 {
-
-        let (a,b,c,d) = (self, atom2, atom3, atom4);
+        let (a, b, c, d) = (self, atom2, atom3, atom4);
         // Form vectors
-        let v1 = (b.x-a.x, b.y-a.y, b.z-a.z);   // vector 1
-        let v2 = (d.x-c.x, d.y-c.y, d.z-c.z);   // vector 2
-        let dot = v1.0*v2.0 + v1.1*v2.1 + v1.2*v2.2; // dot product
+        let v1 = (b.x - a.x, b.y - a.y, b.z - a.z); // vector 1
+        let v2 = (d.x - c.x, d.y - c.y, d.z - c.z); // vector 2
+        let dot = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2; // dot product
         let v1_len = (v1.0.powf(2.0) + v1.1.powf(2.0) + v1.2.powf(2.0)).sqrt(); // length of vector 1
         let v2_len = (v2.0.powf(2.0) + v2.1.powf(2.0) + v2.2.powf(2.0)).sqrt(); // length of vector 2
         let cos = dot / (v1_len * v2_len); // cos of angle
@@ -83,7 +94,7 @@ impl Calculate for Coordinate {
 
 // Originally from foldseek StructureTo3DiBase::approxCBetaPosition
 // link: https://github.com/steineggerlab/foldseek/blob/master/lib/3di/structureto3di.cpp
-pub fn approx_cb(ca: &Coordinate, n: &Coordinate, c: &Coordinate) -> Coordinate{
+pub fn approx_cb(ca: &Coordinate, n: &Coordinate, c: &Coordinate) -> Coordinate {
     // Assumption: CA forms with its four ligands a tetrahedral.
     let v1 = c.sub(ca).normalize();
     let v2 = n.sub(ca).normalize();
@@ -114,7 +125,12 @@ pub struct CoordinateVector {
 
 impl CoordinateVector {
     pub fn new() -> CoordinateVector {
-        CoordinateVector { x: Vec::new(), y: Vec::new(), z: Vec::new(), size: 0 }
+        CoordinateVector {
+            x: Vec::new(),
+            y: Vec::new(),
+            z: Vec::new(),
+            size: 0,
+        }
     }
 }
 
@@ -123,10 +139,26 @@ mod coordinate_tests {
     use super::*;
     #[test]
     fn test_approx_cb() {
-        let n = Coordinate{ x: 199.117, y: 245.223, z: 222.801 };
-        let ca = Coordinate{ x: 200.327, y: 244.427, z: 222.675 };
-        let c = Coordinate{ x: 200.278, y: 243.297, z: 223.701 };
-        let actual_cb = Coordinate{ x: 201.553, y: 245.296, z: 222.934 };
+        let n = Coordinate {
+            x: 199.117,
+            y: 245.223,
+            z: 222.801,
+        };
+        let ca = Coordinate {
+            x: 200.327,
+            y: 244.427,
+            z: 222.675,
+        };
+        let c = Coordinate {
+            x: 200.278,
+            y: 243.297,
+            z: 223.701,
+        };
+        let actual_cb = Coordinate {
+            x: 201.553,
+            y: 245.296,
+            z: 222.934,
+        };
 
         let test_cb = approx_cb(&ca, &n, &c);
 
@@ -134,5 +166,4 @@ mod coordinate_tests {
         println!("test_cb: {:?}", test_cb);
         println!("distance: {:?}", actual_cb.distance(&test_cb));
     }
-
 }

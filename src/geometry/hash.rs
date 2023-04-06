@@ -18,7 +18,7 @@ impl HashValue {
     pub fn perfect_hash(dist: f32, angle: f32) -> Self {
         let dist = dist.round() as u16;
         let angle = angle.round() as u16;
-        let hashvalue = dist << 8 | angle ;
+        let hashvalue = dist << 8 | angle;
         HashValue(hashvalue)
     }
     pub fn reverse_hash(&self) -> (u16, u16) {
@@ -44,7 +44,6 @@ impl fmt::Display for HashValue {
 }
 
 pub type HashCollection = Vec<HashValue>;
-
 
 // #[derive(Debug)]
 // pub struct GeometricHasher {

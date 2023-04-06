@@ -1,7 +1,6 @@
 //
-use motifsearch::cli::picoargs::*;
+use motifsearch::*;
 
 fn main() {
-    use motifsearch::*;
     run();
 }

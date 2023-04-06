@@ -26,6 +26,13 @@ impl HashValue {
         let angle = self.0 & 0b11111111;
         (dist, angle)
     }
+    pub fn loose_hash(&self) -> Self {
+        let (dist, angle) = self.reverse_hash();
+        let dist = dist / 2; // 20 seems to be too loose
+        let angle = angle / 5; // 20 seems to be too loose
+        let hashvalue = dist << 8 | angle;
+        HashValue(hashvalue)
+    }
 }
 
 impl fmt::Debug for HashValue {

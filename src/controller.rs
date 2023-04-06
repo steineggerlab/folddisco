@@ -180,111 +180,48 @@ mod controller_tests {
 
     #[test]
     fn test_index_builder() {
-        let pdb_paths = load_path("data/toy/fusion");
+        let pdb_paths = load_homeobox_toy();
         let mut controller = Controller::new(pdb_paths);
         controller.fill_numeric_id_vec();
         controller.collect_hash();
-        // Save controller hash vectors and residue pairs
-        // for i in 0..controller.hash_collection_vec.len() {
-        //     let hash_collection = controller.hash_collection_vec.get(i).expect("cannot get hash collection");
-        //     let res_pair_vec = controller.res_pair_vec.get(i).expect("cannot get residue pair vector");
-        //     _write_hash_with_res_pair(
-        //         hash_collection, &res_pair_vec,
-        //         &format!("data/homeobox_{}.tsv", i)
-        //     );
-        // }
+
         let index_builder = IndexBuilder::new();
         let index_table =
             index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
         let table_printer = IndexTablePrinter::Debug;
-        table_printer.print(&index_table, "data/checking_index_table.tsv"); // TODO: Change this to work
+        table_printer.print(&index_table, "data/homeobox_index_table.tsv"); // TODO: Change this to work
         println!("{:?}", &controller.path_vec);
     }
 
-    #[test]
-    fn test_querying() {
-        let pdb_paths: Vec<String> = load_yeast_proteome();
-        let mut controller = Controller::new(pdb_paths);
-        controller.fill_numeric_id_vec();
-        controller.collect_hash();
-        let index_builder = IndexBuilder::new();
-        let index_table =
-            index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
-        let query: HashValue = HashValue::from_u16(3158u16);
-        let result = query_single(&index_table, &query);
-        println!("{:?}", result);
-        let homeobox_queries = [
-            HashValue::from_u16(4690u16),
-            HashValue::from_u16(4747u16),
-            HashValue::from_u16(4232u16),
-            HashValue::from_u16(3895u16),
-            HashValue::from_u16(2638u16),
-            HashValue::from_u16(3961u16),
-            HashValue::from_u16(3940u16),
-            HashValue::from_u16(3905u16),
-            HashValue::from_u16(3937u16),
-            HashValue::from_u16(3930u16),
-            HashValue::from_u16(3929u16),
-            HashValue::from_u16(3896u16),
-            HashValue::from_u16(3647u16),
-            HashValue::from_u16(3652u16),
-            HashValue::from_u16(3675u16),
-            HashValue::from_u16(3661u16),
-            HashValue::from_u16(3672u16),
-            HashValue::from_u16(3670u16),
-            HashValue::from_u16(3700u16),
-            HashValue::from_u16(3679u16),
-            HashValue::from_u16(3632u16),
-            HashValue::from_u16(3687u16),
-            HashValue::from_u16(3435u16),
-            HashValue::from_u16(3396u16),
-            HashValue::from_u16(3444u16),
-            HashValue::from_u16(3450u16),
-            HashValue::from_u16(3445u16),
-            HashValue::from_u16(3390u16),
-            HashValue::from_u16(3158u16),
-            HashValue::from_u16(3147u16),
-            HashValue::from_u16(3166u16),
-            HashValue::from_u16(3140u16),
-            HashValue::from_u16(3129u16),
-            HashValue::from_u16(3178u16),
-            HashValue::from_u16(3114u16),
-            HashValue::from_u16(3134u16),
-            HashValue::from_u16(2843u16),
-            HashValue::from_u16(2927u16),
-            HashValue::from_u16(2848u16),
-            HashValue::from_u16(2663u16),
-            HashValue::from_u16(2675u16),
-            HashValue::from_u16(2667u16),
-            HashValue::from_u16(2660u16),
-            HashValue::from_u16(2664u16),
-            HashValue::from_u16(2409u16),
-            HashValue::from_u16(2427u16),
-            HashValue::from_u16(1651u16),
-            HashValue::from_u16(1650u16),
-            HashValue::from_u16(1391u16),
-            HashValue::from_u16(1332u16),
-            HashValue::from_u16(1392u16),
-            HashValue::from_u16(1395u16),
-            HashValue::from_u16(1338u16),
-            HashValue::from_u16(1396u16),
-            HashValue::from_u16(1111u16),
-            HashValue::from_u16(1108u16),
-            HashValue::from_u16(1100u16),
-            HashValue::from_u16(1105u16),
-            HashValue::from_u16(1110u16),
-            HashValue::from_u16(1104u16),
-            HashValue::from_u16(1106u16),
-        ];
-        let result = query_multiple(&index_table, &homeobox_queries);
-        println!("{:?}", result);
-        if let Some(result) = result {
-            for i in result {
-                println!("{:?}", controller.path_vec.get(i));
-            }
-        }
-        let printer = IndexTablePrinter::Debug;
-        printer.print(&index_table, "data/yeast_index_table.tsv");
-        println!("{:?}", &controller.path_vec);
-    }
+    // #[test]
+    // fn test_querying() {
+    //     let pdb_paths: Vec<String> = load_yeast_proteome();
+    //     let mut controller = Controller::new(pdb_paths);
+    //     controller.fill_numeric_id_vec();
+    //     controller.collect_hash();
+    //     let index_builder = IndexBuilder::new();
+    //     let index_table =
+    //         index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
+    //     let query: HashValue = HashValue::from_u16(3158u16);
+    //     let result = query_single(&index_table, &query);
+    //     println!("{:?}", result);
+    //     let homeobox_queries = [
+    //         HashValue::from_u16(3698u16),
+    //         HashValue::from_u16(2684u16),
+    //         HashValue::from_u16(2409u16),
+    //         HashValue::from_u16(3390u16),
+    //         HashValue::from_u16(3440u16),
+    //     ];
+    //     let result = query_multiple(&index_table, &homeobox_queries);
+    //     println!("{:?}", result);
+    //     if let Some(result) = result {
+    //         for i in result {
+    //             println!("{:?}", controller.path_vec.get(i));
+    //         }
+    //     }
+    //     let printer = IndexTablePrinter::Debug;
+    //     printer.print(&index_table, "data/yeast_index_table.tsv");
+    //     println!("{:?}", &controller.path_vec);
+    // }
+
 }

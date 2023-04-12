@@ -13,9 +13,9 @@ impl Coordinate {
     }
     pub fn build(x: &Option<f32>, y: &Option<f32>, z: &Option<f32>) -> Self {
         Coordinate {
-            x: x.unwrap(),
-            y: y.unwrap(),
-            z: z.unwrap(),
+            x: x.expect("Unable to get coordinate"),
+            y: y.expect("Unable to get coordinate"),
+            z: z.expect("Unable to get coordinate"),
         }
     }
     pub fn add(&self, other: &Coordinate) -> Coordinate {

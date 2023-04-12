@@ -8,7 +8,6 @@ pub struct Structure {
     pub num_chains: usize,
     pub chains: Vec<u8>,
     pub atom_vector: AtomVector,
-    // pub atom_vectors: Vec<AtomVector>, // ???왜 AtomVector이 아닌 Vec<AtomVector>???
     pub num_atoms: usize,
     pub num_residues: usize,
 }
@@ -127,6 +126,7 @@ pub struct CompactStructure {
 
 impl CompactStructure {
     pub fn build(origin: &Structure) -> CompactStructure {
+        // Store only backbone atoms
         let model = &origin.atom_vector;
 
         let mut res_vec: Vec<u64> = Vec::new();
@@ -141,10 +141,12 @@ impl CompactStructure {
 
             if &atom.atom_name == b" CA " {
                 if prev_res_serial == Some(atom.res_serial) {
-                    ca_vec.x.last_mut().unwrap().replace(atom.x);
-                    ca_vec.y.last_mut().unwrap().replace(atom.y);
-                    ca_vec.z.last_mut().unwrap().replace(atom.z);
+                    // With same res_serial, substitute 'CA' from None to Some
+                    ca_vec.x.last_mut().expect("Unable to substitute CA from None to Some").replace(atom.x);
+                    ca_vec.y.last_mut().expect("Unable to substitute CA from None to Some").replace(atom.y);
+                    ca_vec.z.last_mut().expect("Unable to substitute CA from None to Some").replace(atom.z);
                 } else {
+                    // With new res_serial and residue 'CA', store 'CA' while 'CB' is None
                     res_vec.push(atom.res_serial);
                     ca_vec.x.push(Some(atom.x));
                     ca_vec.y.push(Some(atom.y));
@@ -156,10 +158,12 @@ impl CompactStructure {
                 }
             } else if &atom.atom_name == b" CB " {
                 if prev_res_serial == Some(atom.res_serial) {
-                    cb_vec.x.last_mut().unwrap().replace(atom.x);
-                    cb_vec.y.last_mut().unwrap().replace(atom.y);
-                    cb_vec.z.last_mut().unwrap().replace(atom.z);
+                    // With same res_serial, substitute 'CB' from None to Some
+                    cb_vec.x.last_mut().expect("Unable to substitute CB from None to Some").replace(atom.x);
+                    cb_vec.y.last_mut().expect("Unable to substitute CB from None to Some").replace(atom.y);
+                    cb_vec.z.last_mut().expect("Unable to substitute CB from None to Some").replace(atom.z);
                 } else {
+                    // With new res_serial and residue 'CB', store 'CB' while 'CA' is None
                     res_vec.push(atom.res_serial);
                     cb_vec.x.push(Some(atom.x));
                     cb_vec.y.push(Some(atom.y));
@@ -208,7 +212,7 @@ impl CompactStructure {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
         if ca1.is_some() && ca2.is_some() {
-            let dist = ca1.unwrap().calc_distance(&ca2.unwrap());
+            let dist = ca1.expect("Unable to get CA coordinate").calc_distance(&ca2.expect("Unable to get CA coordinate"));
             Some(dist)
         } else {
             None
@@ -220,10 +224,11 @@ impl CompactStructure {
         let ca2 = self.get_ca(idx2);
         let cb2 = self.get_cb(idx2);
         if ca1.is_some() && cb1.is_some() && ca2.is_some() && cb2.is_some() {
-            // let angle = ca1.unwrap().calc_dihedral(&ca2.unwrap(), &cb1.unwrap(), &cb2.unwrap());
             let angle = ca1
-                .unwrap()
-                .calc_angle(&cb1.unwrap(), &ca2.unwrap(), &cb2.unwrap());
+                .expect("Unable to get CA1 coordinate")
+                .calc_angle(&cb1.expect("Unable to get CB1 coordinate"),
+                            &ca2.expect("Unable to get CA2 coordinate"), 
+                            &cb2.expect("Unable to get CB2 coordinate"));
             Some(angle)
         } else {
             None

@@ -1,5 +1,5 @@
 use crate::structure::atom::{Atom, AtomVector};
-use crate::structure::coordinate::{approx_cb, Coordinate};
+use crate::structure::coordinate::{approx_cb, Coordinate, CarbonCoordinateVector};
 use crate::utils::calculator::Calculate;
 
 /// Structure is the main data structure for storing the information of a protein structure.
@@ -39,51 +39,51 @@ impl Structure {
         self.atom_vector.push_atom(atom);
     }
 
-    fn _fill_gly_cbeta(&mut self) {
-        // Iterate over self.atom_vector
+    // fn _fill_gly_cbeta(&mut self) {
+    //     // Iterate over self.atom_vector
 
-        let mut curr_res_serial: u64 = 0;
+    //     let mut curr_res_serial: u64 = 0;
 
-        let mut gly_n = Atom::new_empty();
-        let mut gly_ca = Atom::new_empty();
-        let mut gly_c = Atom::new_empty();
-        let mut gly_o = Atom::new_empty();
+    //     let mut gly_n = Atom::new_empty();
+    //     let mut gly_ca = Atom::new_empty();
+    //     let mut gly_c = Atom::new_empty();
+    //     let mut gly_o = Atom::new_empty();
 
-        for i in 0..self.atom_vector.len() {
-            if self.atom_vector.res_name.get(i) == Some(b"GLY") {
-                match self.atom_vector.res_serial.get(i) {
-                    Some(res_serial) => {
-                        if curr_res_serial != *res_serial {
-                            curr_res_serial = *res_serial;
-                            gly_n = Atom::new_empty();
-                            gly_ca = Atom::new_empty();
-                            gly_c = Atom::new_empty();
-                            gly_o = Atom::new_empty();
-                        }
-                    }
-                    None => (),
-                }
-                match self.atom_vector.atom_name.get(i) {
-                    Some(b" N  ") => gly_n = self.atom_vector.get(i),
-                    Some(b" CA ") => gly_ca = self.atom_vector.get(i),
-                    Some(b" C  ") => gly_c = self.atom_vector.get(i),
-                    Some(b" O  ") => gly_o = self.atom_vector.get(i),
-                    _ => (),
-                }
-                if gly_n.is_empty() || gly_ca.is_empty() || gly_c.is_empty() || gly_o.is_empty() {
-                    continue;
-                } else {
-                    let cbeta_coord = approx_cb(
-                        &gly_ca.get_coordinate(),
-                        &gly_n.get_coordinate(),
-                        &gly_c.get_coordinate(),
-                    );
-                    // // Make new cbeta atom
-                    // let cbeta_atom = Atom::new(cbeta_coord.x, cbeta_coord.y, cbeta_coord.z, b"CB  ", b"GLY", gly_ca.chain, gly_ca.res_serial, gly_ca.res_name, );
-                }
-            }
-        }
-    }
+    //     for i in 0..self.atom_vector.len() {
+    //         if self.atom_vector.res_name.get(i) == Some(b"GLY") {
+    //             match self.atom_vector.res_serial.get(i) {
+    //                 Some(res_serial) => {
+    //                     if curr_res_serial != *res_serial {
+    //                         curr_res_serial = *res_serial;
+    //                         gly_n = Atom::new_empty();
+    //                         gly_ca = Atom::new_empty();
+    //                         gly_c = Atom::new_empty();
+    //                         gly_o = Atom::new_empty();
+    //                     }
+    //                 }
+    //                 None => (),
+    //             }
+    //             match self.atom_vector.atom_name.get(i) {
+    //                 Some(b" N  ") => gly_n = self.atom_vector.get(i),
+    //                 Some(b" CA ") => gly_ca = self.atom_vector.get(i),
+    //                 Some(b" C  ") => gly_c = self.atom_vector.get(i),
+    //                 Some(b" O  ") => gly_o = self.atom_vector.get(i),
+    //                 _ => (),
+    //             }
+    //             if gly_n.is_empty() || gly_ca.is_empty() || gly_c.is_empty() || gly_o.is_empty() {
+    //                 continue;
+    //             } else {
+    //                 let cbeta_coord = approx_cb(
+    //                     &gly_ca.get_coordinate(),
+    //                     &gly_n.get_coordinate(),
+    //                     &gly_c.get_coordinate(),
+    //                 );
+    //                 // // Make new cbeta atom
+    //                 // let cbeta_atom = Atom::new(cbeta_coord.x, cbeta_coord.y, cbeta_coord.z, b"CB  ", b"GLY", gly_ca.chain, gly_ca.res_serial, gly_ca.res_name, );
+    //             }
+    //         }
+    //     }
+    // }
 
     pub fn to_compact(&self) -> CompactStructure {
         CompactStructure::build(self)
@@ -94,32 +94,15 @@ impl Structure {
     // pub fn count_residues() {}
 }
 
-#[derive(Debug, Clone)]
-pub struct CarbonCoordinateVector {
-    x: Vec<Option<f32>>,
-    y: Vec<Option<f32>>,
-    z: Vec<Option<f32>>,
-}
 
-impl CarbonCoordinateVector {
-    pub fn new() -> Self {
-        CarbonCoordinateVector {
-            x: Vec::new(),
-            y: Vec::new(),
-            z: Vec::new(),
-        }
-    }
-    pub fn get(&self, idx: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
-        (self.x[idx], self.y[idx], self.z[idx])
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct CompactStructure {
     pub num_chains: usize,
     pub chains: Vec<u8>,
     pub num_residues: usize,
-    pub residues: Vec<u64>,
+    pub residue_serial: Vec<u64>,
+    pub residue_name: Vec<[u8;3]>,
     pub ca_vector: CarbonCoordinateVector,
     pub cb_vector: CarbonCoordinateVector,
 }
@@ -129,49 +112,70 @@ impl CompactStructure {
         // Store only backbone atoms
         let model = &origin.atom_vector;
 
-        let mut res_vec: Vec<u64> = Vec::new();
+        let mut res_serial_vec: Vec<u64> = Vec::new();
+        let mut res_name_vec : Vec<[u8;3]> = Vec::new();
         let mut ca_vec = CarbonCoordinateVector::new();
         let mut cb_vec = CarbonCoordinateVector::new();
+
         let mut prev_res_serial: Option<u64> = None;
+        let mut prev_res_name: Option<&[u8;3]> = None;
+        let mut ca : Option<Coordinate> = None;
+        let mut cb : Option<Coordinate> = None;
+
+        let mut gly_n : Option<Coordinate> = None;
+        let mut gly_c : Option<Coordinate> = None;
 
         for idx in 0..origin.num_atoms {
-            // TODO : implement iterator for Structure.atom_vector
-            // TODO : revise using match, .... etc
-            let atom = model.get(idx);
+            if prev_res_serial != Some(model.get_res_serial(idx)) {
+                // Save previous 'CA' and 'CB'
+                match (ca, cb) {
+                    (Some(ca), Some(cb)) => {
+                        let resi = prev_res_serial.expect("expected residue serial number");
+                        let resn = prev_res_name.expect("expected residue name");
+                        ca_vec.push(&ca);
+                        cb_vec.push(&cb);
+                        res_serial_vec.push(resi);
+                        res_name_vec.push(*resn);
+                    }
+                    (Some(ca), None) => {
+                        let resi = prev_res_serial.expect("expected residue serial number");
+                        let resn = prev_res_name.expect("expected residue name");
+                        ca_vec.push(&ca);
+                        res_serial_vec.push(resi);
+                        res_name_vec.push(*resn);
 
-            if &atom.atom_name == b" CA " {
-                if prev_res_serial == Some(atom.res_serial) {
-                    // With same res_serial, substitute 'CA' from None to Some
-                    ca_vec.x.last_mut().expect("Unable to substitute CA from None to Some").replace(atom.x);
-                    ca_vec.y.last_mut().expect("Unable to substitute CA from None to Some").replace(atom.y);
-                    ca_vec.z.last_mut().expect("Unable to substitute CA from None to Some").replace(atom.z);
-                } else {
-                    // With new res_serial and residue 'CA', store 'CA' while 'CB' is None
-                    res_vec.push(atom.res_serial);
-                    ca_vec.x.push(Some(atom.x));
-                    ca_vec.y.push(Some(atom.y));
-                    ca_vec.z.push(Some(atom.z));
-                    cb_vec.x.push(None);
-                    cb_vec.y.push(None);
-                    cb_vec.z.push(None);
-                    prev_res_serial = Some(atom.res_serial);
+                        if let (Some(b"GLY"), Some(n), Some(c)) = (prev_res_name, &gly_n, &gly_c) {
+                            // Approximate CB
+                            let cb = approx_cb(&ca,n,c);
+                            cb_vec.push(&cb);
+                            } else { cb_vec.push_none();}
+                    }
+                    (None, Some(cb)) => {
+                        let resi = prev_res_serial.expect("expected residue serial number");
+                        let resn = prev_res_name.expect("expected residue name");
+                        ca_vec.push_none();
+                        cb_vec.push(&cb);
+                        res_serial_vec.push(resi);
+                        res_name_vec.push(*resn);
+                    }
+                    _ => (),
                 }
-            } else if &atom.atom_name == b" CB " {
-                if prev_res_serial == Some(atom.res_serial) {
-                    // With same res_serial, substitute 'CB' from None to Some
-                    cb_vec.x.last_mut().expect("Unable to substitute CB from None to Some").replace(atom.x);
-                    cb_vec.y.last_mut().expect("Unable to substitute CB from None to Some").replace(atom.y);
-                    cb_vec.z.last_mut().expect("Unable to substitute CB from None to Some").replace(atom.z);
-                } else {
-                    // With new res_serial and residue 'CB', store 'CB' while 'CA' is None
-                    res_vec.push(atom.res_serial);
-                    cb_vec.x.push(Some(atom.x));
-                    cb_vec.y.push(Some(atom.y));
-                    cb_vec.z.push(Some(atom.z));
-                    ca_vec.x.push(None);
-                    ca_vec.y.push(None);
-                    ca_vec.z.push(None);
-                    prev_res_serial = Some(atom.res_serial);
+                // Reset 'CA' and 'CB'
+                ca = None; cb = None; 
+                prev_res_serial = Some(model.get_res_serial(idx)); 
+                prev_res_name = model.res_name.get(idx);
+            }
+
+            if model.is_ca(idx) {
+                ca = Some(model.get_coordinates(idx));
+            } else if model.is_cb(idx) {
+                cb = Some(model.get_coordinates(idx));
+            } else if &model.get_res_name(idx) == b"GLY" {
+                // If GLY, calculate CB from CA, N, C
+                match model.atom_name.get(idx) {
+                    Some(b" N  ") => {gly_n = Some(model.get_coordinates(idx));},
+                    Some(b" C  ") => {gly_c = Some(model.get_coordinates(idx));},
+                    _ => (),
                 }
             }
         }
@@ -179,30 +183,29 @@ impl CompactStructure {
         CompactStructure {
             num_chains: origin.num_chains,
             chains: origin.chains.clone(),
-            num_residues: origin.num_residues,
-            residues: res_vec,
+            num_residues: res_serial_vec.len(),
+            residue_serial: res_serial_vec,
+            residue_name: res_name_vec,
             ca_vector: ca_vec,
             cb_vector: cb_vec,
         }
     }
 
     pub fn get_ca(&self, idx: usize) -> Option<Coordinate> {
-        let x = self.ca_vector.x.get(idx).unwrap_or(&None);
-        let y = self.ca_vector.y.get(idx).unwrap_or(&None);
-        let z = self.ca_vector.z.get(idx).unwrap_or(&None);
+        let (x,y,z) = self.ca_vector.get(idx);
+
         if x.is_some() && y.is_some() && z.is_some() {
-            Some(Coordinate::build(x, y, z))
+            Some(Coordinate::build(&x, &y, &z))
         } else {
             None
         }
     }
 
     pub fn get_cb(&self, idx: usize) -> Option<Coordinate> {
-        let x = self.cb_vector.x.get(idx).unwrap_or(&None);
-        let y = self.cb_vector.y.get(idx).unwrap_or(&None);
-        let z = self.cb_vector.z.get(idx).unwrap_or(&None);
+        let (x,y,z) = self.cb_vector.get(idx);
+
         if x.is_some() && y.is_some() && z.is_some() {
-            Some(Coordinate::build(x, y, z))
+            Some(Coordinate::build(&x, &y, &z))
         } else {
             None
         }
@@ -218,6 +221,7 @@ impl CompactStructure {
             None
         }
     }
+
     pub fn get_angle(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -232,6 +236,30 @@ impl CompactStructure {
             Some(angle)
         } else {
             None
+        }
+    }
+}
+
+#[cfg(test)]
+mod structure_tests {
+    #[test]
+    fn test_gly_integration() {
+        let data = crate::structure::io::pdb::Reader::from_file("data/111l_alpha.pdb")
+                        .expect("Unable to read test file");
+        let structure = &data.read_structure().expect("Unable to read structure");
+        let compact = &structure.to_compact();
+
+        for idx in 0..compact.num_residues {
+            let res_name = compact.residue_name.get(idx)
+                .expect("expected residue name");
+            if res_name == b"GLY" {
+                let res_str = std::str::from_utf8(res_name).expect("expected residue name");
+                let ca = compact.get_ca(idx);
+                let cb = compact.get_cb(idx);
+
+                println!("residue {} is {} CA: {:?} CB: {:?}", idx, res_str, ca, cb);
+                assert!(cb.is_some());
+            }
         }
     }
 }

@@ -134,6 +134,39 @@ impl CoordinateVector {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CarbonCoordinateVector {
+    x: Vec<Option<f32>>,
+    y: Vec<Option<f32>>,
+    z: Vec<Option<f32>>,
+}
+
+impl CarbonCoordinateVector {
+    pub fn new() -> Self {
+        CarbonCoordinateVector {
+            x: Vec::new(),
+            y: Vec::new(),
+            z: Vec::new(),
+        }
+    }
+    pub fn get(&self, idx: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
+        (self.x[idx], self.y[idx], self.z[idx])
+    }
+
+    pub fn push(&mut self, coordinate: &Coordinate) {
+        self.x.push(Some(coordinate.x));
+        self.y.push(Some(coordinate.y));
+        self.z.push(Some(coordinate.z));
+    }
+
+    pub fn push_none(&mut self) {
+        self.x.push(None);
+        self.y.push(None);
+        self.z.push(None);
+    }
+
+}
+
 #[cfg(test)]
 mod coordinate_tests {
     use super::*;

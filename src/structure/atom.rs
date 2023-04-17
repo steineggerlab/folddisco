@@ -57,6 +57,9 @@ impl Atom {
     pub fn get_coordinate(&self) -> Coordinate {
         Coordinate::new(self.x, self.y, self.z)
     }
+    pub fn get_res_name(&self) -> [u8;3] {
+        self.res_name
+    }
 }
 
 /// AtomVector
@@ -122,7 +125,6 @@ impl AtomVector {
     }
 
     pub fn get(&self, index: usize) -> Atom {
-        // ??? index should be 1--n ???
         Atom {
             // atom_name: self.atom_name[index].clone(),
             atom_name: self.atom_name[index],
@@ -170,7 +172,29 @@ impl AtomVector {
         self.res_serial[index]
     }
 
+    pub fn get_res_name(&self, index: usize) -> [u8; 3] {
+        self.res_name[index]
+    }
+
+    pub fn get_atom_name(&self, index: usize) -> [u8; 4] {
+        self.atom_name[index]
+    }
+
     pub fn len(&self) -> usize {
         self.coordinates.size
+    }
+
+    pub fn _print_residue(&self, index: usize) -> String {
+        let res_byte = self.get_res_name(index);
+        let res_str = std::str::from_utf8(&res_byte).unwrap();
+        String::from(res_str)
+    }
+
+    pub fn _print_atom(&self, index: usize) {
+        let atom_name = self.get_atom_name(index);
+        println!(
+            "{}{}{}{}",
+            atom_name[0] as char, atom_name[1] as char, atom_name[2] as char, atom_name[3] as char
+        );
     }
 }

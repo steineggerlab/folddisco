@@ -1,5 +1,7 @@
 // Common functions for testing
 
+use std::collections::HashMap;
+
 pub fn load_homeobox_toy() -> Vec<String> {
     vec![
         "data/homeobox/1akha-.pdb".to_string(),

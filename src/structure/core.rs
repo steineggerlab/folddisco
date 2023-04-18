@@ -161,8 +161,8 @@ impl CompactStructure {
                     _ => (),
                 }
                 // Reset 'CA' and 'CB'
-                ca = None; cb = None; 
-                prev_res_serial = Some(model.get_res_serial(idx)); 
+                ca = None; cb = None;
+                prev_res_serial = Some(model.get_res_serial(idx));
                 prev_res_name = model.res_name.get(idx);
             }
 
@@ -231,7 +231,7 @@ impl CompactStructure {
             let angle = ca1
                 .expect("Unable to get CA1 coordinate")
                 .calc_angle(&cb1.expect("Unable to get CB1 coordinate"),
-                            &ca2.expect("Unable to get CA2 coordinate"), 
+                            &ca2.expect("Unable to get CA2 coordinate"),
                             &cb2.expect("Unable to get CB2 coordinate"));
             Some(angle)
         } else {
@@ -256,8 +256,7 @@ mod structure_tests {
                 let res_str = std::str::from_utf8(res_name).expect("expected residue name");
                 let ca = compact.get_ca(idx);
                 let cb = compact.get_cb(idx);
-
-                println!("residue {} is {} CA: {:?} CB: {:?}", idx, res_str, ca, cb);
+                println!("residue {} ({}) is {} CA: {:?} CB: {:?}", idx, compact.residue_serial[idx], res_str, ca, cb);
                 assert!(cb.is_some());
             }
         }

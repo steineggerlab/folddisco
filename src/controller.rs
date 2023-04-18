@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::collections::HashMap;
 
 use crate::geometry::hash::{HashCollection, HashValue};
 use crate::index::builder::IndexBuilder;
@@ -10,7 +11,7 @@ pub struct Controller {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
     pub hash_collection_vec: Vec<HashCollection>,
-    // pub res_pair_vec: Vec<Vec<(u64, u64)>>, // WARNING: TEMPORARY
+    pub res_pair_vec: Vec<Vec<(u64, u64, [u8; 3], [u8; 3])>>, // WARNING: TEMPORARY
 }
 
 impl Controller {
@@ -19,7 +20,7 @@ impl Controller {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
             hash_collection_vec: Vec::new(),
-            // res_pair_vec: Vec::new(),// WARNING: TEMPORARY
+            res_pair_vec: Vec::new(),// WARNING: TEMPORARY
         }
     }
 
@@ -31,7 +32,7 @@ impl Controller {
             let compact = structure.to_compact();
             let mut hash_collector = GeometryHashCollector::new();
 
-            // let mut res_pair_vec = Vec::new(); // WARNING: TEMPORARY
+            let mut res_pair_vec = Vec::new(); // WARNING: TEMPORARY
 
             for n in 0..compact.num_residues {
                 for m in n..compact.num_residues {
@@ -44,15 +45,17 @@ impl Controller {
                     hash_collector.collect_hash(hash_value);
 
                     // WARNING: TEMPORARY
-                    // let res1 = compact.residues[n];
-                    // let res2 = compact.residues[m];
-                    // res_pair_vec.push((res1, res2));
+                    let res1 = compact.residue_serial[n];
+                    let res2 = compact.residue_serial[m];
+                    let res1_str = compact.residue_name[n];
+                    let res2_str = compact.residue_name[m];
+                    res_pair_vec.push((res1, res2, res1_str, res2_str));
                 }
             }
-            hash_collector.remove_redundancy();
+            // hash_collector.remove_redundancy();
             self.hash_collection_vec
                 .push(hash_collector.hash_collection);
-            // self.res_pair_vec.push(res_pair_vec); // For debug
+            self.res_pair_vec.push(res_pair_vec); // For debug
         }
         // TEMPORARY
         println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
@@ -61,6 +64,56 @@ impl Controller {
     pub fn fill_numeric_id_vec(&mut self) {
         string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
     }
+
+    pub fn save_hash_per_pair(&self, path: &str) {
+        for i in 0..self.hash_collection_vec.len() {
+            let pdb_path = &self.path_vec[i];
+            let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
+            println!("Saving to {}", new_path);
+            let mut file = std::fs::File::create(new_path).expect("Unable to create file");
+            file.write_all(b"hash\tdist\tangle\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
+            let hash_collection = &self.hash_collection_vec[i];
+            let res_pair_vec = &self.res_pair_vec[i];
+            println!("{}: {} hashes, {} pairs", pdb_path, hash_collection.len(), res_pair_vec.len());
+            for j in 0..res_pair_vec.len(){
+                let hash_value = hash_collection[j];
+                let res1 = res_pair_vec[j].0;
+                let res2 = res_pair_vec[j].1;
+                let res1_str = res_pair_vec[j].2;
+                let res2_str = res_pair_vec[j].3;
+                file.write_all(format!("{}\t{}\t{}\t{:?}\t{:?}\t{}\n", hash_value, res1, res2, res1_str, res2_str, pdb_path).as_bytes())
+                    .expect("Unable to write data");
+            }
+        }
+    }
+
+    pub fn save_filtered_hash_pair(&self, path: &str, res_pair_filter: &HashMap<String, Vec<u64>>) {
+        let mut file = std::fs::File::create(path).expect("Unable to create file");
+        file.write_all(b"hash\tdist\tangle\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
+        for i in 0..self.hash_collection_vec.len() {
+            let pdb_path = self.path_vec[i].split("/").last().unwrap();
+            if !res_pair_filter.contains_key(pdb_path) {
+                continue;
+            }
+            let hash_collection = &self.hash_collection_vec[i];
+            let res_pair_vec = &self.res_pair_vec[i];
+            println!("{}: {} hashes, {} pairs", pdb_path, hash_collection.len(), res_pair_vec.len());
+            for j in 0..res_pair_vec.len(){
+                let hash_value = hash_collection[j];
+                let res1 = res_pair_vec[j].0;
+                let res2 = res_pair_vec[j].1;
+                let res1_str = String::from_utf8(res_pair_vec[j].2.to_ascii_uppercase()).unwrap();
+                let res2_str = String::from_utf8(res_pair_vec[j].3.to_ascii_uppercase()).unwrap();
+                if res_pair_filter[pdb_path].contains(&res1) && res_pair_filter[pdb_path].contains(&res2) {
+                    file.write_all(format!("{}\t{}\t{}\t{:?}\t{:?}\t{}\n", hash_value, res1, res2, res1_str, res2_str, pdb_path).as_bytes())
+                    .expect("Unable to write data");
+                }
+            }
+        }
+    }
+
+
+
 }
 
 fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut Vec<usize>) {
@@ -184,12 +237,58 @@ mod controller_tests {
         let mut controller = Controller::new(pdb_paths);
         controller.fill_numeric_id_vec();
         controller.collect_hash();
-
+        // controller.save_hash_per_pair("data/homeobox_hash_per_pair.tsv");
         let index_builder = IndexBuilder::new();
         let index_table =
             index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
         let table_printer = IndexTablePrinter::Debug;
         table_printer.print(&index_table, "data/homeobox_index_table.tsv"); // TODO: Change this to work
+        println!("{:?}", &controller.path_vec);
+    }
+
+    #[test]
+    fn test_temp() {
+        let pdb_paths = load_path("data/serine_peptidases");
+        let mut controller = Controller::new(pdb_paths);
+        controller.fill_numeric_id_vec();
+        controller.collect_hash();
+
+        let mut serine_filter: HashMap<String, Vec<u64>> = HashMap::new();
+        serine_filter.insert(
+            "1aq2.pdb".to_string(), vec![250, 232, 269],
+        );
+        serine_filter.insert(
+            "1wab.pdb".to_string(), vec![47, 195, 192],
+        );
+        serine_filter.insert(
+            "1sc9.pdb".to_string(), vec![80, 235, 207],
+        );
+        serine_filter.insert(
+            "2o7r.pdb".to_string(), vec![169, 306, 276],
+        );
+        serine_filter.insert(
+            "1bs9.pdb".to_string(), vec![90, 187, 175],
+        );
+        serine_filter.insert(
+            "1ju3.pdb".to_string(), vec![117, 287, 259],
+        );
+        serine_filter.insert(
+            "1uk7.pdb".to_string(), vec![34, 252, 224],
+        );
+        serine_filter.insert(
+            "1okg.pdb".to_string(), vec![255, 75, 61],
+        );
+        serine_filter.insert(
+            "1qfm.pdb".to_string(), vec![554, 680, 641],
+        );
+
+
+        controller.save_filtered_hash_pair("data/serine_hash_per_pair.tsv", &serine_filter);
+        let index_builder = IndexBuilder::new();
+        let index_table =
+            index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
+        let table_printer = IndexTablePrinter::Debug;
+        table_printer.print(&index_table, "data/serine_index_table.tsv");
         println!("{:?}", &controller.path_vec);
     }
 

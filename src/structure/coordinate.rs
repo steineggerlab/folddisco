@@ -115,6 +115,21 @@ pub fn approx_cb(ca: &Coordinate, n: &Coordinate, c: &Coordinate) -> Coordinate 
     cb
 }
 
+pub fn calc_torsion_angle(
+    a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate,
+) -> f32 {
+    let v1 = b.sub(a);
+    let v2 = c.sub(b);
+    let v3 = d.sub(c);
+
+    let r = v1.cross(&v2).normalize();
+    let s = v2.cross(&v3).normalize();
+    let t = r.cross(&v2.normalize()).normalize();
+    let x = r.dot(&s);
+    let y = s.dot(&t);
+    -y.atan2(x).to_degrees()
+}
+
 #[derive(Debug, Clone)]
 pub struct CoordinateVector {
     pub x: Vec<f32>,
@@ -132,6 +147,40 @@ impl CoordinateVector {
             size: 0,
         }
     }
+    pub fn get(&self, idx: usize) -> (f32, f32, f32) {
+        (self.x[idx], self.y[idx], self.z[idx])
+    }
+    pub fn calc_torsion_angle(
+        &self,
+        a: usize,
+        b: usize,
+        c: usize,
+        d: usize,
+    ) -> f32 {
+        let (a_x, a_y, a_z) = self.get(a);
+        let (b_x, b_y, b_z) = self.get(b);
+        let (c_x, c_y, c_z) = self.get(c);
+        let (d_x, d_y, d_z) = self.get(d);
+
+        let a = Coordinate {x: a_x, y: a_y, z: a_z};
+        let b = Coordinate {x: b_x, y: b_y, z: b_z};
+        let c = Coordinate {x: c_x, y: c_y, z: c_z};
+        let d = Coordinate {x: d_x, y: d_y, z: d_z};
+        calc_torsion_angle(&a, &b, &c, &d)
+    }
+
+    pub fn calc_all_torsion_angles(&self) -> Vec<f32> {
+        let mut torsion_angles = Vec::new();
+        for i in 0..self.x.len() - 3 {
+            let a = i;
+            let b = i + 1;
+            let c = i + 2;
+            let d = i + 3;
+            torsion_angles.push(self.calc_torsion_angle(a, b, c, d));
+        }
+        torsion_angles
+    }
+
 }
 
 #[derive(Debug, Clone)]
@@ -163,6 +212,62 @@ impl CarbonCoordinateVector {
         self.x.push(None);
         self.y.push(None);
         self.z.push(None);
+    }
+
+    pub fn calc_torsion_angle(
+        &self,
+        a: usize,
+        b: usize,
+        c: usize,
+        d: usize,
+    ) -> Option<f32> {
+        let (a_x, a_y, a_z) = self.get(a);
+        let (b_x, b_y, b_z) = self.get(b);
+        let (c_x, c_y, c_z) = self.get(c);
+        let (d_x, d_y, d_z) = self.get(d);
+
+        if a_x.is_none() || a_y.is_none() || a_z.is_none()
+        || b_x.is_none() || b_y.is_none() || b_z.is_none()
+        || c_x.is_none() || c_y.is_none() || c_z.is_none()
+        || d_x.is_none() || d_y.is_none() || d_z.is_none()
+        {
+            return None;
+        }
+
+        let a = Coordinate {
+            x: a_x.unwrap(),
+            y: a_y.unwrap(),
+            z: a_z.unwrap(),
+        };
+        let b = Coordinate {
+            x: b_x.unwrap(),
+            y: b_y.unwrap(),
+            z: b_z.unwrap(),
+        };
+        let c = Coordinate {
+            x: c_x.unwrap(),
+            y: c_y.unwrap(),
+            z: c_z.unwrap(),
+        };
+        let d = Coordinate {
+            x: d_x.unwrap(),
+            y: d_y.unwrap(),
+            z: d_z.unwrap(),
+        };
+
+        Some(calc_torsion_angle(&a, &b, &c, &d))
+    }
+
+    pub fn calc_all_torsion_angles(&self) -> Vec<Option<f32>> {
+        let mut torsion_angles = Vec::new();
+        for i in 0..self.x.len() - 3 {
+            let a = i;
+            let b = i + 1;
+            let c = i + 2;
+            let d = i + 3;
+            torsion_angles.push(self.calc_torsion_angle(a, b, c, d));
+        }
+        torsion_angles
     }
 
 }
@@ -199,4 +304,48 @@ mod coordinate_tests {
         println!("test_cb: {:?}", test_cb);
         println!("distance: {:?}", actual_cb.distance(&test_cb));
     }
+
+    #[test]
+    fn test_calc_torsion_angle() {
+        let a = Coordinate {
+            x: 24.969,
+            y: 13.428,
+            z: 30.692,
+        };
+        let b = Coordinate {
+            x: 24.044,
+            y: 12.661,
+            z: 29.808,
+        };
+        let c = Coordinate {
+            x: 22.785,
+            y: 13.482,
+            z: 29.543,
+        };
+        let d = Coordinate {
+            x: 21.951,
+            y: 13.670,
+            z: 30.431,
+        };
+
+        let actual_phi = -71.21515;
+        let test_phi = calc_torsion_angle(&a, &b, &c, &d);
+
+        println!("actual_phi: {:?}", actual_phi);
+        println!("test_phi: {:?}", test_phi);
+    }
+
+    #[test]
+    fn test_calc_torsion_angle_vec() {
+        let coord_vec = CoordinateVector {
+            x: vec![24.969, 24.044, 22.785, 21.951],
+            y: vec![13.428, 12.661, 13.482, 13.670],
+            z: vec![30.692, 29.808, 29.543, 30.431],
+            size: 4,
+        };
+        let torsion_vec = coord_vec.calc_all_torsion_angles();
+        println!("torsion_vec: {}", torsion_vec[0]);
+    }
+
+
 }

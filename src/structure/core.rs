@@ -105,6 +105,7 @@ pub struct CompactStructure {
     pub residue_name: Vec<[u8;3]>,
     pub ca_vector: CarbonCoordinateVector,
     pub cb_vector: CarbonCoordinateVector,
+    pub ca_torsion_vector: Vec<Option<f32>>,
 }
 
 impl CompactStructure {
@@ -179,6 +180,7 @@ impl CompactStructure {
                 }
             }
         }
+        let ca_torsion_vec = ca_vec.calc_all_torsion_angles();
 
         CompactStructure {
             num_chains: origin.num_chains,
@@ -188,6 +190,7 @@ impl CompactStructure {
             residue_name: res_name_vec,
             ca_vector: ca_vec,
             cb_vector: cb_vec,
+            ca_torsion_vector: ca_torsion_vec,
         }
     }
 
@@ -237,6 +240,19 @@ impl CompactStructure {
         } else {
             None
         }
+    }
+
+    pub fn get_accumulated_torsion(&self, idx1: usize, idx2: usize) -> Option<f32> {
+        if idx1.abs_diff(idx2) < 3 {
+            return None;
+        }
+        let start_ind = idx1.min(idx2);
+        let end_ind = idx1.max(idx2) - 3;
+        let mut torsion = 0.0;
+        for idx in start_ind..end_ind {
+            torsion += self.ca_torsion_vector[idx].unwrap_or(0.0);
+        }
+        Some(torsion)
     }
 }
 

@@ -12,6 +12,7 @@ pub struct Controller {
     pub numeric_id_vec: Vec<usize>,
     pub hash_collection_vec: Vec<HashCollection>,
     pub res_pair_vec: Vec<Vec<(u64, u64, [u8; 3], [u8; 3])>>, // WARNING: TEMPORARY
+    pub remove_redundancy: bool,
 }
 
 impl Controller {
@@ -21,6 +22,7 @@ impl Controller {
             numeric_id_vec: Vec::new(),
             hash_collection_vec: Vec::new(),
             res_pair_vec: Vec::new(),// WARNING: TEMPORARY
+            remove_redundancy: false,
         }
     }
 
@@ -36,11 +38,16 @@ impl Controller {
 
             for n in 0..compact.num_residues {
                 for m in n..compact.num_residues {
-                    if n == m {
+                    // if n == m {
+                    //     continue;
+                    // }
+                    if n.abs_diff(m) < 3 { // WARNING: TEMPORARY FOR CHECKING IF ACCUMULATED TORSION WORKS
                         continue;
                     }
+
                     let dist = compact.get_distance(n, m).expect("cannot get distance");
-                    let angle = compact.get_angle(n, m).unwrap_or(0.0);
+                    // let angle = compact.get_angle(n, m).unwrap_or(0.0);
+                    let angle = compact.get_accumulated_torsion(n, m).expect("cannot get accumulated torsion angle");
                     let hash_value = HashValue::perfect_hash(dist, angle);
                     hash_collector.collect_hash(hash_value);
 
@@ -52,7 +59,9 @@ impl Controller {
                     res_pair_vec.push((res1, res2, res1_str, res2_str));
                 }
             }
-            // hash_collector.remove_redundancy();
+            if self.remove_redundancy {
+                hash_collector.remove_redundancy();
+            }
             self.hash_collection_vec
                 .push(hash_collector.hash_collection);
             self.res_pair_vec.push(res_pair_vec); // For debug
@@ -292,35 +301,33 @@ mod controller_tests {
         println!("{:?}", &controller.path_vec);
     }
 
-    // #[test]
-    // fn test_querying() {
-    //     let pdb_paths: Vec<String> = load_yeast_proteome();
-    //     let mut controller = Controller::new(pdb_paths);
-    //     controller.fill_numeric_id_vec();
-    //     controller.collect_hash();
-    //     let index_builder = IndexBuilder::new();
-    //     let index_table =
-    //         index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
-    //     let query: HashValue = HashValue::from_u16(3158u16);
-    //     let result = query_single(&index_table, &query);
-    //     println!("{:?}", result);
-    //     let homeobox_queries = [
-    //         HashValue::from_u16(3698u16),
-    //         HashValue::from_u16(2684u16),
-    //         HashValue::from_u16(2409u16),
-    //         HashValue::from_u16(3390u16),
-    //         HashValue::from_u16(3440u16),
-    //     ];
-    //     let result = query_multiple(&index_table, &homeobox_queries);
-    //     println!("{:?}", result);
-    //     if let Some(result) = result {
-    //         for i in result {
-    //             println!("{:?}", controller.path_vec.get(i));
-    //         }
-    //     }
-    //     let printer = IndexTablePrinter::Debug;
-    //     printer.print(&index_table, "data/yeast_index_table.tsv");
-    //     println!("{:?}", &controller.path_vec);
-    // }
+    #[test]
+    fn test_querying() {
+        let pdb_paths: Vec<String> = load_yeast_proteome();
+        let mut controller = Controller::new(pdb_paths);
+        controller.remove_redundancy = true;
+        controller.fill_numeric_id_vec();
+        controller.collect_hash();
+
+        let index_builder = IndexBuilder::new();
+        let index_table =
+            index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
+        let query: HashValue = HashValue::from_u16(4255u16);
+        let result = query_single(&index_table, &query);
+        println!("{:?}", result);
+        let homeobox_queries = [
+            HashValue::from_u16(4255u16),
+        ];
+        let result = query_multiple(&index_table, &homeobox_queries);
+        println!("{:?}", result);
+        if let Some(result) = result {
+            for i in result {
+                println!("{:?}", controller.path_vec.get(i));
+            }
+        }
+        let printer = IndexTablePrinter::Debug;
+        printer.print(&index_table, "data/yeast_index_table.tsv");
+        println!("{:?}", &controller.path_vec);
+    }
 
 }

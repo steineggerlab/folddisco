@@ -1,0 +1,26 @@
+cd ../homeobox
+open *.pdb
+color gray
+
+# color first motif deeppink
+color #1:82-89 #2:215-222 #3:245-252 #4:11-18 deeppink
+# color second motif orange
+color #1:100-106 #2:233-239 #3:266-272 #4:26-32 orange
+# color third motif powderblue
+color #1:113-116 #2:246-249 #3:279-282 #4:42-45 powderblue
+
+# align all models (align is not working for homeo box, instead used mm)
+# align #2:215-222 to #1:82-89;align #2:233-239 to #1:100-106;align #2;246-249 to #1:113-116;align #3:245-252 to #1:82-89;align #3:266-272 to #1:100-106;align #3;279-282 to #1:113-116;align #4:11-18 to #1:82-89;align #4:26-32 to #1:100-106;align #4;42-45 to #1:113-116
+mm #2 to #1;mm #3 to #1;mm #4 to #1
+
+hide cartoons
+# show #1:82-89,100-106,113-116 #2:215-222,233-239,246-249 #3:245-252,266-272,279-282 #4:11-18,26-32,42-45 atom
+show #1:82-89,100-106,113-116 #2:215-222,233-239,246-249 #3:245-252,266-272,279-282 #4:11-18,26-32,42-45 cartoon
+
+### Awk commands to generate chimeraX commands
+# awk -F"\t" 'BEGIN {ORS=" ";print "color"} NR!=1 {printf "#%d:%d-%d ",NR-1,$3,$4} END {print "deeppink"}' data/homeobox/info.tsv
+# awk -F"\t" 'BEGIN {ORS=" ";print "color"} NR!=1 {printf "#%d:%d-%d ",NR-1,$5,$6} END {print "orange"}' data/homeobox/info.tsv
+# awk -F"\t" 'BEGIN {ORS=" ";print "color"} NR!=1 {printf "#%d:%d-%d ",NR-1,$7,$8} END {print "powderblue"}' data/homeobox/info.tsv
+# awk -F"\t" 'NR!=1 && NR !=2 {printf "align #%d:%d-%d,%d-%d,%d-%d to #1:82-89,100-106,113-116;", NR-1,$3,$4,$5,$6,$7,$8}' data/homeobox/info.tsv
+# awk -F"\t" 'NR!=1 && NR !=2 {printf "align #%d:%d-%d to #1:82-89;align #%d:%d-%d to #1:100-106;align #%d;%d-%d to #1:113-116;", NR-1,$3,$4,NR-1,$5,$6,NR-1,$7,$8}' data/homeobox/info.tsv
+# awk -F"\t" 'BEGIN {ORS=" ";print "show"} NR!=1 {printf "#%d:%d-%d,%d-%d,%d-%d ",NR-1,$3,$4,$5,$6,$7,$8} END {print "atoms"}' data/homeobox/info.tsv

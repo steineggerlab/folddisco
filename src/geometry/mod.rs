@@ -1,2 +1,3 @@
 pub mod core;
-pub mod hash;
+pub mod simple_hash;
+pub mod hash_func;

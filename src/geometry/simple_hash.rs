@@ -33,6 +33,10 @@ impl HashValue {
         let hashvalue = dist << 8 | angle;
         HashValue(hashvalue)
     }
+
+    // pub fn
+
+
 }
 
 impl fmt::Debug for HashValue {

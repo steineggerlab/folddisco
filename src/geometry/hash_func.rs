@@ -64,18 +64,18 @@ mod hash_func_test {
 
 }
 
-pub struct U64Hasher;
+// pub struct U64Hasher;
 
-impl Hasher for U64Hasher {
-    fn finish(&self) -> u64 {
-        0
-    }
+// impl Hasher for U64Hasher {
+//     fn finish(&self) -> u64 {
+//         0
+//     }
 
-    fn write(&mut self, _bytes: &[u8]) {
-        unimplemented!()
-    }
+//     fn write(&mut self, _bytes: &[u8]) {
+//         unimplemented!()
+//     }
 
-    fn write_u64(&mut self, i: u64) {
-        unimplemented!()
-    }
-}
+//     fn write_u64(&mut self, i: u64) {
+//         unimplemented!()
+//     }
+// }

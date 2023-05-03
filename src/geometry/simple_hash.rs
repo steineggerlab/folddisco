@@ -2,7 +2,7 @@ use std::fmt;
 // use std::hash::Hasher;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
-pub struct HashValue(u16);
+pub struct HashValue(u64);
 
 impl HashValue {
     // Constructor
@@ -11,32 +11,32 @@ impl HashValue {
     //     HashValue(hashvalue)
     // }
 
-    pub fn from_u16(hashvalue: u16) -> Self {
+    pub fn from_u64(hashvalue: u64) -> Self {
         HashValue(hashvalue)
     }
 
     pub fn perfect_hash(dist: f32, angle: f32) -> Self {
-        let dist = dist.round() as u16;
-        let angle = angle.round() as u16;
-        let hashvalue = dist << 8 | angle;
+        let hashvalue = (dist.to_bits() as u64) << 32 | angle.to_bits() as u64;
         HashValue(hashvalue)
     }
-    pub fn reverse_hash(&self) -> (u16, u16) {
-        let dist = self.0 >> 8;
-        let angle = self.0 & 0b11111111;
+
+    pub fn reverse_hash(&self) -> (f32, f32) {
+        let dist_bits = (self.0 >> 32) as u32;
+        let angle_bits = (self.0 & 0x00000000FFFFFFFF) as u32;
+        let dist = f32::from_bits(dist_bits);
+        let angle = f32::from_bits(angle_bits);
         (dist, angle)
     }
-    pub fn loose_hash(&self) -> Self {
-        let (dist, angle) = self.reverse_hash();
-        let dist = dist / 2; // 20 seems to be too loose
-        let angle = angle / 5; // 20 seems to be too loose
-        let hashvalue = dist << 8 | angle;
-        HashValue(hashvalue)
-    }
+
+    // pub fn loose_hash(&self) -> Self {
+    //     let (dist, angle) = self.reverse_hash();
+    //     let dist = dist / 2; // 20 seems to be too loose
+    //     let angle = angle / 5; // 20 seems to be too loose
+    //     let hashvalue = dist << 8 | angle;
+    //     HashValue(hashvalue)
+    // }
 
     // pub fn
-
-
 }
 
 impl fmt::Debug for HashValue {
@@ -55,6 +55,23 @@ impl fmt::Display for HashValue {
 }
 
 pub type HashCollection = Vec<HashValue>;
+
+
+
+pub fn discretize_angle(val: f32) -> u16 {
+    // min = -180, max = 180, bins = 2^16,
+    let cont_f = 360.0_f32 / (2.0_f32.powi(16) - 1.0_f32);
+    let disc_f = 1.0_f32 / cont_f;
+    (val - (-180.0) * (disc_f) + 0.5) as u16
+}
+
+pub fn continuize_anlge(val: u16) -> f32 {
+    // min = -180, max = 180, bins = 2^16, disc_f = 2^16 / 360, cont_f = 360 / 2^16
+    let cont_f = 360.0_f32 / (2.0_f32.powi(16) - 1.0_f32);
+
+    (val as f32) * (cont_f) - 180.0
+}
+
 
 // #[derive(Debug)]
 // pub struct GeometricHasher {

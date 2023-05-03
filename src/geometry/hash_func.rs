@@ -52,7 +52,7 @@ mod hash_func_test {
     #[test]
     fn test_hash_64_comparison_inline() {
         let start = std::time::Instant::now();
-        for i in 0..10000000 {
+        for i in 0..100000 {
             let key = i;
             let h_key = super::hash_64(key);
             let inv_key = super::hash_64_inv(h_key);

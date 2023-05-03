@@ -150,6 +150,12 @@ pub fn continuize_u32_vec(vec: &Vec<Option<u32>>, disc_params: &DiscParams) -> V
     cont_vec
 }
 
+
+
+
+
+
+
 /* TESTS */
 #[cfg(test)]
 mod tests {

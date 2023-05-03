@@ -246,14 +246,19 @@ impl CompactStructure {
         if idx1.abs_diff(idx2) < 3 {
             return None;
         }
-        let start_ind = idx1.min(idx2);
-        let end_ind = idx1.max(idx2) - 3;
+        let start_ind = idx1;
+        let end_ind = idx2 - 3;
         let mut torsion = 0.0;
         for idx in start_ind..end_ind {
             torsion += self.ca_torsion_vector[idx].unwrap_or(0.0);
         }
         Some(torsion)
     }
+
+    pub fn get_torsion(&self, idx: usize) -> Option<f32> {
+        self.ca_torsion_vector[idx ]
+    }
+
 }
 
 #[cfg(test)]

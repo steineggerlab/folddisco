@@ -77,7 +77,7 @@ fn write_index_table_debug<T: Hash + Display, U: Display + Hash + Ord + Eq>(
     path: &str,
 ) {
     let mut file = std::fs::File::create(path).expect("Unable to create file");
-    file.write_all(b"hash\tdist\tangle\tids\tidcount\tid_unique\n")
+    file.write_all(b"hash\tedge1\tedge2\tedge3\tids\tidcount\tid_unique\n")
         .expect("Unable to write data");
     for (key, value) in index_table {
         let value_comma_separated = value

@@ -6,3 +6,6 @@
 /data/yeast
 /data/yeast_full
 /archive
+*_index_table.tsv
+*_hash_per_pair.tsv
+*.pdb.tsv

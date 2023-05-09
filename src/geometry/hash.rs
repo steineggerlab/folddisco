@@ -52,33 +52,59 @@ impl fmt::Display for HashValue {
 
 pub type HashCollection = Vec<HashValue>;
 
-// #[derive(Debug)]
-// pub struct GeometricHasher {
-//     angles: Vec<f32>,
-//     distances: Vec<f32>,
-//     hashvalue: Vec<u64>, // TODO: Figure out the data type for hash
-// }
+#[cfg(test)]
+mod tests {
+    // use super::*;
+    use crate::{geometry, structure};
+    use crate::utils::calculator::Calculate;
+    #[test]
+    fn test_hash1() {
+        let f = structure::io::pdb::Reader::from_file("data/111l_alpha.pdb").unwrap();
+        let structure = &f.read_structure().unwrap();
+        let compact = &structure.to_compact();
+        
+        for i in 0..compact.num_residues {
+            for j in i+1..compact.num_residues {
+                let ci = compact.get_ca(i).expect("compact failed to get CA");
+                let cj = compact.get_ca(j).expect("compact failed to get CA");
 
-// impl GeometricHasher {
-//     pub fn new(angles: Vec<f32>, distances: Vec<f32>) -> GeometricHasher {
-//         GeometricHasher {
-//             angles: angles,
-//             distances: distances,
-//             hashvalue: Vec::new(),
-//         }
-//     }
-// }
+                let dist = compact.get_distance(i,j).expect("compact failed to get distance");
+                let angle = compact.get_angle(i,j).expect("compact failed to get angle");
+                let torsion = ci.calc_torsion_angle(&cj, &cj, &cj);
 
-// impl Hasher for HashValue {
-//     fn finish(&self) -> u64 {
-//         self.0 as u64
-//     }
+                let hashvalue = geometry::hash::HashValue::perfect_hash(dist, angle);
+                let reverse = hashvalue.reverse_hash();
 
-//     fn write(&mut self, _bytes: &[u8]) {
+                // println!("residue1: {}, residue2: {}, dist: {}=={}, angle: {}=={}", i, j, dist.round(), reverse.0, angle.round(), reverse.1);
+                assert_eq!(dist.round() as u16, reverse.0);
+                assert_eq!(angle.round() as u16, reverse.1);
+            }
+        }
+    }
 
-//     }
+    #[test]
+    fn test_hash2() {
+        let f = structure::io::pdb::Reader::from_file("data/AF-Q8W3K0-F1-model_v4.pdb").unwrap();
+        let structure = &f.read_structure().unwrap();
+        let compact = &structure.to_compact();
+        
+        for i in 0..compact.num_residues {
+            for j in i+1..compact.num_residues {
+                let ci = compact.get_ca(i).expect("compact failed to get CA");
+                let cj = compact.get_ca(j).expect("compact failed to get CA");
 
-//     fn write_u64(&mut self, i: u64) {
-//         self.0 = i as u16;
-//     }
-// }
+                let dist = compact.get_distance(i,j).expect("compact failed to get distance");
+                let angle = compact.get_angle(i,j).expect("compact failed to get angle");
+                let torsion = ci.calc_torsion_angle(&cj, &cj, &cj);
+
+                let hashvalue = geometry::hash::HashValue::perfect_hash(dist, angle);
+                let reverse = hashvalue.reverse_hash();
+
+                println!("residue1: {}, residue2: {}, dist: {}=={}, angle: {}=={}", i, j, dist.round(), reverse.0, angle.round(), reverse.1);
+                assert_eq!(dist.round() as u16, reverse.0);
+                assert_eq!(angle.round() as u16, reverse.1);
+            }
+        } 
+    }
+
+}

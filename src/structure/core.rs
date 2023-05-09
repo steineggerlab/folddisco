@@ -39,52 +39,6 @@ impl Structure {
         self.atom_vector.push_atom(atom);
     }
 
-    // fn _fill_gly_cbeta(&mut self) {
-    //     // Iterate over self.atom_vector
-
-    //     let mut curr_res_serial: u64 = 0;
-
-    //     let mut gly_n = Atom::new_empty();
-    //     let mut gly_ca = Atom::new_empty();
-    //     let mut gly_c = Atom::new_empty();
-    //     let mut gly_o = Atom::new_empty();
-
-    //     for i in 0..self.atom_vector.len() {
-    //         if self.atom_vector.res_name.get(i) == Some(b"GLY") {
-    //             match self.atom_vector.res_serial.get(i) {
-    //                 Some(res_serial) => {
-    //                     if curr_res_serial != *res_serial {
-    //                         curr_res_serial = *res_serial;
-    //                         gly_n = Atom::new_empty();
-    //                         gly_ca = Atom::new_empty();
-    //                         gly_c = Atom::new_empty();
-    //                         gly_o = Atom::new_empty();
-    //                     }
-    //                 }
-    //                 None => (),
-    //             }
-    //             match self.atom_vector.atom_name.get(i) {
-    //                 Some(b" N  ") => gly_n = self.atom_vector.get(i),
-    //                 Some(b" CA ") => gly_ca = self.atom_vector.get(i),
-    //                 Some(b" C  ") => gly_c = self.atom_vector.get(i),
-    //                 Some(b" O  ") => gly_o = self.atom_vector.get(i),
-    //                 _ => (),
-    //             }
-    //             if gly_n.is_empty() || gly_ca.is_empty() || gly_c.is_empty() || gly_o.is_empty() {
-    //                 continue;
-    //             } else {
-    //                 let cbeta_coord = approx_cb(
-    //                     &gly_ca.get_coordinate(),
-    //                     &gly_n.get_coordinate(),
-    //                     &gly_c.get_coordinate(),
-    //                 );
-    //                 // // Make new cbeta atom
-    //                 // let cbeta_atom = Atom::new(cbeta_coord.x, cbeta_coord.y, cbeta_coord.z, b"CB  ", b"GLY", gly_ca.chain, gly_ca.res_serial, gly_ca.res_name, );
-    //             }
-    //         }
-    //     }
-    // }
-
     pub fn to_compact(&self) -> CompactStructure {
         CompactStructure::build(self)
     }

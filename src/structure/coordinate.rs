@@ -1,5 +1,7 @@
 use crate::utils::calculator::Calculate;
 use crate::utils::constants::CA_CB_DIST;
+use crate::structure::core::Structure;
+
 #[derive(Debug, Clone)]
 pub struct Coordinate {
     pub x: f32,
@@ -80,16 +82,37 @@ impl Calculate for Coordinate {
     fn calc_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate) -> f32 {
         let (a, b, c, d) = (self, atom2, atom3, atom4);
         // Form vectors
-        let v1 = (b.x - a.x, b.y - a.y, b.z - a.z); // vector 1
-        let v2 = (d.x - c.x, d.y - c.y, d.z - c.z); // vector 2
-        let dot = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2; // dot product
-        let v1_len = (v1.0.powf(2.0) + v1.1.powf(2.0) + v1.2.powf(2.0)).sqrt(); // length of vector 1
-        let v2_len = (v2.0.powf(2.0) + v2.1.powf(2.0) + v2.2.powf(2.0)).sqrt(); // length of vector 2
+        let v1 = b.sub(a); // vector 1
+        let v2 = d.sub(c); // vector 2
+        let dot = v1.dot(&v2); // dot product
+        let v1_len = v1.norm(); // length of vector 1
+        let v2_len = v2.norm(); // length of vector 2
         let cos = dot / (v1_len * v2_len); // cos of angle
         let radian = cos.acos(); // angle in radians
         let degree = radian.to_degrees(); // angle in degrees
         degree
     }
+
+    fn calc_torsion_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate) -> f32 {
+        let (ca, b, c, d) = (self, atom2, atom3, atom4);
+        // If psi angle, b: N(i), ca: CA(i), c: C(i), d: N(i+1)
+        // If phi angle, b: C(i-1), c: N(i), ca: CA(i), d: C(i)
+
+        // Form vectors
+        // FIXME: order of atoms do not match
+        let v1 = b.sub(ca);
+        let v2 = c.sub(b);
+        let v3 = d.sub(c);
+
+        // Form normal vectors via cross products
+        let r = v1.cross(&v2).normalize();
+        let s = v2.cross(&v3).normalize();
+        let t = r.cross(&v2.normalize()).normalize();
+        let x = r.dot(&s);
+        let y = s.dot(&t);
+        -y.atan2(x).to_degrees()
+    }
+
 }
 
 // Originally from foldseek StructureTo3DiBase::approxCBetaPosition
@@ -167,6 +190,51 @@ impl CarbonCoordinateVector {
 
 }
 
+// IDEA: TORSION ANGLE
+pub fn calc_torsion_angle(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate) -> f32 {
+    let (a, b, c, d) = (atom1, atom2, atom3, atom4);
+    // If psi angle, b: N(i), ca: CA(i), c: C(i), d: N(i+1)
+    // If phi angle, b: C(i-1), c: N(i), ca: CA(i), d: C(i)
+
+    // Form vectors
+    let v1 = b.sub(a);
+    let v2 = c.sub(b);
+    let v3 = d.sub(c);
+
+    // Form normal vectors via cross products
+    let r = v1.cross(&v2).normalize();
+    let s = v2.cross(&v3).normalize();
+    let t = r.cross(&v2.normalize()).normalize();
+    let x = r.dot(&s);
+    let y = s.dot(&t);
+    -y.atan2(x).to_degrees()
+}
+
+pub fn get_psi_angle(structure: &Structure, idx: usize) -> f32 {
+    let psi_vec: Vec<f32> = Vec::new();
+
+    let n = structure.atom_vector.get_nth_n(idx).get_coordinate();
+    let ca = structure.atom_vector.get_nth_ca(idx).get_coordinate();
+    let c = structure.atom_vector.get_nth_c(idx).get_coordinate();
+    let n2 = structure.atom_vector.get_nth_n(idx+1).get_coordinate();
+
+    let psi = calc_torsion_angle(&n, &ca,&c, &n2);
+    psi
+}
+
+pub fn get_all_psi_angles(structure: &Structure) -> Vec<f32> {
+    let mut psi_vec: Vec<f32> = Vec::new();
+
+    for i in 0..structure.num_residues {
+        let psi = get_psi_angle(structure, i);
+        psi_vec.push(psi);
+    }
+
+    psi_vec
+}
+
+// TODO: implement get_torsion_angle (phi)
+
 #[cfg(test)]
 mod coordinate_tests {
     use super::*;
@@ -198,5 +266,35 @@ mod coordinate_tests {
         println!("actual_cb: {:?}", actual_cb);
         println!("test_cb: {:?}", test_cb);
         println!("distance: {:?}", actual_cb.distance(&test_cb));
+    }
+
+    #[test]
+    fn test_calc_torsion_angle() {
+        let a = Coordinate {
+            x: 24.969,
+            y: 13.428,
+            z: 30.692,
+        };
+        let b = Coordinate {
+            x: 24.044,
+            y: 12.661,
+            z: 29.808,
+        };
+        let c = Coordinate {
+            x: 22.785,
+            y: 13.482,
+            z: 29.543,
+        };
+        let d = Coordinate {
+            x: 21.951,
+            y: 13.670,
+            z: 30.431,
+        };
+
+        let actual_torsion = -71.21515;
+        let test_torsion = a.calc_torsion_angle(&b, &c, &d);
+
+        println!("actual_torsion: {:?}", actual_torsion);
+        println!("test_torsion: {:?}", test_torsion);
     }
 }

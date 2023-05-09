@@ -9,3 +9,4 @@
 *_index_table.tsv
 *_hash_per_pair.tsv
 *.pdb.tsv
+data/cys_his_asp.zip

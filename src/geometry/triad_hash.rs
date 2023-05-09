@@ -7,21 +7,16 @@ impl HashValue {
 
     pub fn perfect_hash(edge1: f32, edge2: f32, edge3: f32) -> Self {
         let mut hashvalue = 0;
-        let mut edges = vec![edge1, edge2, edge3];
+        let edges = vec![edge1, edge2, edge3];
         // If edges are not sorted, panic
-        if edges[0] > edges[1] {
-            panic!("01 Edges are not sorted");
-        } else if edges[1] > edges[2] {
-            panic!("02 Edges are not sorted");
+        if edges[0] > edges[1] || edges[0] > edges[2] || edges[1] > edges[2] {
+            panic!("Edges are not sorted"); // Not panic, but return None
         }
         // If edges are not in range, panic
-        if edges[0] < 3.5 || edges[0] > 19.5 {
-            panic!("03 Edges are not in range");
-        } else if edges[1] < 3.5 || edges[1] > 19.5 {
-            panic!("04 Edges are not in range");
-        } else if edges[2] < 3.5 || edges[2] > 19.5 {
-            println!("{}", edges[2]);
-            panic!("05 Edges are not in range");
+        for edge in edges.iter() {
+            if *edge < 3.5 || *edge > 19.5 {
+                panic!("Edges are not in range");
+            }
         }
 
         let edge1 = (edge1.round() - 4.0_f32) as u16;

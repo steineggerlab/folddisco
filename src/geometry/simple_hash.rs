@@ -65,7 +65,7 @@ pub fn discretize_angle(val: f32) -> u16 {
     (val - (-180.0) * (disc_f) + 0.5) as u16
 }
 
-pub fn continuize_anlge(val: u16) -> f32 {
+pub fn continuize_angle(val: u16) -> f32 {
     // min = -180, max = 180, bins = 2^16, disc_f = 2^16 / 360, cont_f = 360 / 2^16
     let cont_f = 360.0_f32 / (2.0_f32.powi(16) - 1.0_f32);
 

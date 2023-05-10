@@ -2,7 +2,8 @@ use std::io::Write;
 use std::collections::HashMap;
 
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
-use crate::geometry::triad_hash::{HashCollection, HashValue};
+// use crate::geometry::triad_hash::{HashCollection, HashValue};
+use crate::geometry::ppf::{HashCollection, HashValue};
 use crate::index::builder::IndexBuilder;
 use crate::index::*;
 use crate::structure::core::CompactStructure;
@@ -12,7 +13,7 @@ pub struct Controller {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
     pub hash_collection_vec: Vec<HashCollection>,
-    pub res_pair_vec: Vec<Vec<(u64, u64, u64)>>, // WARNING: TEMPORARY
+    pub res_pair_vec: Vec<Vec<(u64, u64, [u8;3], [u8;3])>>, // WARNING: TEMPORARY
     pub remove_redundancy: bool,
 }
 
@@ -27,39 +28,94 @@ impl Controller {
         }
     }
 
-    // pub fn collect_hash(&mut self) {
+    pub fn collect_hash(&mut self) {
+        for i in 0..self.path_vec.len() {
+            let pdb_path = &self.path_vec[i];
+            let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
+            let structure = pdb_reader.read_structure().expect("structure read failed");
+            let compact = structure.to_compact();
+            let mut hash_collector = GeometryHashCollector::new();
+
+            let mut res_pairs: Vec<(u64, u64, [u8;3], [u8;3])> = Vec::new(); // WARNING: TEMPORARY
+
+            for n in 0..compact.num_residues {
+                for m in 0..compact.num_residues {
+                    if n == m {
+                        continue;
+                    }
+                    // if n.abs_diff(m) < 3 { // WARNING: TEMPORARY FOR CHECKING IF ACCUMULATED TORSION WORKS
+                    //     continue;
+                    // }
+
+                    let ppf = compact.get_ppf(n, m).expect("cannot get ppf");
+                    // let angle = compact.get_accumulated_torsion(n, m).expect("cannot get accumulated torsion angle");
+                    let hash_value = HashValue::perfect_hash(&ppf);
+                    hash_collector.collect_hash(hash_value);
+
+                    // WARNING: TEMPORARY
+                    let res1 = compact.residue_serial[n];
+                    let res2 = compact.residue_serial[m];
+                    let res1_str = compact.residue_name[n];
+                    let res2_str = compact.residue_name[m];
+                    res_pairs.push((res1, res2, res1_str, res2_str));
+                }
+            }
+            if self.remove_redundancy {
+                hash_collector.remove_redundancy();
+            }
+            self.hash_collection_vec
+                .push(hash_collector.hash_collection);
+            self.res_pair_vec.push(res_pairs); // For debug
+        }
+        // TEMPORARY
+        println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
+    }
+
+
+    // pub fn collect_triad_hash(&mut self) {
     //     for i in 0..self.path_vec.len() {
     //         let pdb_path = &self.path_vec[i];
     //         let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
     //         let structure = pdb_reader.read_structure().expect("structure read failed");
     //         let compact = structure.to_compact();
     //         let mut hash_collector = GeometryHashCollector::new();
-
     //         let mut res_pair_vec = Vec::new(); // WARNING: TEMPORARY
-
     //         for n in 0..compact.num_residues {
     //             for m in n..compact.num_residues {
-    //                 // if n == m {
-    //                 //     continue;
-    //                 // }
-    //                 if n.abs_diff(m) < 3 { // WARNING: TEMPORARY FOR CHECKING IF ACCUMULATED TORSION WORKS
-    //                     continue;
+    //                 for o in m..compact.num_residues {
+    //                     if n == m || m == o || n == o {
+    //                         continue;
+    //                     }
+    //                     if n.abs_diff(m) < 2 || m.abs_diff(o) < 2 || n.abs_diff(o) < 2 {
+    //                         continue;
+    //                     }
+    //                     if !(n < m && m < o) {
+    //                         continue;
+    //                     }
+
+    //                     let dist1 = compact.get_distance(n, m).expect("cannot get distance");
+    //                     if dist1 < 3.5 || dist1 > 19.5 { // distance range is 3.5 ~ 19.5
+    //                         continue;
+    //                     }
+    //                     let dist2 = compact.get_distance(m, o).expect("cannot get distance");
+    //                     if dist2 < 3.5 || dist2 > 19.5 { // distance range is 3.0 ~ 20.0
+    //                         continue;
+    //                     }
+    //                     let dist3 = compact.get_distance(n, o).expect("cannot get distance");
+    //                     if dist3 < 3.5 || dist3 > 19.5 { // distance range is 3.0 ~ 20.0
+    //                         continue;
+    //                     }
+    //                     let mut edges = vec![dist1, dist2, dist3];
+    //                     edges.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    //                     let hash_value = crate::geometry::triad_hash::HashValue::perfect_hash(edges[0], edges[1], edges[2]);
+    //                     hash_collector.collect_hash(hash_value);
+    //                     res_pair_vec.push(
+    //                         (compact.residue_serial[n], compact.residue_serial[m], compact.residue_serial[o])
+    //                     ); // WARNING: TEMPORARY
     //                 }
-
-    //                 let dist = compact.get_distance(n, m).expect("cannot get distance");
-    //                 let angle = compact.get_angle(n, m).unwrap_or(0.0);
-    //                 // let angle = compact.get_accumulated_torsion(n, m).expect("cannot get accumulated torsion angle");
-    //                 let hash_value = HashValue::perfect_hash(dist, angle);
-    //                 hash_collector.collect_hash(hash_value);
-
-    //                 // WARNING: TEMPORARY
-    //                 let res1 = compact.residue_serial[n];
-    //                 let res2 = compact.residue_serial[m];
-    //                 let res1_str = compact.residue_name[n];
-    //                 let res2_str = compact.residue_name[m];
-    //                 res_pair_vec.push((res1, res2, res1_str, res2_str));
     //             }
     //         }
+
     //         if self.remove_redundancy {
     //             hash_collector.remove_redundancy();
     //         }
@@ -67,63 +123,7 @@ impl Controller {
     //             .push(hash_collector.hash_collection);
     //         self.res_pair_vec.push(res_pair_vec); // For debug
     //     }
-    //     // TEMPORARY
-    //     println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
     // }
-
-
-    pub fn collect_triad_hash(&mut self) {
-        for i in 0..self.path_vec.len() {
-            let pdb_path = &self.path_vec[i];
-            let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
-            let structure = pdb_reader.read_structure().expect("structure read failed");
-            let compact = structure.to_compact();
-            let mut hash_collector = GeometryHashCollector::new();
-            let mut res_pair_vec = Vec::new(); // WARNING: TEMPORARY
-            for n in 0..compact.num_residues {
-                for m in n..compact.num_residues {
-                    for o in m..compact.num_residues {
-                        if n == m || m == o || n == o {
-                            continue;
-                        }
-                        if n.abs_diff(m) < 2 || m.abs_diff(o) < 2 || n.abs_diff(o) < 2 {
-                            continue;
-                        }
-                        if !(n < m && m < o) {
-                            continue;
-                        }
-
-                        let dist1 = compact.get_distance(n, m).expect("cannot get distance");
-                        if dist1 < 3.5 || dist1 > 19.5 { // distance range is 3.5 ~ 19.5
-                            continue;
-                        }
-                        let dist2 = compact.get_distance(m, o).expect("cannot get distance");
-                        if dist2 < 3.5 || dist2 > 19.5 { // distance range is 3.0 ~ 20.0
-                            continue;
-                        }
-                        let dist3 = compact.get_distance(n, o).expect("cannot get distance");
-                        if dist3 < 3.5 || dist3 > 19.5 { // distance range is 3.0 ~ 20.0
-                            continue;
-                        }
-                        let mut edges = vec![dist1, dist2, dist3];
-                        edges.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                        let hash_value = crate::geometry::triad_hash::HashValue::perfect_hash(edges[0], edges[1], edges[2]);
-                        hash_collector.collect_hash(hash_value);
-                        res_pair_vec.push(
-                            (compact.residue_serial[n], compact.residue_serial[m], compact.residue_serial[o])
-                        ); // WARNING: TEMPORARY
-                    }
-                }
-            }
-
-            if self.remove_redundancy {
-                hash_collector.remove_redundancy();
-            }
-            self.hash_collection_vec
-                .push(hash_collector.hash_collection);
-            self.res_pair_vec.push(res_pair_vec); // For debug
-        }
-    }
 
     pub fn fill_numeric_id_vec(&mut self) {
         string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
@@ -135,7 +135,7 @@ impl Controller {
             let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
             println!("Saving to {}", new_path);
             let mut file = std::fs::File::create(new_path).expect("Unable to create file");
-            file.write_all(b"hash\tedge1\tedge2\tedge3\tres1_ind\tres2_ind\tres3_ind\tpdb\n").expect("Unable to write header");
+            file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
             let hash_collection = &self.hash_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
             println!("{}: {} hashes, {} pairs", pdb_path, hash_collection.len(), res_pair_vec.len());
@@ -143,8 +143,9 @@ impl Controller {
                 let hash_value = hash_collection[j];
                 let res1 = res_pair_vec[j].0;
                 let res2 = res_pair_vec[j].1;
-                let res3 = res_pair_vec[j].2;
-                file.write_all(format!("{}\t{}\t{}\t{:?}\t{}\n", hash_value, res1, res2, res3, pdb_path).as_bytes())
+                let res1_str = res_pair_vec[j].2;
+                let res2_str = res_pair_vec[j].3;
+                file.write_all(format!("{}\t{}\t{}\t{:?}\t{:?}\t{}\n", hash_value, res1, res2, res1_str, res2_str, pdb_path).as_bytes())
                     .expect("Unable to write data");
             }
         }
@@ -152,7 +153,7 @@ impl Controller {
 
     pub fn save_filtered_hash_pair(&self, path: &str, res_pair_filter: &HashMap<String, Vec<u64>>) {
         let mut file = std::fs::File::create(path).expect("Unable to create file");
-        file.write_all(b"hash\tedge1\tedge2\tedge3\tres1_ind\tres2_ind\tres3_ind\tpdb\n").expect("Unable to write header");
+            file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
         for i in 0..self.hash_collection_vec.len() {
             let pdb_path = self.path_vec[i].split("/").last().unwrap();
             if !res_pair_filter.contains_key(pdb_path) {
@@ -165,9 +166,10 @@ impl Controller {
                 let hash_value = hash_collection[j];
                 let res1 = res_pair_vec[j].0;
                 let res2 = res_pair_vec[j].1;
-                let res3 = res_pair_vec[j].2;
-                if res_pair_filter[pdb_path].contains(&res1) && res_pair_filter[pdb_path].contains(&res2) && res_pair_filter[pdb_path].contains(&res3) {
-                    file.write_all(format!("{}\t{}\t{}\t{}\t{}\n", hash_value, res1, res2, res3, pdb_path).as_bytes())
+                let res1_str = res_pair_vec[j].2;
+                let res2_str = res_pair_vec[j].3;
+                if res_pair_filter[pdb_path].contains(&res1) && res_pair_filter[pdb_path].contains(&res2) {
+                    file.write_all(format!("{}\t{}\t{}\t{:?}\t{:?}\t{}\n", hash_value, res1, res2, res1_str, res2_str, pdb_path).as_bytes())
                     .expect("Unable to write data");
                 }
             }
@@ -278,7 +280,8 @@ mod controller_tests {
         let pdb_paths = load_homeobox_toy();
         let mut controller = Controller::new(pdb_paths);
         controller.fill_numeric_id_vec();
-        controller.collect_triad_hash();
+        // controller.collect_triad_hash();
+        controller.collect_hash();
         for i in 0..controller.hash_collection_vec.len() {
             println!(
                 "{:?} | {:?} | {:?} hashes",
@@ -298,7 +301,8 @@ mod controller_tests {
         let pdb_paths = load_homeobox_toy();
         let mut controller = Controller::new(pdb_paths);
         controller.fill_numeric_id_vec();
-        controller.collect_triad_hash();
+        // controller.collect_triad_hash();
+        controller.collect_hash();
         controller.save_hash_per_pair("data/homeobox_hash_per_pair.tsv");
         let index_builder = IndexBuilder::new();
         let index_table =
@@ -313,7 +317,8 @@ mod controller_tests {
         let pdb_paths = load_path("data/serine_peptidases");
         let mut controller = Controller::new(pdb_paths);
         controller.fill_numeric_id_vec();
-        controller.collect_triad_hash();
+        // controller.collect_triad_hash();
+        controller.collect_hash();
 
         let mut serine_filter: HashMap<String, Vec<u64>> = HashMap::new();
         serine_filter.insert(

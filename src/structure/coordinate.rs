@@ -66,6 +66,18 @@ impl Coordinate {
         let dz = self.z - other.z;
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
+
+    pub fn get_ppf(&self, other: &Coordinate) -> [f32; 4] {
+        let n1 = self.normalize();
+        let n2=other.normalize();
+        let d=other.sub(self);
+        let nd=d.normalize();
+        let n1_nd = n1.dot(&nd).acos().to_degrees();
+        let n2_nd = n2.dot(&nd).acos().to_degrees();
+        let n1_n2 = n1.dot(&n2).acos().to_degrees();
+        [d.norm(), n1_nd, n2_nd, n1_n2]
+    }
+
 }
 
 impl Calculate for Coordinate {

@@ -3,7 +3,8 @@ use std::collections::HashMap;
 
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
-use crate::geometry::ppf::{HashCollection, HashValue};
+// use crate::geometry::ppf::{HashCollection, HashValue};
+use crate::geometry::trrosetta::{HashCollection, HashValue};
 use crate::index::builder::IndexBuilder;
 use crate::index::*;
 use crate::structure::core::CompactStructure;
@@ -47,9 +48,10 @@ impl Controller {
                     //     continue;
                     // }
 
-                    let ppf = compact.get_ppf(n, m).expect("cannot get ppf");
+                    let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
+                    // let ppf = compact.get_ppf(n, m).expect("cannot get ppf");
                     // let angle = compact.get_accumulated_torsion(n, m).expect("cannot get accumulated torsion angle");
-                    let hash_value = HashValue::perfect_hash(&ppf);
+                    let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
                     hash_collector.collect_hash(hash_value);
 
                     // WARNING: TEMPORARY
@@ -135,7 +137,8 @@ impl Controller {
             let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
             println!("Saving to {}", new_path);
             let mut file = std::fs::File::create(new_path).expect("Unable to create file");
-            file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
+            file.write_all(b"hash\tcbdist\tomega\ttheta1\ttheta2\tphi1\tphi2\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
+            // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header"); // ppf
             let hash_collection = &self.hash_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
             println!("{}: {} hashes, {} pairs", pdb_path, hash_collection.len(), res_pair_vec.len());
@@ -153,7 +156,8 @@ impl Controller {
 
     pub fn save_filtered_hash_pair(&self, path: &str, res_pair_filter: &HashMap<String, Vec<u64>>) {
         let mut file = std::fs::File::create(path).expect("Unable to create file");
-            file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
+        file.write_all(b"hash\tcbdist\tomega\ttheta1\ttheta2\tphi1\tphi2\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
+            // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
         for i in 0..self.hash_collection_vec.len() {
             let pdb_path = self.path_vec[i].split("/").last().unwrap();
             if !res_pair_filter.contains_key(pdb_path) {

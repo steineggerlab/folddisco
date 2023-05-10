@@ -2,6 +2,8 @@ use crate::structure::atom::{Atom, AtomVector};
 use crate::structure::coordinate::{approx_cb, Coordinate, CarbonCoordinateVector};
 use crate::utils::calculator::Calculate;
 
+use crate::structure::coordinate::{calc_torsion_angle, calc_angle_point};
+
 /// Structure is the main data structure for storing the information of a protein structure.
 #[derive(Debug)]
 pub struct Structure {
@@ -103,6 +105,7 @@ pub struct CompactStructure {
     pub num_residues: usize,
     pub residue_serial: Vec<u64>,
     pub residue_name: Vec<[u8;3]>,
+    pub n_vector: CarbonCoordinateVector,
     pub ca_vector: CarbonCoordinateVector,
     pub cb_vector: CarbonCoordinateVector,
     pub ca_torsion_vector: Vec<Option<f32>>,
@@ -115,11 +118,13 @@ impl CompactStructure {
 
         let mut res_serial_vec: Vec<u64> = Vec::new();
         let mut res_name_vec : Vec<[u8;3]> = Vec::new();
+        let mut n_vec = CarbonCoordinateVector::new();
         let mut ca_vec = CarbonCoordinateVector::new();
         let mut cb_vec = CarbonCoordinateVector::new();
 
         let mut prev_res_serial: Option<u64> = None;
         let mut prev_res_name: Option<&[u8;3]> = None;
+        let mut n: Option<Coordinate> = None;
         let mut ca : Option<Coordinate> = None;
         let mut cb : Option<Coordinate> = None;
 
@@ -129,40 +134,41 @@ impl CompactStructure {
         for idx in 0..origin.num_atoms {
             if prev_res_serial != Some(model.get_res_serial(idx)) {
                 // Save previous 'CA' and 'CB'
-                match (ca, cb) {
-                    (Some(ca), Some(cb)) => {
+                match (n, ca, cb) {
+                    (Some(n), Some(ca), Some(cb)) => {
                         let resi = prev_res_serial.expect("expected residue serial number");
                         let resn = prev_res_name.expect("expected residue name");
+                        n_vec.push(&n);
                         ca_vec.push(&ca);
                         cb_vec.push(&cb);
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
                     }
-                    (Some(ca), None) => {
+                    (Some(n), Some(ca), None) => {
                         let resi = prev_res_serial.expect("expected residue serial number");
                         let resn = prev_res_name.expect("expected residue name");
+                        n_vec.push(&n);
                         ca_vec.push(&ca);
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
 
-                        if let (Some(b"GLY"), Some(n), Some(c)) = (prev_res_name, &gly_n, &gly_c) {
+                        if let (Some(b"GLY"), Some(gly_n), Some(gly_c)) = (prev_res_name, &gly_n, &gly_c) {
                             // Approximate CB
-                            let cb = approx_cb(&ca,n,c);
+                            let cb = approx_cb(&ca,gly_n,gly_c);
                             cb_vec.push(&cb);
-                            } else { cb_vec.push_none();}
+                        } else {
+                            cb_vec.push_none();
+                        }
                     }
-                    (None, Some(cb)) => {
-                        let resi = prev_res_serial.expect("expected residue serial number");
-                        let resn = prev_res_name.expect("expected residue name");
-                        ca_vec.push_none();
-                        cb_vec.push(&cb);
-                        res_serial_vec.push(resi);
-                        res_name_vec.push(*resn);
-                    }
-                    _ => (),
+                    (None, None, None) => {},
+                    (None, None, Some(_)) => {},
+                    (None, Some(_), None) => {},
+                    (None, Some(_), Some(_)) => {},
+                    (Some(_), None, None) => {},
+                    (Some(_), None, Some(_)) => {},
                 }
                 // Reset 'CA' and 'CB'
-                ca = None; cb = None;
+                ca = None; cb = None; n = None;
                 prev_res_serial = Some(model.get_res_serial(idx));
                 prev_res_name = model.res_name.get(idx);
             }
@@ -171,10 +177,15 @@ impl CompactStructure {
                 ca = Some(model.get_coordinates(idx));
             } else if model.is_cb(idx) {
                 cb = Some(model.get_coordinates(idx));
+            } else if model.is_n(idx) && &model.get_res_name(idx) != b"GLY" {
+                n = Some(model.get_coordinates(idx));
             } else if &model.get_res_name(idx) == b"GLY" {
                 // If GLY, calculate CB from CA, N, C
                 match model.atom_name.get(idx) {
-                    Some(b" N  ") => {gly_n = Some(model.get_coordinates(idx));},
+                    Some(b" N  ") => {
+                        gly_n = Some(model.get_coordinates(idx));
+                        n = Some(model.get_coordinates(idx));
+                    },
                     Some(b" C  ") => {gly_c = Some(model.get_coordinates(idx));},
                     _ => (),
                 }
@@ -188,6 +199,7 @@ impl CompactStructure {
             num_residues: res_serial_vec.len(),
             residue_serial: res_serial_vec,
             residue_name: res_name_vec,
+            n_vector: n_vec,
             ca_vector: ca_vec,
             cb_vector: cb_vec,
             ca_torsion_vector: ca_torsion_vec,
@@ -213,6 +225,17 @@ impl CompactStructure {
             None
         }
     }
+
+    pub fn get_n(&self, idx: usize) -> Option<Coordinate> {
+        let (x,y,z) = self.n_vector.get(idx);
+
+        if x.is_some() && y.is_some() && z.is_some() {
+            Some(Coordinate::build(&x, &y, &z))
+        } else {
+            None
+        }
+    }
+
 
     pub fn get_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
@@ -268,6 +291,27 @@ impl CompactStructure {
 
     pub fn get_torsion(&self, idx: usize) -> Option<f32> {
         self.ca_torsion_vector[idx ]
+    }
+
+    pub fn get_trrosetta_feature(&self, idx1: usize, idx2: usize) -> Option<[f32; 6]> {
+        let ca1 = self.get_ca(idx1);
+        let ca2 = self.get_ca(idx2);
+        let cb1 = self.get_cb(idx1);
+        let cb2 = self.get_cb(idx2);
+        let n1 = self.get_n(idx1);
+        let n2 = self.get_n(idx2);
+        if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2)) = (ca1, ca2, cb1, cb2, n1, n2) {
+            let cb_dist = cb1.calc_distance(&cb2);
+            let omega = calc_torsion_angle(&ca1, &cb1, &cb2, &ca2);
+            let theta1 = calc_torsion_angle(&n1, &ca1, &cb1, &cb2);
+            let theta2 = calc_torsion_angle(&cb1, &cb2, &ca2, &n2);
+            let phi1 = calc_angle_point(&ca1, &cb1, &cb2);
+            let phi2 = calc_angle_point(&cb1, &cb2, &ca2);
+            let feature = [cb_dist, omega, theta1, theta2, phi1, phi2];
+            Some(feature)
+        } else {
+            None
+        }
     }
 
 }

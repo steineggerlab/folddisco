@@ -1,6 +1,6 @@
 use crate::utils::calculator::Calculate;
 use crate::utils::constants::CA_CB_DIST;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Coordinate {
     pub x: f32,
     pub y: f32,
@@ -102,6 +102,23 @@ impl Calculate for Coordinate {
         let degree = radian.to_degrees(); // angle in degrees
         degree
     }
+
+
+}
+
+
+pub fn calc_angle_point(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordinate) -> f32 {
+    let (a, b, c) = (atom1, atom2, atom3);
+    // Form vectors
+    let v1 = (a.x - b.x, a.y - b.y, a.z - b.z); // vector 1
+    let v2 = (c.x - b.x, c.y - b.y, c.z - b.z); // vector 2
+    let dot = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2; // dot product
+    let v1_len = (v1.0.powf(2.0) + v1.1.powf(2.0) + v1.2.powf(2.0)).sqrt(); // length of vector 1
+    let v2_len = (v2.0.powf(2.0) + v2.1.powf(2.0) + v2.2.powf(2.0)).sqrt(); // length of vector 2
+    let cos = dot / (v1_len * v2_len); // cos of angle
+    let radian = cos.acos(); // angle in radians
+    let degree = radian.to_degrees(); // angle in degrees
+    degree
 }
 
 // Originally from foldseek StructureTo3DiBase::approxCBetaPosition

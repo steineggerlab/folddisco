@@ -60,6 +60,9 @@ impl Atom {
     pub fn get_res_name(&self) -> [u8;3] {
         self.res_name
     }
+    pub fn get_res_serial(&self) -> u64 {
+        self.res_serial
+    }
 }
 
 /// AtomVector

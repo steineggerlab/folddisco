@@ -1,5 +1,5 @@
 use crate::structure::atom::{Atom, AtomVector};
-use crate::structure::coordinate::{approx_cb, Coordinate, CarbonCoordinateVector};
+use crate::structure::coordinate::{approx_cb, Coordinate, CarbonCoordinateVector, Torsion, TorsionType};
 use crate::utils::calculator::Calculate;
 
 /// Structure is the main data structure for storing the information of a protein structure.
@@ -43,12 +43,15 @@ impl Structure {
         CompactStructure::build(self)
     }
 
+    pub fn get_torsion(&self) -> Torsion {
+        //FIXME: Right now, only Psi is calculated
+        Torsion::build(self, TorsionType::Psi)
+    }
+
     // pub fn count_chains() {}
     // pub fn count_atoms() {}
     // pub fn count_residues() {}
 }
-
-
 
 #[derive(Debug, Clone)]
 pub struct CompactStructure {
@@ -191,6 +194,10 @@ impl CompactStructure {
         } else {
             None
         }
+    }
+
+    pub fn get_res_serial(&self, idx1: usize, idx2: usize) -> (u64, u64) {
+        (self.residue_serial[idx1], self.residue_serial[idx2])
     }
 }
 

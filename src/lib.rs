@@ -7,8 +7,10 @@ pub mod controller;
 pub mod geometry;
 pub mod index;
 pub mod structure;
-pub mod test;
 pub mod utils;
+
+/* re-export: pub use */
+pub use structure::io::pdb::Reader as PDBReader;
 
 pub struct MotifSearch {
     pub pdb_files: Vec<String>,

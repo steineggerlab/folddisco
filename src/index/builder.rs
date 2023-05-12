@@ -30,7 +30,7 @@ impl IndexBuilder {
 #[cfg(test)]
 mod index_builder_tests {
     use super::*;
-    use crate::{index::IndexTablePrinter, test::load_homeobox_toy};
+    use crate::index::IndexTablePrinter;
 
     #[test]
     fn test_concat() {

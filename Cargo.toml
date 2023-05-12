@@ -25,17 +25,20 @@ path = "tests/train.rs"
 name = "vae"
 path = "tests/pytorch_vae.rs"
 
-[[bin]]
-name = "prep"
-path = "train/data_prep.rs"
+[[example]]
+name = "data_prep"
+path = "examples/data_prep.rs"
 
-[[bin]]
-name = "kmean"
-path = "train/kmeans.rs"
+[[example]]
+name = "kmeans"
+path = "examples/kmeans.rs"
 
 [dependencies]
+rand = "0.8.5"
+
+# Packages for training will not be included in the library dependencies
+[dev-dependencies]
 anyhow = "1.0.71"
 csv = "1.2.1"
 dfdx = { version = "0.11.2", features = ["numpy", "safetensors"] }
-rand = "0.8.5"
 tch = { version = "0.12.0", features = ["python"] }

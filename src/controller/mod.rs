@@ -11,7 +11,6 @@ use crate::index::*;
 use crate::structure::core::CompactStructure;
 use crate::structure::io::pdb::Reader as PDBReader;
 
-
 pub struct Controller {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
@@ -123,7 +122,6 @@ impl Controller {
         }
     }
 
-
     // pub fn collect_triad_hash(&mut self) {
     //     for i in 0..self.path_vec.len() {
     //         let pdb_path = &self.path_vec[i];
@@ -187,7 +185,8 @@ impl Controller {
             let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
             println!("Saving to {}", new_path);
             let mut file = std::fs::File::create(new_path).expect("Unable to create file");
-            file.write_all(b"hash\tval1\tval2\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
+            file.write_all(b"hash\tval1\tval2\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
+                .expect("Unable to write header");
             // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header"); // ppf
             let hash_collection = &self.hash_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
@@ -217,7 +216,8 @@ impl Controller {
 
     pub fn save_filtered_hash_pair(&self, path: &str, res_pair_filter: &HashMap<String, Vec<u64>>) {
         let mut file = std::fs::File::create(path).expect("Unable to create file");
-        file.write_all(b"hash\tval1\tval2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
+        file.write_all(b"hash\tval1\tval2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
+            .expect("Unable to write header");
         // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
         for i in 0..self.hash_collection_vec.len() {
             let pdb_path = self.path_vec[i].split("/").last().unwrap();

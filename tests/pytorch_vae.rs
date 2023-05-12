@@ -10,9 +10,13 @@
      t10k-labels-idx1-ubyte.gz
 */
 
-
 use anyhow::Result;
-use tch::{nn::{self, VarStore}, nn::Module, nn::OptimizerConfig, Kind, Reduction, Tensor};
+use tch::{
+    nn::Module,
+    nn::OptimizerConfig,
+    nn::{self, VarStore},
+    Kind, Reduction, Tensor,
+};
 
 struct VAE {
     fc1: nn::Linear,
@@ -24,7 +28,6 @@ struct VAE {
     mu: nn::Linear,
     var: nn::Linear,
 }
-
 
 impl VAE {
     fn new(vs: &nn::Path) -> Self {
@@ -53,18 +56,25 @@ impl VAE {
 
     fn vector_quantize(&self, input: &Tensor) -> (Tensor, Tensor, Tensor, Tensor) {
         let weight = self.vq.ws.t_copy();
-        let distances: Tensor = input.square().sum(Kind::Float) +
-            self.vq.ws.square().sum(Kind::Float) -
-            2.0 * input.matmul(&weight);
+        let distances: Tensor = input.square().sum(Kind::Float)
+            + self.vq.ws.square().sum(Kind::Float)
+            - 2.0 * input.matmul(&weight);
         let encoding_indices = distances.argmin(1, false).unsqueeze(1);
 
-        let mut encodings = Tensor::zeros( &[encoding_indices.size()[0], 128], (Kind::Float, input.device()) );
+        let mut encodings = Tensor::zeros(
+            &[encoding_indices.size()[0], 128],
+            (Kind::Float, input.device()),
+        );
         // dbg!(encodings.kind());
         // dbg!(Tensor::ones_like(&encoding_indices).to_dtype(Kind::Float, true, false).kind());
         // dbg!(Tensor::ones_like(&encoding_indices).to_dtype(Kind::Float, true, false).size());
         // dbg!(encodings.size());
         // dbg!(encoding_indices.size());
-        encodings.scatter_(1, &encoding_indices, &Tensor::ones_like(&encoding_indices).to_dtype(Kind::Float, true, false));
+        encodings.scatter_(
+            1,
+            &encoding_indices,
+            &Tensor::ones_like(&encoding_indices).to_dtype(Kind::Float, true, false),
+        );
 
         let quantized = encodings.matmul(&self.vq.ws);
         let e_latent_loss = quantized.detach().mse_loss(input, Reduction::Mean);
@@ -108,7 +118,6 @@ fn gaussian_nll_loss(x: &Tensor, mu: &Tensor, var: &Tensor) -> Tensor {
     loss.mean(Kind::Float) + pi
 }
 
-
 pub fn main() -> Result<()> {
     // let device = tch::Device::cuda_if_available();
     let device = tch::Device::Cpu;
@@ -143,28 +152,38 @@ pub fn main() -> Result<()> {
         let mut kld_loss = 0f64;
         let mut vq_loss = 0f64;
 
-        for bimages in m.tensor_split(60, 0).iter(){
+        for bimages in m.tensor_split(60, 0).iter() {
             dbg!(bimages.size());
             // for bimage in bimages.iter(){
-                let (vqloss, mu, var, perp, emb) = vae.forward(bimages);
-                let loss = gaussian_nll_loss(&bimages, &mu, &var);
-                let loss = &loss + &vqloss;
-                // let (mse, kld) = loss(bimages, &mu, &var);
-                // let loss = &mse + &kld + &vqloss;
+            let (vqloss, mu, var, perp, emb) = vae.forward(bimages);
+            let loss = gaussian_nll_loss(&bimages, &mu, &var);
+            let loss = &loss + &vqloss;
+            // let (mse, kld) = loss(bimages, &mu, &var);
+            // let loss = &mse + &kld + &vqloss;
 
-                opt.backward_step(&loss);
-                train_loss += f64::try_from(&loss).expect("what??");
-                // mse_loss += f64::try_from(&mse).expect("what??");
-                // kld_loss += f64::try_from(&kld).expect("what??");
-                // vq_loss += f64::try_from(&vqloss).expect("what??");
-                samples += bimages.size()[0] as f64;
+            opt.backward_step(&loss);
+            train_loss += f64::try_from(&loss).expect("what??");
+            // mse_loss += f64::try_from(&mse).expect("what??");
+            // kld_loss += f64::try_from(&kld).expect("what??");
+            // vq_loss += f64::try_from(&vqloss).expect("what??");
+            samples += bimages.size()[0] as f64;
             // }
         }
         println!("Epoch: {}, loss: {}", epoch, train_loss);
         // tch::vision::image::save(&image_matrix(&s, 8)?, format!("s_{}.png", epoch))?
     }
-    let test_tensor = Tensor::of_slice(&[0.101744349_f32, 0.242118414_f32, 0.915585216_f32, 0.514111815_f32, 0.189199839_f32, 0.165612265_f32]).resize(&[1, 6]);
-    let test_tensor2 = Tensor::of_slice(&[0.12_f32, 0.8_f32, 0.96_f32, 0.53_f32, 0.17_f32, 0.145_f32]).resize(&[1, 6]);
+    let test_tensor = Tensor::of_slice(&[
+        0.101744349_f32,
+        0.242118414_f32,
+        0.915585216_f32,
+        0.514111815_f32,
+        0.189199839_f32,
+        0.165612265_f32,
+    ])
+    .resize(&[1, 6]);
+    let test_tensor2 =
+        Tensor::of_slice(&[0.12_f32, 0.8_f32, 0.96_f32, 0.53_f32, 0.17_f32, 0.145_f32])
+            .resize(&[1, 6]);
     dbg!(test_tensor.size());
     println!("Test tensor");
     test_tensor.print();

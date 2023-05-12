@@ -1,3 +1,4 @@
+use crate::geometry::feature::{Torsion, TorsionType};
 use crate::structure::atom::{Atom, AtomVector};
 use crate::structure::coordinate::{approx_cb, CarbonCoordinateVector, Coordinate};
 use crate::utils::calculator::Calculate;

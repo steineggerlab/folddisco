@@ -1,4 +1,5 @@
 pub mod core;
+pub mod feature;
 pub mod hash_func;
 pub mod ppf;
 pub mod simple_hash;

@@ -5,7 +5,7 @@
 /data/serine_peptidases
 /data/yeast
 /data/yeast_full
-/archive
+**/archive
 *_index_table.tsv
 *_hash_per_pair.tsv
 *.pdb.tsv

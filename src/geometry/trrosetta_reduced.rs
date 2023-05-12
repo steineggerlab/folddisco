@@ -1,6 +1,10 @@
-
 use std::fmt;
-use tch::{nn::{self, VarStore}, nn::Module, nn::OptimizerConfig, Kind, Reduction, Tensor, IndexOp};
+use tch::{
+    nn::Module,
+    nn::OptimizerConfig,
+    nn::{self, VarStore},
+    IndexOp, Kind, Reduction, Tensor,
+};
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(u64);
 
@@ -38,12 +42,30 @@ impl fmt::Display for HashValue {
 
 pub type HashCollection = Vec<HashValue>;
 
-const TRR_VEC_MEAN: [f32; 6] = [16.52766413, -1.698674698, 18.56931785, 18.56931787, 78.95890075, 78.95890075];
-const TRR_VEC_STD: [f32; 6] = [8.348999265, 101.2725858, 97.42699042, 97.42699038, 38.27151932, 38.27151932];
-
+const TRR_VEC_MEAN: [f32; 6] = [
+    16.52766413,
+    -1.698674698,
+    18.56931785,
+    18.56931787,
+    78.95890075,
+    78.95890075,
+];
+const TRR_VEC_STD: [f32; 6] = [
+    8.348999265,
+    101.2725858,
+    97.42699042,
+    97.42699038,
+    38.27151932,
+    38.27151932,
+];
 
 pub fn reduce_with_vae(trr: [f32; 6], vae: &VAE) -> Vec<f32> {
-    let trr = trr.iter().zip(TRR_VEC_MEAN.iter()).zip(TRR_VEC_STD.iter()).map(|((x, m), s)| (x - m) / s).collect::<Vec<f32>>();
+    let trr = trr
+        .iter()
+        .zip(TRR_VEC_MEAN.iter())
+        .zip(TRR_VEC_STD.iter())
+        .map(|((x, m), s)| (x - m) / s)
+        .collect::<Vec<f32>>();
     let trr_tensor = Tensor::of_slice(&trr).reshape(&[1, 6]).to_kind(Kind::Float);
     let encoded = vae.encode(&trr_tensor);
     let (_, quantized, _, _) = vae.vector_quantize(&encoded);
@@ -70,7 +92,6 @@ pub struct VAE {
     mu: nn::Linear,
     var: nn::Linear,
 }
-
 
 impl VAE {
     pub fn new(vs: &nn::Path) -> Self {
@@ -99,18 +120,25 @@ impl VAE {
 
     pub fn vector_quantize(&self, input: &Tensor) -> (Tensor, Tensor, Tensor, Tensor) {
         let weight = self.vq.ws.t_copy();
-        let distances: Tensor = input.square().sum(Kind::Float) +
-            self.vq.ws.square().sum(Kind::Float) -
-            2.0 * input.matmul(&weight);
+        let distances: Tensor = input.square().sum(Kind::Float)
+            + self.vq.ws.square().sum(Kind::Float)
+            - 2.0 * input.matmul(&weight);
         let encoding_indices = distances.argmin(1, false).unsqueeze(1);
 
-        let mut encodings = Tensor::zeros( &[encoding_indices.size()[0], 128], (Kind::Float, input.device()) );
+        let mut encodings = Tensor::zeros(
+            &[encoding_indices.size()[0], 128],
+            (Kind::Float, input.device()),
+        );
         // dbg!(encodings.kind());
         // dbg!(Tensor::ones_like(&encoding_indices).to_dtype(Kind::Float, true, false).kind());
         // dbg!(Tensor::ones_like(&encoding_indices).to_dtype(Kind::Float, true, false).size());
         // dbg!(encodings.size());
         // dbg!(encoding_indices.size());
-        encodings.scatter_(1, &encoding_indices, &Tensor::ones_like(&encoding_indices).to_dtype(Kind::Float, true, false));
+        encodings.scatter_(
+            1,
+            &encoding_indices,
+            &Tensor::ones_like(&encoding_indices).to_dtype(Kind::Float, true, false),
+        );
 
         let quantized = encodings.matmul(&self.vq.ws);
         let e_latent_loss = quantized.detach().mse_loss(input, Reduction::Mean);

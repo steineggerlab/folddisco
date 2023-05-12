@@ -70,7 +70,6 @@ mod tests {
 
                 let dist = compact.get_distance(i,j).expect("compact failed to get distance");
                 let angle = compact.get_angle(i,j).expect("compact failed to get angle");
-                let torsion = ci.calc_torsion_angle(&cj, &cj, &cj);
 
                 let hashvalue = geometry::hash::HashValue::perfect_hash(dist, angle);
                 let reverse = hashvalue.reverse_hash();

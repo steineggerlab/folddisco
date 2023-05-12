@@ -1,5 +1,6 @@
 use crate::structure::atom::{Atom, AtomVector};
-use crate::structure::coordinate::{approx_cb, Coordinate, CarbonCoordinateVector, Torsion, TorsionType};
+use crate::structure::coordinate::{approx_cb, Coordinate, CarbonCoordinateVector};
+use crate::geometry::feature::{Torsion, TorsionType};
 use crate::utils::calculator::Calculate;
 
 /// Structure is the main data structure for storing the information of a protein structure.

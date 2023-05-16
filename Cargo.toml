@@ -17,7 +17,11 @@ opt-level = 3
 name = "motifsearch"
 path = "src/cli/main.rs"
 
+[[bin]]
+name = "train"
+path = "tests/train.rs"
 
 
 [dependencies]
+dfdx = { version = "0.11.2", features = ["numpy", "safetensors"] }
 rand = "0.8.5"

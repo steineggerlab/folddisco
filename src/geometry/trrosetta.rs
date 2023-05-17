@@ -30,7 +30,12 @@ impl HashValue {
     }
 
     pub fn perfect_hash(
-        cb_dist: f32, omega: f32, theta1: f32, theta2: f32, phi1: f32, phi2: f32,
+        cb_dist: f32,
+        omega: f32,
+        theta1: f32,
+        theta2: f32,
+        phi1: f32,
+        phi2: f32,
     ) -> Self {
         let mut cbd = cb_dist;
         if cb_dist > 20.0 {
@@ -68,11 +73,14 @@ impl HashValue {
         let h_phi1 = (self.0 >> 8) as u8;
         let h_phi2 = (self.0 & 0x000000FF) as u8;
         [
-            h_cb_dist as f32, h_omega as f32, h_theta1 as f32,
-            h_theta2 as f32, h_phi1 as f32, h_phi2 as f32,
+            h_cb_dist as f32,
+            h_omega as f32,
+            h_theta1 as f32,
+            h_theta2 as f32,
+            h_phi1 as f32,
+            h_phi2 as f32,
         ]
     }
-
 }
 
 impl fmt::Debug for HashValue {
@@ -85,7 +93,11 @@ impl fmt::Debug for HashValue {
 impl fmt::Display for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let val = self.reverse_hash();
-        write!(f, "{}\t{}\t{}\t{}\t{}\t{}\t{}", self.0, val[0], val[1], val[2], val[3], val[4], val[5])
+        write!(
+            f,
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            self.0, val[0], val[1], val[2], val[3], val[4], val[5]
+        )
         // write!(f, "{}", self.0)
     }
 }
@@ -102,4 +114,3 @@ pub fn continuize_value(val: u64, min: f32, max: f32, num_bin: f32) -> f32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     (val as f32) * (cont_f)
 }
-

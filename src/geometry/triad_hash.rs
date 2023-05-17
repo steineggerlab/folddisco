@@ -4,7 +4,6 @@ use std::fmt;
 pub struct HashValue(u16);
 
 impl HashValue {
-
     pub fn perfect_hash(edge1: f32, edge2: f32, edge3: f32) -> Self {
         let mut hashvalue = 0;
         let edges = vec![edge1, edge2, edge3];
@@ -44,7 +43,6 @@ impl HashValue {
         }
         (edge1, edge2, edge3)
     }
-
 }
 
 #[cfg(test)]
@@ -61,7 +59,11 @@ mod temp_test {
 impl fmt::Debug for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (edge1, edge2, edge3) = self.reverse_hash();
-        write!(f, "HashValue({}), edge1={}, edge2={}, edge3={}", self.0, edge1, edge2, edge3)
+        write!(
+            f,
+            "HashValue({}), edge1={}, edge2={}, edge3={}",
+            self.0, edge1, edge2, edge3
+        )
     }
 }
 
@@ -74,7 +76,6 @@ impl fmt::Display for HashValue {
 
 pub type HashCollection = Vec<HashValue>;
 
-
 pub struct PossibleTriangles {
     pub dist_vec: Vec<u8>,
     pub triangles: Vec<(u8, u8, u8)>,
@@ -84,11 +85,12 @@ impl PossibleTriangles {
     pub fn new(dist_vec: Vec<u8>) -> Self {
         let mut triangles = Vec::new();
         for i in 0..dist_vec.len() {
-            for j in i+1..dist_vec.len() {
-                for k in j+1..dist_vec.len() {
-                    if dist_vec[i] + dist_vec[j] > dist_vec[k] &&
-                       dist_vec[i] + dist_vec[k] > dist_vec[j] &&
-                       dist_vec[j] + dist_vec[k] > dist_vec[i] {
+            for j in i + 1..dist_vec.len() {
+                for k in j + 1..dist_vec.len() {
+                    if dist_vec[i] + dist_vec[j] > dist_vec[k]
+                        && dist_vec[i] + dist_vec[k] > dist_vec[j]
+                        && dist_vec[j] + dist_vec[k] > dist_vec[i]
+                    {
                         triangles.push((dist_vec[i], dist_vec[j], dist_vec[k]));
                     }
                 }
@@ -109,11 +111,12 @@ impl PossibleTriangles {
     pub fn all_triangles(&self) -> Vec<(u8, u8, u8)> {
         let mut triangles = Vec::new();
         for i in 0..self.dist_vec.len() {
-            for j in i+1..self.dist_vec.len() {
-                for k in j+1..self.dist_vec.len() {
-                    if self.dist_vec[i] + self.dist_vec[j] > self.dist_vec[k] &&
-                       self.dist_vec[i] + self.dist_vec[k] > self.dist_vec[j] &&
-                       self.dist_vec[j] + self.dist_vec[k] > self.dist_vec[i] {
+            for j in i + 1..self.dist_vec.len() {
+                for k in j + 1..self.dist_vec.len() {
+                    if self.dist_vec[i] + self.dist_vec[j] > self.dist_vec[k]
+                        && self.dist_vec[i] + self.dist_vec[k] > self.dist_vec[j]
+                        && self.dist_vec[j] + self.dist_vec[k] > self.dist_vec[i]
+                    {
                         triangles.push((self.dist_vec[i], self.dist_vec[j], self.dist_vec[k]));
                     }
                 }
@@ -121,5 +124,4 @@ impl PossibleTriangles {
         }
         triangles
     }
-
 }

@@ -56,8 +56,6 @@ impl fmt::Display for HashValue {
 
 pub type HashCollection = Vec<HashValue>;
 
-
-
 pub fn discretize_angle(val: f32) -> u16 {
     // min = -180, max = 180, bins = 2^16,
     let cont_f = 360.0_f32 / (2.0_f32.powi(16) - 1.0_f32);
@@ -71,7 +69,6 @@ pub fn continuize_angle(val: u16) -> f32 {
 
     (val as f32) * (cont_f) - 180.0
 }
-
 
 // #[derive(Debug)]
 // pub struct GeometricHasher {

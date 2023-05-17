@@ -1,6 +1,4 @@
-
 // use motifsearch::*;
-
 
 // type EncoderLayer = (
 //     (Linear<6, 32>, ReLU),
@@ -14,7 +12,7 @@
 //     (Linear<32, 6>, Sigmoid),
 // );
 
-use dfdx::optim::{SgdConfig, Momentum, WeightDecay, Sgd};
+use dfdx::optim::{Momentum, Sgd, SgdConfig, WeightDecay};
 use dfdx::prelude::*;
 
 fn main() {
@@ -31,19 +29,19 @@ fn main() {
         Linear<32, 6>,
     );
 
-    type Mlp = (
-        EncoderLayer,
-        DecoderLayer,
-    );
+    type Mlp = (EncoderLayer, DecoderLayer);
 
     let dev = AutoDevice::default();
     let mut mlp = dev.build_module::<Mlp, f32>();
     let mut grads = mlp.alloc_grads();
-    let mut sgd = Sgd::new(&mlp, SgdConfig{
-        lr: 1e-2,
-        momentum: Some(Momentum::Nesterov(0.9)),
-        weight_decay: Some(WeightDecay::L2(1e-4)),
-    });
+    let mut sgd = Sgd::new(
+        &mlp,
+        SgdConfig {
+            lr: 1e-2,
+            momentum: Some(Momentum::Nesterov(0.9)),
+            weight_decay: Some(WeightDecay::L2(1e-4)),
+        },
+    );
 
     let x: Tensor<Rank2<4, 6>, f32, _> = dev.sample_normal();
     // let y: Tensor<Rank2<4, 2>, f32, _> = dev.sample_normal();

@@ -21,7 +21,13 @@ path = "src/cli/main.rs"
 name = "train"
 path = "tests/train.rs"
 
+[[bin]]
+name = "vae"
+path = "tests/pytorch_vae.rs"
 
 [dependencies]
+anyhow = "1.0.71"
+csv = "1.2.1"
 dfdx = { version = "0.11.2", features = ["numpy", "safetensors"] }
 rand = "0.8.5"
+tch = { version = "0.12.0", features = ["python"] }

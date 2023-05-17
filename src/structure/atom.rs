@@ -57,7 +57,7 @@ impl Atom {
     pub fn get_coordinate(&self) -> Coordinate {
         Coordinate::new(self.x, self.y, self.z)
     }
-    pub fn get_res_name(&self) -> [u8;3] {
+    pub fn get_res_name(&self) -> [u8; 3] {
         self.res_name
     }
 }

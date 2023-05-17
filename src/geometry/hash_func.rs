@@ -1,4 +1,3 @@
-
 // Invertible hash function for 64-bit unsigned integers
 // Originally from https://aebou.rbind.io/post/a-rust-glimpse-at-thomas-wang-integer-hash-function/
 #[inline]
@@ -61,7 +60,6 @@ mod hash_func_test {
         let end = std::time::Instant::now();
         println!("hash_64: {:?}", end - start);
     }
-
 }
 
 // pub struct U64Hasher;

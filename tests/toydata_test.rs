@@ -29,7 +29,6 @@
 //     }
 // }
 
-
 // #[test]
 // fn test_serine_peptidase() {
 //     let path = "data/serine_peptidases";
@@ -38,8 +37,5 @@
 //     let mut controller = Controller::new(pdb_paths);
 //     controller.fill_numeric_id_vec();
 //     controller.collect_hash();
-
-
-
 
 // }

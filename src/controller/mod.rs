@@ -1,5 +1,5 @@
-use std::io::Write;
 use std::collections::HashMap;
+use std::io::Write;
 
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
@@ -14,7 +14,7 @@ pub struct Controller {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
     pub hash_collection_vec: Vec<HashCollection>,
-    pub res_pair_vec: Vec<Vec<(u64, u64, [u8;3], [u8;3])>>, // WARNING: TEMPORARY
+    pub res_pair_vec: Vec<Vec<(u64, u64, [u8; 3], [u8; 3])>>, // WARNING: TEMPORARY
     pub remove_redundancy: bool,
 }
 
@@ -24,7 +24,7 @@ impl Controller {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
             hash_collection_vec: Vec::new(),
-            res_pair_vec: Vec::new(),// WARNING: TEMPORARY
+            res_pair_vec: Vec::new(), // WARNING: TEMPORARY
             remove_redundancy: false,
         }
     }
@@ -37,7 +37,7 @@ impl Controller {
             let compact = structure.to_compact();
             let mut hash_collector = GeometryHashCollector::new();
 
-            let mut res_pairs: Vec<(u64, u64, [u8;3], [u8;3])> = Vec::new(); // WARNING: TEMPORARY
+            let mut res_pairs: Vec<(u64, u64, [u8; 3], [u8; 3])> = Vec::new(); // WARNING: TEMPORARY
 
             for n in 0..compact.num_residues {
                 for m in 0..compact.num_residues {
@@ -51,7 +51,8 @@ impl Controller {
                     let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
                     // let ppf = compact.get_ppf(n, m).expect("cannot get ppf");
                     // let angle = compact.get_accumulated_torsion(n, m).expect("cannot get accumulated torsion angle");
-                    let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                    let hash_value =
+                        HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
                     hash_collector.collect_hash(hash_value);
 
                     // WARNING: TEMPORARY
@@ -72,7 +73,6 @@ impl Controller {
         // TEMPORARY
         println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
     }
-
 
     // pub fn collect_triad_hash(&mut self) {
     //     for i in 0..self.path_vec.len() {
@@ -141,15 +141,26 @@ impl Controller {
             // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header"); // ppf
             let hash_collection = &self.hash_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
-            println!("{}: {} hashes, {} pairs", pdb_path, hash_collection.len(), res_pair_vec.len());
-            for j in 0..res_pair_vec.len(){
+            println!(
+                "{}: {} hashes, {} pairs",
+                pdb_path,
+                hash_collection.len(),
+                res_pair_vec.len()
+            );
+            for j in 0..res_pair_vec.len() {
                 let hash_value = hash_collection[j];
                 let res1 = res_pair_vec[j].0;
                 let res2 = res_pair_vec[j].1;
                 let res1_str = res_pair_vec[j].2;
                 let res2_str = res_pair_vec[j].3;
-                file.write_all(format!("{}\t{}\t{}\t{:?}\t{:?}\t{}\n", hash_value, res1, res2, res1_str, res2_str, pdb_path).as_bytes())
-                    .expect("Unable to write data");
+                file.write_all(
+                    format!(
+                        "{}\t{}\t{}\t{:?}\t{:?}\t{}\n",
+                        hash_value, res1, res2, res1_str, res2_str, pdb_path
+                    )
+                    .as_bytes(),
+                )
+                .expect("Unable to write data");
             }
         }
     }
@@ -157,7 +168,7 @@ impl Controller {
     pub fn save_filtered_hash_pair(&self, path: &str, res_pair_filter: &HashMap<String, Vec<u64>>) {
         let mut file = std::fs::File::create(path).expect("Unable to create file");
         file.write_all(b"hash\tcbdist\tomega\ttheta1\ttheta2\tphi1\tphi2\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
-            // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
+        // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
         for i in 0..self.hash_collection_vec.len() {
             let pdb_path = self.path_vec[i].split("/").last().unwrap();
             if !res_pair_filter.contains_key(pdb_path) {
@@ -165,23 +176,33 @@ impl Controller {
             }
             let hash_collection = &self.hash_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
-            println!("{}: {} hashes, {} pairs", pdb_path, hash_collection.len(), res_pair_vec.len());
-            for j in 0..res_pair_vec.len(){
+            println!(
+                "{}: {} hashes, {} pairs",
+                pdb_path,
+                hash_collection.len(),
+                res_pair_vec.len()
+            );
+            for j in 0..res_pair_vec.len() {
                 let hash_value = hash_collection[j];
                 let res1 = res_pair_vec[j].0;
                 let res2 = res_pair_vec[j].1;
                 let res1_str = res_pair_vec[j].2;
                 let res2_str = res_pair_vec[j].3;
-                if res_pair_filter[pdb_path].contains(&res1) && res_pair_filter[pdb_path].contains(&res2) {
-                    file.write_all(format!("{}\t{}\t{}\t{:?}\t{:?}\t{}\n", hash_value, res1, res2, res1_str, res2_str, pdb_path).as_bytes())
+                if res_pair_filter[pdb_path].contains(&res1)
+                    && res_pair_filter[pdb_path].contains(&res2)
+                {
+                    file.write_all(
+                        format!(
+                            "{}\t{}\t{}\t{:?}\t{:?}\t{}\n",
+                            hash_value, res1, res2, res1_str, res2_str, pdb_path
+                        )
+                        .as_bytes(),
+                    )
                     .expect("Unable to write data");
                 }
             }
         }
     }
-
-
-
 }
 
 fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut Vec<usize>) {
@@ -325,33 +346,15 @@ mod controller_tests {
         controller.collect_hash();
 
         let mut serine_filter: HashMap<String, Vec<u64>> = HashMap::new();
-        serine_filter.insert(
-            "1aq2.pdb".to_string(), vec![250, 232, 269],
-        );
-        serine_filter.insert(
-            "1wab.pdb".to_string(), vec![47, 195, 192],
-        );
-        serine_filter.insert(
-            "1sc9.pdb".to_string(), vec![80, 235, 207],
-        );
-        serine_filter.insert(
-            "2o7r.pdb".to_string(), vec![169, 306, 276],
-        );
-        serine_filter.insert(
-            "1bs9.pdb".to_string(), vec![90, 187, 175],
-        );
-        serine_filter.insert(
-            "1ju3.pdb".to_string(), vec![117, 287, 259],
-        );
-        serine_filter.insert(
-            "1uk7.pdb".to_string(), vec![34, 252, 224],
-        );
-        serine_filter.insert(
-            "1okg.pdb".to_string(), vec![255, 75, 61],
-        );
-        serine_filter.insert(
-            "1qfm.pdb".to_string(), vec![554, 680, 641],
-        );
+        serine_filter.insert("1aq2.pdb".to_string(), vec![250, 232, 269]);
+        serine_filter.insert("1wab.pdb".to_string(), vec![47, 195, 192]);
+        serine_filter.insert("1sc9.pdb".to_string(), vec![80, 235, 207]);
+        serine_filter.insert("2o7r.pdb".to_string(), vec![169, 306, 276]);
+        serine_filter.insert("1bs9.pdb".to_string(), vec![90, 187, 175]);
+        serine_filter.insert("1ju3.pdb".to_string(), vec![117, 287, 259]);
+        serine_filter.insert("1uk7.pdb".to_string(), vec![34, 252, 224]);
+        serine_filter.insert("1okg.pdb".to_string(), vec![255, 75, 61]);
+        serine_filter.insert("1qfm.pdb".to_string(), vec![554, 680, 641]);
 
         controller.save_filtered_hash_pair("data/serine_hash_per_pair.tsv", &serine_filter);
         let index_builder = IndexBuilder::new();
@@ -390,5 +393,4 @@ mod controller_tests {
     //     printer.print(&index_table, "data/yeast_index_table.tsv");
     //     println!("{:?}", &controller.path_vec);
     // }
-
 }

@@ -46,14 +46,22 @@ impl HashValue {
 impl fmt::Debug for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let ppf = self.reverse_hash();
-        write!(f, "HashValue({}), dist={}, angle={},{},{}", self.0, ppf[0], ppf[1], ppf[2], ppf[3])
+        write!(
+            f,
+            "HashValue({}), dist={}, angle={},{},{}",
+            self.0, ppf[0], ppf[1], ppf[2], ppf[3]
+        )
     }
 }
 
 impl fmt::Display for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let ppf = self.reverse_hash();
-        write!(f, "{}\t{}\t{}\t{}\t{}", self.0, ppf[0], ppf[1], ppf[2], ppf[3])
+        write!(
+            f,
+            "{}\t{}\t{}\t{}\t{}",
+            self.0, ppf[0], ppf[1], ppf[2], ppf[3]
+        )
         // write!(f, "{}", self.0)
     }
 }
@@ -86,7 +94,6 @@ pub fn continuize_angle(val: u8) -> f32 {
 
 //     (val as f32) * (cont_f) - 180.0
 // }
-
 
 // #[derive(Debug)]
 // pub struct GeometricHasher {

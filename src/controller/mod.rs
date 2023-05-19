@@ -4,11 +4,13 @@ use std::io::Write;
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
 // use crate::geometry::ppf::{HashCollection, HashValue};
-use crate::geometry::trrosetta::{HashCollection, HashValue};
+// use crate::geometry::trrosetta::{HashCollection, HashValue};
+use crate::geometry::trrosetta_reduced::*;
 use crate::index::builder::IndexBuilder;
 use crate::index::*;
 use crate::structure::core::CompactStructure;
 use crate::structure::io::pdb::Reader as PDBReader;
+
 
 pub struct Controller {
     pub path_vec: Vec<String>,
@@ -30,6 +32,7 @@ impl Controller {
     }
 
     pub fn collect_hash(&mut self) {
+        let vae = load_vae();
         for i in 0..self.path_vec.len() {
             let pdb_path = &self.path_vec[i];
             let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
@@ -51,8 +54,13 @@ impl Controller {
                     let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
                     // let ppf = compact.get_ppf(n, m).expect("cannot get ppf");
                     // let angle = compact.get_accumulated_torsion(n, m).expect("cannot get accumulated torsion angle");
-                    let hash_value =
-                        HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                    if trr[0] < 2.0 || trr[0] > 20.0 {
+                        continue;
+                    }
+                    let reduced_trr = reduce_with_vae(trr, &vae);
+                    let hash_value = HashValue::perfect_hash(reduced_trr[0], reduced_trr[1]);
+                    // let hash_value =
+                    //     HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
                     hash_collector.collect_hash(hash_value);
 
                     // WARNING: TEMPORARY
@@ -137,7 +145,7 @@ impl Controller {
             let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
             println!("Saving to {}", new_path);
             let mut file = std::fs::File::create(new_path).expect("Unable to create file");
-            file.write_all(b"hash\tcbdist\tomega\ttheta1\ttheta2\tphi1\tphi2\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
+            file.write_all(b"hash\tval1\tval2\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
             // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header"); // ppf
             let hash_collection = &self.hash_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
@@ -167,7 +175,7 @@ impl Controller {
 
     pub fn save_filtered_hash_pair(&self, path: &str, res_pair_filter: &HashMap<String, Vec<u64>>) {
         let mut file = std::fs::File::create(path).expect("Unable to create file");
-        file.write_all(b"hash\tcbdist\tomega\ttheta1\ttheta2\tphi1\tphi2\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
+        file.write_all(b"hash\tval1\tval2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n").expect("Unable to write header");
         // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
         for i in 0..self.hash_collection_vec.len() {
             let pdb_path = self.path_vec[i].split("/").last().unwrap();
@@ -339,7 +347,7 @@ mod controller_tests {
 
     #[test]
     fn test_temp() {
-        let pdb_paths = load_path("data/serine_peptidases");
+        let pdb_paths = load_path("data/serine_peptidases_");
         let mut controller = Controller::new(pdb_paths);
         controller.fill_numeric_id_vec();
         // controller.collect_triad_hash();
@@ -349,12 +357,12 @@ mod controller_tests {
         serine_filter.insert("1aq2.pdb".to_string(), vec![250, 232, 269]);
         serine_filter.insert("1wab.pdb".to_string(), vec![47, 195, 192]);
         serine_filter.insert("1sc9.pdb".to_string(), vec![80, 235, 207]);
-        serine_filter.insert("2o7r.pdb".to_string(), vec![169, 306, 276]);
-        serine_filter.insert("1bs9.pdb".to_string(), vec![90, 187, 175]);
-        serine_filter.insert("1ju3.pdb".to_string(), vec![117, 287, 259]);
-        serine_filter.insert("1uk7.pdb".to_string(), vec![34, 252, 224]);
-        serine_filter.insert("1okg.pdb".to_string(), vec![255, 75, 61]);
-        serine_filter.insert("1qfm.pdb".to_string(), vec![554, 680, 641]);
+        // serine_filter.insert("2o7r.pdb".to_string(), vec![169, 306, 276]);
+        // serine_filter.insert("1bs9.pdb".to_string(), vec![90, 187, 175]);
+        // serine_filter.insert("1ju3.pdb".to_string(), vec![117, 287, 259]);
+        // serine_filter.insert("1uk7.pdb".to_string(), vec![34, 252, 224]);
+        // serine_filter.insert("1okg.pdb".to_string(), vec![255, 75, 61]);
+        // serine_filter.insert("1qfm.pdb".to_string(), vec![554, 680, 641]);
 
         controller.save_filtered_hash_pair("data/serine_hash_per_pair.tsv", &serine_filter);
         let index_builder = IndexBuilder::new();

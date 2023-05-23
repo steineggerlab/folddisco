@@ -25,6 +25,14 @@ path = "tests/train.rs"
 name = "vae"
 path = "tests/pytorch_vae.rs"
 
+[[bin]]
+name = "prep"
+path = "train/data_prep.rs"
+
+[[bin]]
+name = "kmean"
+path = "train/kmeans.rs"
+
 [dependencies]
 anyhow = "1.0.71"
 csv = "1.2.1"

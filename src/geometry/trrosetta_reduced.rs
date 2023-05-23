@@ -131,3 +131,7 @@ impl VAE {
         (loss, mu, var, perplexity, encodings)
     }
 }
+
+pub fn normalize_angle_degree(val: f32, min: f32, max: f32) -> f32 {
+    (val - min) / (max - min)
+}

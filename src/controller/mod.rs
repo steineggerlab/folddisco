@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
@@ -81,6 +81,48 @@ impl Controller {
         // TEMPORARY
         println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
     }
+
+    pub fn save_raw_feature(&mut self, path: &str) {
+        let mut file = std::fs::File::create(path).expect("cannot create file");
+        for i in 0..self.path_vec.len() {
+            let pdb_path = &self.path_vec[i];
+            if i == 100 {
+                println!("Processing {}th pdb - {}", i, pdb_path);
+                // Stop loop
+                break;
+            }
+            // println!("Processing {}", pdb_path);
+            let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
+            let structure = pdb_reader.read_structure().expect("structure read failed");
+            let compact = structure.to_compact();
+            for n in 0..compact.num_residues {
+                for m in 0..compact.num_residues {
+                    if n == m {
+                        continue;
+                    }
+                    let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
+                    if trr[0] < 2.0 || trr[0] > 20.0 {
+                        continue;
+                    }
+                    // normalize trr[0]
+                    let n_cb_dist = (trr[0] - 2.0) / 18.0;
+                    let omega = normalize_angle_degree(trr[1], -180.0, 180.0);
+                    let phi1 = normalize_angle_degree(trr[2], -180.0, 180.0);
+                    let phi2 = normalize_angle_degree(trr[3], -180.0, 180.0);
+                    let psi1 = normalize_angle_degree(trr[4], 0.0, 180.0);
+                    let psi2 = normalize_angle_degree(trr[5], 0.0, 180.0);
+
+                    let line = format!(
+                        "{}\t{}\t{}\t{}\t{}\t{}\n",
+                        n_cb_dist, omega, phi1, phi2, psi1, psi2
+                    );
+
+                    file.write_all(line.as_bytes()).expect("cannot write file");
+                }
+            }
+        }
+    }
+
 
     // pub fn collect_triad_hash(&mut self) {
     //     for i in 0..self.path_vec.len() {

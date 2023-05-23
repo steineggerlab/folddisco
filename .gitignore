@@ -10,3 +10,4 @@
 *_hash_per_pair.tsv
 *.pdb.tsv
 data/cys_his_asp.zip
+yeast_raw_feature.tsv

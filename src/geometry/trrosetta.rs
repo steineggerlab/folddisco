@@ -114,3 +114,7 @@ pub fn continuize_value(val: u64, min: f32, max: f32, num_bin: f32) -> f32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     (val as f32) * (cont_f)
 }
+
+pub fn normalize_angle_degree(val: f32, min: f32, max: f32) -> f32 {
+    (val - min) / (max - min)
+}

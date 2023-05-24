@@ -1,4 +1,4 @@
-use crate::geometry::feature::{Torsion, TorsionType};
+use crate::structure::feature::{Torsion, TorsionType};
 use crate::structure::atom::{Atom, AtomVector};
 use crate::structure::coordinate::{approx_cb, CarbonCoordinateVector, Coordinate};
 use crate::utils::calculator::Calculate;
@@ -91,7 +91,10 @@ impl Structure {
     pub fn to_compact(&self) -> CompactStructure {
         CompactStructure::build(self)
     }
-
+    pub fn get_torsion(&self) -> Torsion {
+        //FIXME: Right now, only Psi is calculated
+        Torsion::build(self, TorsionType::Psi)
+    }
     // pub fn count_chains() {}
     // pub fn count_atoms() {}
     // pub fn count_residues() {}
@@ -269,6 +272,10 @@ impl CompactStructure {
         } else {
             None
         }
+    }
+
+    pub fn get_res_serial(&self, idx1: usize, idx2: usize) -> (u64, u64) {
+        (self.residue_serial[idx1], self.residue_serial[idx2])
     }
 
     pub fn get_accumulated_torsion(&self, idx1: usize, idx2: usize) -> Option<f32> {

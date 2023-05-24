@@ -5,3 +5,18 @@
 //         }
 //     }
 // }
+
+
+pub enum HashType {
+    SimpleHash,
+    TriadHash,
+    PPFHash,
+    TRRosettaHash,
+    TRRosettaReducedHash,
+    None,
+}
+
+pub trait GeometricHash {
+    // fn hash(&self, structure: &core::CompactStructure) -> Vec<u64>;
+    fn hash_type(&self) -> HashType;
+}

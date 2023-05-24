@@ -1,5 +1,5 @@
 use motifsearch::controller::{self, Controller, GeometryHashCollector};
-use motifsearch::geometry::hash::{HashCollection, HashValue};
+use motifsearch::geometry::trrosetta::{HashCollection, HashValue};
 use motifsearch::index::builder::IndexBuilder;
 use motifsearch::index::IndexTablePrinter;
 use motifsearch::PDBReader;
@@ -25,11 +25,8 @@ fn test_geometry_hash_collector() {
                 if i == j {
                     continue;
                 }
-
-                let dist = compact.get_distance(i, j).expect("Failed to get distance");
-                // If angle is None, then set it to 0.0. TODO: Glycine should be handled.
-                let angle = compact.get_angle(i, j).unwrap_or(0.0);
-                let hash_value = HashValue::perfect_hash(dist, angle);
+                let trr = compact.get_trrosetta_feature(i, j).expect("Failed to get trrosetta feature");
+                let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
                 hash_collector.collect_hash(hash_value);
             }
         }

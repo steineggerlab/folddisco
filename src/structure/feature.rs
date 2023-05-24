@@ -1,4 +1,4 @@
-use crate::structure::coordinate::{self, Coordinate};
+use crate::structure::coordinate::{Coordinate};
 use crate::structure::core::Structure;
 
 #[derive(Debug, Clone)]

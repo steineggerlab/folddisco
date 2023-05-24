@@ -1,4 +1,4 @@
-use motifsearch::geometry::feature::Torsion;
+use motifsearch::structure::feature::Torsion;
 use motifsearch::structure::core;
 use motifsearch::PDBReader;
 

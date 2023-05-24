@@ -60,6 +60,12 @@ impl Atom {
     pub fn get_res_name(&self) -> [u8; 3] {
         self.res_name
     }
+    pub fn get_res_name_string(&self) -> String {
+        String::from_utf8(self.res_name.to_vec()).expect("Found invalid UTF-8 in res_name")
+    }
+    pub fn get_res_serial(&self) -> u64 {
+        self.res_serial
+    }
 }
 
 /// AtomVector
@@ -178,6 +184,49 @@ impl AtomVector {
 
     pub fn get_atom_name(&self, index: usize) -> [u8; 4] {
         self.atom_name[index]
+    }
+
+    // IMPORTANT: LET'S STICK TO 0-BASED INDEXING AS IN RUST
+
+    pub fn get_nth_residue(&self, n: usize) -> AtomVector {
+        //TODO: n 0-base or 1-base?
+        let mut nth_vector = AtomVector::new();
+        for i in 0..self.len() {
+            if self.get_res_serial(i) as usize == n+1 {
+                nth_vector.push_atom(self.get(i));
+            }
+        }
+        nth_vector
+    }
+
+    pub fn get_nth_n(&self, n: usize) -> Atom {
+        //TODO: n 0-base (or 1-base)?
+        for i in 0..self.len() {
+            if (self.get_res_serial(i) as usize == n+1) && self.is_n(i) {
+                return self.get(i);
+            }
+        }
+        Atom::new_empty()
+    }
+
+    pub fn get_nth_ca(&self, n: usize) -> Atom {
+        //TODO: n 0-base or (1-base)?
+        for i in 0..self.len() {
+            if (self.get_res_serial(i) as usize == n+1) && self.is_ca(i) {
+                return self.get(i);
+            }
+        }
+        Atom::new_empty()
+    }
+
+    pub fn get_nth_c(&self, n: usize) -> Atom {
+        //TODO: n 0-base or (1-base)?
+        for i in 0..self.len() {
+            if (self.get_res_serial(i) as usize == n+1) && self.is_c(i) {
+                return self.get(i);
+            }
+        }
+        Atom::new_empty()
     }
 
     pub fn len(&self) -> usize {

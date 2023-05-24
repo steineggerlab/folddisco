@@ -24,9 +24,9 @@ pub fn load_yeast_proteome() -> Vec<String> {
 }
 
 pub fn load_path(dir: &str) -> Vec<String> {
-    // Load all pdbs in data/yeast
+    // Load all pdbs in given path
     let mut pdb_paths = Vec::new();
-    let paths = std::fs::read_dir(dir).expect("Unable to read yeast proteome");
+    let paths = std::fs::read_dir(dir).expect("Unable to read pdb directory");
     for path in paths {
         let path = path.expect("Unable to read path");
         let path = path.path();

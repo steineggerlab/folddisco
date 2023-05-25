@@ -425,6 +425,7 @@ dependencies = [
  "anyhow",
  "csv",
  "dfdx",
+ "pico-args",
  "rand",
  "tch",
 ]
@@ -521,6 +522,10 @@ name = "percent-encoding"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
+
+[[package]]
+name = "pico-args"
+version = "0.5.0"
 
 [[package]]
 name = "pkg-config"

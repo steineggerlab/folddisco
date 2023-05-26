@@ -1,6 +1,7 @@
 //
 
-use motifsearch::*;
+// use crate::*;
+use motifsearch::cli::{*, workflows::build_index};
 use pico_args::Arguments;
 
 const HELP: &str = "\
@@ -15,33 +16,17 @@ OPTIONS:
   -h, --help                 Print this help menu
 ";
 
-#[derive(Debug)]
-enum Subcommand {
-    Index,
-    Query,
-    // Add subcommands here
-}
-
-enum AppArgs {
-    Global {
-        help: bool,
-    },
-    Index {
-        threads: usize,
-        help: bool,
-    },
-    Query {
-        threads: usize,
-        help: bool,
-    },
-}
 
 fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
     let mut args = pico_args::Arguments::from_env();
     match args.subcommand().expect("Failed to parse subcommand").as_deref() {
         Some("index") => {
             Ok(AppArgs::Index {
-                threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+                pdb_dir: args.opt_value_from_str(["-d", "--pdb-dir"])?,
+                pdb_path_vec: Vec::new(),
+                index_path: args.value_from_str(["-i", "--index-path"])?,
+                num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+                verbose: args.contains(["-v", "--verbose"]),
                 help: args.contains(["-h", "--help"]),
             })
         }
@@ -77,14 +62,11 @@ fn main() {
                 println!("No subcommand specified. Try `motifsearch --help` for more information.");
             }
         }
-        AppArgs::Index { threads, help } => {
+        AppArgs::Index { help, .. } => {
             if help {
                 println!("{}", HELP);
             } else {
-                println!("Indexing with {} threads...", threads);
-                // let mut index = Index::new();
-                // index.build(threads);
-                println!("Indexing done.");
+                build_index::build_index(parsed_args);
             }
         }
         AppArgs::Query { threads, help } => {

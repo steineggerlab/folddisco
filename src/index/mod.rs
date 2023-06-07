@@ -9,7 +9,6 @@ use std::hash::Hash;
 use std::io::Write;
 use std::sync::Arc;
 
-
 // TODO: Generalize this to handle multiple hash types
 
 /// ## Index table saves the hash and the list of ids that have the same hash.

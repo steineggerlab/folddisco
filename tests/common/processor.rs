@@ -1,5 +1,5 @@
-use motifsearch::structure::feature::Torsion;
 use motifsearch::structure::core;
+use motifsearch::structure::feature::Torsion;
 use motifsearch::PDBReader;
 
 #[derive(Debug)]

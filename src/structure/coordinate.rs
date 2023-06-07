@@ -1,3 +1,5 @@
+use std::collections::btree_map::Iter;
+
 use crate::utils::calculator::Calculate;
 use crate::utils::constants::CA_CB_DIST;
 #[derive(Debug, Clone, Copy)]
@@ -303,7 +305,22 @@ impl CarbonCoordinateVector {
         }
         torsion_angles
     }
+
 }
+
+impl Iterator for CarbonCoordinateVector {
+    type Item = Coordinate;
+    fn next(&mut self) -> Option<Self::Item> {
+        let x = self.x.pop().unwrap();
+        let y = self.y.pop().unwrap();
+        let z = self.z.pop().unwrap();
+        match (x, y, z) {
+            (Some(x), Some(y), Some(z)) => Some(Coordinate { x, y, z }),
+            _ => None,
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod coordinate_tests {

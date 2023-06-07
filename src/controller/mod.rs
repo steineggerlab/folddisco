@@ -4,7 +4,7 @@ use std::io::Write;
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
 // use crate::geometry::ppf::{HashCollection, HashValue};
-use crate::geometry::trrosetta::{HashCollection, HashValue, normalize_angle_degree};
+use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue};
 // use crate::geometry::trrosetta_reduced::*;
 use crate::index::builder::IndexBuilder;
 use crate::index::*;
@@ -58,7 +58,8 @@ impl Controller {
                     }
                     // let reduced_trr = reduce_with_vae(trr, &vae);
                     // let hash_value = HashValue::perfect_hash(reduced_trr[0], reduced_trr[1]);
-                    let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                    let hash_value =
+                        HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
                     hash_collector.collect_hash(hash_value);
 
                     // WARNING: TEMPORARY
@@ -300,8 +301,6 @@ fn _write_hash_with_res_pair(
             .expect("Unable to write data");
     }
 }
-
-
 
 // // IMPORTANT: MOVED TO tests
 // #[cfg(test)]

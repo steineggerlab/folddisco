@@ -83,6 +83,16 @@ impl HashValue {
     }
 }
 
+// impl Hasher for HashValue {
+//     fn finish(&self) -> u64 {
+//         self.0
+//     }
+
+//     fn write(&mut self, _bytes: &[u8]) {
+//         unimplemented!()
+//     }
+// }
+
 impl fmt::Debug for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let values = self.reverse_hash();

@@ -1,7 +1,7 @@
 //
 
 // use crate::*;
-use motifsearch::cli::{*, workflows::build_index};
+use motifsearch::cli::{workflows::build_index, *};
 use pico_args::Arguments;
 
 const HELP: &str = "\
@@ -16,38 +16,31 @@ OPTIONS:
   -h, --help                 Print this help menu
 ";
 
-
 fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
     let mut args = pico_args::Arguments::from_env();
-    match args.subcommand().expect("Failed to parse subcommand").as_deref() {
-        Some("index") => {
-            Ok(AppArgs::Index {
-                pdb_dir: args.opt_value_from_str(["-d", "--pdb-dir"])?,
-                pdb_path_vec: Vec::new(),
-                index_path: args.value_from_str(["-i", "--index-path"])?,
-                num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
-                verbose: args.contains(["-v", "--verbose"]),
-                help: args.contains(["-h", "--help"]),
-            })
-        }
-        Some("query") => {
-            Ok(AppArgs::Query {
-                threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
-                help: args.contains(["-h", "--help"]),
-            })
-        }
-        Some(_) => {
-            Err("Invalid subcommand".into())
-        }
-        None => {
-            Ok(AppArgs::Global {
-                help: args.contains(["-h", "--help"]),
-            })
-        }
+    match args
+        .subcommand()
+        .expect("Failed to parse subcommand")
+        .as_deref()
+    {
+        Some("index") => Ok(AppArgs::Index {
+            pdb_dir: args.opt_value_from_str(["-d", "--pdb-dir"])?,
+            pdb_path_vec: Vec::new(),
+            index_path: args.value_from_str(["-i", "--index-path"])?,
+            num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            verbose: args.contains(["-v", "--verbose"]),
+            help: args.contains(["-h", "--help"]),
+        }),
+        Some("query") => Ok(AppArgs::Query {
+            threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            help: args.contains(["-h", "--help"]),
+        }),
+        Some(_) => Err("Invalid subcommand".into()),
+        None => Ok(AppArgs::Global {
+            help: args.contains(["-h", "--help"]),
+        }),
     }
 }
-
-
 
 fn main() {
     let parsed_args = parse_arg().unwrap_or_else(|e| {

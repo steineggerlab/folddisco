@@ -1,6 +1,6 @@
-use crate::structure::feature::{Torsion, TorsionType};
 use crate::structure::atom::{Atom, AtomVector};
 use crate::structure::coordinate::{approx_cb, CarbonCoordinateVector, Coordinate};
+use crate::structure::feature::{Torsion, TorsionType};
 use crate::utils::calculator::Calculate;
 
 use crate::structure::coordinate::{calc_angle_point, calc_torsion_angle};

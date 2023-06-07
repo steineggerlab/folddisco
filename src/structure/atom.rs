@@ -192,7 +192,7 @@ impl AtomVector {
         //TODO: n 0-base or 1-base?
         let mut nth_vector = AtomVector::new();
         for i in 0..self.len() {
-            if self.get_res_serial(i) as usize == n+1 {
+            if self.get_res_serial(i) as usize == n + 1 {
                 nth_vector.push_atom(self.get(i));
             }
         }
@@ -202,7 +202,7 @@ impl AtomVector {
     pub fn get_nth_n(&self, n: usize) -> Atom {
         //TODO: n 0-base (or 1-base)?
         for i in 0..self.len() {
-            if (self.get_res_serial(i) as usize == n+1) && self.is_n(i) {
+            if (self.get_res_serial(i) as usize == n + 1) && self.is_n(i) {
                 return self.get(i);
             }
         }
@@ -212,7 +212,7 @@ impl AtomVector {
     pub fn get_nth_ca(&self, n: usize) -> Atom {
         //TODO: n 0-base or (1-base)?
         for i in 0..self.len() {
-            if (self.get_res_serial(i) as usize == n+1) && self.is_ca(i) {
+            if (self.get_res_serial(i) as usize == n + 1) && self.is_ca(i) {
                 return self.get(i);
             }
         }
@@ -222,7 +222,7 @@ impl AtomVector {
     pub fn get_nth_c(&self, n: usize) -> Atom {
         //TODO: n 0-base or (1-base)?
         for i in 0..self.len() {
-            if (self.get_res_serial(i) as usize == n+1) && self.is_c(i) {
+            if (self.get_res_serial(i) as usize == n + 1) && self.is_c(i) {
                 return self.get(i);
             }
         }

@@ -25,8 +25,11 @@ fn test_geometry_hash_collector() {
                 if i == j {
                     continue;
                 }
-                let trr = compact.get_trrosetta_feature(i, j).expect("Failed to get trrosetta feature");
-                let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                let trr = compact
+                    .get_trrosetta_feature(i, j)
+                    .expect("Failed to get trrosetta feature");
+                let hash_value =
+                    HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
                 hash_collector.collect_hash(hash_value);
             }
         }

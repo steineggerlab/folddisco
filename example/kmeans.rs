@@ -63,7 +63,6 @@ fn main() {
                 file.write("\n".as_bytes()).unwrap();
             }
             break;
-
         }
         centroids = new_centroids;
     }
@@ -77,7 +76,6 @@ fn main() {
         }
         file.write("\n".as_bytes()).unwrap();
     }
-
 }
 
 fn euclidean_distance(a: &[f32], b: &[f32]) -> f32 {

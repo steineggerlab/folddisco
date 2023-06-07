@@ -6,7 +6,6 @@
 //     }
 // }
 
-
 pub enum HashType {
     SimpleHash,
     TriadHash,

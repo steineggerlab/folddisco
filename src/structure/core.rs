@@ -5,6 +5,8 @@ use crate::utils::calculator::Calculate;
 
 use crate::structure::coordinate::{calc_angle_point, calc_torsion_angle};
 
+use super::coordinate::{calc_torsion_radian, calc_angle_radian};
+
 /// Structure is the main data structure for storing the information of a protein structure.
 #[derive(Debug)]
 pub struct Structure {
@@ -323,6 +325,31 @@ impl CompactStructure {
             let phi1 = calc_angle_point(&ca1, &cb1, &cb2);
             let phi2 = calc_angle_point(&cb1, &cb2, &ca2);
             let feature = [cb_dist, omega, theta1, theta2, phi1, phi2];
+            Some(feature)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_trrosetta_feature2(&self, idx1: usize, idx2: usize) -> Option<[f32; 7]> {
+        let ca1 = self.get_ca(idx1);
+        let ca2 = self.get_ca(idx2);
+        let cb1 = self.get_cb(idx1);
+        let cb2 = self.get_cb(idx2);
+        let n1 = self.get_n(idx1);
+        let n2 = self.get_n(idx2);
+        if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2)) =
+            (ca1, ca2, cb1, cb2, n1, n2)
+        {
+            let log_dist = (idx2 - idx1) as f32;
+            let log_dist = log_dist.ln();
+            let cb_dist = cb1.calc_distance(&cb2);
+            let omega = calc_torsion_radian(&ca1, &cb1, &cb2, &ca2);
+            let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
+            let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
+            let phi1 = calc_angle_radian(&ca1, &cb1, &cb2);
+            let phi2 = calc_angle_radian(&cb1, &cb2, &ca2);
+            let feature = [omega, theta1, theta2, phi1, phi2, cb_dist, log_dist];
             Some(feature)
         } else {
             None

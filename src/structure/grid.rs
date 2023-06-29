@@ -1,3 +1,4 @@
+// WARNING: Leave this until the prototyping is done 2023-06-08 12:53:26
 use std::collections::{HashSet, HashMap};
 use crate::structure::core::CompactStructure;
 use crate::structure::coordinate::{approx_cb, CarbonCoordinateVector, Coordinate};
@@ -7,7 +8,6 @@ pub struct Grid {
     pub spacing: f32,
     pub grid: HashMap<(usize, usize, usize), HashSet<usize>>,
 }
-
 
 impl Grid {
     pub fn new(structure: &CompactStructure, spacing: f32) -> Grid {
@@ -128,5 +128,5 @@ mod grid_tests {
         let end_time = std::time::Instant::now();
         println!("Time elapsed - NO GRID: {:?}", end_time - start_time);
     }
-
+    
 }

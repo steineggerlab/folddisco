@@ -118,6 +118,18 @@ pub fn calc_angle_point(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordina
     let degree = radian.to_degrees(); // angle in degrees
     degree
 }
+pub fn calc_angle_radian(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordinate) -> f32 {
+    let (a, b, c) = (atom1, atom2, atom3);
+    // Form vectors
+    let v1 = (a.x - b.x, a.y - b.y, a.z - b.z); // vector 1
+    let v2 = (c.x - b.x, c.y - b.y, c.z - b.z); // vector 2
+    let dot = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2; // dot product
+    let v1_len = (v1.0.powf(2.0) + v1.1.powf(2.0) + v1.2.powf(2.0)).sqrt(); // length of vector 1
+    let v2_len = (v2.0.powf(2.0) + v2.1.powf(2.0) + v2.2.powf(2.0)).sqrt(); // length of vector 2
+    let cos = dot / (v1_len * v2_len); // cos of angle
+    let radian = cos.acos(); // angle in radians
+    radian
+}
 
 // Originally from foldseek StructureTo3DiBase::approxCBetaPosition
 // link: https://github.com/steineggerlab/foldseek/blob/master/lib/3di/structureto3di.cpp
@@ -153,6 +165,19 @@ pub fn calc_torsion_angle(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Co
     let x = r.dot(&s);
     let y = s.dot(&t);
     -y.atan2(x).to_degrees()
+}
+
+pub fn calc_torsion_radian(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate) -> f32 {
+    let v1 = b.sub(a);
+    let v2 = c.sub(b);
+    let v3 = d.sub(c);
+
+    let r = v1.cross(&v2).normalize();
+    let s = v2.cross(&v3).normalize();
+    let t = r.cross(&v2.normalize()).normalize();
+    let x = r.dot(&s);
+    let y = s.dot(&t);
+    -y.atan2(x)
 }
 
 #[derive(Debug, Clone)]

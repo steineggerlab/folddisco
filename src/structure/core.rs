@@ -341,8 +341,9 @@ impl CompactStructure {
         if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2)) =
             (ca1, ca2, cb1, cb2, n1, n2)
         {
-            let log_dist = (idx2 - idx1) as f32;
-            let log_dist = log_dist.ln();
+            let log_dist = idx2 as f32 - idx1 as f32;
+            let dist_sign = if idx2 > idx1 { 1.0 } else { -1.0 };
+            let log_dist = log_dist.abs().ln() * dist_sign;
             let cb_dist = cb1.calc_distance(&cb2);
             let omega = calc_torsion_radian(&ca1, &cb1, &cb2, &ca2);
             let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);

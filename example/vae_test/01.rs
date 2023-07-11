@@ -6,7 +6,7 @@
  * Description:
  *     This code is written as part of project "vae_test".
  * ---
- * Last Modified: 2023-06-29 17:45:03
+ * Last Modified: 2023-07-11 17:33:18
  * Modified By: Hyunbin Kim (khb7840@gmail.com)
  * ---
  * Copyright © 2023 Hyunbin Kim, All rights reserved
@@ -19,6 +19,11 @@ use tch::{
     nn::{self, VarStore},
     IndexOp, Kind, Reduction, Tensor,
 };
+
+use motifsearch::controller::{self, Controller, GeometryHashCollector};
+
+use motifsearch::index::builder::IndexBuilder;
+use motifsearch::PDBReader;
 
 struct Encoder {
     fc1: nn::Linear,
@@ -74,13 +79,66 @@ fn read_and_build_model() -> Encoder {
 }
 
 
+fn load_homeobox_toy() -> Vec<String> {
+    vec![
+        "data/homeobox/1akha-.pdb".to_string(),
+        "data/homeobox/1b72a-.pdb".to_string(),
+        "data/homeobox/1b72b-.pdb".to_string(),
+        "data/homeobox/1ba5--.pdb".to_string(),
+    ]
+}
 
 fn main() {
     // IMPORTANT: Model should be saved as safetensors
+    // Load model
     let path = "data/encoder.safetensors";
     let loaded = tch::Tensor::read_safetensors(path);
-    println!("loaded: {:?}", loaded);
     let enc = read_and_build_model();
-    let temp = enc.forward(&Tensor::ones(&[1, 7], (Kind::Float, tch::Device::Cpu)));
-    println!("temp: {:?}", temp);
+    // Test if encoder works
+    // let temp = enc.forward(&Tensor::ones(&[1, 7], (Kind::Float, tch::Device::Cpu)));
+    // println!("temp: {:?}", temp);
+
+    // Load dataset
+    let dataset = load_homeobox_toy();
+    for pdb_path in dataset {
+        // Start measure time
+        let start = std::time::Instant::now();
+        let pdb_reader = PDBReader::from_file(&pdb_path).expect("Failed to read PDB file");
+        let structure = pdb_reader.read_structure().expect("Failed to read structure");
+        let compact = structure.to_compact();
+
+        let mut hash_collector = GeometryHashCollector::new();
+
+        let N: usize = compact.num_residues.try_into().unwrap();
+        let mut trr_input_vec = Vec::with_capacity(N * N - N);
+        let mut counter: usize = 0;
+        for i in 0..compact.num_residues {
+            for j in 0..compact.num_residues {
+                counter += 1;
+                if i == j {
+                    continue;
+                }
+                let trr = compact
+                    .get_trrosetta_feature2(i, j)
+                    .expect("Failed to get trrosetta feature");
+                // Fill trr_input_vec with trr
+                trr_input_vec.push(trr);
+                dbg!("{},{}, {:?}, {}", i, j, trr, trr_input_vec.len());
+                // print!("{}/{} ", trr, encoded);
+                    // let hash_value =
+                //     HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                // hash_collector.collect_hash(hash_value);
+                counter += 1;
+            }
+        }
+        // Convert trr_input_vec to tensor
+        // Print trr_input_vec is filled
+        println!("trr_input_vec: {:?}", trr_input_vec);
+        // Flatten
+        let trr_input_vec = trr_input_vec.into_iter().flatten().collect::<Vec<_>>();
+        let trr_input = Tensor::of_slice(&trr_input_vec).reshape(&[(N*N - N) as i64, 7]);
+        let encoded = enc.forward(&trr_input);
+        encoded.print();
+    }
+    
 }

@@ -15,6 +15,7 @@ pub struct Controller {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
     pub hash_collection_vec: Vec<HashCollection>,
+    pub hash_new_collection_vec: Vec<crate::geometry::two_float::HashCollection>, // WARNING: TEMPORARY
     pub res_pair_vec: Vec<Vec<(u64, u64, [u8; 3], [u8; 3])>>, // WARNING: TEMPORARY
     pub remove_redundancy: bool,
 }
@@ -25,6 +26,7 @@ impl Controller {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
             hash_collection_vec: Vec::new(),
+            hash_new_collection_vec: Vec::new(),
             res_pair_vec: Vec::new(), // WARNING: TEMPORARY
             remove_redundancy: false,
         }
@@ -180,15 +182,16 @@ impl Controller {
     }
 
     pub fn save_hash_per_pair(&self, path: &str) {
-        for i in 0..self.hash_collection_vec.len() {
+        let mut file = std::fs::File::create(path).expect("Unable to create file");
+        file.write_all(b"hash\tval1\tval2\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
+            .expect("Unable to write header");
+        println!("{}", self.hash_new_collection_vec.len());
+        for i in 0..self.hash_new_collection_vec.len() {
             let pdb_path = &self.path_vec[i];
-            let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
-            println!("Saving to {}", new_path);
-            let mut file = std::fs::File::create(new_path).expect("Unable to create file");
-            file.write_all(b"hash\tval1\tval2\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
-                .expect("Unable to write header");
+            // let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
+            // println!("Saving to {}", new_path);
             // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header"); // ppf
-            let hash_collection = &self.hash_collection_vec[i];
+            let hash_collection = &self.hash_new_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
             println!(
                 "{}: {} hashes, {} pairs",
@@ -219,15 +222,15 @@ impl Controller {
         file.write_all(b"hash\tval1\tval2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
             .expect("Unable to write header");
         // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
-        for i in 0..self.hash_collection_vec.len() {
+        for i in 0..self.hash_new_collection_vec.len() {
             let pdb_path = self.path_vec[i].split("/").last().unwrap();
             if !res_pair_filter.contains_key(pdb_path) {
                 continue;
             }
-            let hash_collection = &self.hash_collection_vec[i];
+            let hash_collection = &self.hash_new_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
             println!(
-                "{}: {} hashes, {} pairs",
+                "Saving filtered {}: {} hashes, {} pairs",
                 pdb_path,
                 hash_collection.len(),
                 res_pair_vec.len()
@@ -236,8 +239,8 @@ impl Controller {
                 let hash_value = hash_collection[j];
                 let res1 = res_pair_vec[j].0;
                 let res2 = res_pair_vec[j].1;
-                let res1_str = res_pair_vec[j].2;
-                let res2_str = res_pair_vec[j].3;
+                let res1_str = res_pair_vec[j].2.to_ascii_uppercase();
+                let res2_str = res_pair_vec[j].3.to_ascii_uppercase();
                 if res_pair_filter[pdb_path].contains(&res1)
                     && res_pair_filter[pdb_path].contains(&res2)
                 {

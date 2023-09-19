@@ -164,7 +164,8 @@ pub fn calc_torsion_angle(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Co
     let t = r.cross(&v2.normalize()).normalize();
     let x = r.dot(&s);
     let y = s.dot(&t);
-    -y.atan2(x).to_degrees()
+    let out = -y.atan2(x);
+    (2.0 * out).cos()
 }
 
 pub fn calc_torsion_radian(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate) -> f32 {

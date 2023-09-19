@@ -4,7 +4,7 @@ use std::io::Write;
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
 // use crate::geometry::ppf::{HashCollection, HashValue};
-use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue};
+use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue, discretize_value, discretize_value_with_voting};
 // use crate::geometry::trrosetta_reduced::*;
 use crate::index::builder::IndexBuilder;
 use crate::index::*;
@@ -83,7 +83,7 @@ impl Controller {
         println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
     }
 
-    pub fn save_raw_feature(&mut self, path: &str) {
+    pub fn save_raw_feature(&mut self, path: &str, discretize: bool) {
         let mut file = std::fs::File::create(path).expect("cannot create file");
         for i in 0..self.path_vec.len() {
             let pdb_path = &self.path_vec[i];
@@ -105,19 +105,39 @@ impl Controller {
                     if trr[0] < 2.0 || trr[0] > 20.0 {
                         continue;
                     }
+                    let res1 = compact.residue_serial[n];
+                    let res2 = compact.residue_serial[m];
+                    // [u8;3] to String
+                    let res1_aa = String::from_utf8_lossy(&compact.residue_name[n]).to_string();
+                    let res2_aa = String::from_utf8_lossy(&compact.residue_name[m]).to_string();
                     // normalize trr[0]
-                    let n_cb_dist = (trr[0] - 2.0) / 18.0;
-                    let omega = normalize_angle_degree(trr[1], -180.0, 180.0);
-                    let phi1 = normalize_angle_degree(trr[2], -180.0, 180.0);
-                    let phi2 = normalize_angle_degree(trr[3], -180.0, 180.0);
-                    let psi1 = normalize_angle_degree(trr[4], 0.0, 180.0);
-                    let psi2 = normalize_angle_degree(trr[5], 0.0, 180.0);
-
-                    let line = format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\n",
+                    // let n_cb_dist = (trr[0] - 2.0) / 18.0;
+                    let n_cb_dist = trr[0];
+                    let omega = trr[1];
+                    let phi1 = trr[2];
+                    let phi2 = trr[3];
+                    let psi1 = trr[4];
+                    let psi2 = trr[5];
+                    let mut line = format!(
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                        pdb_path, res1, res2, res1_aa, res2_aa,
                         n_cb_dist, omega, phi1, phi2, psi1, psi2
                     );
-
+                    if discretize == true {
+                        let n_cb_dist = discretize_value_with_voting(n_cb_dist, 2.0, 20.0, 16.0, 0.5);
+                        // Torsion angles
+                        let omega = discretize_value_with_voting(omega, -1.0, 1.0, 6.0, 0.15);
+                        let phi1 = discretize_value_with_voting(phi1, -1.0, 1.0, 6.0, 0.15);
+                        let phi2 = discretize_value_with_voting(phi2, -1.0, 1.0, 6.0, 0.15);
+                        // Planar angles
+                        let psi1 = discretize_value_with_voting(psi1, 0.0, 180.0, 6.0, 10.0);
+                        let psi2 = discretize_value_with_voting(psi2, 0.0, 180.0, 6.0, 10.0);
+                        line = format!(
+                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                            pdb_path, res1, res2, res1_aa, res2_aa,
+                            n_cb_dist, omega, phi1, phi2, psi1, psi2
+                        );
+                    }
                     file.write_all(line.as_bytes()).expect("cannot write file");
                 }
             }

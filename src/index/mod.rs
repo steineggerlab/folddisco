@@ -79,12 +79,18 @@ fn write_index_table_debug<T: Hash + Display, U: Display + Hash + Ord + Eq>(
     path: &str,
 ) {
     let mut file = std::fs::File::create(path).expect("Unable to create file");
-    file.write_all(b"hash\tedge1\tedge2\tedge3\tids\tidcount\tid_unique\n")
+    file.write_all(b"hash\tdist\tomega\tphi1\tphi2\tpsi1\tpsi2\tids\tidcount\tid_unique\n")
         .expect("Unable to write data");
     for (key, value) in index_table {
+        // Calculate id count & add
         let value_comma_separated = value
             .iter()
-            .map(|x| x.to_string())
+            .fold(HashMap::new(), |mut acc, x| {
+                *acc.entry(x).or_insert(0) += 1;
+                acc
+            })
+            .into_iter()
+            .map(|(x, y)| format!("{}:{}", x, y))
             .collect::<Vec<String>>()
             .join(",");
         let count = value.len();

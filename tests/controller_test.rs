@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use motifsearch::controller::{self, Controller, GeometryHashCollector};
 use motifsearch::geometry::trrosetta::{HashCollection, HashValue};
 use motifsearch::index::builder::IndexBuilder;
@@ -80,8 +82,55 @@ fn test_index_builder() {
         index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
     let table_printer = IndexTablePrinter::Debug;
     table_printer.print(&index_table, "data/homeobox_index_table.tsv"); // TODO: Change this to work
+    controller.save_raw_feature("data/homeobox_hash_raw. tsv", true);
     println!("{:?}", &controller.path_vec);
 }
+
+#[test]
+fn test_index_builder_2() {
+    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    let mut controller = Controller::new(pdb_paths);
+    controller.fill_numeric_id_vec();
+    controller.collect_hash();
+
+    let index_builder = IndexBuilder::new();
+    let index_table =
+        index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
+    let table_printer = IndexTablePrinter::Debug;
+    controller.save_raw_feature("data/serine_hash_raw.tsv", true);
+    table_printer.print(&index_table, "data/serine_peptidases_index_table.tsv"); // TODO: Change this to work
+    println!("{:?}", &controller.path_vec);
+}
+
+    #[test]
+    fn test_temp() {
+        let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+        let mut controller = Controller::new(pdb_paths);
+        controller.fill_numeric_id_vec();
+        // controller.collect_triad_hash();
+        controller.collect_hash();
+
+        let mut serine_filter: HashMap<String, Vec<u64>> = HashMap::new();
+        serine_filter.insert("1aq2.pdb".to_string(), vec![250, 232, 269]);
+        serine_filter.insert("1wab.pdb".to_string(), vec![47, 195, 192]);
+        serine_filter.insert("1sc9.pdb".to_string(), vec![80, 235, 207]);
+        serine_filter.insert("2o7r.pdb".to_string(), vec![169, 306, 276]);
+        serine_filter.insert("1bs9.pdb".to_string(), vec![90, 187, 175]);
+        serine_filter.insert("1ju3.pdb".to_string(), vec![117, 287, 259]);
+        serine_filter.insert("1uk7.pdb".to_string(), vec![34, 252, 224]);
+        serine_filter.insert("1okg.pdb".to_string(), vec![255, 75, 61]);
+        serine_filter.insert("1qfm.pdb".to_string(), vec![554, 680, 641]);
+        controller.save_hash_per_pair("data/archive/serine_hash_per_pair.tsv");
+        controller.save_filtered_hash_pair("data/archive/serine_hash_per_pair_filtered.tsv", &serine_filter);
+        let index_builder = IndexBuilder::new();
+        let index_table =
+            index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
+        let table_printer = IndexTablePrinter::Debug;
+        table_printer.print(&index_table, "data/archive/serine_index_table.tsv");
+        println!("{:?}", &controller.path_vec);
+    }
+
+
 
 // #[test]
 // fn test_querying() {

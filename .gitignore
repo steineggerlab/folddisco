@@ -15,3 +15,4 @@ yeast_raw_feature.tsv
 data/serine_vae_hash_table_rounded.tsv
 data/serine_vae_per_pair_hash.tsv
 data/serine_hash_raw.tsv
+serine_vae_per_pair_hash.tsv

@@ -115,10 +115,10 @@ mod grid_tests {
 
     #[test]
     fn test_grid() {
-        let path = String::from("data/111l_alpha.pdb");
+        let path = String::from("data/serine_peptidases_filtered/1qfm.pdb");
         let reader = PDBReader::from_file(&path).expect("Failed to read PDB file");
         let structure: CompactStructure = reader.read_structure().expect("Failed to convert").to_compact();
-        let grid = Grid::new(&structure, 10.0);
+        let grid = Grid::new(&structure, 20.0);
         let start_time = std::time::Instant::now();
         let dist_vec = grid.calc_pairwise_dist(&structure);
         let end_time = std::time::Instant::now();

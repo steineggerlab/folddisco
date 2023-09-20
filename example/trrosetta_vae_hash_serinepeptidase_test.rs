@@ -1,16 +1,7 @@
-/*
- * File: 01.rs
- * Project: vae_test
- * Created: 2023-06-29 14:37:33
- * Author: Hyunbin Kim (khb7840@gmail.com)
- * Description:
- *     This code is written as part of project "vae_test".
- * ---
- * Last Modified: 2023-07-11 20:10:13
- * Modified By: Hyunbin Kim (khb7840@gmail.com)
- * ---
- * Copyright © 2023 Hyunbin Kim, All rights reserved
- */
+// File: trrosetta_vae_hash_serinepeptidase_test.rs
+// Created: 2023-09-05 16:36:23
+// Author: Hyunbin Kim (khb7840@gmail.com)
+// Copyright © 2023 Hyunbin Kim, All rights reserved
 
 use std::fmt;
 use tch::{

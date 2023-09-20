@@ -6,6 +6,7 @@
 /data/cys_proteases
 /data/yeast
 /data/yeast_full
+/analysis
 **/archive
 *_index_table.tsv
 *_hash_per_pair.tsv

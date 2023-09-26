@@ -106,6 +106,7 @@ impl Structure {
 pub struct CompactStructure {
     pub num_chains: usize,
     pub chains: Vec<u8>,
+    pub chain_per_residue: Vec<u8>,
     pub num_residues: usize,
     pub residue_serial: Vec<u64>,
     pub residue_name: Vec<[u8; 3]>,
@@ -126,6 +127,7 @@ impl CompactStructure {
         let mut ca_vec = CarbonCoordinateVector::new();
         let mut cb_vec = CarbonCoordinateVector::new();
 
+        let mut chain_per_residue: Vec<u8> = Vec::new();
         let mut prev_res_serial: Option<u64> = None;
         let mut prev_res_name: Option<&[u8; 3]> = None;
         let mut n: Option<Coordinate> = None;
@@ -147,6 +149,7 @@ impl CompactStructure {
                         cb_vec.push(&cb);
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
+                        chain_per_residue.push(origin.atom_vector.chain[idx]);
                     }
                     (Some(n), Some(ca), None) => {
                         let resi = prev_res_serial.expect("expected residue serial number");
@@ -155,7 +158,7 @@ impl CompactStructure {
                         ca_vec.push(&ca);
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
-
+                        chain_per_residue.push(origin.atom_vector.chain[idx]);
                         if let (Some(b"GLY"), Some(gly_n), Some(gly_c)) =
                             (prev_res_name, &gly_n, &gly_c)
                         {
@@ -206,6 +209,7 @@ impl CompactStructure {
         CompactStructure {
             num_chains: origin.num_chains,
             chains: origin.chains.clone(),
+            chain_per_residue: chain_per_residue,
             num_residues: res_serial_vec.len(),
             residue_serial: res_serial_vec,
             residue_name: res_name_vec,
@@ -258,7 +262,7 @@ impl CompactStructure {
             None
         }
     }
-
+    
     pub fn get_angle(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -274,6 +278,16 @@ impl CompactStructure {
         } else {
             None
         }
+    }
+    
+    pub fn get_pdb_feature(&self, idx1: usize, idx2: usize) -> Vec<f32> {
+        let cb1 = self.get_cb(idx1);
+        let cb2 = self.get_cb(idx2);
+        let cb_dist = cb1.unwrap().calc_distance(&cb2.unwrap());
+        let angle = self.get_angle(idx1, idx2).unwrap();
+        let ca_dist = self.get_distance(idx1, idx2).unwrap();
+        let feature = vec![ca_dist, cb_dist, angle];
+        feature
     }
 
     pub fn get_res_serial(&self, idx1: usize, idx2: usize) -> (u64, u64) {

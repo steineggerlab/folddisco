@@ -4,3 +4,7 @@
 
 # # 
 # $foldcomp decompress -f $1 $2 
+
+# 0. Download cluster list
+# 1. With list, extract foldseek database
+# 2. Align the clusters

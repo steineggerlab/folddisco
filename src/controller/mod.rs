@@ -4,7 +4,7 @@ use std::io::Write;
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
 // use crate::geometry::ppf::{HashCollection, HashValue};
-use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue, discretize_value, discretize_value_with_voting};
+use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
 // use crate::geometry::trrosetta_reduced::*;
 use crate::index::builder::IndexBuilder;
 use crate::index::*;
@@ -89,10 +89,7 @@ impl Controller {
             let pdb_path = &self.path_vec[i];
             if i == 100 {
                 println!("Processing {}th pdb - {}", i, pdb_path);
-                // Stop loop
-                break;
             }
-            // println!("Processing {}", pdb_path);
             let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
             let structure = pdb_reader.read_structure().expect("structure read failed");
             let compact = structure.to_compact();
@@ -124,14 +121,14 @@ impl Controller {
                         n_cb_dist, omega, phi1, phi2, psi1, psi2
                     );
                     if discretize == true {
-                        let n_cb_dist = discretize_value_with_voting(n_cb_dist, 2.0, 20.0, 16.0, 0.5);
+                        let n_cb_dist = discretize_value(n_cb_dist, 2.0, 20.0, 12.0);
                         // Torsion angles
-                        let omega = discretize_value_with_voting(omega, -1.0, 1.0, 6.0, 0.15);
-                        let phi1 = discretize_value_with_voting(phi1, -1.0, 1.0, 6.0, 0.15);
-                        let phi2 = discretize_value_with_voting(phi2, -1.0, 1.0, 6.0, 0.15);
+                        let omega = discretize_value(omega, -1.0, 1.0, 6.0);
+                        let phi1 = discretize_value(phi1, -1.0, 1.0, 6.0);
+                        let phi2 = discretize_value(phi2, -1.0, 1.0, 6.0);
                         // Planar angles
-                        let psi1 = discretize_value_with_voting(psi1, 0.0, 180.0, 6.0, 10.0);
-                        let psi2 = discretize_value_with_voting(psi2, 0.0, 180.0, 6.0, 10.0);
+                        let psi1 = discretize_value(psi1, 0.0, 180.0, 6.0);
+                        let psi2 = discretize_value(psi2, 0.0, 180.0, 6.0);
                         line = format!(
                             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                             pdb_path, res1, res2, res1_aa, res2_aa,
@@ -144,63 +141,21 @@ impl Controller {
         }
     }
 
-    // pub fn collect_triad_hash(&mut self) {
-    //     for i in 0..self.path_vec.len() {
-    //         let pdb_path = &self.path_vec[i];
-    //         let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
-    //         let structure = pdb_reader.read_structure().expect("structure read failed");
-    //         let compact = structure.to_compact();
-    //         let mut hash_collector = GeometryHashCollector::new();
-    //         let mut res_pair_vec = Vec::new(); // WARNING: TEMPORARY
-    //         for n in 0..compact.num_residues {
-    //             for m in n..compact.num_residues {
-    //                 for o in m..compact.num_residues {
-    //                     if n == m || m == o || n == o {
-    //                         continue;
-    //                     }
-    //                     if n.abs_diff(m) < 2 || m.abs_diff(o) < 2 || n.abs_diff(o) < 2 {
-    //                         continue;
-    //                     }
-    //                     if !(n < m && m < o) {
-    //                         continue;
-    //                     }
-
-    //                     let dist1 = compact.get_distance(n, m).expect("cannot get distance");
-    //                     if dist1 < 3.5 || dist1 > 19.5 { // distance range is 3.5 ~ 19.5
-    //                         continue;
-    //                     }
-    //                     let dist2 = compact.get_distance(m, o).expect("cannot get distance");
-    //                     if dist2 < 3.5 || dist2 > 19.5 { // distance range is 3.0 ~ 20.0
-    //                         continue;
-    //                     }
-    //                     let dist3 = compact.get_distance(n, o).expect("cannot get distance");
-    //                     if dist3 < 3.5 || dist3 > 19.5 { // distance range is 3.0 ~ 20.0
-    //                         continue;
-    //                     }
-    //                     let mut edges = vec![dist1, dist2, dist3];
-    //                     edges.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    //                     let hash_value = crate::geometry::triad_hash::HashValue::perfect_hash(edges[0], edges[1], edges[2]);
-    //                     hash_collector.collect_hash(hash_value);
-    //                     res_pair_vec.push(
-    //                         (compact.residue_serial[n], compact.residue_serial[m], compact.residue_serial[o])
-    //                     ); // WARNING: TEMPORARY
-    //                 }
-    //             }
-    //         }
-
-    //         if self.remove_redundancy {
-    //             hash_collector.remove_redundancy();
-    //         }
-    //         self.hash_collection_vec
-    //             .push(hash_collector.hash_collection);
-    //         self.res_pair_vec.push(res_pair_vec); // For debug
-    //     }
-    // }
-
     pub fn fill_numeric_id_vec(&mut self) {
         string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
     }
 
+    pub fn save_id_vec(&self, path: &str) {
+        // Save numeric_id_vec & path_vec as headerless tsv
+        let mut file = std::fs::File::create(path).expect("Unable to create file");
+        for i in 0..self.numeric_id_vec.len() {
+            let numeric_id = self.numeric_id_vec[i];
+            let path = &self.path_vec[i];
+            file.write_all(format!("{}\t{}\n", numeric_id, path).as_bytes())
+                .expect("Unable to write data");
+        }
+    }
+    
     pub fn save_hash_per_pair(&self, path: &str) {
         let mut file = std::fs::File::create(path).expect("Unable to create file");
         file.write_all(b"hash\tval1\tval2\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")

@@ -41,14 +41,14 @@ impl HashValue {
         if cb_dist > 20.0 {
             cbd = 20.0;
         }
-        let h_cb_dist = discretize_value_with_voting(cbd, 2.0, 20.0, 16.0, 0.5);
+        let h_cb_dist = discretize_value(cbd, 2.0, 20.0, 10.0);
         // Torsion angles
-        let h_omega = discretize_value_with_voting(omega, -1.0, 1.0, 6.0, 0.15);
-        let h_theta1 = discretize_value_with_voting(theta1, -1.0, 1.0, 6.0, 0.15);
-        let h_theta2 = discretize_value_with_voting(theta2, -1.0, 1.0, 6.0, 0.15);
+        let h_omega = discretize_value(omega, -1.0, 1.0, 6.0);
+        let h_theta1 = discretize_value(theta1, -1.0, 1.0, 6.0);
+        let h_theta2 = discretize_value(theta2, -1.0, 1.0, 6.0);
         // Planar angles
-        let h_phi1 = discretize_value_with_voting(phi1, 0.0, 180.0, 6.0, 10.0);
-        let h_phi2 = discretize_value_with_voting(phi2, 0.0, 180.0, 6.0, 10.0);
+        let h_phi1 = discretize_value(phi1, 0.0, 180.0, 6.0);
+        let h_phi2 = discretize_value(phi2, 0.0, 180.0, 6.0);
 
         assert!(h_cb_dist < 256);
         assert!(h_omega < 256);
@@ -119,24 +119,6 @@ pub fn discretize_value(val: f32, min: f32, max: f32, num_bin: f32) -> u64 {
     let disc_f = 1.0_f32 / cont_f;
     (val * (disc_f) + 0.5) as u64
 }
-
-pub fn discretize_value_with_voting(val: f32, min: f32, max: f32, num_bin: f32, diff: f32) -> u64 {
-    let cont_f = (max - min) / (num_bin - 1.0_f32);
-    let disc_f = 1.0_f32 / cont_f;
-    let val_min_disc = ((val - diff) * (disc_f) + 0.5) as u64;
-    let val_max_disc = ((val + diff) * (disc_f) + 0.5) as u64;
-    let val_disc = (val * (disc_f) + 0.5) as u64;
-    // Voting
-    if val_disc == val_min_disc {
-        val_min_disc
-    } else if val_disc == val_max_disc {
-        val_max_disc
-    } else {
-        val_disc
-    }
-}
-
-
 
 pub fn continuize_value(val: u64, min: f32, max: f32, num_bin: f32) -> f32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);

@@ -19,3 +19,11 @@ serine_vae_per_pair_hash.tsv
 analysis/
 *_hash_raw.tsv
 *_index_table.tsv
+data/homeobox_hash_raw. tsv
+data/homeobox_index_table.tsv
+data/homeobox_index_table.tsv
+data/homeobox_hash_raw. tsv
+*.log
+data/merops_afdb_pa_hash_active_site.tsv
+data/merops_pdb_hash_active_site.tsv
+data/index_table_test.txt

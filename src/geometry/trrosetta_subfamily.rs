@@ -41,14 +41,14 @@ impl HashValue {
         if cb_dist > 20.0 {
             cbd = 20.0;
         }
-        let h_cb_dist = discretize_value(cbd, 2.0, 20.0, 8.0);
+        let h_cb_dist = discretize_value(cbd, 2.0, 20.0, 16.0);
         // Torsion angles
         let h_omega = discretize_value(omega, -1.0, 1.0, 4.0);
-        let h_theta1 = discretize_value(theta1, -1.0, 1.0, 4.0);
-        let h_theta2 = discretize_value(theta2, -1.0, 1.0, 4.0);
+        let h_theta1 = discretize_value(theta1, -1.0, 1.0, 8.0);
+        let h_theta2 = discretize_value(theta2, -1.0, 1.0, 8.0);
         // Planar angles
-        let h_phi1 = discretize_value(phi1, 0.0, 180.0, 8.0);
-        let h_phi2 = discretize_value(phi2, 0.0, 180.0, 8.0);
+        let h_phi1 = discretize_value(phi1, 0.0, 180.0, 16.0);
+        let h_phi2 = discretize_value(phi2, 0.0, 180.0, 16.0);
 
         assert!(h_cb_dist < 256);
         assert!(h_omega < 256);
@@ -81,7 +81,7 @@ impl HashValue {
             h_phi2 as f32,
         ]
     }
-
+    
     pub fn neighbors(&self, include_self: bool) -> Vec<HashValue> {
         let mut neighbors = Vec::new();
         // Get neighbors for each feature

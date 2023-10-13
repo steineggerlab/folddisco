@@ -79,7 +79,7 @@ fn load_info_tsv(path: &str) -> HashMap<String, PeptidaseInfo> {
             .split(", ")
             .map(|x| x[1..]
             .parse::<u64>()
-            .expect("Failed converting active site"))
+            .unwrap_or(0))
             .collect::<Vec<u64>>();
         let len_active_site = active_site.len();
         let pdb_id_new = pdb_id.clone();
@@ -140,22 +140,23 @@ fn calc_feature_for_only_active_site(pdb_path: &String, info: &PeptidaseInfo) ->
 fn main() {
     // Measure runtime
     let start = std::time::Instant::now();
-    let pdb_paths = load_path("/Users/hbk/Projects/Lab/06_FoldMotif/repos/merops/merops_pdb/");
+    let pdb_paths = load_path("/Users/hbk/Projects/Lab/06_FoldMotif/repos/merops/merops_afdb_pa/");
     let mut controller = Controller::new(pdb_paths);
     controller.fill_numeric_id_vec();
-    controller.collect_hash();
+    // controller.collect_hash();
     let end = std::time::Instant::now();
     println!("Elapsed time: {:?} for {:?} pdbs", end - start, controller.path_vec.len());
     // controller.save_raw_feature("data/merops_pdb_hash_raw.tsv", false);
     // controller.save_id_vec("data/merops_id_vec.tsv");
 
     // Read merops information
-    let info_tsv_path = "/Users/hbk/Projects/Lab/06_FoldMotif/repos/merops/pdb_pa.tsv";
+    let info_tsv_path = "/Users/hbk/Projects/Lab/06_FoldMotif/repos/merops/uniprot_pa.tsv.filtered.tsv";
     let merops_info = load_info_tsv(info_tsv_path);
     
     // Calculate feature for only active site
     println!("Calculating feature for only active site");
     let mut output = vec![];
+    let mut count = 1;
     for pdb_path in controller.path_vec.iter() {
         let pdb_path_str = pdb_path;
         let pdb_id = pdb_path.split("/").last().expect("Failed parsing name").split(".").next().expect("Failed parsing nam2");
@@ -165,20 +166,47 @@ fn main() {
             continue;
         }
         let output_for_pdb = calc_feature_for_only_active_site(pdb_path_str, info.unwrap());
+        // println!("Output for {} is {}", pdb_id, output_for_pdb.len());
         output.extend(output_for_pdb);
+        // If output reaches some limit, write to tsv and clear
+        if output.len() > 100 {
+            // Write output to tsv
+            let file_name = format!("data/merops_afdb_pa_hash_active_site_{}.tsv", count);
+            let mut output_tsv = File::create(file_name).expect("Failed creating output file");
+            writeln!(output_tsv, "pdb_path\tpdb_id\tuniprot_id\tsubfamily\tfamily\tclan\tname\tactive_site_raw\tlen_active_site\tres1\tres2\tres1_name\tres2_name\ttrr_dist\ttrr_omega\ttrr_phi1\ttrr_phi2\ttrr_psi1\ttrr_psi2\tpdb_ca_dist\tpdb_cb_dist\tpdb_ca_cb_angle").expect("Failed writing header");
+            for (pdb_path, info, res1, res2, res1_name, res2_name, trr, pdb_feature) in output {
+                let output_line = format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    pdb_path, info.to_tsv(), res1, res2, res1_name, res2_name,
+                    trr[0], trr[1], trr[2], trr[3], trr[4], trr[5], pdb_feature[0], pdb_feature[1], pdb_feature[2]
+                );
+                writeln!(output_tsv, "{}", output_line).expect("Failed writing output");
+            }
+            // Reset output
+            output = vec![];
+            count += 1;
+        }
+        if count > 25 {
+            break;
+        }
     }
-    // Write output to tsv
-    let mut output_tsv = File::create("data/merops_pdb_hash_active_site.tsv").expect("Failed creating output file");
+    // Concatenate all tsv files
+    let mut output_tsv = File::create("data/merops_afdb_pa_hash_active_site.tsv").expect("Failed creating output file");
     writeln!(output_tsv, "pdb_path\tpdb_id\tuniprot_id\tsubfamily\tfamily\tclan\tname\tactive_site_raw\tlen_active_site\t\tres1\tres2\tres1_name\tres2_name\ttrr_dist\ttrr_omega\ttrr_phi1\ttrr_phi2\ttrr_psi1\ttrr_psi2\tpdb_ca_dist\tpdb_cb_dist\tpdb_ca_cb_angle").expect("Failed writing header");
-    for (pdb_path, info, res1, res2, res1_name, res2_name, trr, pdb_feature) in output {
-        let output_line = format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-            pdb_path, info.to_tsv(), res1, res2, res1_name, res2_name,
-            trr[0], trr[1], trr[2], trr[3], trr[4], trr[5], pdb_feature[0], pdb_feature[1], pdb_feature[2]
-        );
-        writeln!(output_tsv, "{}", output_line).expect("Failed writing output");
-    }
-    
+    // Read all tsv files and write to output
+    for i in 1..count {
+        let file_name = format!("data/merops_afdb_pa_hash_active_site_{}.tsv", i);
+        let mut input_tsv = BufReader::new(File::open(file_name.clone()).expect("Failed opening file"));
+        let mut input_tsv_lines = String::new();
+        input_tsv.read_to_string(&mut input_tsv_lines).expect("Failed reading line");
+        let mut input_tsv_lines = input_tsv_lines.lines();
+        input_tsv_lines.next();
+        for line in input_tsv_lines {
+            writeln!(output_tsv, "{}", line).expect("Failed writing output");
+        }
+        // Delete file
+        std::fs::remove_file(file_name).expect("Failed deleting file");
+    }    
     // End
     println!("Done");
 }

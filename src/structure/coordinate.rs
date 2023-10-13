@@ -259,6 +259,10 @@ impl CarbonCoordinateVector {
         }
     }
     pub fn get(&self, idx: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
+        // Handle out of bound
+        if idx >= self.x.len() {
+            return (None, None, None);
+        }
         (self.x[idx], self.y[idx], self.z[idx])
     }
 

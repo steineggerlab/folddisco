@@ -4,7 +4,9 @@ use std::io::Write;
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
 // use crate::geometry::ppf::{HashCollection, HashValue};
-use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
+// use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
+use crate::geometry::trrosetta_subfamily::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
+// use crate::geometry::aa_pair::{HashCollection, HashValue, discretize_value, map_aa_to_u8};
 // use crate::geometry::trrosetta_reduced::*;
 use crate::index::builder::IndexBuilder;
 use crate::index::*;
@@ -62,13 +64,18 @@ impl Controller {
                     // let hash_value = HashValue::perfect_hash(reduced_trr[0], reduced_trr[1]);
                     let hash_value =
                         HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
-                    hash_collector.collect_hash(hash_value);
 
                     // WARNING: TEMPORARY
                     let res1 = compact.residue_serial[n];
                     let res2 = compact.residue_serial[m];
                     let res1_str = compact.residue_name[n];
                     let res2_str = compact.residue_name[m];
+                    // Convert amino acid three letter code to one letter code
+                    // let res1_u8 = map_aa_to_u8(&res1_str);
+                    // let res2_u8 = map_aa_to_u8(&res2_str);
+                    // let hash_value = HashValue::perfect_hash(res1_u8, res2_u8, n as usize, m as usize, trr[0]);
+                    hash_collector.collect_hash(hash_value);
+                    
                     res_pairs.push((res1, res2, res1_str, res2_str));
                 }
             }
@@ -107,6 +114,12 @@ impl Controller {
                     // [u8;3] to String
                     let res1_aa = String::from_utf8_lossy(&compact.residue_name[n]).to_string();
                     let res2_aa = String::from_utf8_lossy(&compact.residue_name[m]).to_string();
+                    // let res1_str = compact.residue_name[n];
+                    // let res2_str = compact.residue_name[m];
+                    // // Convert amino acid three letter code to one letter code
+                    // let res1_u8 = map_aa_to_u8(&res1_str);
+                    // let res2_u8 = map_aa_to_u8(&res2_str);
+
                     // normalize trr[0]
                     // let n_cb_dist = (trr[0] - 2.0) / 18.0;
                     let n_cb_dist = trr[0];
@@ -115,11 +128,17 @@ impl Controller {
                     let phi2 = trr[3];
                     let psi1 = trr[4];
                     let psi2 = trr[5];
+                    let logdist = ((n as i32 - m as i32).abs() + 1).ilog2();
+                    let hash_value =
+                        HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+
+                    // let hash_value = HashValue::perfect_hash(res1_u8, res2_u8, n as usize, m as usize, trr[0]);
                     let mut line = format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                        pdb_path, res1, res2, res1_aa, res2_aa,
-                        n_cb_dist, omega, phi1, phi2, psi1, psi2
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                        pdb_path, res1, res2, res1_aa, res2_aa, logdist,
+                        n_cb_dist, omega, phi1, phi2, psi1, psi2, hash_value
                     );
+
                     if discretize == true {
                         let n_cb_dist = discretize_value(n_cb_dist, 2.0, 20.0, 12.0);
                         // Torsion angles
@@ -129,10 +148,11 @@ impl Controller {
                         // Planar angles
                         let psi1 = discretize_value(psi1, 0.0, 180.0, 6.0);
                         let psi2 = discretize_value(psi2, 0.0, 180.0, 6.0);
+                        let logdist = ((n as i32 - m as i32).abs() + 1).ilog2();
                         line = format!(
-                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                            pdb_path, res1, res2, res1_aa, res2_aa,
-                            n_cb_dist, omega, phi1, phi2, psi1, psi2
+                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                            pdb_path, res1, res2, res1_aa, res2_aa, logdist,
+                            n_cb_dist, omega, phi1, phi2, psi1, psi2, hash_value
                         );
                     }
                     file.write_all(line.as_bytes()).expect("cannot write file");

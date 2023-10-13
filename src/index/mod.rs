@@ -147,4 +147,47 @@ pub fn query_multiple<T: Hash + Eq, U: Hash + Eq + Clone>(
     result
 }
 
+
+pub fn query_multiple_with_neighbors<T: Hash + Eq, U: Hash + Eq + Clone>(
+    index_table: &IndexTable<T, U>,
+    queries_with_neighbors: Vec<Vec<T>>,
+) -> Option<Vec<U>> {
+    // query_multiple returns the intersection of the results of the queries
+    // TODO: Generated. NEEDS TESTING
+    let mut result: Option<Vec<U>> = None;
+    for query_list in queries_with_neighbors {
+        let mut neighbor_result: Option<Vec<U>> = None;
+        for query in query_list {
+            let query_result = query_single(index_table, &query);
+            match query_result {
+                Some(x) => {
+                    match neighbor_result {
+                        Some(y) => {
+                            // Union result if result is in query_result
+                            // Element should be unique in neighbor_result
+                            neighbor_result = Some(y.into_iter().chain(x).collect::<std::collections::HashSet<_>>().into_iter().collect());
+                        }
+                        None => {
+                            neighbor_result = Some(x);
+                        }
+                    }
+                }
+                None => {
+                    neighbor_result = neighbor_result;
+                }
+            }
+        }
+        // Intersect result if result is in neighbor_result
+        match result {
+            Some(y) => {
+                result = Some(y.into_iter().filter(|z| neighbor_result.as_ref().unwrap().contains(z)).collect());
+            }
+            None => {
+                result = neighbor_result;
+            }
+        }
+    }
+    result
+}
+
 pub struct OffsetTable<T: Hash>(pub HashMap<T, usize>);

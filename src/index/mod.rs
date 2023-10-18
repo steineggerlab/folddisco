@@ -7,7 +7,8 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::io::Write;
-use std::sync::Arc;
+use serde::{Serialize, Deserialize};
+
 
 // TODO: Generalize this to handle multiple hash types
 
@@ -16,6 +17,64 @@ use std::sync::Arc;
 /// - Value: list of ids
 pub type IndexTable<T, U> = HashMap<T, Vec<U>>;
 
+
+pub struct IndexTableForSave<K, V> 
+where 
+    K: Hash + Eq + Serialize + for<'de> Deserialize<'de>, 
+    V: Serialize + for<'de> Deserialize<'de> 
+{
+    pub table: HashMap<K, Vec<V>>,
+}
+
+pub enum IndexTableFileType {
+    Json,
+    Tsv,
+    Binary,
+}
+
+impl<K, V> IndexTableForSave<K, V> 
+where 
+    K: Hash + Eq + Serialize + for<'de> Deserialize<'de>, 
+    V: Serialize + for<'de> Deserialize<'de> 
+{
+    pub fn new() -> IndexTableForSave<K, V> {
+        IndexTableForSave {
+            table: HashMap::new(),
+        }
+    }
+    pub fn insert(&mut self, key: K, value: V) {
+        let value_vec = self.table.entry(key).or_insert(Vec::new());
+        value_vec.push(value);
+    }
+    pub fn get(&self, key: &K) -> Option<&Vec<V>> {
+        self.table.get(key)
+    }
+    fn save_to_json(&self, path: &str) {
+        let serialized = serde_json::to_string(&self.table).unwrap();
+        let mut file = std::fs::File::create(path).expect("Unable to create file");
+        file.write_all(serialized.as_bytes())
+            .expect("Unable to write data");
+    }
+
+    pub fn save_to_file(&self, path: &str, output_type: IndexTableFileType) {
+        match output_type {
+            IndexTableFileType::Json => self.save_to_json(path),
+            IndexTableFileType::Tsv => unimplemented!(),
+            IndexTableFileType::Binary => unimplemented!(),
+        }
+    }
+    
+    pub fn from_IndexTable(index_table: &IndexTable<K, V>) -> IndexTableForSave<K, V> {
+        let mut index_table_for_save = IndexTableForSave::new();
+        for (key, value) in index_table {
+            for v in value {
+                index_table_for_save.insert(key.clone(), v.clone());
+            }
+        }
+        index_table_for_save
+    }
+    
+}
 pub enum IndexTablePrinter {
     Text,
     Binary,
@@ -23,20 +82,20 @@ pub enum IndexTablePrinter {
 }
 
 impl IndexTablePrinter {
-    pub fn print<T: Hash + Display, U: Display + Hash + Ord + Eq>(
+    pub fn print<T: Hash + Eq + Display, U: Display + Hash + Ord + Eq>(
         &self,
         index_table: &IndexTable<T, U>,
         path: &str,
     ) {
         match self {
             IndexTablePrinter::Text => write_index_table_text(index_table, path),
-            IndexTablePrinter::Binary => write_index_table_binary(index_table, path),
+            IndexTablePrinter::Binary => unimplemented!(),
             IndexTablePrinter::Debug => write_index_table_debug(index_table, path),
         }
     }
 }
 
-fn write_index_table_text<T: Hash + Display, U: Display + Hash + Ord + Eq>(
+fn write_index_table_text<T: Hash + Eq + Display, U: Display + Hash + Ord + Eq>(
     index_table: &IndexTable<T, U>,
     path: &str,
 ) {
@@ -55,33 +114,14 @@ fn write_index_table_text<T: Hash + Display, U: Display + Hash + Ord + Eq>(
     }
 }
 
-// WARNING: not working now
-fn write_index_table_binary<T: Hash + Display, U: Display>(
-    index_table: &IndexTable<T, U>,
-    path: &str,
-) {
-    let mut file = std::fs::File::create(path).expect("Unable to create file");
-    for (key, value) in index_table {
-        let value_comma_separated = value
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(",");
-        let line = format!("{}\t{}\n", key.to_string(), value_comma_separated);
-        // Write text file
-        file.write_all(line.as_bytes())
-            .expect("Unable to write data");
-    }
-}
-
-fn write_index_table_debug<T: Hash + Display, U: Display + Hash + Ord + Eq>(
+fn write_index_table_debug<T: Hash + Eq + Display, U: Display + Hash + Ord + Eq>(
     index_table: &IndexTable<T, U>,
     path: &str,
 ) {
     let mut file = std::fs::File::create(path).expect("Unable to create file");
     file.write_all(b"hash\tdist\tomega\tphi1\tphi2\tpsi1\tpsi2\tids\tidcount\tid_unique\n")
         .expect("Unable to write data");
-    for (key, value) in index_table {
+    for (key, value) in index_table.table {
         // Calculate id count & add
         let value_comma_separated = value
             .iter()

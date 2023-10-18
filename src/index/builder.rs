@@ -25,6 +25,8 @@ impl IndexBuilder {
         }
         index_table
     }
+    
+    
 }
 
 #[cfg(test)]

@@ -3,57 +3,17 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use motifsearch::controller::{self, Controller, GeometryHashCollector};
-use motifsearch::geometry::trrosetta::{HashCollection, HashValue};
-// use motifsearch::geometry::trrosetta_subfamily::{HashCollection, HashValue};
+// use motifsearch::geometry::trrosetta::{HashCollection, HashValue};
+use motifsearch::geometry::trrosetta_subfamily::{HashCollection, HashValue};
 // use motifsearch::geometry::aa_pair::{HashCollection, HashValue};
 use motifsearch::index::builder::IndexBuilder;
 use motifsearch::index::query_multiple_with_neighbors;
 use motifsearch::index::{IndexTablePrinter, query_single, query_multiple};
 use motifsearch::PDBReader;
+use motifsearch::index::index_table;
 
 mod common;
 use common::loader;
-
-// #[test]
-// fn test_geometry_hash_collector() {
-//     let pdb_paths = loader::load_homeobox_toy();
-//     for pdb_path in pdb_paths {
-//         // Start measure time
-//         let start = std::time::Instant::now();
-//         let pdb_reader = PDBReader::from_file(&pdb_path).expect("Failed to read PDB file");
-//         let structure = pdb_reader
-//             .read_structure()
-//             .expect("Failed to read structure");
-//         let compact = structure.to_compact();
-
-//         let mut hash_collector = GeometryHashCollector::new();
-//         for i in 0..compact.num_residues {
-//             for j in 0..compact.num_residues {
-//                 if i == j {
-//                     continue;
-//                 }
-//                 let trr = compact
-//                     .get_trrosetta_feature(i, j)
-//                     .expect("Failed to get trrosetta feature");
-//                 let hash_value =
-//                     HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
-//                 hash_collector.collect_hash(hash_value);
-//             }
-//         }
-//         //
-//         let before_dedup = hash_collector.hash_collection.len();
-//         hash_collector.remove_redundancy();
-//         let end = std::time::Instant::now();
-//         println!(
-//             "{:?} | {} AAs | {:?} | {} | {} hashes",
-//             &pdb_path,
-//             compact.num_residues,
-//             end - start,
-//             before_dedup,
-//             hash_collector.hash_collection.len()
-//         );
-//     }
-// } // WORKS with errors in Glycine  2023-03-28 18:23:37
 
 #[test]
 fn test_controller() {
@@ -108,31 +68,18 @@ fn test_index_builder_2() {
 }
 
 #[test]
-fn test_temp() {
-    let pdb_paths = loader::load_path("analysis/result/msd_human_s1");
-    let mut controller = Controller::new(pdb_paths);
-    controller.fill_numeric_id_vec();
-    // controller.collect_triad_hash();
-    controller.collect_hash();
-    controller.save_hash_per_pair("analysis/result/msd_human_s1_hash_per_pair.tsv");
-    controller.save_raw_feature("analysis/result/msd_human_s1_hash_raw.tsv", true);
-    let index_builder = IndexBuilder::new();
-    let index_table =
-        index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
-    let table_printer = IndexTablePrinter::Debug;
-    table_printer.print(&index_table, "analysis/result/msd_human_s1_index_table.tsv");
-    // println!("{:?}", &controller.path_vec);
-}
-
-#[test]
 fn test_querying() {
-    let pdb_paths: Vec<String> = loader::load_path("data/serine_peptidases_filtered");
+    let pdb_paths: Vec<String> = loader::load_path("analysis/test");
+    let start = std::time::Instant::now();
     let mut controller = Controller::new(pdb_paths);
     controller.fill_numeric_id_vec();
     controller.collect_hash();
     let index_builder = IndexBuilder::new();
     let index_table =
         index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
+    let lap1 = std::time::Instant::now();
+    println!("[OLD] Time elapsed for building index table {:?}", lap1 - start);
+
     let query: HashValue = HashValue::from_u64(6597069965577u64);
     let result = query_single(&index_table, &query);
     // Remove duplicates in result
@@ -147,7 +94,9 @@ fn test_querying() {
         }
         println!("Queried {:?}", dedup_result);
     }
-
+    let lap2 = std::time::Instant::now();
+    println!("[OLD] Time elapsed for single query {:?}", lap2 - lap1);
+    
     // Measure time
     let start = std::time::Instant::now();
     let homeobox_queries = [
@@ -171,14 +120,14 @@ fn test_querying() {
                 dedup_result.push(i);
             }
         }
-        println!("Queried ind (3) {:?}", dedup_result);
+        // println!("Queried ind (3) {:?}", dedup_result);
         for i in dedup_result {
             println!("Queried prot (3) {:?}", controller.path_vec.get(i));
         }
     }
-    let end = std::time::Instant::now();
-    println!("Time elapsed for quering neighbors {:?}", end - start);
-    let start = std::time::Instant::now();
+    let lap3 = std::time::Instant::now();
+    println!("[OLD] Time elapsed for quering neighbors {:?}", lap3 - lap2);
+
     let result = query_multiple(&index_table, &homeobox_queries);
 
     if let Some(result) = result {
@@ -190,15 +139,135 @@ fn test_querying() {
                 dedup_result.push(i);
             }
         }
-        println!("Queried ind (3) {:?}", dedup_result);
+        // println!("Queried ind (3) {:?}", dedup_result);
         for i in dedup_result {
-            println!("Queried prot (3) {:?}", controller.path_vec.get(i));
+            println!("[OLD] Queried prot (3) {:?}", controller.path_vec.get(i));
         }
     }
     let end = std::time::Instant::now();
-    println!("Time elapsed for quering {:?}", end - start);
+    println!("[OLD] Time elapsed for quering {:?}", end - lap3);
+}
+
+
+#[test]
+fn test_querying_using_new_index_table() {
+    // let pdb_paths: Vec<String> = loader::load_path("data/serine_peptidases_filtered");
+    let pdb_paths: Vec<String> = loader::load_path("analysis/test");
+    let start = std::time::Instant::now();
+    let mut controller = Controller::new(pdb_paths);
+    controller.fill_numeric_id_vec();
+    let mut index_table = index_table::IndexTable::new();
     
-    // let printer = IndexTablePrinter::Debug;
-    // printer.print(&index_table, "data/yeast_index_table.tsv");
-    // println!("{:?}", &controller.path_vec);
+    for i in 0.. controller.path_vec.len() {
+        let pdb_path = &controller.path_vec[i];
+        let pdb_reader = PDBReader::from_file(pdb_path).expect("PDB file not found");
+        let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
+        let compact = compact.to_compact();
+        
+        let mut hash_vec: Vec<u64> = Vec::with_capacity(compact.num_residues.pow(2));
+        let mut res_pair: Vec<(u16, u16)> = Vec::with_capacity(compact.num_residues.pow(2));
+        
+        for n in 0..compact.num_residues {
+            for m in 0..compact.num_residues {
+                if n == m {
+                    continue;
+                }
+                let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
+                if trr[0] < 2.0 || trr[0] > 20.0 {
+                    continue;
+                }
+                let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                hash_vec.push(hash_value.as_u64());
+                
+                let res1 = compact.residue_serial[n] as u16;
+                let res2 = compact.residue_serial[m] as u16;
+                res_pair.push((res1, res2));
+            }
+        }
+        index_table.concat_structure(i, hash_vec);
+    }
+    let lap1 = std::time::Instant::now();
+    println!("[NEW] Time elapsed for building index table {:?}", lap1 - start);
+    
+    let result = index_table.query_single(&6597069965577u64);
+    // Remove duplicates in result
+    if let Some(result) = result {
+        let mut set = HashSet::new();
+        let mut dedup_result = Vec::new();
+        for i in result {
+            if !set.contains(&i) {
+                set.insert(i);
+                dedup_result.push(i);
+            }
+        }
+        println!("[NEW] Single queried {:?}", dedup_result);
+        let queried_ind = dedup_result.iter().map(|x| controller.path_vec.get(x.get_id())).collect::<Vec<_>>();
+        println!("[NEW] Single queried {:?}", queried_ind);
+    }
+    let lap2 = std::time::Instant::now();
+    println!("[NEW] Time elapsed for single query {:?}", lap2 - lap1);
+
+    // Measure time
+    let homeobox_queries = vec![
+        HashValue::from_u64(6597069965577u64),
+        HashValue::from_u64(4398046577927u64),
+        HashValue::from_u64(8800438323719u64),
+    ];
+    let homeobox_queries_as_u64_ref = homeobox_queries.iter().map(|x| x.as_u64()).collect::<Vec<u64>>();
+
+    let homeobox_neighboring_queries: Vec<Vec<u64>> = homeobox_queries.iter().map(|x| x.neighbors(true).iter().map(|x| x.as_u64()).collect()).collect();
+    // println!("HASHES (3) {:?}", &homeobox_neighboring_queries);
+    
+    // let result = query_multiple(&index_table, &homeobox_queries);
+    let result = index_table.query_multiple_with_neighbors(&homeobox_neighboring_queries);
+    // Remove duplicates in result
+    if let Some(result) = result {
+        let mut set = HashSet::new();
+        let mut dedup_result = Vec::new();
+        for i in result {
+            if !set.contains(&i) {
+                set.insert(i);
+                dedup_result.push(i);
+            }
+        }
+        // println!("Queried ind (3) {:?}", dedup_result);
+        for i in dedup_result {
+            println!("[NEW] Queried prot (3) {:?}", controller.path_vec.get(i.get_id()));
+        }
+    }
+    let lap3 = std::time::Instant::now();
+    println!("[NEW] Time elapsed for quering neighbors {:?}", lap3 - lap2);
+    let result = index_table.query_multiple(&homeobox_queries_as_u64_ref);
+
+    if let Some(result) = result {
+        let mut set = HashSet::new();
+        let mut dedup_result = Vec::new();
+        for i in result {
+            if !set.contains(&i) {
+                set.insert(i);
+                dedup_result.push(i);
+            }
+        }
+        // println!("Queried ind (3) {:?}", dedup_result);
+        for i in dedup_result {
+            println!("[NEW] Queried prot (3) {:?}", controller.path_vec.get(i.get_id()));
+        }
+    }
+    let end = std::time::Instant::now();
+    println!("[NEW] Time elapsed for quering {:?}", end - lap3);
+
+    // Save
+    let result = index_table.save_to_bin("analysis/test_index_table.bin");
+    if let Err(e) = result {
+        println!("Error saving index table to binary: {:?}", e);
+    }
+    let result = index_table.save_to_json("analysis/test_index_table.json");
+    if let Err(e) = result {
+        println!("Error saving index table to json: {:?}", e);
+    }
+
+    let new_index_table = index_table::IndexTable::load_from_bin("analysis/test_index_table.bin").expect("Failed to load index table from binary");
+    let result = new_index_table.query_multiple(&homeobox_queries_as_u64_ref);
+    println!("Result from loading binary: {:?}", result);
+    
 }

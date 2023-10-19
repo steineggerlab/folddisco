@@ -2,13 +2,12 @@
 // Declare inner modules
 pub mod alloc;
 pub mod builder;
+pub mod index_table;
 
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::io::Write;
-use serde::{Serialize, Deserialize};
-
 
 // TODO: Generalize this to handle multiple hash types
 
@@ -17,64 +16,12 @@ use serde::{Serialize, Deserialize};
 /// - Value: list of ids
 pub type IndexTable<T, U> = HashMap<T, Vec<U>>;
 
-
-pub struct IndexTableForSave<K, V> 
-where 
-    K: Hash + Eq + Serialize + for<'de> Deserialize<'de>, 
-    V: Serialize + for<'de> Deserialize<'de> 
-{
-    pub table: HashMap<K, Vec<V>>,
-}
-
 pub enum IndexTableFileType {
     Json,
     Tsv,
     Binary,
 }
 
-impl<K, V> IndexTableForSave<K, V> 
-where 
-    K: Hash + Eq + Serialize + for<'de> Deserialize<'de>, 
-    V: Serialize + for<'de> Deserialize<'de> 
-{
-    pub fn new() -> IndexTableForSave<K, V> {
-        IndexTableForSave {
-            table: HashMap::new(),
-        }
-    }
-    pub fn insert(&mut self, key: K, value: V) {
-        let value_vec = self.table.entry(key).or_insert(Vec::new());
-        value_vec.push(value);
-    }
-    pub fn get(&self, key: &K) -> Option<&Vec<V>> {
-        self.table.get(key)
-    }
-    fn save_to_json(&self, path: &str) {
-        let serialized = serde_json::to_string(&self.table).unwrap();
-        let mut file = std::fs::File::create(path).expect("Unable to create file");
-        file.write_all(serialized.as_bytes())
-            .expect("Unable to write data");
-    }
-
-    pub fn save_to_file(&self, path: &str, output_type: IndexTableFileType) {
-        match output_type {
-            IndexTableFileType::Json => self.save_to_json(path),
-            IndexTableFileType::Tsv => unimplemented!(),
-            IndexTableFileType::Binary => unimplemented!(),
-        }
-    }
-    
-    pub fn from_IndexTable(index_table: &IndexTable<K, V>) -> IndexTableForSave<K, V> {
-        let mut index_table_for_save = IndexTableForSave::new();
-        for (key, value) in index_table {
-            for v in value {
-                index_table_for_save.insert(key.clone(), v.clone());
-            }
-        }
-        index_table_for_save
-    }
-    
-}
 pub enum IndexTablePrinter {
     Text,
     Binary,
@@ -121,7 +68,7 @@ fn write_index_table_debug<T: Hash + Eq + Display, U: Display + Hash + Ord + Eq>
     let mut file = std::fs::File::create(path).expect("Unable to create file");
     file.write_all(b"hash\tdist\tomega\tphi1\tphi2\tpsi1\tpsi2\tids\tidcount\tid_unique\n")
         .expect("Unable to write data");
-    for (key, value) in index_table.table {
+    for (key, value) in index_table {
         // Calculate id count & add
         let value_comma_separated = value
             .iter()

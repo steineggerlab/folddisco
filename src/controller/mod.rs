@@ -90,6 +90,9 @@ impl Controller {
         println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
     }
 
+    
+    
+    
     pub fn save_raw_feature(&mut self, path: &str, discretize: bool) {
         let mut file = std::fs::File::create(path).expect("cannot create file");
         for i in 0..self.path_vec.len() {

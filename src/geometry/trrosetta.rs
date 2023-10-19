@@ -28,6 +28,9 @@ impl HashValue {
     pub fn from_u64(hashvalue: u64) -> Self {
         HashValue(hashvalue)
     }
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
 
     pub fn perfect_hash(
         cb_dist: f32,

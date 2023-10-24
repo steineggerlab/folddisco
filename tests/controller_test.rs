@@ -12,6 +12,8 @@ use motifsearch::index::{IndexTablePrinter, query_single, query_multiple};
 use motifsearch::PDBReader;
 use motifsearch::index::index_table;
 
+use rayon::prelude::*;
+
 mod common;
 use common::loader;
 
@@ -69,7 +71,8 @@ fn test_index_builder_2() {
 
 #[test]
 fn test_querying() {
-    let pdb_paths: Vec<String> = loader::load_path("analysis/test");
+    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    // let pdb_paths: Vec<String> = loader::load_path("analysis/test");
     let start = std::time::Instant::now();
     let mut controller = Controller::new(pdb_paths);
     controller.fill_numeric_id_vec();
@@ -151,8 +154,9 @@ fn test_querying() {
 
 #[test]
 fn test_querying_using_new_index_table() {
-    // let pdb_paths: Vec<String> = loader::load_path("data/serine_peptidases_filtered");
-    let pdb_paths: Vec<String> = loader::load_path("analysis/test");
+    rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
+    let pdb_paths: Vec<String> = loader::load_path("data/serine_peptidases_filtered");
+    // let pdb_paths: Vec<String> = loader::load_path("analysis/test");
     let start = std::time::Instant::now();
     let mut controller = Controller::new(pdb_paths);
     controller.fill_numeric_id_vec();
@@ -167,23 +171,34 @@ fn test_querying_using_new_index_table() {
         let mut hash_vec: Vec<u64> = Vec::with_capacity(compact.num_residues.pow(2));
         let mut res_pair: Vec<(u16, u16)> = Vec::with_capacity(compact.num_residues.pow(2));
         
-        for n in 0..compact.num_residues {
-            for m in 0..compact.num_residues {
+        
+        // for n in 0..compact.num_residues {
+        //     for m in 0..compact.num_residues {
+        // Using rayon::iter::MultiZip
+        let res_bound = (0..compact.num_residues).collect::<Vec<_>>();
+        let r: Vec<(u64, (u16, u16))> = (&res_bound, &res_bound).into_par_iter().map(
+            |(n, m)| {
                 if n == m {
-                    continue;
+                    return (0u64, (0u16, 0u16))
                 }
-                let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
+                let trr = compact.get_trrosetta_feature(*n, *m).unwrap_or([0.0; 6]);
                 if trr[0] < 2.0 || trr[0] > 20.0 {
-                    continue;
+                    return (0u64, (0u16, 0u16))
                 }
                 let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
-                hash_vec.push(hash_value.as_u64());
+                // hash_vec.push(hash_value.as_u64());
                 
-                let res1 = compact.residue_serial[n] as u16;
-                let res2 = compact.residue_serial[m] as u16;
-                res_pair.push((res1, res2));
+                let res1 = compact.residue_serial[*n] as u16;
+                let res2 = compact.residue_serial[*m] as u16;
+                // res_pair.push((res1, res2));
+                (hash_value.as_u64(), (res1, res2))
+                // println!("n: {:?} m: {:?} hash: {:?} res1: {:?} res2: {:?}", n, m, hash_value.as_u64(), res1, res2);
             }
-        }
+        ).collect();
+        // Filter out the 0s
+        let r = r.into_iter().filter(|(x, _)| *x != 0).collect::<Vec<_>>();
+        hash_vec = r.iter().map(|(x, _)| *x).collect::<Vec<_>>();
+        res_pair = r.iter().map(|(_, x)| *x).collect::<Vec<_>>();
         index_table.concat_structure(i, hash_vec);
     }
     let lap1 = std::time::Instant::now();

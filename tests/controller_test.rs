@@ -17,6 +17,21 @@ use rayon::prelude::*;
 mod common;
 use common::loader;
 
+fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
+    let mut res = Vec::new();
+    for i in 0..n {
+        for j in 0..n {
+            if i == j && !include_same {
+                continue;
+            }
+            res.push((i, j));
+        }
+    }
+    res
+}
+
+
+
 #[test]
 fn test_controller() {
     let pdb_paths = loader::load_homeobox_toy();
@@ -71,8 +86,8 @@ fn test_index_builder_2() {
 
 #[test]
 fn test_querying() {
-    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    // let pdb_paths: Vec<String> = loader::load_path("analysis/test");
+    // let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    let pdb_paths: Vec<String> = loader::load_path("analysis/test");
     let start = std::time::Instant::now();
     let mut controller = Controller::new(pdb_paths);
     controller.fill_numeric_id_vec();
@@ -155,8 +170,8 @@ fn test_querying() {
 #[test]
 fn test_querying_using_new_index_table() {
     rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
-    let pdb_paths: Vec<String> = loader::load_path("data/serine_peptidases_filtered");
-    // let pdb_paths: Vec<String> = loader::load_path("analysis/test");
+    // let pdb_paths: Vec<String> = loader::load_path("data/serine_peptidases_filtered");
+    let pdb_paths: Vec<String> = loader::load_path("analysis/test");
     let start = std::time::Instant::now();
     let mut controller = Controller::new(pdb_paths);
     controller.fill_numeric_id_vec();
@@ -174,9 +189,9 @@ fn test_querying_using_new_index_table() {
         
         // for n in 0..compact.num_residues {
         //     for m in 0..compact.num_residues {
-        // Using rayon::iter::MultiZip
-        let res_bound = (0..compact.num_residues).collect::<Vec<_>>();
-        let r: Vec<(u64, (u16, u16))> = (&res_bound, &res_bound).into_par_iter().map(
+        // Generate a combination of n and m
+        let res_bound = get_all_combination(compact.num_residues, false);
+        let r: Vec<(u64, (u16, u16))> = (&res_bound).into_par_iter().map(
             |(n, m)| {
                 if n == m {
                     return (0u64, (0u16, 0u16))

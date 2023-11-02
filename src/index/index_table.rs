@@ -194,6 +194,16 @@ impl IndexTable {
             self.add(hash, Value::Single(id));
         }
     }
+    pub fn fill(&mut self, id_vec: &Vec<Id>, hash_collection_vec: &Vec<Vec<Key>>) {
+        assert_eq!(id_vec.len(), hash_collection_vec.len(), "Length of id_vec and hash_collection_vec must be equal.");
+        for i in 0..hash_collection_vec.len() {
+            let hash_collection = &hash_collection_vec[i];
+            let id = id_vec[i];
+            for hash in hash_collection {
+                self.add(*hash, Value::Single(id));
+            }
+        }
+    }
 
 }
 

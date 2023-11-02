@@ -12,6 +12,7 @@ use crate::index::builder::IndexBuilder;
 use crate::index::*;
 use crate::structure::core::CompactStructure;
 use crate::structure::io::pdb::Reader as PDBReader;
+use rayon::prelude::*;
 
 pub struct Controller {
     pub path_vec: Vec<String>,
@@ -20,6 +21,8 @@ pub struct Controller {
     pub hash_new_collection_vec: Vec<crate::geometry::two_float::HashCollection>, // WARNING: TEMPORARY
     pub res_pair_vec: Vec<Vec<(u64, u64, [u8; 3], [u8; 3])>>, // WARNING: TEMPORARY
     pub remove_redundancy: bool,
+    pub num_threads_file: usize,
+    pub num_threads_hash: usize,
 }
 
 impl Controller {
@@ -31,10 +34,34 @@ impl Controller {
             hash_new_collection_vec: Vec::new(),
             res_pair_vec: Vec::new(), // WARNING: TEMPORARY
             remove_redundancy: false,
+            num_threads_file: 2,
+            num_threads_hash: 3,
         }
     }
-
     pub fn collect_hash(&mut self) {
+        // Set file threads
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads_file)
+            .build()
+            .expect("Failed to build thread pool for iterating files");
+        // For iterating files, apply multi-threading with num_threads_for_file
+        let output = pool.install(|| {
+            self.path_vec
+                .par_iter()
+                .map(|pdb_path| {
+                    let hash_collection = par_get_feature_per_structure(pdb_path, self.num_threads_hash);
+                    hash_collection
+                })
+                .collect::<Vec<HashCollection>>()
+        }) as Vec<HashCollection>;
+        println!("Collected {} pdbs", output.len()); // TEMP
+        println!("Hash collection: {:?}", output[0][0]); // TEMP
+        self.hash_collection_vec = output;
+    }
+    
+    
+    
+    pub fn _collect_hash(&mut self) {
         // let vae = load_vae();
         for i in 0..self.path_vec.len() {
             let pdb_path = &self.path_vec[i];
@@ -303,146 +330,80 @@ fn _write_hash_with_res_pair(
     }
 }
 
-// // IMPORTANT: MOVED TO tests
-// #[cfg(test)]
-// mod controller_tests {
-//     use super::*;
-//     use crate::index::IndexTablePrinter;
-//     use crate::structure::io::pdb;
-//     use crate::test::{load_homeobox_toy, load_path, load_yeast_proteome};
+fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
+    let mut res = Vec::new();
+    for i in 0..n {
+        for j in 0..n {
+            if i == j && !include_same {
+                continue;
+            }
+            res.push((i, j));
+        }
+    }
+    res
+}
 
-//     // #[test]
-//     // fn test_geometry_hash_collector() {
-//     //     let pdb_paths = load_homeobox_toy();
-//     //     for pdb_path in pdb_paths {
-//     //         // Start measure time
-//     //         let start = std::time::Instant::now();
-//     //         let pdb_reader = PDBReader::from_file(&pdb_path).expect("Failed to read PDB file");
-//     //         let structure = pdb_reader
-//     //             .read_structure()
-//     //             .expect("Failed to read structure");
-//     //         let compact = structure.to_compact();
+fn par_get_feature_per_structure(pdb_path: &String, num_threads: usize) -> Vec<HashValue> {
+    let pdb_reader = PDBReader::from_file(pdb_path).expect("PDB file not found");
+    let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
+    let compact = compact.to_compact();
+    let res_bound = get_all_combination(compact.num_residues, false);
+    // Set number of threads
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build()
+        .expect("Failed to build thread pool for iterating residues");
+    let output =  pool.install(|| {
+        res_bound
+            .into_par_iter()
+            .map(|(n, m)| {
+                let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
+                if trr[0] >= 2.0 && trr[0] <= 20.0 {
+                    return HashValue::from_u64(0u64);
+                }
+                let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                hash_value
 
-//     //         let mut hash_collector = GeometryHashCollector::new();
-//     //         for i in 0..compact.num_residues {
-//     //             for j in 0..compact.num_residues {
-//     //                 if i == j {
-//     //                     continue;
-//     //                 }
+            })
+            .filter(|x| x != &HashValue::from_u64(0u64))
+            .collect::<Vec<HashValue>>()
+    });
+    output
+}
 
-//     //                 let dist = compact.get_distance(i, j).expect("Failed to get distance");
-//     //                 // If angle is None, then set it to 0.0. TODO: Glycine should be handled.
-//     //                 let angle = compact.get_angle(i, j).unwrap_or(0.0);
-//     //                 let hash_value = HashValue::perfect_hash(dist, angle);
-//     //                 hash_collector.collect_hash(hash_value);
-//     //             }
-//     //         }
-//     //         //
-//     //         let before_dedup = hash_collector.hash_collection.len();
-//     //         hash_collector.remove_redundancy();
-//     //         let end = std::time::Instant::now();
-//     //         println!(
-//     //             "{:?} | {} AAs | {:?} | {} | {} hashes",
-//     //             &pdb_path,
-//     //             compact.num_residues,
-//     //             end - start,
-//     //             before_dedup,
-//     //             hash_collector.hash_collection.len()
-//     //         );
-//     //     } // WORKS with errors in Glycine  2023-03-28 18:23:37
-//     // }
+#[cfg(test)]
+mod tests {
+    use core::num;
 
-//     #[test]
-//     fn test_controller() {
-//         let pdb_paths = load_homeobox_toy();
-//         let mut controller = Controller::new(pdb_paths);
-//         controller.fill_numeric_id_vec();
-//         // controller.collect_triad_hash();
-//         controller.collect_hash();
-//         for i in 0..controller.hash_collection_vec.len() {
-//             println!(
-//                 "{:?} | {:?} | {:?} hashes",
-//                 controller.path_vec.get(i),
-//                 controller.numeric_id_vec.get(i),
-//                 controller
-//                     .hash_collection_vec
-//                     .get(i)
-//                     .unwrap_or(&HashCollection::new())
-//                     .len()
-//             );
-//         }
-//     } // WORKS 2023-03-28 20:13:33
+    #[test]
+    fn test_get_all_combination() {
+        let res = super::get_all_combination(3, false);
+        assert_eq!(res, vec![(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)]);
+        let res = super::get_all_combination(3, true);
+        assert_eq!(res, vec![(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)]);
+    }
+    
+    #[test]
+    fn test_par_get_feature_per_structure() {
+        let pdb_path = String::from("data/homeobox/1akha-.pdb");
+        let num_threads = 1;
 
-//     #[test]
-//     fn test_index_builder() {
-//         let pdb_paths = load_homeobox_toy();
-//         let mut controller = Controller::new(pdb_paths);
-//         controller.fill_numeric_id_vec();
-//         // controller.collect_triad_hash();
-//         controller.collect_hash();
-//         controller.save_hash_per_pair("data/homeobox_hash_per_pair.tsv");
-//         let index_builder = IndexBuilder::new();
-//         let index_table =
-//             index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
-//         let table_printer = IndexTablePrinter::Debug;
-//         table_printer.print(&index_table, "data/homeobox_index_table.tsv"); // TODO: Change this to work
-//         println!("{:?}", &controller.path_vec);
-//     }
-
-//     #[test]
-//     fn test_temp() {
-//         let pdb_paths = load_path("data/serine_peptidases_");
-//         let mut controller = Controller::new(pdb_paths);
-//         controller.fill_numeric_id_vec();
-//         // controller.collect_triad_hash();
-//         controller.collect_hash();
-
-//         let mut serine_filter: HashMap<String, Vec<u64>> = HashMap::new();
-//         serine_filter.insert("1aq2.pdb".to_string(), vec![250, 232, 269]);
-//         serine_filter.insert("1wab.pdb".to_string(), vec![47, 195, 192]);
-//         serine_filter.insert("1sc9.pdb".to_string(), vec![80, 235, 207]);
-//         // serine_filter.insert("2o7r.pdb".to_string(), vec![169, 306, 276]);
-//         // serine_filter.insert("1bs9.pdb".to_string(), vec![90, 187, 175]);
-//         // serine_filter.insert("1ju3.pdb".to_string(), vec![117, 287, 259]);
-//         // serine_filter.insert("1uk7.pdb".to_string(), vec![34, 252, 224]);
-//         // serine_filter.insert("1okg.pdb".to_string(), vec![255, 75, 61]);
-//         // serine_filter.insert("1qfm.pdb".to_string(), vec![554, 680, 641]);
-
-//         controller.save_filtered_hash_pair("data/serine_hash_per_pair.tsv", &serine_filter);
-//         let index_builder = IndexBuilder::new();
-//         let index_table =
-//             index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
-//         let table_printer = IndexTablePrinter::Debug;
-//         table_printer.print(&index_table, "data/serine_index_table.tsv");
-//         println!("{:?}", &controller.path_vec);
-//     }
-
-//     // #[test]
-//     // fn test_querying() {
-//     //     let pdb_paths: Vec<String> = load_yeast_proteome();
-//     //     let mut controller = Controller::new(pdb_paths);
-//     //     controller.remove_redundancy = true;
-//     //     controller.fill_numeric_id_vec();
-//     //     controller.collect_hash();
-
-//     //     let index_builder = IndexBuilder::new();
-//     //     let index_table =
-//     //         index_builder.concat(&controller.numeric_id_vec, &controller.hash_collection_vec);
-//     //     let query: HashValue = HashValue::from_u16(4255u16);
-//     //     let result = query_single(&index_table, &query);
-//     //     println!("{:?}", result);
-//     //     let homeobox_queries = [
-//     //         HashValue::from_u16(4255u16),
-//     //     ];
-//     //     let result = query_multiple(&index_table, &homeobox_queries);
-//     //     println!("{:?}", result);
-//     //     if let Some(result) = result {
-//     //         for i in result {
-//     //             println!("{:?}", controller.path_vec.get(i));
-//     //         }
-//     //     }
-//     //     let printer = IndexTablePrinter::Debug;
-//     //     printer.print(&index_table, "data/yeast_index_table.tsv");
-//     //     println!("{:?}", &controller.path_vec);
-//     // }
-// }
+        let start = std::time::Instant::now();
+        let hash_collection = super::par_get_feature_per_structure(&pdb_path, num_threads);
+        let end = std::time::Instant::now();
+        println!("Time elapsed {}: {:?}", num_threads, end - start);
+        // println!("Hash collection: {:?}", hash_collection);
+        let num_threads = 2;
+        let start = std::time::Instant::now();
+        let hash_collection = super::par_get_feature_per_structure(&pdb_path, num_threads);
+        let end = std::time::Instant::now();
+        println!("Time elapsed {}: {:?}", num_threads, end - start);
+        // println!("Hash collection: {:?}", hash_collection);
+        let num_threads = 4;
+        let start = std::time::Instant::now();
+        let hash_collection = super::par_get_feature_per_structure(&pdb_path, num_threads);
+        let end = std::time::Instant::now();
+        println!("Time elapsed {}: {:?}", num_threads, end - start);
+        // println!("Hash collection: {:?}", hash_collection);
+    }
+}

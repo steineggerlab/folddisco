@@ -86,8 +86,8 @@ fn test_index_builder_2() {
 
 #[test]
 fn test_querying() {
-    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    // let pdb_paths: Vec<String> = loader::load_path("analysis/test");
+    // let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    let pdb_paths: Vec<String> = loader::load_path("analysis/test");
     let start = std::time::Instant::now();
     let mut controller = Controller::new(pdb_paths);
     controller.fill_numeric_id_vec();
@@ -169,9 +169,11 @@ fn test_querying() {
 
 #[test]
 fn test_querying_using_new_index_table() {
-    rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
-    let pdb_paths: Vec<String> = loader::load_path("data/serine_peptidases_filtered");
+    rayon::ThreadPoolBuilder::new().num_threads(6).build_global().unwrap();
+    // let pdb_paths: Vec<String> = loader::load_path("data/serine_peptidases_filtered");
     // let pdb_paths: Vec<String> = loader::load_path("analysis/test");
+    let pdb_paths: Vec<String> = loader::load_path("analysis/raw_ecoli");
+
     let start = std::time::Instant::now();
     let mut controller = Controller::new(pdb_paths);
     controller.fill_numeric_id_vec();

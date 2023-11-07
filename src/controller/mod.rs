@@ -1,3 +1,5 @@
+pub mod query;
+
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 
@@ -54,9 +56,12 @@ impl Controller {
                 })
                 .collect::<Vec<HashCollection>>()
         }) as Vec<HashCollection>;
+        
         println!("Collected {} pdbs", output.len()); // TEMP
         println!("Hash collection: {:?}", output[0][0]); // TEMP
         self.hash_collection_vec = output;
+        // Delete pool
+        
     }
     
     

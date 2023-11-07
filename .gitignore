@@ -27,3 +27,4 @@ data/homeobox_hash_raw. tsv
 data/merops_afdb_pa_hash_active_site.tsv
 data/merops_pdb_hash_active_site.tsv
 data/index_table_test.txt
+data/index.bin

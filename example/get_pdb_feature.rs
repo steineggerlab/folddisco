@@ -27,7 +27,7 @@ pub fn make_query(path: &String, residues: &Vec<u64>) -> HashCollection {
 
 pub fn main() {
     let list: Vec<(String, Vec<u64>)> = vec![
-        ("analysis/raw_ecoli/AF-P76176-F1-model_v4.pdb".to_string(), vec![84, 145, 223]),
+        ("analysis/AF-P10144-F1-model_v4.pdb".to_string(), vec![64, 108, 203]),
         // ("analysis/raw_ecoli/AF-Q7BSW5-F1-model_v4.pdb".to_string(), vec![127, 156, 263]),
     ];
     for (path, residues) in list {

@@ -28,3 +28,5 @@ data/merops_afdb_pa_hash_active_site.tsv
 data/merops_pdb_hash_active_site.tsv
 data/index_table_test.txt
 data/index.bin
+*.lookup
+*.bin

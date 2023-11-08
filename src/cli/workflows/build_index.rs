@@ -8,6 +8,7 @@
 // and the path to save the index table.
 
 use crate::cli::*;
+use crate::index::lookup::{save_lookup_to_file, load_lookup_from_file};
 use rayon::prelude::*;
 use std::collections::HashMap;
 // Import unique
@@ -54,16 +55,17 @@ pub fn build_index(env: AppArgs) {
                 let mut controller = Controller::new(pdb_path_vec);
                 controller.fill_numeric_id_vec();
                 // Iterate per file parallelly
-                let hashes = (controller.path_vec).into_par_iter().map(
+                let hashes = (&controller.path_vec).into_par_iter().map(
                     |pdb_path| {
                         // Read structure from PDB file
-                        let pdb_reader = PDBReader::from_file(pdb_path).expect("[ERROR] PDB file not found");
+                        let pdb_reader = PDBReader::from_file(&pdb_path).expect("[ERROR] PDB file not found");
                         let compact = pdb_reader.read_structure().expect("[ERROR] Failed to read PDB file");
                         let compact = compact.to_compact();
-                        let mut hash_vec: Vec<u64> = Vec::with_capacity(compact.num_residues.pow(2));
+                        // let mut hash_vec: Vec<u64> = Vec::with_capacity(compact.num_residues.pow(2));
                         let mut res_pair: Vec<(u16, u16)> = Vec::with_capacity(compact.num_residues.pow(2));
+                        // Iterate over all residue pairs
                         let res_bound = get_all_combination(compact.num_residues, false);
-                        let hash_collection: Vec<u64> = res_bound.iter().map(
+                        let mut hash_collection: Vec<u64> = res_bound.iter().map(
                             |(n, m)| {
                                 if n == m {
                                     return 0u64
@@ -76,16 +78,52 @@ pub fn build_index(env: AppArgs) {
                                 hash_value.as_u64()
                             }
                         ).collect();
+                        // Filter out invalid residue pairs & deduplicate
+                        hash_collection.sort_unstable();
+                        hash_collection.dedup();
+                        // Return
                         hash_collection
                     }
                 ).collect::<Vec<_>>();
+                println!("Hash length: {}", hashes.len());
+                println!("Hash vec length: {}", hashes[0].len());
                 let lap1 = std::time::Instant::now();
                 if verbose { println!("[INFO ] Time elapsed for building index table {:?}", lap1 - start); }
+                // Saving index table
                 let mut index_table = IndexTable::new();
                 index_table.fill(&controller.numeric_id_vec, &hashes);
-                index_table.save_to_bin(&index_path).expect("[ERROR] Failed to save index table");
+                index_table.remove(&0u64); // Remove invalid hash
+                index_table.save_to_bin_custom(&index_path).expect("[ERROR] Failed to save index table");
                 let lap2 = std::time::Instant::now();
                 if verbose { println!("[INFO ] Time elapsed for saving index table {:?}", lap2 - lap1); }
+                // Save lookup. The path to lookup table is the same as the index table with .lookup extension
+                let lookup_path = format!("{}.lookup", index_path); 
+                save_lookup_to_file(&lookup_path, &controller.path_vec, &controller.numeric_id_vec, None);
+                let lap3 = std::time::Instant::now();
+                if verbose { println!("[INFO ] Time elapsed for saving lookup table {:?}", lap3 - lap2); }
+                // TEMP: load index table saved
+                let index_table = IndexTable::load_from_bin_custom(&index_path).expect("[ERROR] Failed to load index table");
+                println!("Index table length: {}", index_table.0.len());
+                let mut count = 0;
+                for (key, value) in index_table.0.iter() {
+                    count += 1;
+                    println!("Key: {}, Value: {:?}", key, value);
+                    if count > 2 {
+                        break
+                    }
+                }
+                let lap4 = std::time::Instant::now();
+                if verbose { println!("[INFO ] Time elapsed for loading index table {:?}", lap4 - lap3); }
+                
+                let (path_vec, numeric_id_vec, optional_vec) = load_lookup_from_file(&lookup_path);
+                let lap5 = std::time::Instant::now();
+                println!("Path vec length: {}", path_vec.len());
+                println!("Numeric id vec length: {}", numeric_id_vec.len());
+                for i in 0..5 {
+                    println!("Path: {}, Numeric id: {}, Optional: {}", path_vec[i], numeric_id_vec[i], optional_vec[i]);
+                }
+                if verbose { println!("[INFO ] Time elapsed for loading lookup table {:?}", lap5 - lap4); }
+
                 if verbose { println!("[INFO ] Done!"); }
             }
         }

@@ -1,8 +1,10 @@
-//
+// File: main.rs
+// Created: 2023-09-05 16:36:23
+// Author: Hyunbin Kim (khb7840@gmail.com)
+// Copyright © 2023 Hyunbin Kim, All rights reserved
 
 // use crate::*;
 use motifsearch::cli::{workflows::build_index, *};
-use pico_args::Arguments;
 
 const HELP: &str = "\
 USAGE: motifsearch index [OPTIONS] <PDBS...>
@@ -33,6 +35,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
         }),
         Some("query") => Ok(AppArgs::Query {
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            index_path: args.opt_value_from_str(["-i", "--index-path"])?,
             help: args.contains(["-h", "--help"]),
         }),
         Some(_) => Err("Invalid subcommand".into()),
@@ -62,7 +65,7 @@ fn main() {
                 build_index::build_index(parsed_args);
             }
         }
-        AppArgs::Query { threads, help } => {
+        AppArgs::Query { help, threads, .. } => {
             if help {
                 println!("{}", HELP);
             } else {

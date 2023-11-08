@@ -21,6 +21,10 @@ use serde::{Serialize, Deserialize};
 use bincode;
 use serde_json;
 
+use std::io::{BufReader, BufWriter};
+use std::io::Error;
+use byteorder::{WriteBytesExt, ReadBytesExt, LittleEndian as LE};
+
 // Define the types for Key and Id
 // 
 pub type Key = u64; // Hash value for a given residue-residue pair
@@ -46,7 +50,7 @@ impl Value {
 
 // IndexTable is a HashMap that maps a key to a vector of values
 #[derive(Serialize, Deserialize, Debug)]
-pub struct IndexTable(FxHashMap<Key, Vec<Value>>);
+pub struct IndexTable(pub FxHashMap<Key, Vec<Value>>);
 
 impl IndexTable {
     // Create a new IndexTable
@@ -84,8 +88,11 @@ impl IndexTable {
 
     // Save the IndexTable to a binary file
     pub fn save_to_bin(&self, filename: &str) -> std::io::Result<()> {
-        let file = File::create(filename)?;
-        let bin_result = bincode::serialize_into(file, self);
+        let mut file = File::create(filename)?;
+        let encoded = bincode::serialize(self).unwrap();
+        println!("Encoded length: {}", encoded.len());
+        let bin_result = file.write_all(&encoded);
+        // let bin_result = bincode::serialize_into(file, self);
         if let Err(e) = bin_result {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -98,7 +105,10 @@ impl IndexTable {
     // Load the IndexTable from a binary file
     pub fn load_from_bin(filename: &str) -> std::io::Result<Self> {
         let file = File::open(filename)?;
-        let table_load_result = bincode::deserialize_from(file);
+        let raw: Vec<u8> = file.bytes().map(|x| x.unwrap()).collect();
+        let table_load_result = bincode::deserialize::<IndexTable>(&raw);
+        // let table_load_result = bincode::deserialize_from(file);
+
         if let Err(e) = table_load_result {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -109,9 +119,79 @@ impl IndexTable {
         Ok(table)
     }
 
+    pub fn save_to_bin_custom(&self, path: &str) -> std::io::Result<()> {
+        let file = File::create(path)?;
+        let mut writer = BufWriter::new(file);
+        let mut count = 0;
+        for (key, values) in &self.0 {
+            count += 1;
+            if count < 5 {
+                println!("Key: {}, Values: {:?}", key, values.len());
+            }
+            writer.write_u64::<LE>(*key)?;
+            writer.write_u64::<LE>(values.len() as u64)?;
+            for value in values {
+                match value {
+                    // If single, write 0u8
+                    Value::Single(value) => {
+                        writer.write_u8(0u8)?;
+                        writer.write_u64::<LE>(*value as u64)?;
+                    },
+                    Value::Triple(id, res_id1, res_id2) => {
+                        writer.write_u8(1u8)?;
+                        writer.write_u64::<LE>(*id as u64)?;
+                        writer.write_u16::<LE>(*res_id1 as u16)?;
+                        writer.write_u16::<LE>(*res_id2 as u16)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+    // TODO: IMPORTANT: Remove serde dependency
+    pub fn load_from_bin_custom(path: &str) -> std::io::Result<IndexTable> {
+        let file = File::open(path)?;
+        let mut reader = BufReader::new(file);
+        let mut index_table = IndexTable::new();
+        let mut count = 0;
+        while let Ok(key) = reader.read_u64::<LE>() {
+            let len = reader.read_u64::<LE>()? as u64;
+            
+            count += 1;
+            if count < 5 {
+                println!("Key: {}, Len: {}", key, len);
+            }
+            for _ in 0..len {
+                let value_type = reader.read_u8()?;
+                match value_type {
+                    0u8 => {
+                        let value = reader.read_u64::<LE>()? as usize;
+                        index_table.add(key, Value::Single(value));
+                    },
+                    1u8 => {
+                        let id = reader.read_u64::<LE>()? as usize;
+                        let res_id1 = reader.read_u16::<LE>()? as u16;
+                        let res_id2 = reader.read_u16::<LE>()? as u16;
+                        index_table.add(key, Value::Triple(id, res_id1, res_id2));
+                    },
+                    _ => {
+                        return Err(Error::new(std::io::ErrorKind::Other, "Invalid value type"));
+                    }
+                }
+            }
+        }
+
+        Ok(index_table)
+    }
+
+    
     // Add a value to the IndexTable
     pub fn add(&mut self, key: Key, value: Value) {
         self.0.entry(key).or_insert_with(Vec::new).push(value);
+    }
+    pub fn remove(&mut self, key: &Key) {
+        self.0.remove(key);
     }
     
     pub fn query_single(&self, query: &Key) -> Option<Vec<Value>> {

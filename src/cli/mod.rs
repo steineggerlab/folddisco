@@ -22,6 +22,7 @@ pub enum AppArgs {
     },
     Query {
         threads: usize,
+        index_path: Option<String>,
         help: bool,
     },
 }

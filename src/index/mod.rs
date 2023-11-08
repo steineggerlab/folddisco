@@ -3,6 +3,7 @@
 pub mod alloc;
 pub mod builder;
 pub mod index_table;
+pub mod lookup;
 
 use std::collections::HashMap;
 use std::fmt::Display;

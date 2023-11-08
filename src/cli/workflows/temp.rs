@@ -1,0 +1,90 @@
+use std::collections::HashSet;
+
+use crate::cli::*;
+use crate::index::lookup::load_lookup_from_file;
+use rayon::prelude::*;
+use crate::prelude::*;
+
+pub fn query_test_for_swissprot(env: AppArgs) {
+    match env {
+        AppArgs::Test {
+            index_path,
+            verbose,
+        } => {
+            let start = std::time::Instant::now();
+            let lookup_path = format!("{}.lookup", index_path);
+            let (path_vec, _, _) = load_lookup_from_file(&lookup_path);
+            let lap1 = std::time::Instant::now();
+            if verbose { println!("[INFO ] Time elapsed for loading lookup table {:?}", lap1 - start); }
+            let index_table = IndexTable::load_from_bin_custom(&index_path).expect("[ERROR] Failed to load index table");
+            let lap2 = std::time::Instant::now();
+            if verbose { println!("[INFO ] Time elapsed for loading index table {:?}", lap2 - lap1); }
+            // Measure time
+            let queries = vec![
+                HashValue::from_u64(6597069965577u64),
+                HashValue::from_u64(4398046577927u64),
+                HashValue::from_u64(8800438323719u64),
+            ];
+            let queries_u64 = queries.iter().map(|x| x.as_u64()).collect::<Vec<u64>>();
+            let neighboring_queries: Vec<Vec<u64>> = queries.iter()
+                .map(|x| x.neighbors(true)
+                .iter().map(|x| x.as_u64())
+                .collect())
+                .collect();
+
+            // let result = query_multiple(&index_table, &homeobox_queries);
+            let result = index_table.query_multiple_with_neighbors(&neighboring_queries);
+            // Remove duplicates in result
+            if let Some(result) = result {
+                let mut set = HashSet::new();
+                let mut dedup_result = Vec::new();
+                for i in result {
+                    if !set.contains(&i) {
+                        set.insert(i);
+                        dedup_result.push(i);
+                    }
+                }
+                let result = dedup_result.iter().map(|x| path_vec.get(x.get_id())).collect::<Vec<_>>();
+                println!("[INFO ] Queried with neighboring {:?}", result);
+            }
+            let lap3 = std::time::Instant::now();
+            println!("[INFO ] Time elapsed for quering neighbors {:?}", lap3 - lap2);
+            let result = index_table.query_multiple(&queries_u64);
+            let mut str_result = Vec::new();
+            if let Some(result) = result {
+                let mut set = HashSet::new();
+                let mut dedup_result = Vec::new();
+                for i in result {
+                    if !set.contains(&i) {
+                        set.insert(i);
+                        dedup_result.push(i);
+                    }
+                }
+                // println!("Queried ind (3) {:?}", dedup_result);
+                str_result = dedup_result.iter().map(|x| path_vec.get(x.get_id()).unwrap().clone()).collect::<Vec<_>>();
+                println!("[INFO ] Queried {:?}", str_result);
+            }
+            let end = std::time::Instant::now();
+            println!("[INFO ] Time elapsed for quering {:?}", end - lap3);
+
+            let answer = vec![
+                "P00766","P15119","P97592","Q06606","P97594","P10144","Q9Y6M0","Q9JHJ7","P98159","P20231","Q9Y337","Q9Y5Q5","Q9Z319","Q80YN4","Q9UKR0","Q9UL52","Q5S248","Q9I8X1","Q8QHK2","Q7SZE2","Q2PQJ3","Q5W959","E5L0E5","P21845","P50343","Q02844","P50342","P27435","Q9NRR2","Q9QUL7","Q9P0G3","Q8CGR5","P39675","Q14520","Q8K0D2","Q6L711","Q5E9Z2","Q8VCA5","Q9NRS4","P00765","P20733","P15945","Q61759","P15948","P15946","Q9QYZ9","P83748","A6H6T1","O60235","Q8VHJ4","Q9BZJ3","P07146","P07628","Q61754","P36369","P15949","Q8BIK6","Q7RTY8","Q9JM71","Q9BQR3","Q8BJR6","Q6BEA2","Q8NF86","Q80WM7","Q7RTY7","P57727","Q8K1T0","Q9H2R5","Q7JIG6","O97398","Q966V2","Q8IYP2","Q32LI2","Q9BYE2","Q5U405","P35588","P18291","P32821","P32822","P00762","Q06605","P00775","Q54179","P80420","P24664","P35049","Q402U7","P04814","P35044","P54624","P54625","P35587","P35050","P35043","P35042","P35586","Q07943","P42278","P54628","P52905","P42280","P54630","P42279","P54629","P15944","Q9XSM2","Q9N2D1","P00763","P06872","Q29463","P08897","P00771","P36178","P35002","P34153","P20731","P34155","P20734","P35034","P35031","Q91041","P35051","P35033","P19799","P70059","P07477","P29786","P35035","P35036","P35037","P35038","P35039","P35040","P35041","P29787","O97399","P08246","P37357","P37358","Q3UP87","P98064","Q9UF09","P08311","P28293","P17977","P24158","Q61096","P11032","P12544","Q7YRZ7","P04187","P08882","Q03238","P51124","P21842","P23946","P21843","P52195","P56435","P79204","A7WPL7","P00770","P80219","O46683","P15157","P27436","P19236","P49863","P49864","O35205","P20718","P09650","P21812","P50340","P21844","P50341","P50339","P00760","P06871","P08426","Q6GPI1","P07338","P00767","P04813","Q9CR35","P00772","P00773","Q91X79","Q28153","P32197","Q9UNI1","O46644","Q867B0","Q5R1M5","P09093","O19023","P08419","P00774","P08217","P05208","Q29461","P98074","P98072","P98073","P97435","Q99895","P55091","Q7M3E1","Q3SYP2","Q16651","Q9ESD1","Q9ES87","P06870","P20151","P07288","P33619","P04071","P00755","P36375","Q27289","Q17025","P15947","P00756","Q6H321","P00759","P36368","P35030","P04971","P33588","P26324","P47797","Q9I8W9","Q8QG86","Q5W960","P81824","Q9PSN3","Q8AY81","B0FXM1","A7LAC6","F8S114","P12788","P18964","Q91516","Q9YGJ8","Q9DF66","Q9DF67","P49277","O13058","O13063","O42207","Q802F0","Q9NZP8","Q3UZ09","P00746","P03953","P32038","P51779","Q63ZK0","Q3T0A3","Q6P326","P00736","Q5R1W3","Q4R577","P09871","P15156","Q6P6T1","Q0VCX1","Q69DK8","P06681","P21180","Q863A0","Q8SQ75","Q8SQ74","Q3SYW2","P21180","P00751","P04186","P81475","Q03710","Q864V9","Q864W1","Q864W0","P98064","P48740","Q8CHN8","P05156","Q61129","Q9WUW3","Q5R5A4","P05049","P13582","O62589","P08861","P08218","Q14C59","Q8CG16","Q8CFG9","Q8CFG8","Q6P6T1","P00748","P98140","Q04962","Q80YC5","O97507","D3ZTE0","P03952","P14272","P26262","Q2KJ63","P03951","Q91Y47","Q5NTB3","P00740","P00741","P16292","P19540","P16294","P16295","P16293","P16296","P16291","Q95ND7","Q804X6","Q6SA95","P08709","P22457","Q8K3U6","Q2F9P2","Q2F9P4","P00742","P00743","P25155","Q63207","O19045","O88947","P00734","P00735","P19221","P18292","Q19AZ8","Q5R537","P04070","P00745","P31394","P33587","Q28278","Q28380","Q28412","Q28506","Q28315","Q28661","Q9GLP2","P28175","Q26422","Q27081","P21902","P10323","P08001","P23578","P29293","P48038","P10626","Q9GL10","Q2UVH8","P05981","Q05511","O35453","Q5R5E8","Q05319","Q04756","Q9R098","Q6QNF4","O00187","Q91WP0","Q9QX89","P00749","P16227","P04185","Q05589","P06869","P29598","P15120","Q8MHY7","Q5RF29","P00750","P11214","P19637","P98121","P49150","Q28198","Q8SQ23","Q5R8J0","P06868","P00747","P12545","P06867","Q01177","P20918","P80009","P80010","P33574","P81286","Q29485","O18783","Q5R8X6","P49275","O97370","O13061","Q9I8X2","Q92876","O08762","P56730","Q99JC8","Q5G271","Q5G270","Q5G269","Q5G268","Q5G267","Q5G265","P98119","P15638","P79953","Q90WD8","Q66TN7","Q61955","O88780","Q9UQ47","P49276","O43240","O15393","Q9JIQ8","Q5M8S2","Q6IE63","Q9Y5K2","Q9ER10","Q9GZN4","P81176","P43430","P40313","Q9UBX7","Q9QYN3","P07478","P76176","P36376","P36374","P09582","P32824","Q86WS5","Q6ZMR5","Q3UQ41","Q8NHM4","Q6UWB4","P49862","Q91VE3","Q9Y5Y6","P56677","Q0IIH7","Q00356","Q9UKR3","Q9UKQ9","Q9DBI0","Q8IU80","P34168","Q9H3S3","Q9ER04","Q924N9","Q99MS4","Q8VIF2","A1L453","Q6UWY2","Q7RTZ1","Q7M761","Q8BHM9","Q6IE14","Q6ZWK6","Q7RTY7","Q3UKY7","Q14B25","Q7RTY5","Q7RTY3","A2VE36","Q7RTY9","Q8QHK3","Q8UUK2","Q9YGJ2","Q9YGI6","O93421","Q8JH85","B5U6Y3","Q91053","Q6T5L0","P18692","O73800","Q9DG83","Q9PT51","Q71QI3","Q91509","Q9I8X0","Q9DG84","P20005","P05620","O13059","Q71QH7","Q7SZE1","F8S116","Q2QA04","Q9PTL3","Q8UUJ1","P81884","P81882","O13069","E5AJX2","Q8CG14","Q7Z5A4","Q86T26","Q14B24","Q8C0G2","Q571E5","Q571E5","Q2L4Q9","Q58L93","A6MFK8","A6MFK7","Q1L659","Q4QXT9","P11033","P08884","P08883","P13366","P00758","P36373","P07647","Q76B45","P15950","Q5K4E3","Q5K2P9","Q5K2P8","Q14BX2","Q920S2","Q9D9M0","P23604","P23605","P35046","P35047","Q9VWU1","P35003","P81428","Q58L94","B5G6G5","P83370","P82807","Q9PT41","P33589","Q9PTU8","P43685","Q5QSK2","Q8BZ10","P47796","P80646","P00768","P00769","Q58L96","Q1L658","Q58L95","Q5FBW2","Q6IWF1","Q5W958","P11034","P09872","E5L0E6","Q09GK1","Q5MCS0","A8QL53","A8QL56","A8QL57","Q8MUG0","Q9I8W9","Q9YGJ9","Q7SYF1","Q8AY80","Q71QI8","Q71QH9","Q71QI7","Q71QI2","Q27J47","Q072L6","Q072L7","B0FXM3","E0Y418","Q9DF68","Q8UVX1","Q9PT40","Q8AY82","Q7T229","Q8UUJ2","Q6T6S7","P0C5B4","B5U2W0","Q8JH62","E0Y419","P85109","P00757","Q2TV78","Q5K4E3","Q5K4E3","F2YMG0","Q3V0Q7","Q8K4I7","Q6IE62","P60852","Q7Z410","P20160","P80015","P00738","P06866","Q61646","Q28801","Q60574","Q62558","P19006","P50417","Q28801","O35086","P19007","Q8SPS7","Q2TBU0","Q5R5F6","P00739","P26927","P26928","Q24K22","P14210","Q9BH09","Q867B7","Q76BS1","P17945","P00744","P22891","Q08048","Q9CQ52","Q8BW11","Q6IE06","O70169","Q6AXZ6","Q9DAA4","A4D1T9","Q6PEW0","Q7M756","Q6AY28","Q9UI38","Q8BLH5","Q8N3Z0","Q8C0F9","Q5E9X7","Q1WK24","Q5E9P5","Q9Y432","P08519","P14417","G5ECX0","O96900","P35005","P54627","P35004","P42277","P51588","P17205","P17207","P58840","O93267","P00764","P35048","Q90627","Q90629","P12323","Q07276","Q17004","Q28773","P98139","P70375","Q8VHK8","O13057","O13060","O13062","Q8NRF6","Q8BU25","P80420","Q5K2P8","Q71QJ4","Q71QI0","Q32KU2","Q4R7Y7","P0C1U8","P09331","P09332","A7X3Q8","A7X3Q7","Q2YTM4","Q2FFT3","Q9FD08","P0C0Q2","A7X3Q6","P12546","P0C0V0","P39099","P0AEE3","P44947","D0ZY51","Q92743","Q9R118","Q9QZK5","A4IHA1","A6YFB5","O43464","Q9JIY5","A0JNK3","O82261","P83110","Q9D236","Q6GMI0","P83105","Q9DBA6","Q2T9J0","A2RT60","P39668","Q9SEL7","Q9Z4H7","Q9LA06","Q48EU9","Q4KGQ4","B0KV30","O22609","Q9LU10","Q9VFJ3","P18584","Q9PL97","P72780","P73354","P73940","P05676","Q8MQS8","Q7Z269","Q8VZD4","P9WHR8","Q9LK71","Q9SHZ0","Q9LK70","Q9FIV6","Q9FL12","Q9FM41","Q9SHZ1","Q3E6S8","Q9C691","Q9R9I1","O34358","P0A3Z5","P54925","Q8NXB8","O85291","Q52894","O05942","F1N152","P55377","Q5HNH7","Q5HQE2","Q9Z6T0","Q92JA1","Q8YG32","P0A3Z5","Q89AP5","Q4L530","Q49WF1","Q2SL36","A4XSC0","A6VUA4","Q0CSC0","E1V4H2","F6AA62","P80057","P39790","P15636","Q7M135","O95084","P53920","A5AB13","A5DVI0","Q0CSC0","Q4WLG1","Q0UY70","Q9D6X6","Q9P7S1","O74325","Q8RY22","Q7S9D2","Q6AY61","Q1WK23","A1CUK5","A1DP85","A3LX99","A5DVI0","A6RG85","Q4WLG1","Q0UY70","Q1LZE9","P00776","P00777","P52320","P52321","Q07006","Q03424","P00778","Q05308","Q9HWK6","P41140","P27459","Q9IFX3","Q9ILI6","Q80KJ8","Q9JH67","Q9JGF2","Q3ZN07","Q4TWH9","Q96PZ2","Q6SJ93","P55440","O53983"
+            ];
+            let answer = answer.iter().map(|x| format!("/fast/hyunbin/motif/swissprot_benchmark/swissprot_v4_foldcomp/AF-{}-F1-model_v4.pdb", x)).collect::<Vec<_>>();
+            let metric = compare_target_answer( &str_result, &answer, &path_vec);
+            println!("Precision: {}", metric.precision());
+            println!("Recall: {}", metric.recall()); 
+            println!("Accuracy: {}", metric.accuracy());
+            println!("F1 score: {}", metric.f1_score());
+            println!("TP: {}", metric.true_pos);
+            println!("TN: {}", metric.true_neg);
+            println!("FP: {}", metric.false_pos);
+            println!("FN: {}", metric.false_neg);
+        }
+        _ => {
+            eprintln!("Invalid subcommand");
+            std::process::exit(1);
+        }
+    }
+    
+}

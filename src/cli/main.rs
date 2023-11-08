@@ -4,7 +4,7 @@
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
 // use crate::*;
-use motifsearch::cli::{workflows::build_index, *};
+use motifsearch::cli::{workflows::{build_index, temp}, *};
 
 const HELP: &str = "\
 USAGE: motifsearch index [OPTIONS] <PDBS...>
@@ -38,6 +38,10 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             index_path: args.opt_value_from_str(["-i", "--index-path"])?,
             help: args.contains(["-h", "--help"]),
         }),
+        Some("test") => Ok(AppArgs::Test {
+            index_path: args.value_from_str(["-i", "--index-path"])?,
+            verbose: args.contains(["-v", "--verbose"]),
+        }),
         Some(_) => Err("Invalid subcommand".into()),
         None => Ok(AppArgs::Global {
             help: args.contains(["-h", "--help"]),
@@ -52,28 +56,29 @@ fn main() {
     });
     match parsed_args {
         AppArgs::Global { help } => {
-            if help {
-                println!("{}", HELP);
-            } else {
-                println!("No subcommand specified. Try `motifsearch --help` for more information.");
-            }
+            if !help { eprintln!("No subcommand specified."); }
+            eprintln!("{}", HELP);
         }
         AppArgs::Index { help, .. } => {
             if help {
-                println!("{}", HELP);
+                eprintln!("{}", HELP);
             } else {
                 build_index::build_index(parsed_args);
             }
         }
         AppArgs::Query { help, threads, .. } => {
             if help {
-                println!("{}", HELP);
+                eprintln!("{}", HELP);
             } else {
-                println!("Querying with {} threads...", threads);
+                eprintln!("Querying with {} threads...", threads);
                 // let mut query = Query::new();
                 // query.build(threads);
-                println!("Querying done.");
+                eprintln!("Querying done.");
             }
+        }
+        AppArgs::Test { .. } => {
+            eprintln!("Testing");
+            temp::query_test_for_swissprot(parsed_args);
         }
     }
 }

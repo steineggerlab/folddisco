@@ -20,7 +20,7 @@ use crate::prelude::*;
 // TODO: Generated. need to be
 
 const HELP_INDEX: &str = "\
-USAGE: motifsearch index [OPTIONS] <PDBS...>
+USAGE: motifsearch index [OPTIONS]
 Options:
     -d, --pdb-dir <PDB_DIR>     Directory containing PDB files
     -i, --index-path <INDEX_PATH>   Path to save the index table

@@ -25,4 +25,8 @@ pub enum AppArgs {
         index_path: Option<String>,
         help: bool,
     },
+    Test {
+        index_path: String,
+        verbose: bool,
+    }
 }

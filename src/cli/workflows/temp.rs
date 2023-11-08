@@ -24,9 +24,9 @@ pub fn query_test_for_swissprot(env: AppArgs) {
                 // HashValue::from_u64(6597069965577u64),
                 // HashValue::from_u64(4398046577927u64),
                 // HashValue::from_u64(8800438323719u64),
-                HashValue::from_u64(55019035054177u64),
-                HashValue::from_u64(54975583378047u64),
-                HashValue::from_u64(76966319255137u64),
+                HashValue::from_u64(5501903505417u64),
+                HashValue::from_u64(5497558337804u64),
+                HashValue::from_u64(7696631925513u64),
             ];
             let queries_u64 = queries.iter().map(|x| x.as_u64()).collect::<Vec<u64>>();
             let result = index_table.query_multiple(&queries_u64);

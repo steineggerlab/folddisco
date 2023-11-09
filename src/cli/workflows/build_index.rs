@@ -99,6 +99,9 @@ pub fn build_index(env: AppArgs) {
                 // Save lookup. The path to lookup table is the same as the index table with .lookup extension
                 let lookup_path = format!("{}.lookup", index_path); 
                 save_lookup_to_file(&lookup_path, &controller.path_vec, &controller.numeric_id_vec, None);
+                for i in 0..10 {
+                    println!("Path: {}, Numeric id: {}", controller.path_vec[i], controller.numeric_id_vec[i]);
+                }
                 let lap3 = std::time::Instant::now();
                 if verbose { println!("[INFO ] Time elapsed for saving lookup table {:?}", lap3 - lap2); }
                 // TEMP: load index table saved

@@ -224,7 +224,28 @@ impl IndexTable {
         }
         result
     }
-
+    pub fn query_multiple_with_count(&self, queries: &Vec<Key>, min_count: usize) -> Option<Vec<Value>> {
+        let mut counts: FxHashMap<Value, usize> = FxHashMap::with_capacity_and_hasher(queries.len(), Default::default());
+        for query in queries {
+            let query_result = self.get(query);
+            match query_result {
+                Some(x) => {
+                    for value in x {
+                        *counts.entry(*value).or_insert(0) += 1;
+                    }
+                }
+                None => {
+                    return None;
+                }
+            }
+        }
+        let result: Vec<Value> = counts.into_iter()
+            .filter(|&(_, count)| count >= min_count)
+            .map(|(value, _)| value)
+            .collect();
+        Some(result)
+    }
+    
     pub fn query_multiple_with_neighbors(&self, queries_with_neighbors: &Vec<Vec<Key>>) -> Option<Vec<Value>> {
         let mut result: Option<Vec<Value>> = None;
         for query_list in queries_with_neighbors {

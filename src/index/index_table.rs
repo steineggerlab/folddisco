@@ -205,6 +205,7 @@ impl IndexTable {
         let mut result: Option<Vec<Value>> = None;
         for query in queries {
             let query_result = self.get(query);
+            println!("Query: {:?}, Query result: {:?}", query, query_result);
             match query_result {
                 Some(x) => {
                     match &mut result {

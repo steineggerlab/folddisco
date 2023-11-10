@@ -33,10 +33,12 @@ pub fn query_test_for_swissprot(env: AppArgs) {
             ];
             let queries_u64 = queries.iter().map(|x| x.as_u64()).collect::<Vec<u64>>();
             let result = index_table.query_multiple_with_connectivity(&queries_u64, 2);
+
             let mut str_result = Vec::new();
             if let Some(result) = result {
                 let mut set = HashSet::new();
                 let mut dedup_result = Vec::new();
+                println!("Total result: {}", result.len());
                 for i in result {
                     if !set.contains(&i) {
                         set.insert(i);

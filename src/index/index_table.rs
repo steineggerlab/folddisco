@@ -295,9 +295,7 @@ impl IndexTable {
                         }
                     }
                 }
-                None => {
-                    return None;
-                }
+                None => { } // do nothing
             }
         }
         // Filter1: count over min_count

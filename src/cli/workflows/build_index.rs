@@ -8,6 +8,7 @@
 // and the path to save the index table.
 
 use crate::cli::*;
+use crate::index::index_table::Value;
 use crate::index::lookup::{save_lookup_to_file, load_lookup_from_file};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -65,22 +66,40 @@ pub fn build_index(env: AppArgs) {
                         let mut res_pair: Vec<(u16, u16)> = Vec::with_capacity(compact.num_residues.pow(2));
                         // Iterate over all residue pairs
                         let res_bound = get_all_combination(compact.num_residues, false);
-                        let mut hash_collection: Vec<u64> = res_bound.iter().map(
+                        // Single
+                        // let mut hash_collection = res_bound.iter().map(
+                        //     |(n, m)| {
+                        //         if n == m {
+                        //             return 0u64
+                        //         }
+                        //         let trr = compact.get_trrosetta_feature(*n, *m).unwrap_or([0.0; 6]);
+                        //         if trr[0] < 2.0 || trr[0] > 20.0 {
+                        //             return 0u64
+                        //         }
+                        //         let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                        //         hash_value.as_u64()
+                        //     }
+                        // ).collect();
+
+                        // Triple 
+                        let mut hash_collection: Vec<Value> = Vec::with_capacity(res_bound.len());
+                        hash_collection = res_bound.iter().map(
                             |(n, m)| {
                                 if n == m {
-                                    return 0u64
+                                    return Value::Triple(0usize, 0u16, 0u16)
                                 }
                                 let trr = compact.get_trrosetta_feature(*n, *m).unwrap_or([0.0; 6]);
                                 if trr[0] < 2.0 || trr[0] > 20.0 {
-                                    return 0u64
+                                    return Value::Triple(0usize, 0u16, 0u16)
                                 }
                                 let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
-                                hash_value.as_u64()
+                                Value::Triple(hash_value.as_usize(), *n as u16, *m as u16)
                             }
                         ).collect();
+                        
                         // Filter out invalid residue pairs & deduplicate
-                        hash_collection.sort_unstable();
-                        hash_collection.dedup();
+                        // hash_collection.sort_unstable();
+                        // hash_collection.dedup();
                         // Return
                         hash_collection
                     }
@@ -91,7 +110,10 @@ pub fn build_index(env: AppArgs) {
                 if verbose { println!("[INFO ] Time elapsed for building index table {:?}", lap1 - start); }
                 // Saving index table
                 let mut index_table = IndexTable::new();
-                index_table.fill(&controller.numeric_id_vec, &hashes);
+                // index_table.fill(&controller.numeric_id_vec, &hashes);
+                // Triple
+                index_table.fill_triple(&controller.numeric_id_vec, &hashes);
+                
                 index_table.remove(&0u64); // Remove invalid hash
                 index_table.save_to_bin_custom(&index_path).expect("[ERROR] Failed to save index table");
                 let lap2 = std::time::Instant::now();

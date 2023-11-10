@@ -31,6 +31,9 @@ impl HashValue {
     pub fn as_u64(&self) -> u64 {
         self.0
     }
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
 
     pub fn perfect_hash(
         cb_dist: f32,

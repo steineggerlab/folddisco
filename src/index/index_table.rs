@@ -139,7 +139,7 @@ impl IndexTable {
                     },
                     Value::Triple(id, res_id1, res_id2) => {
                         writer.write_u8(1u8)?;
-                        writer.write_u64::<LE>(*id as u64)?;
+                        writer.write_u32::<LE>(*id as u32)?;
                         writer.write_u16::<LE>(*res_id1 as u16)?;
                         writer.write_u16::<LE>(*res_id2 as u16)?;
                     }
@@ -170,7 +170,7 @@ impl IndexTable {
                         index_table.add(key, Value::Single(value));
                     },
                     1u8 => {
-                        let id = reader.read_u64::<LE>()? as usize;
+                        let id = reader.read_u32::<LE>()? as usize;
                         let res_id1 = reader.read_u16::<LE>()? as u16;
                         let res_id2 = reader.read_u16::<LE>()? as u16;
                         index_table.add(key, Value::Triple(id, res_id1, res_id2));
@@ -181,7 +181,6 @@ impl IndexTable {
                 }
             }
         }
-
         Ok(index_table)
     }
 
@@ -282,6 +281,51 @@ impl IndexTable {
         result
     }
 
+    pub fn query_multiple_with_connectivity(&self, queries: &Vec<Key>, min_count: usize) -> Option<Vec<Value>> {
+        let mut count_pair_map: FxHashMap<Value, (usize, Vec<(u16, u16)>)> = FxHashMap::with_capacity_and_hasher(queries.len(), Default::default());
+        for query in queries {
+            let query_result = self.get(query);
+            match query_result {
+                Some(x) => {
+                    for value in x {
+                        if let Value::Triple(id, res_id1, res_id2) = value {
+                            let entry = count_pair_map.entry(*value).or_insert((0, Vec::new()));
+                            entry.0 += 1;
+                            entry.1.push((*res_id1, *res_id2));
+                        }
+                    }
+                }
+                None => {
+                    return None;
+                }
+            }
+        }
+        // Filter1: count over min_count
+        // Filter2: res_index pair is connected with other res_index pair
+        let result: Vec<Value> = count_pair_map.into_iter()
+            .filter(|&(_, (count, _))| count >= min_count)
+            .filter(|&(_, (_, res_pairs))| {
+                let mut connected = false;
+                for i in 0..res_pairs.len() {
+                    for j in i+1..res_pairs.len() {
+                        let res_pair1 = res_pairs[i];
+                        let res_pair2 = res_pairs[j];
+                        if res_pair1.0 == res_pair2.0 || res_pair1.0 == res_pair2.1 || res_pair1.1 == res_pair2.0 || res_pair1.1 == res_pair2.1 {
+                            connected = true;
+                            break;
+                        }
+                    }
+                    if connected {
+                        break;
+                    }
+                }
+                connected
+            })
+            .map(|(value, _)| value)
+            .collect();
+        Some(result)
+    }
+
     pub fn concat_structure_with_res_pair(&mut self, id: Id, hashes: Vec<Key>, res_pairs: Vec<(ResId, ResId)>) {
         // This function consumes hashes and res_pairs
         assert_eq!(hashes.len(), res_pairs.len(), "Length of hashes and res_pairs must be equal.");
@@ -303,6 +347,17 @@ impl IndexTable {
             let id = id_vec[i];
             for hash in hash_collection {
                 self.add(*hash, Value::Single(id));
+            }
+        }
+    }
+    pub fn fill_triple(&mut self, id_vec: &Vec<Id>, hash_vec: &Vec<Vec<Value>>) {
+        // assert value is triple
+        assert_eq!(id_vec.len(), hash_vec.len(), "Length of id_vec and hash_vec must be equal.");
+        for i in 0..hash_vec.len() {
+            let hash_collection = &hash_vec[i];
+            let id = id_vec[i];
+            for hash in hash_collection {
+                self.add(id as Key, *hash);
             }
         }
     }

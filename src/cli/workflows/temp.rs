@@ -51,11 +51,11 @@ pub fn query_test_for_swissprot(env: AppArgs) {
             println!("[INFO ] Time elapsed for quering {:?}", end - lap2);
 
             let answer = vec![
-                "analysis/raw_ecoli/AF-P76176-F1-model_v4.pdb", "analysis/raw_ecoli/AF-P0C0V0-F1-model_v4.pdb", "analysis/raw_ecoli/AF-P39099-F1-model_v4.pdb", 
-                "analysis/raw_ecoli/AF-P0AEE3-F1-model_v4.pdb", 
-                "analysis/raw_ecoli/AF-Q7BSW5-F1-model_v4.pdb", "analysis/raw_ecoli/AF-Q47692-F1-model_v4.pdb", 
-                "analysis/raw_ecoli/AF-O68900-F1-model_v4.pdb", "analysis/raw_ecoli/AF-Q7BS42-F1-model_v4.pdb", "analysis/raw_ecoli/AF-Q84GK0-F1-model_v4.pdb", 
-                "analysis/raw_ecoli/AF-Q9EZE7-F1-model_v4.pdb", "analysis/raw_ecoli/AF-Q8FDW4-F1-model_v4.pdb",
+                "/fast/hyunbin/foldcomp/ecoli_pdb/AF-P76176-F1-model_v4.pdb", "/fast/hyunbin/foldcomp/ecoli_pdb/AF-P0C0V0-F1-model_v4.pdb", "/fast/hyunbin/foldcomp/ecoli_pdb/AF-P39099-F1-model_v4.pdb", 
+                "/fast/hyunbin/foldcomp/ecoli_pdb/AF-P0AEE3-F1-model_v4.pdb", 
+                "/fast/hyunbin/foldcomp/ecoli_pdb/AF-Q7BSW5-F1-model_v4.pdb", "/fast/hyunbin/foldcomp/ecoli_pdb/AF-Q47692-F1-model_v4.pdb", 
+                "/fast/hyunbin/foldcomp/ecoli_pdb/AF-O68900-F1-model_v4.pdb", "/fast/hyunbin/foldcomp/ecoli_pdb/AF-Q7BS42-F1-model_v4.pdb", "/fast/hyunbin/foldcomp/ecoli_pdb/AF-Q84GK0-F1-model_v4.pdb", 
+                "/fast/hyunbin/foldcomp/ecoli_pdb/AF-Q9EZE7-F1-model_v4.pdb", "/fast/hyunbin/foldcomp/ecoli_pdb/AF-Q8FDW4-F1-model_v4.pdb",
              ];
             let answer  = answer.iter().map(|x| x.to_string()).collect::<Vec<_>>();
 

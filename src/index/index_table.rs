@@ -304,7 +304,7 @@ impl IndexTable {
         // Filter2: res_index pair is connected with other res_index pair
         let result: Vec<Value> = count_pair_map.into_iter()
             .filter(|&(_, (count, _))| count >= min_count)
-            .filter(|&(_, (_, res_pairs))| {
+            .filter(|(_, (_, res_pairs))| {
                 let mut connected = false;
                 for i in 0..res_pairs.len() {
                     for j in i+1..res_pairs.len() {

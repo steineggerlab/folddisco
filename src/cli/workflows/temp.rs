@@ -33,20 +33,23 @@ pub fn query_test_for_swissprot(env: AppArgs) {
             ];
             let queries_u64 = queries.iter().map(|x| x.as_u64()).collect::<Vec<u64>>();
             let result = index_table.query_multiple_with_connectivity(&queries_u64, 2);
-            let mut str_result = Vec::new();
-            if let Some(result) = result {
-                let mut set = HashSet::new();
-                let mut dedup_result = Vec::new();
-                for i in result {
-                    if !set.contains(&i) {
-                        set.insert(i);
-                        dedup_result.push(i);
-                    }
-                }
-                // println!("Queried ind (3) {:?}", dedup_result);
-                str_result = dedup_result.iter().map(|x| path_vec.get(x.get_id()).unwrap().clone()).collect::<Vec<_>>();
-                println!("[INFO ] Queried {:?}", str_result);
+            for r in result {
+                println!("Result: {:?}", r);
             }
+            // let mut str_result = Vec::new();
+            // if let Some(result) = result {
+            //     let mut set = HashSet::new();
+            //     let mut dedup_result = Vec::new();
+            //     for i in result {
+            //         if !set.contains(&i) {
+            //             set.insert(i);
+            //             dedup_result.push(i);
+            //         }
+            //     }
+            //     // println!("Queried ind (3) {:?}", dedup_result);
+            //     str_result = dedup_result.iter().map(|x| path_vec.get(x.get_id()).unwrap().clone()).collect::<Vec<_>>();
+            //     println!("[INFO ] Queried {:?}", str_result);
+            // }
             let end = std::time::Instant::now();
             println!("[INFO ] Time elapsed for quering {:?}", end - lap2);
 

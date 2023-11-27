@@ -4,6 +4,7 @@ pub mod alloc;
 pub mod builder;
 pub mod index_table;
 pub mod lookup;
+pub mod delta;
 
 use std::collections::HashMap;
 use std::fmt::Display;

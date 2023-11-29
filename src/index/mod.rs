@@ -5,6 +5,7 @@ pub mod builder;
 pub mod index_table;
 pub mod lookup;
 pub mod delta;
+pub mod io;
 
 use std::collections::HashMap;
 use std::fmt::Display;

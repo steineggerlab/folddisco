@@ -156,6 +156,20 @@ pub fn as_u64_from_delta_encoding_bytes(bytes: &[u8], cursor: &mut usize) -> u64
 }
 
 
+pub fn write_vector_file(path: &str, vec: &Vec<u64>) -> Result<(), Error> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(path)?;
+    let total_size: u64 = 8 * vec.len() as u64;
+    file.set_len(total_size as u64)?;
+    // Write as whole
+    let mut writer = BufWriter::new(file);
+    let vec_bytes = unsafe { std::slice::from_raw_parts(vec.as_ptr() as *const u8, total_size as usize) };
+    writer.write_all(vec_bytes)?;
+    Ok(())
+}
 
 pub fn write_hashmap_to_file(path: &str, map: &HashMap<u64, Vec<u64>>) -> Result<(), Error> {
     let mut file = OpenOptions::new()

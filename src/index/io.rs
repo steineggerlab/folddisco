@@ -23,7 +23,7 @@ pub fn write_u64_vector(path: &str, vec: &Vec<u64>) -> Result<(), Error> {
     Ok(())
 }
 
-fn read_u64_vector(path: &str) -> Result<&'static [u64], Error> {
+pub fn read_u64_vector(path: &str) -> Result<&'static [u64], Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
     let vec = unsafe { std::slice::from_raw_parts(mmap.as_ptr() as *const u64, mmap.len() / size_of::<u64>()) };
@@ -32,14 +32,14 @@ fn read_u64_vector(path: &str) -> Result<&'static [u64], Error> {
     Ok(vec)
 }
 
-fn read_u64_vector_with_mmap(path: &str)-> Result<(Mmap, &'static [u64]), Error> {
+pub fn read_u64_vector_with_mmap(path: &str)-> Result<(Mmap, &'static [u64]), Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
     let vec = unsafe { std::slice::from_raw_parts(mmap.as_ptr() as *const u64, mmap.len() / size_of::<u64>()) };
     Ok((mmap, vec))
 }
 
-fn get_hashmap_size(map: &HashMap<u64, Vec<u64>>) -> usize {
+pub fn get_hashmap_size(map: &HashMap<u64, Vec<u64>>) -> usize {
     let mut size = 0;
     for (key, value) in map {
         size += mem::size_of::<u64>() * 2;
@@ -49,7 +49,7 @@ fn get_hashmap_size(map: &HashMap<u64, Vec<u64>>) -> usize {
 }
 
 // This function consumes the original hashmap
-fn convert_hashmap_to_offset_and_values(orig_map: HashMap<u64, Vec<u64>>) -> (FxHashMap<u64, (usize, usize)>, Vec<u64>) {
+pub fn convert_hashmap_to_offset_and_values(orig_map: HashMap<u64, Vec<u64>>) -> (FxHashMap<u64, (usize, usize)>, Vec<u64>) {
     // OffsetMap - key: hash, value: (offset, length)
     // Vec - all values concatenated
     let mut offset_map = FxHashMap::default();
@@ -63,11 +63,11 @@ fn convert_hashmap_to_offset_and_values(orig_map: HashMap<u64, Vec<u64>>) -> (Fx
     (offset_map, vec)
 }
 
-fn get_values_with_offset(vec: &[u64], offset: usize, length: usize) -> &[u64] {
+pub fn get_values_with_offset(vec: &[u64], offset: usize, length: usize) -> &[u64] {
     &vec[offset..offset + length]
 }
 
-fn save_offset_map(path: &str, offset_map: &FxHashMap<u64, (usize, usize)>) -> Result<(), Error> {
+pub fn save_offset_map(path: &str, offset_map: &FxHashMap<u64, (usize, usize)>) -> Result<(), Error> {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -85,7 +85,7 @@ fn save_offset_map(path: &str, offset_map: &FxHashMap<u64, (usize, usize)>) -> R
     Ok(())
 }
 
-fn read_offset_map(path: &str) -> Result<FxHashMap<u64, (usize, usize)>, Error> {
+pub fn read_offset_map(path: &str) -> Result<FxHashMap<u64, (usize, usize)>, Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
     let mut offset_map = FxHashMap::default();

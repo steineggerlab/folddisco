@@ -39,4 +39,5 @@ pub mod prelude {
     pub use crate::index::index_table::IndexTable;
     pub use crate::utils::loader::{load_path, get_all_combination};
     pub use crate::utils::benchmark::{Metrics, calculate_metrics, compare_target_answer};
+    pub use crate::utils::log::{INFO, FAIL, WARN, DONE, log_msg, print_log_msg};
 }

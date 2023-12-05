@@ -6,3 +6,4 @@ pub mod constants;
 pub mod discretizer;
 pub mod loader;
 pub mod benchmark;
+pub mod log;

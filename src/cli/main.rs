@@ -5,7 +5,7 @@
 
 // use crate::*;
 use motifsearch::cli::{workflows::{build_index, temp}, *};
-
+use motifsearch::prelude::*;
 const HELP: &str = "\
 USAGE: motifsearch index [OPTIONS] <PDBS...>
        motifsearch query [OPTIONS] <PDB> <INDEX>
@@ -70,7 +70,7 @@ fn main() {
             if help {
                 eprintln!("{}", HELP);
             } else {
-                eprintln!("Querying with {} threads...", threads);
+                eprintln!("{} Querying with {} threads...",  INFO, threads);
                 // let mut query = Query::new();
                 // query.build(threads);
                 eprintln!("Querying done.");

@@ -29,6 +29,10 @@ path = "example/e_coli.test.rs"
 name = "feature_distribution"
 path = "example/check_feature_distribution.rs"
 
+[[example]]
+name = "index_io"
+path = "example/index_io.rs"
+
 [dependencies]
 rand = "0.8.5"
 pico-args = { version = "0.5.0", features = ["combined-flags"], path = "lib/pico-args" }

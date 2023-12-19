@@ -2,6 +2,7 @@ pub mod query;
 
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
+use std::sync::atomic::AtomicUsize;
 
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
@@ -36,8 +37,8 @@ impl Controller {
             hash_new_collection_vec: Vec::new(),
             res_pair_vec: Vec::new(), // WARNING: TEMPORARY
             remove_redundancy: false,
-            num_threads_file: 2,
-            num_threads_hash: 3,
+            num_threads_file: 3,
+            num_threads_hash: 2,
         }
     }
     pub fn collect_hash(&mut self) {
@@ -64,7 +65,15 @@ impl Controller {
         
     }
     
-    
+    pub fn get_allocation_size(&self) -> usize {
+        let mut allocation_size = 0usize;
+        self.path_vec.iter().for_each(|pdb_path| {
+            let pdb_reader = PDBReader::from_file(pdb_path).expect("PDB file not found");
+            let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
+            allocation_size += compact.num_residues * (compact.num_residues - 1);
+        });
+        allocation_size
+    }
     
     pub fn _collect_hash(&mut self) {
         // let vae = load_vae();
@@ -122,9 +131,6 @@ impl Controller {
         println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
     }
 
-    
-    
-    
     pub fn save_raw_feature(&mut self, path: &str, discretize: bool) {
         let mut file = std::fs::File::create(path).expect("cannot create file");
         for i in 0..self.path_vec.len() {

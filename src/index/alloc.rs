@@ -30,15 +30,9 @@ impl IndexAllocator {
         let start = self.cursor.fetch_add(len, Ordering::SeqCst);
         let size = self.data_size.load(Ordering::Relaxed);
         for (i, value) in ext_data.iter().enumerate() {
-            // If start + i is out of bound, then resize the allocation vector
-            if start + i >=  size {
-                // Use unsafe code to resize the allocation vector
-                // Allow mutable method to be called in here
-                
-                let size_as_mb = size as f32 * 8.0 / 1024.0 / 1024.0;
-                println!("Resized allocation vector to {}MB", size_as_mb);
-            }
-            self.allocation[start + i].store(value.load(Ordering::Relaxed), Ordering::Relaxed);
+            self.allocation[start + i].store(
+                value.load(Ordering::Relaxed), Ordering::Relaxed
+            );
         }
     }
     

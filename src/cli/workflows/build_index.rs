@@ -96,6 +96,11 @@ pub fn build_index(env: AppArgs) {
                         hash_collection.sort_unstable();
                         hash_collection.dedup();
                         
+                        // drop unnecessary variables
+                        drop(compact);
+                        drop(pdb_reader);
+                        hash_collection.shrink_to_fit();
+                        
                         // Return
                         hash_collection
                     }

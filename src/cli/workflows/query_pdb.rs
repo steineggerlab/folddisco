@@ -42,10 +42,11 @@ pub fn query_pdb(env: AppArgs) {
                 std::process::exit(0);
             } 
             
-            // Get path
-            let offset_path = format!("{:?}.offset", index_path.clone().unwrap());
-            let value_path = format!("{:?}.value", index_path.clone().unwrap());
-            let lookup_path = format!("{:?}.lookup", index_path.clone().unwrap());
+            // Get path. formatting without quotation marks
+            let index_path = index_path.unwrap();
+            let offset_path = format!("{}.offset", index_path.clone()); 
+            let value_path = format!("{}.value", index_path.clone());
+            let lookup_path = format!("{}.lookup", index_path.clone());
             println!("offset_path: {}", offset_path);
             println!("value_path: {}", value_path);
             println!("lookup_path: {}", lookup_path);

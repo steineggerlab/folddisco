@@ -10,18 +10,15 @@ fn main() {
     const NUM_THREADS: usize = 6;
     
     // Load directory
-    let yeast_pdb_paths = motifsearch::utils::loader::load_path("analysis/raw_ecoli");
+    let yeast_pdb_paths = motifsearch::utils::loader::load_path("data/serine_peptidases_filtered");
     let mut controller = motifsearch::controller::Controller::new(yeast_pdb_paths);
     controller.num_threads_file = NUM_THREADS;
     controller.num_threads_hash = NUM_THREADS;
     controller.fill_numeric_id_vec();
     
-    // Default allocation size
-    let default_alloc_size: usize = 1024 * 1024 * 16; // usize = 8 bytes, 16M * 8 bytes = 128 MB
-
-    let mut allocator = IndexAllocator::new(
-        controller.num_threads_hash, default_alloc_size
-    );
+    let alloc_size = 
+    
+    let mut allocator = IndexAllocator::new(controller.num_threads_hash, alloc_size);
     let mut dedup_size: AtomicUsize = AtomicUsize::new(0);
     
     let start = Instant::now();

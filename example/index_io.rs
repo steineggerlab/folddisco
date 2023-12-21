@@ -1,20 +1,33 @@
 
-use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc}, time::Instant, io::{BufWriter, Write}, fs::File};
+use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}, time::Instant, io::{BufWriter, Write}, fs::File};
 
 use byteorder::LittleEndian;
 // This example is to check if the IndexAllocator works as intended
-use motifsearch::{prelude::*, structure::atom::Atom, index::alloc::resize_allocation};
+use motifsearch::{prelude::*, structure::atom::Atom};
 use rayon::prelude::*;
+use rustc_hash::FxHashMap;
 
 fn main() {
     const NUM_THREADS: usize = 6;
     
     // Load directory
-    let yeast_pdb_paths = motifsearch::utils::loader::load_path("analysis/raw_ecoli");
+    let yeast_pdb_paths = motifsearch::utils::loader::load_path("data/serine_peptidases_filtered");
     let mut controller = motifsearch::controller::Controller::new(yeast_pdb_paths);
     controller.num_threads_file = NUM_THREADS;
     controller.num_threads_hash = NUM_THREADS;
     controller.fill_numeric_id_vec();
+
+    let mut id_lookup_map = FxHashMap::<String, usize>::default();
+    for i in 0..controller.path_vec.len() {
+        id_lookup_map.insert(controller.path_vec[i].clone(), controller.numeric_id_vec[i]);
+    }
+    let id_lookup_map = Arc::new(id_lookup_map);
+    
+    // Save offset
+    let mut offset = AtomicUsize::new(0);
+    let offset_vec = Arc::new(Mutex::new(
+        Vec::<(u64, (usize, usize))>::with_capacity(controller.path_vec.len())
+    ));
     
     rayon::ThreadPoolBuilder::new().num_threads(NUM_THREADS).build_global().unwrap();
     let start = Instant::now();
@@ -53,12 +66,20 @@ fn main() {
             hash_collection.sort_unstable();
             hash_collection.dedup();
             hash_collection.retain(|&x| x != 0);
-            // allocator.fill_and_update(hash_collection);
-            // allocator.fill_usize_vec(hash_collection);
+
             // Drop everything
             drop(compact);
             drop(pdb_reader);
             hash_collection.shrink_to_fit();
+            // Check offset map is empty
+            
+            let offset = offset.fetch_add(hash_collection.len(), Ordering::Relaxed);
+
+            // Append offset: numeric id as key, offset as value
+            let nid = id_lookup_map.get(pdb_path.as_str()).unwrap().clone();
+            let mut offset_vec = offset_vec.lock().unwrap();
+            offset_vec.push((nid as u64, (offset, hash_collection.len())));
+
             hash_collection
         }
     ).flatten().collect::<Vec<_>>();
@@ -73,7 +94,7 @@ fn main() {
     println!("Result size: {}", result.len());
 
     // Save to file
-    let mut file = File::create("analysis/raw_ecoli.bin").expect(
+    let mut file = File::create("analysis/serine_peptidases.bin").expect(
         &log_msg(FAIL, "Failed to create index file")
     );
     let mut buf = BufWriter::new(file);
@@ -83,7 +104,17 @@ fn main() {
     buf.flush().expect(
         &log_msg(FAIL, "Failed to flush index file")
     );
-    
+
+    let mut file = File::create("analysis/serine_peptidases.offset").expect(
+        &log_msg(FAIL, "Failed to create offset file")
+    );
+    let mut writer = BufWriter::new(file);
+    for (key, value) in offset_vec.lock().unwrap().iter() {
+        writer.write_all(&key.to_le_bytes());
+        writer.write_all(&value.0.to_le_bytes());
+        writer.write_all(&value.1.to_le_bytes());
+    }
+
     let end = Instant::now();
     println!("Time elapsed with {} threads: {:?}", NUM_THREADS, end - start);
     // Clear everything

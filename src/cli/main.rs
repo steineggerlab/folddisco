@@ -4,7 +4,7 @@
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
 // use crate::*;
-use motifsearch::cli::{workflows::{build_index, temp}, *};
+use motifsearch::cli::{workflows::{build_index, temp, query_pdb}, *};
 use motifsearch::prelude::*;
 const HELP: &str = "\
 USAGE: motifsearch index [OPTIONS] <PDBS...>
@@ -71,8 +71,7 @@ fn main() {
                 eprintln!("{}", HELP);
             } else {
                 eprintln!("{} Querying with {} threads...",  INFO, threads);
-                // let mut query = Query::new();
-                // query.build(threads);
+                query_pdb::query_pdb(parsed_args);
                 eprintln!("Querying done.");
             }
         }

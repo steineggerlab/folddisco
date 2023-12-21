@@ -46,6 +46,10 @@ pub fn query_pdb(env: AppArgs) {
             let offset_path = format!("{:?}.offset", index_path.clone());
             let value_path = format!("{:?}.value", index_path.clone());
             let lookup_path = format!("{:?}.lookup", index_path.clone());
+            println!("offset_path: {}", offset_path);
+            println!("value_path: {}", value_path);
+            println!("lookup_path: {}", lookup_path);
+
             // Load index table
             let value_vec = measure_time!(read_u64_vector(&value_path).expect("[ERROR] Failed to load value vector"));
             let offset_table = measure_time!(read_offset_map(&offset_path).expect("[ERROR] Failed to load offset table"));

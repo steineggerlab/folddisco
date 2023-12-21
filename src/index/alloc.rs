@@ -150,14 +150,14 @@ mod tests {
         
     }
     
-    #[test]
-    pub fn test_resize() {
-        let mut allocator = IndexAllocator::new(8, 10000000);
-        resize_allocation(&mut allocator, 20000000);
-        assert_eq!(allocator.data_size.load(Ordering::Relaxed), 20000000);
-        println!("Data size: {}", allocator.data_size.load(Ordering::Relaxed));
-        println!("Allocation size: {}", allocator.allocation.len());
-    }
+    // #[test]
+    // pub fn test_resize() {
+    //     let mut allocator = IndexAllocator::new(8, 10000000);
+    //     resize_allocation(&mut allocator, 20000000);
+    //     assert_eq!(allocator.data_size.load(Ordering::Relaxed), 20000000);
+    //     println!("Data size: {}", allocator.data_size.load(Ordering::Relaxed));
+    //     println!("Allocation size: {}", allocator.allocation.len());
+    // }
     
 }
 

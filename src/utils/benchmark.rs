@@ -81,7 +81,7 @@ pub fn compare_target_answer<T: Eq + PartialEq>(target: &Vec<T>, answer: &Vec<T>
 #[macro_export]
 macro_rules! measure_time {
     ($x:expr) => {{
-        let start = Instant::now();
+        let start = std::time::Instant::now();
         let result = $x;
         let duration = start.elapsed();
         println!("Time elapsed in {:?}: {:?}", stringify!($x), duration);

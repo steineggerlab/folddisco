@@ -12,10 +12,12 @@ use crate::index::index_table::Value;
 use crate::index::lookup::{save_lookup_to_file, load_lookup_from_file};
 use crate::index::io::*;
 use rayon::prelude::*;
+use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 // Import unique
 use std::collections::HashSet;
 use std::hash;
+use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}, time::Instant, io::{BufWriter, Write}, fs::File};
 
 use crate::prelude::*;
 
@@ -62,6 +64,18 @@ pub fn build_index(env: AppArgs) {
                 };
                 let mut controller = Controller::new(pdb_path_vec);
                 controller.fill_numeric_id_vec();
+
+                // Define offset that can be shared across threads
+                let mut offset = AtomicUsize::new(0);
+                let offset_vec = Arc::new(Mutex::new(
+                    Vec::<(u64, (usize, usize))>::with_capacity(controller.path_vec.len())
+                ));
+                let mut id_lookup_map = FxHashMap::<String, usize>::default();
+                for i in 0..controller.path_vec.len() {
+                    id_lookup_map.insert(controller.path_vec[i].clone(), controller.numeric_id_vec[i]);
+                }
+                let id_lookup_map = Arc::new(id_lookup_map);
+    
                 // Iterate per file parallelly
                 let hashes = (&controller.path_vec).into_par_iter().map(
                     |pdb_path| {
@@ -104,10 +118,16 @@ pub fn build_index(env: AppArgs) {
                         drop(pdb_reader);
                         hash_collection.shrink_to_fit();
                         
+                        // Add offset
+                        let offset = offset.fetch_add(hash_collection.len(), Ordering::Relaxed);
+                        let nid = id_lookup_map.get(pdb_path.as_str()).unwrap().clone();
+                        let mut offset_vec = offset_vec.lock().unwrap();
+                        offset_vec.push((nid as u64, (offset, hash_collection.len())));
+
                         // Return
                         hash_collection
                     }
-                ).collect::<Vec<_>>();
+                ).flatten().collect::<Vec<_>>();
                 // Remove invalid hash
                 
                 
@@ -115,39 +135,26 @@ pub fn build_index(env: AppArgs) {
                 if verbose { 
                     print_log_msg(INFO, &format!("Time elapsed for getting features {:?}", lap1 - start));
                 }
-                // Saving index table
-                let mut index_table = HashMap::<u64, Vec<u64>>::new();
 
-                for i in 0..hashes.len() {
-                    let hash_vec = &hashes[i];
-                    for j in 0..hash_vec.len() {
-                        let hash = hash_vec[j];
-                        if hash == 0 {
-                            continue
-                        }
-                        let numeric_id = controller.numeric_id_vec[i] as u64;
-                        let mut value_vec = index_table.entry(hash).or_insert(Vec::new());
-                        value_vec.push(numeric_id);
-                    }
-                }
-                let lap2 = std::time::Instant::now();
-
-                if verbose { 
-                    print_log_msg(INFO, &format!("Time elapsed for filling index table {:?}", lap2 - lap1));
-                }
-                
-                // index_table.remove(&0u64); // Remove invalid hash
                 // Convert to offset table
-                let (offset_table, value_vec) = convert_hashmap_to_offset_and_values(index_table);
                 let lap3 = std::time::Instant::now();
                 if verbose { 
-                    print_log_msg(INFO, &format!("Time elapsed for converting index table {:?}", lap3 - lap2));
+                    print_log_msg(INFO, &format!("Time elapsed for converting index table {:?}", lap3 - lap1));
                 }
                 // Save offset table
+                // Sort offset
+                offset_vec.lock().unwrap().sort_unstable_by(|a, b| a.0.cmp(&b.0));
                 let offset_path = format!("{}.offset", index_path);
-                save_offset_map(&offset_path, &offset_table).expect(
-                    &log_msg(FAIL, "Failed to save offset table")
+                let mut file = File::create(&offset_path).expect(
+                    &log_msg(FAIL, "Failed to create offset file")
                 );
+                let mut writer = BufWriter::new(file);
+                for (key, value) in offset_vec.lock().unwrap().iter() {
+                    writer.write_all(&key.to_le_bytes());
+                    writer.write_all(&value.0.to_le_bytes());
+                    writer.write_all(&value.1.to_le_bytes());
+                }
+                
                 let lap4 = std::time::Instant::now();
                 if verbose { 
                     print_log_msg(INFO, &format!("Time elapsed for saving offset table {:?}", lap4 - lap3));
@@ -155,7 +162,7 @@ pub fn build_index(env: AppArgs) {
                 
                 // Save value vector
                 let value_path = format!("{}.value", index_path);
-                write_u64_vector(&value_path, &value_vec).expect(
+                write_u64_vector(&value_path, &hashes).expect(
                     &log_msg(FAIL, "Failed to save values")
                 );
                 let lap5 = std::time::Instant::now();
@@ -189,7 +196,7 @@ pub fn build_index(env: AppArgs) {
                     print_log_msg(INFO, &format!("Time elapsed for loading lookup table {:?}", lap10 - lap9));
                 }
                 let lap11 = std::time::Instant::now();
-                let offset = offset_table.get(&hashes[1][3]).unwrap();
+                let offset = offset_table.get(&hashes[3]).unwrap();
                 let values = get_values_with_offset(&value_vec, offset.0, offset.1);
                 if verbose {
                     print_log_msg(INFO, &format!("Time elapsed for getting values {:?}", lap11 - lap10));

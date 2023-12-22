@@ -80,7 +80,7 @@ pub fn query_pdb(env: AppArgs) {
             }
             println!("queried size: {:?}", intersection.len());
             for i in 0..intersection.len() {
-                println!("{:?}", lookup.1[intersection[i] as usize]);
+                println!("{:?}", lookup.0[intersection[i] as usize]);
             }
         },
         _ => {

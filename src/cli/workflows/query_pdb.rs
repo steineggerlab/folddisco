@@ -58,11 +58,12 @@ pub fn query_pdb(env: AppArgs) {
             let lookup = measure_time!(load_lookup_from_file(&lookup_path));
 
             // Make query with pdb
+            // P00776,149,171,253
             let pdb_dir = "/fast/hyunbin/motif/swissprot_benchmark/swissprot_v4_raw";
             let pdb_path = "AF-P00766-F1-model_v4.pdb";
             let pdb_path = format!("{}/{}", pdb_dir, pdb_path);
             
-            let pdb_query =  make_query(&pdb_path, &vec![75u64, 120u64, 213u64]);
+            let pdb_query =  make_query(&pdb_path, &vec![149u64, 171u64, 253u64]);
 
             // Get values with offset
             let offset_to_query = pdb_query.iter().map(|&x| offset_table.get(&x).unwrap()).collect::<Vec<_>>();

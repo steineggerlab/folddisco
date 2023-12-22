@@ -36,6 +36,7 @@ impl HashValue {
     }
 
     pub fn perfect_hash(
+        res1: u64, res2: u64, 
         cb_dist: f32,
         omega: f32,
         theta1: f32,
@@ -56,13 +57,20 @@ impl HashValue {
         let h_phi1 = discretize_value(phi1, 0.0, 180.0, 16.0);
         let h_phi2 = discretize_value(phi2, 0.0, 180.0, 16.0);
 
+        let mut res_diff = (res1 as i64 - res2 as i64).abs() as u64;
+        if res_diff > 512 {
+            res_diff = 512;
+        }
+        let res_diff = discretize_value(res_diff as f32, 0.0, 512.0, 16.0);
+        
         assert!(h_cb_dist < 256);
         assert!(h_omega < 256);
         assert!(h_theta1 < 256);
         assert!(h_theta2 < 256);
         assert!(h_phi1 < 256);
         assert!(h_phi2 < 256);
-        let hashvalue = h_cb_dist << 40
+        let hashvalue = res_diff << 48
+            | h_cb_dist << 40
             | h_omega << 32
             | h_theta1 << 24
             | h_theta2 << 16
@@ -71,7 +79,8 @@ impl HashValue {
         HashValue(hashvalue)
     }
 
-    pub fn reverse_hash(&self) -> [f32; 6] {
+    pub fn reverse_hash(&self) -> [f32; 7] {
+        let res_diff = (self.0 >> 48) as u8;
         let h_cb_dist = (self.0 >> 40) as u8;
         let h_omega = (self.0 >> 32) as u8;
         let h_theta1 = (self.0 >> 24) as u8;
@@ -79,6 +88,7 @@ impl HashValue {
         let h_phi1 = (self.0 >> 8) as u8;
         let h_phi2 = (self.0 & 0x000000FF) as u8;
         [
+            res_diff as f32,
             h_cb_dist as f32,
             h_omega as f32,
             h_theta1 as f32,

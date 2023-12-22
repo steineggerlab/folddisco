@@ -59,11 +59,15 @@ pub fn query_pdb(env: AppArgs) {
 
             // Make query with pdb
             //
-            let pdb_dir = "/fast/hyunbin/motif/swissprot_benchmark/swissprot_v4_raw";
-            let pdb_path = "AF-P00766-F1-model_v4.pdb";
-            let pdb_path = format!("{}/{}", pdb_dir, pdb_path);
+            // let pdb_dir = "/fast/hyunbin/motif/swissprot_benchmark/swissprot_v4_raw";
+            // let pdb_path = "AF-P00766-F1-model_v4.pdb";
+            let pdb_dir = "/Users/hbk/Projects/Lab/06_FoldMotif/repos/organization/motifsearch/data/serine_peptidases_filtered";
+            let pdb_path = "1aq2.pdb";
             
-            let pdb_query =  make_query(&pdb_path, &vec![75u64, 120u64, 213u64]);
+            let pdb_path = format!("{}/{}", pdb_dir, pdb_path);
+            //51	1aq2	[250]	[232]	[269]
+            // let pdb_query =  make_query(&pdb_path, &vec![75u64, 120u64, 213u64]);
+            let pdb_query =  make_query(&pdb_path, &vec![232u64, 250u64, 269u64]);
 
             // Get values with offset
             let offset_to_query = pdb_query.iter().map(|&x| offset_table.get(&x).unwrap()).collect::<Vec<_>>();

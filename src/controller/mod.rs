@@ -105,7 +105,7 @@ impl Controller {
                     // let hash_value = HashValue::perfect_hash(reduced_trr[0], reduced_trr[1]);
                     let hash_value =
                         HashValue::perfect_hash(
-                            compact.residue_serial[n], compact.residue_serial[m],
+                            // compact.residue_serial[n], compact.residue_serial[m],
                             trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                         );
 
@@ -175,7 +175,7 @@ impl Controller {
                     let logdist = ((n as i32 - m as i32).abs() + 1).ilog2();
                     let hash_value =
                         HashValue::perfect_hash(
-                            res1, res2,
+                            // res1, res2,
                             trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                         );
 
@@ -379,7 +379,7 @@ fn par_get_feature_per_structure(pdb_path: &String, num_threads: usize) -> Vec<H
                     return HashValue::from_u64(0u64);
                 }
                 let hash_value = HashValue::perfect_hash(
-                    compact.residue_serial[n], compact.residue_serial[m],
+                    // compact.residue_serial[n], compact.residue_serial[m],
                     trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                 );
                 hash_value

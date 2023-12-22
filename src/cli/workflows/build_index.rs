@@ -90,7 +90,7 @@ pub fn build_index(env: AppArgs) {
                                     return 0u64
                                 }
                                 let hash_value = HashValue::perfect_hash(
-                                    compact.residue_serial[n] as u64, compact.residue_serial[m] as u64,
+                                    // compact.residue_serial[n] as u64, compact.residue_serial[m] as u64,
                                     trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                                 );
                                 hash_value.as_u64()

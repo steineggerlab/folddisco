@@ -78,13 +78,10 @@ pub fn query_pdb(env: AppArgs) {
 
                 }
             }
-            println!("intersection: {:?}", intersection);
-            
-            // Print head of lookup
-            for i in 0..10 {
-                println!("{}: {:?} {:?}", i, lookup.0[i], lookup.1[i]);
+            println!("queried size: {:?}", intersection.len());
+            for i in 0..intersection.len() {
+                println!("{:?}", lookup.1[intersection[i] as usize]);
             }
-            
         },
         _ => {
             eprintln!("{}", HELP_QUERY);

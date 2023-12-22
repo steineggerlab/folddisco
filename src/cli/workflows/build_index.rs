@@ -8,14 +8,16 @@
 // and the path to save the index table.
 
 use crate::cli::*;
-use crate::index::index_table::Value;
+use crate::index::index_table::{Value, self};
 use crate::index::lookup::{save_lookup_to_file, load_lookup_from_file};
 use crate::index::io::*;
 use rayon::prelude::*;
-use std::collections::HashMap;
+// use std::collections::HashMap;
+use dashmap::DashMap;
 // Import unique
 use std::collections::HashSet;
 use std::hash;
+use std::sync::Arc;
 
 use crate::prelude::*;
 
@@ -78,17 +80,17 @@ pub fn build_index(env: AppArgs) {
                         // Iterate over all residue pairs
                         let res_bound = get_all_combination(compact.num_residues, false);
                         // Single
-                        let mut hash_collection: Vec<u64> = res_bound.iter().map(
+                        let mut hash_collection: Vec<u64> = res_bound.into_par_iter().map(
                             |(n, m)| {
                                 if n == m {
                                     return 0u64
                                 }
-                                let trr = compact.get_trrosetta_feature(*n, *m).unwrap_or([0.0; 6]);
+                                let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
                                 if trr[0] < 2.0 || trr[0] > 20.0 {
                                     return 0u64
                                 }
                                 let hash_value = HashValue::perfect_hash(
-                                    compact.residue_serial[*n] as u64, compact.residue_serial[*m] as u64,
+                                    compact.residue_serial[n] as u64, compact.residue_serial[m] as u64,
                                     trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                                 );
                                 hash_value.as_u64()
@@ -115,21 +117,36 @@ pub fn build_index(env: AppArgs) {
                 if verbose { 
                     print_log_msg(INFO, &format!("Time elapsed for getting features {:?}", lap1 - start));
                 }
-                // Saving index table
-                let mut index_table = HashMap::<u64, Vec<u64>>::new();
 
-                for i in 0..hashes.len() {
-                    let hash_vec = &hashes[i];
-                    for j in 0..hash_vec.len() {
-                        let hash = hash_vec[j];
-                        if hash == 0 {
-                            continue
+                let mut index_table = DashMap::<u64, Vec<u64>>::new();
+                let mut index_table = Arc::new(index_table);
+                // for i in (0..hashes.len()).into_par_iter().rev() {
+                //     let hash_vec = &hashes[i];
+                //     for j in 0..hash_vec.len() {
+                //         let hash = hash_vec[j];
+                //         if hash == 0 {
+                //             continue
+                //         }
+                //         let numeric_id = controller.numeric_id_vec[i] as u64;
+                //         let mut value_vec = index_table.entry(hash).or_insert(Vec::new());
+                //         value_vec.push(numeric_id);
+                //     }
+                // }
+                // FILL IN INDEX TABLE WITH PARALLEL
+                (&hashes).into_par_iter().enumerate().for_each(
+                    |(i, hash_vec)| {
+                        for j in 0..hash_vec.len() {
+                            let hash = hash_vec[j];
+                            if hash == 0 {
+                                continue
+                            }
+                            let numeric_id = controller.numeric_id_vec[i] as u64;
+                            let mut value_vec = index_table.entry(hash).or_insert(Vec::new());
+                            value_vec.push(numeric_id);
                         }
-                        let numeric_id = controller.numeric_id_vec[i] as u64;
-                        let mut value_vec = index_table.entry(hash).or_insert(Vec::new());
-                        value_vec.push(numeric_id);
                     }
-                }
+                );
+
                 let lap2 = std::time::Instant::now();
 
                 if verbose { 
@@ -138,6 +155,7 @@ pub fn build_index(env: AppArgs) {
                 
                 // index_table.remove(&0u64); // Remove invalid hash
                 // Convert to offset table
+                let index_table = Arc::try_unwrap(index_table).unwrap();
                 let (offset_table, value_vec) = convert_hashmap_to_offset_and_values(index_table);
                 let lap3 = std::time::Instant::now();
                 if verbose { 

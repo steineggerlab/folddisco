@@ -4,6 +4,7 @@ use std::time::Instant;
 use std::fs::OpenOptions;
 use memmap2::{Mmap, MmapMut};
 use std::collections::HashMap;
+use dashmap::DashMap;
 use std::mem::{self, size_of};
 // Using FxHashMap
 use rustc_hash::FxHashMap;
@@ -39,21 +40,20 @@ pub fn read_u64_vector_with_mmap(path: &str)-> Result<(Mmap, &'static [u64]), Er
     Ok((mmap, vec))
 }
 
-pub fn get_hashmap_size(map: &HashMap<u64, Vec<u64>>) -> usize {
-    let mut size = 0;
-    for (key, value) in map {
-        size += mem::size_of::<u64>() * 2;
-        size += mem::size_of::<u64>() * value.len();
-    }
-    size
-}
+// pub fn get_hashmap_size(map: &DashMap<u64, Vec<u64>>) -> usize {
+//     let mut size = 0;
+//     for (key, value) in map {
+//         size += mem::size_of::<u64>() * value.len();
+//     }
+//     size
+// }
 
 // This function consumes the original hashmap
-pub fn convert_hashmap_to_offset_and_values(orig_map: HashMap<u64, Vec<u64>>) -> (FxHashMap<u64, (usize, usize)>, Vec<u64>) {
+pub fn convert_hashmap_to_offset_and_values(orig_map: DashMap<u64, Vec<u64>>) -> (FxHashMap<u64, (usize, usize)>, Vec<u64>) {
     // OffsetMap - key: hash, value: (offset, length)
     // Vec - all values concatenated
     let mut offset_map = FxHashMap::default();
-    let mut vec: Vec<u64> = Vec::with_capacity(get_hashmap_size(&orig_map));
+    let mut vec: Vec<u64> = Vec::new();
     let mut offset: usize = 0;
     for (key, value) in orig_map {
         offset_map.insert(key, (offset, value.len()));

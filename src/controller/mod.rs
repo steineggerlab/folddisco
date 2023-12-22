@@ -104,7 +104,10 @@ impl Controller {
                     // let reduced_trr = reduce_with_vae(trr, &vae);
                     // let hash_value = HashValue::perfect_hash(reduced_trr[0], reduced_trr[1]);
                     let hash_value =
-                        HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                        HashValue::perfect_hash(
+                            compact.residue_serial[n], compact.residue_serial[m],
+                            trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
+                        );
 
                     // WARNING: TEMPORARY
                     let res1 = compact.residue_serial[n];
@@ -171,7 +174,10 @@ impl Controller {
                     let psi2 = trr[5];
                     let logdist = ((n as i32 - m as i32).abs() + 1).ilog2();
                     let hash_value =
-                        HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                        HashValue::perfect_hash(
+                            res1, res2,
+                            trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
+                        );
 
                     // let hash_value = HashValue::perfect_hash(res1_u8, res2_u8, n as usize, m as usize, trr[0]);
                     let mut line = format!(
@@ -372,7 +378,10 @@ fn par_get_feature_per_structure(pdb_path: &String, num_threads: usize) -> Vec<H
                 if trr[0] >= 2.0 && trr[0] <= 20.0 {
                     return HashValue::from_u64(0u64);
                 }
-                let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
+                let hash_value = HashValue::perfect_hash(
+                    compact.residue_serial[n], compact.residue_serial[m],
+                    trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
+                );
                 hash_value
 
             })

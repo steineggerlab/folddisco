@@ -50,6 +50,9 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    // Init
+    print_fold_disco_logo();
+
     let parsed_args = parse_arg().unwrap_or_else(|e| {
         eprintln!("Error: {}", e);
         std::process::exit(1);

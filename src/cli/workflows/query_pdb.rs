@@ -64,25 +64,26 @@ pub fn query_pdb(env: AppArgs) {
             
             let pdb_query =  make_query(&pdb_path, &vec![75u64, 120u64, 213u64]);
 
-            let mut observed = HashSet::new();
-            let mut queried_values = Vec::new();
-            for hash in pdb_query {
-                let offset = offset_table.get(&hash.as_u64()).expect("[ERROR] Failed to get offset");
-                let values = get_values_with_offset(&value_vec, offset.0, offset.1);
-                // Make intersection
-                for value in values {
-                    if !observed.contains(&value) {
-                        observed.insert(value);
-                    } else {
-                        queried_values.push(value);
-                    }
+            // Get values with offset
+            let offset_to_query = pdb_query.iter().map(|&x| offset_table.get(&x).unwrap()).collect::<Vec<_>>();
+            let mut intersection = Vec::new();
+            for i in 0..offset_to_query.len() {
+                let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
+                if i == 0 {
+                    intersection = single_queried_values.to_vec();
+                } else {
+                    // Filter intersection with single_queried_values
+                    intersection = intersection.par_iter().filter(|&&x| single_queried_values.contains(&x)).map(|&x| x).collect::<Vec<_>>();
+
                 }
             }
+            println!("intersection: {:?}", intersection);
             
-            // Print out queried values
-            for i in 0..queried_values.len() {
-                println!("{:?}", lookup.0[*queried_values[i] as usize]);
+            // Print head of lookup
+            for i in 0..10 {
+                println!("{}: {:?} {:?}", i, lookup.0[i], lookup.1[i]);
             }
+            
         },
         _ => {
             eprintln!("{}", HELP_QUERY);

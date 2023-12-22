@@ -30,3 +30,17 @@ pub enum AppArgs {
         verbose: bool,
     }
 }
+
+pub fn print_fold_disco_logo() {
+    let logo = [
+        "",
+        "\x1b[91m░█▀▀░█▀█░█░░░█▀▄░\x1b[93m█▀▄░▀█▀░█▀▀░█▀▀░█▀█\x1b[0m",
+        "\x1b[91m░█▀▀░█░█░█░░░█░█░\x1b[93m█░█░░█░░▀▀█░█░░░█░█\x1b[0m",
+        "\x1b[91m░▀░░░▀▀▀░▀▀▀░▀▀░░\x1b[93m▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀\x1b[0m",
+        "",
+    ];
+
+    for line in &logo {
+        println!("{}", line);
+    }
+}

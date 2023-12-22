@@ -68,6 +68,7 @@ pub fn query_pdb(env: AppArgs) {
             let offset_to_query = pdb_query.iter().map(|&x| offset_table.get(&x).unwrap()).collect::<Vec<_>>();
             let mut intersection = Vec::new();
             for i in 0..offset_to_query.len() {
+                println!("offset_to_query: {:?}", offset_to_query[i]);
                 let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
                 if i == 0 {
                     intersection = single_queried_values.to_vec();

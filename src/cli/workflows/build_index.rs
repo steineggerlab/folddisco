@@ -106,8 +106,9 @@ pub fn build_index(env: AppArgs) {
                         drop(pdb_reader);
                         hash_collection.shrink_to_fit();
                         
+                        let numeric_id = controller.numeric_id_vec[controller.path_vec.iter().position(|x| x == pdb_path).unwrap()];
                         // Return
-                        hash_collection
+                        (numeric_id, hash_collection)
                     }
                 ).collect::<Vec<_>>();
                 // Remove invalid hash
@@ -133,16 +134,16 @@ pub fn build_index(env: AppArgs) {
                 //     }
                 // }
                 // FILL IN INDEX TABLE WITH PARALLEL
-                (&hashes).into_par_iter().enumerate().for_each(
-                    |(i, hash_vec)| {
+                (&hashes).into_par_iter().for_each(
+                    |(nid, hash_vec)| {
                         for j in 0..hash_vec.len() {
                             let hash = hash_vec[j];
                             if hash == 0 {
                                 continue
                             }
-                            let numeric_id = controller.numeric_id_vec[i] as u64;
+                            let nid = *nid as u64;
                             let mut value_vec = index_table.entry(hash).or_insert(Vec::new());
-                            value_vec.push(numeric_id);
+                            value_vec.push(nid);
                         }
                     }
                 );
@@ -207,7 +208,7 @@ pub fn build_index(env: AppArgs) {
                     print_log_msg(INFO, &format!("Time elapsed for loading lookup table {:?}", lap10 - lap9));
                 }
                 let lap11 = std::time::Instant::now();
-                let offset = offset_table.get(&hashes[1][3]).unwrap();
+                let offset = offset_table.get(&hashes[1].1[3]).unwrap();
                 let values = get_values_with_offset(&value_vec, offset.0, offset.1);
                 if verbose {
                     print_log_msg(INFO, &format!("Time elapsed for getting values {:?}", lap11 - lap10));

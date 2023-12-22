@@ -17,9 +17,7 @@ pub fn make_query(path: &String, residues: &Vec<u64>) -> Vec<u64> {
     for i in 0..indices.len() {
         for j in i+1..indices.len() {
             let trr = compact.get_trrosetta_feature(indices[i], indices[j]).unwrap_or([0.0; 6]);
-            let hash_value = HashValue::perfect_hash(
-                i as u64, j as u64, trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
-            );
+            let hash_value = HashValue::perfect_hash(trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]);
             hash_collection.push(hash_value.as_u64());
         }
     }

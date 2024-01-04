@@ -16,6 +16,10 @@ pub enum HashType {
 }
 
 pub trait GeometricHash {
-    // fn hash(&self, structure: &core::CompactStructure) -> Vec<u64>;
+    fn from_u64(hash: u64) -> Self;
+    fn to_u64(&self) -> u64;
+    fn perfect_hash(feature: Vec<f32>) -> Self;
+    fn reverse_hash(&self) -> Vec<f32>;
     fn hash_type(&self) -> HashType;
+    
 }

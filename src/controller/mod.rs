@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::sync::atomic::AtomicUsize;
 
+use crate::geometry::core::GeometricHash;
 // use crate::geometry::simple_hash::{HashCollection, HashValue};
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
 // use crate::geometry::ppf::{HashCollection, HashValue};
@@ -95,12 +96,13 @@ impl Controller {
                     //     continue;
                     // }
 
-                    let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
+                    let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]).to_vec();
                     // let ppf = compact.get_ppf(n, m).expect("cannot get ppf");
                     // let angle = compact.get_accumulated_torsion(n, m).expect("cannot get accumulated torsion angle");
                     if trr[0] < 2.0 || trr[0] > 20.0 {
                         continue;
                     }
+
                     // let reduced_trr = reduce_with_vae(trr, &vae);
                     // let hash_value = HashValue::perfect_hash(reduced_trr[0], reduced_trr[1]);
                     let hash_value =
@@ -108,7 +110,8 @@ impl Controller {
                             // compact.residue_serial[n], compact.residue_serial[m],
                             trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                         );
-
+                    // let hash_value = GeometricHash::perfect_hash(trr);
+                    
                     // WARNING: TEMPORARY
                     let res1 = compact.residue_serial[n];
                     let res2 = compact.residue_serial[m];

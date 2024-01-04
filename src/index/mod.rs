@@ -7,6 +7,8 @@ pub mod lookup;
 pub mod delta;
 pub mod io;
 
+pub mod new_alloc;
+
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;

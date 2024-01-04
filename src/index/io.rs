@@ -40,13 +40,14 @@ pub fn read_u64_vector_with_mmap(path: &str)-> Result<(Mmap, &'static [u64]), Er
     Ok((mmap, vec))
 }
 
-// pub fn get_hashmap_size(map: &DashMap<u64, Vec<u64>>) -> usize {
-//     let mut size = 0;
-//     for (key, value) in map {
-//         size += mem::size_of::<u64>() * value.len();
-//     }
-//     size
-// }
+pub fn get_hashmap_size(map: &DashMap<u64, Vec<u64>>) -> usize {
+    let mut size = 0;
+    // // Iter dashmap
+    // for (key, value) in map.iter() {
+    //     size += mem::size_of::<u64>() * value.len();
+    // }
+    size
+}
 
 // This function consumes the original hashmap
 pub fn convert_hashmap_to_offset_and_values(orig_map: DashMap<u64, Vec<u64>>) -> (FxHashMap<u64, (usize, usize)>, Vec<u64>) {
@@ -130,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_offset_is_working() {
-        let mut orig_map = HashMap::new();
+        let mut orig_map = DashMap::new();
         orig_map.insert(1, vec![1, 2, 3, 4, 5]);
         orig_map.insert(2, vec![6, 7, 8]);
         orig_map.insert(3, vec![9, 10, 11, 12]);
@@ -144,8 +145,8 @@ mod tests {
         assert_eq!(get_values_with_offset(&vec, 8, 4), &[9, 10, 11, 12]);
     }
 
-    fn huge_hashmap(size: usize) -> HashMap<u64, Vec<u64>> {
-        let mut orig_map = HashMap::new();
+    fn huge_hashmap(size: usize) -> DashMap<u64, Vec<u64>> {
+        let mut orig_map = DashMap::new();
         for i in 1..size {
             orig_map.insert(i as u64, vec![i as u64; i]);
         }

@@ -1,4 +1,6 @@
 use std::fmt;
+use crate::geometry::core::GeometricHash;
+use crate::geometry::core::HashType;
 // use std::hash::Hasher;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
@@ -100,3 +102,41 @@ pub fn continuize_angle(val: u16) -> f32 {
 //         self.0 = i as u16;
 //     }
 // }
+
+
+// pub trait GeometricHash {
+//     fn from_u64(hash: u64) -> Self;
+//     fn to_u64(&self) -> u64;
+//     fn perfect_hash(&self, feature: Vec<f32>) -> u64;
+//     fn reverse_hash(&self, hash: u64) -> Vec<f32>;
+//     fn hash_type(&self) -> HashType;
+// }
+
+impl GeometricHash for HashValue {
+    fn from_u64(hash: u64) -> Self {
+        HashValue(hash)
+    }
+
+    fn to_u64(&self) -> u64 {
+        self.0
+    }
+
+    fn perfect_hash(feature: Vec<f32>) -> Self {
+        let dist = feature[0];
+        let angle = feature[1];
+        let hashvalue = (dist.to_bits() as u64) << 32 | angle.to_bits() as u64;
+        HashValue(hashvalue)
+    }
+
+    fn reverse_hash(&self) -> Vec<f32> {
+        let dist_bits = (self.0 >> 32) as u32;
+        let angle_bits = (self.0 & 0x00000000FFFFFFFF) as u32;
+        let dist = f32::from_bits(dist_bits);
+        let angle = f32::from_bits(angle_bits);
+        vec![dist, angle]
+    }
+
+    fn hash_type(&self) -> HashType {
+        HashType::SimpleHash
+    }
+}

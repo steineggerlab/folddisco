@@ -1,4 +1,5 @@
 pub mod query;
+pub mod new_mod;
 
 use std::collections::{HashMap, HashSet};
 use std::io::Write;

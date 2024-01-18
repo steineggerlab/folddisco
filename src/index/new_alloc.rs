@@ -67,6 +67,20 @@ pub struct IndexBuilder<K: HashableSync, V: HashableSync> {
 unsafe impl<K: HashableSync, V: HashableSync> Sync for IndexBuilder<K, V> {}
 
 impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
+    pub fn empty() -> IndexBuilder<K, V> {
+        IndexBuilder {
+            offset: DashMap::new(),
+            allocation: Arc::new(HugeAllocation::new(0)),
+            ids: Arc::new(Vec::new()),
+            data: Arc::new(Vec::new()),
+            data_dashmap: Arc::new(DashMap::new()),
+            num_threads: 0,
+            allocation_size: 0,
+            offset_path: String::from(""),
+            data_path: String::from(""),
+        }
+    }
+    
     // Constructor
     pub fn new(
         ids: Vec<K>, data: Vec<Vec<V>>,
@@ -190,12 +204,6 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
             handle.join().unwrap();
         }
     }
-    
-    
-    
-    
-    
-    
     
     
     // Allocate memory with allocation size

@@ -52,10 +52,23 @@ impl<K: HashableSync> FoldDisco<K> {
             self.path_vec
                 .par_iter()
                 .map(|pdb_path| {
-                    unimplemented!();
+                    let pdb_reader = PDBReader::from_file(pdb_path).expect(
+                        log_msg(FAIL, "PDB file not found").as_str()
+                    );
+                    let compact = pdb_reader.read_structure().expect(
+                        log_msg(FAIL, "Failed to read structure").as_str()
+                    );
+                    let hash_vec = get_geometric_hash_from_structure(
+                        &compact, HashType::FoldDiscoDefault
+                    );
+                    // Drop intermediate variables
+                    drop(compact);
+                    drop(pdb_reader);
+                    hash_vec
                 })
-                .collect::<Vec<Vec<K>>>()
-        });
+            })
+            .collect::<Vec<Vec<K>>>();
+        self.hash_collection = output;
     }
 
     pub fn get_allocation_size(&self) -> usize {
@@ -121,10 +134,13 @@ pub fn get_geometric_hash_from_structure<H: GeometricHash>(
     res_bound.iter().for_each(|(i, j)| {
         match hash_type {
             HashType::PDBMotif => {
+                
                 let dist = structure.get_distance(*i, *j);
                 let angle = structure.get_angle(*i, *j);
                 if dist.is_some() && angle.is_some() {
-                    let hash = H::perfect_hash(vec![dist.unwrap(), angle.unwrap()]);
+                    let hash = HashType::perfect_hash(
+                        vec![dist.unwrap(), angle.unwrap()]
+                    );
                     hash_vec.push(hash);
                 }
                 hash_vec.push(hash);

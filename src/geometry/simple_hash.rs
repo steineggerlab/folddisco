@@ -13,7 +13,7 @@ impl HashValue {
     //     HashValue(hashvalue)
     // }
 
-    pub fn from_u64(hashvalue: u64) -> Self {src/controller/mod.rs
+    pub fn from_u64(hashvalue: u64) -> Self {
         HashValue(hashvalue)
     }
 
@@ -112,31 +112,31 @@ pub fn continuize_angle(val: u16) -> f32 {
 //     fn hash_type(&self) -> HashType;
 // }
 
-impl GeometricHash for HashValue {
-    fn from_u64(hash: u64) -> Self {
-        HashValue(hash)
-    }
+// impl GeometricHash for HashValue {
+//     fn from_u64(hash: u64) -> Self {
+//         HashValue(hash)
+//     }
 
-    fn to_u64(&self) -> u64 {
-        self.0
-    }
+//     fn to_u64(&self) -> u64 {
+//         self.0
+//     }
 
-    fn perfect_hash(feature: Vec<f32>) -> Self {
-        let dist = feature[0];
-        let angle = feature[1];
-        let hashvalue = (dist.to_bits() as u64) << 32 | angle.to_bits() as u64;
-        HashValue(hashvalue)
-    }
+//     fn perfect_hash(feature: Vec<f32>) -> Self {
+//         let dist = feature[0];
+//         let angle = feature[1];
+//         let hashvalue = (dist.to_bits() as u64) << 32 | angle.to_bits() as u64;
+//         HashValue(hashvalue)
+//     }
 
-    fn reverse_hash(&self) -> Vec<f32> {
-        let dist_bits = (self.0 >> 32) as u32;
-        let angle_bits = (self.0 & 0x00000000FFFFFFFF) as u32;
-        let dist = f32::from_bits(dist_bits);
-        let angle = f32::from_bits(angle_bits);
-        vec![dist, angle]
-    }
+//     fn reverse_hash(&self) -> Vec<f32> {
+//         let dist_bits = (self.0 >> 32) as u32;
+//         let angle_bits = (self.0 & 0x00000000FFFFFFFF) as u32;
+//         let dist = f32::from_bits(dist_bits);
+//         let angle = f32::from_bits(angle_bits);
+//         vec![dist, angle]
+//     }
 
-    fn hash_type(&self) -> HashType {
-        HashType::SimpleHash
-    }
-}
+//     fn hash_type(&self) -> HashType {
+//         HashType::SimpleHash
+//     }
+// }

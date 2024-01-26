@@ -81,9 +81,9 @@ pub fn process_structure(compact: &core::CompactStructure) -> TmpGeometry {
         for j in i + 1..compact.num_residues {
             let resi_pair = compact.get_res_serial(i, j);
             let dist = compact
-                .get_distance(i, j)
+                .get_ca_distance(i, j)
                 .expect("compact failed to get distance");
-            let angle = compact.get_angle(i, j).unwrap_or(0.0);
+            let angle = compact.get_ca_cb_angle(i, j).unwrap_or(0.0);
             // let angle = compact.get_angle(i,j).expect("compact failed to get angle");
             tmp_geometry.push(resi_pair, angle, dist);
         }

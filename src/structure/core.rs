@@ -250,7 +250,7 @@ impl CompactStructure {
         }
     }
 
-    pub fn get_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
+    pub fn get_ca_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
         if ca1.is_some() && ca2.is_some() {
@@ -262,8 +262,21 @@ impl CompactStructure {
             None
         }
     }
+
+    pub fn get_cb_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
+        let cb1 = self.get_cb(idx1);
+        let cb2 = self.get_cb(idx2);
+        if cb1.is_some() && cb2.is_some() {
+            let dist = cb1
+                .expect("Unable to get CA coordinate")
+                .calc_distance(&cb2.expect("Unable to get CA coordinate"));
+            Some(dist)
+        } else {
+            None
+        }
+    }
     
-    pub fn get_angle(&self, idx1: usize, idx2: usize) -> Option<f32> {
+    pub fn get_ca_cb_angle(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
         let ca2 = self.get_ca(idx2);
@@ -281,11 +294,9 @@ impl CompactStructure {
     }
     
     pub fn get_pdb_feature(&self, idx1: usize, idx2: usize) -> Vec<f32> {
-        let cb1 = self.get_cb(idx1);
-        let cb2 = self.get_cb(idx2);
-        let cb_dist = cb1.unwrap().calc_distance(&cb2.unwrap());
-        let angle = self.get_angle(idx1, idx2).unwrap();
-        let ca_dist = self.get_distance(idx1, idx2).unwrap();
+        let cb_dist = self.get_cb_distance(idx1, idx2).unwrap();
+        let angle = self.get_ca_cb_angle(idx1, idx2).unwrap();
+        let ca_dist = self.get_ca_distance(idx1, idx2).unwrap();
         let feature = vec![ca_dist, cb_dist, angle];
         feature
     }

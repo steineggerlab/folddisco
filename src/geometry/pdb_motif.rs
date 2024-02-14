@@ -13,7 +13,7 @@ use crate::geometry::core::HashType;
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(u32);
 
-impl HashValue {
+impl GeometricHash for HashValue {
     pub fn from_u32(hashvalue: u32) -> Self {
         HashValue(hashvalue)
     }
@@ -27,21 +27,14 @@ impl HashValue {
         let aa2_hash = aa2 as u32;
         assert!(i != j);
 
-        let h4 = discretize_value(ca_dist, 2.0, 20.0, 16.0);
-        
+        let ca_dist_hash = discretize_value(ca_dist, 2.0, 20.0, 16.0);
+        let delta_hash = discretize_value()
         
         assert!(aa1_hash < 256);
         assert!(aa2_hash < 256);
 
         assert!(h4 < 256);
         let hashvalue = aa1_hash << 24 | aa2_hash << 16 | h3 << 8 | h4;
-        HashValue(hashvalue)
-    }
-
-    
-    
-    pub fn perfect_hash(dist: f32, angle: f32) -> Self {
-        let hashvalue = (dist.to_bits() as u64) << 32 | angle.to_bits() as u64;
         HashValue(hashvalue)
     }
 
@@ -53,15 +46,6 @@ impl HashValue {
         (dist, angle)
     }
 
-    // pub fn loose_hash(&self) -> Self {
-    //     let (dist, angle) = self.reverse_hash();
-    //     let dist = dist / 2; // 20 seems to be too loose
-    //     let angle = angle / 5; // 20 seems to be too loose
-    //     let hashvalue = dist << 8 | angle;
-    //     HashValue(hashvalue)
-    // }
-
-    // pub fn
 }
 
 impl fmt::Debug for HashValue {
@@ -78,8 +62,6 @@ impl fmt::Display for HashValue {
         // write!(f, "{}", self.0)
     }
 }
-
-pub type HashCollection = Vec<HashValue>;
 
 pub fn discretize_angle(val: f32) -> u16 {
     // min = -180, max = 180, bins = 2^16,

@@ -310,28 +310,6 @@ fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut V
     }
 }
 
-pub struct GeometryHashCollector {
-    pub hash_collection: HashCollection,
-    // TODO: FILL IN OTHER FIELDS
-}
-
-impl GeometryHashCollector {
-    pub fn new() -> GeometryHashCollector {
-        GeometryHashCollector {
-            hash_collection: HashCollection::new(),
-        }
-    }
-
-    pub fn collect_hash(&mut self, hash_value: HashValue) {
-        self.hash_collection.push(hash_value);
-    }
-
-    pub fn remove_redundancy(&mut self) {
-        self.hash_collection.sort();
-        self.hash_collection.dedup();
-    }
-}
-
 // Temporary function for testing
 fn _write_hash_with_res_pair(
     hash_collection: &Vec<HashValue>,

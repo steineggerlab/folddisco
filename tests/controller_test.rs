@@ -17,20 +17,6 @@ use rayon::prelude::*;
 mod common;
 use common::loader;
 
-fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
-    let mut res = Vec::new();
-    for i in 0..n {
-        for j in 0..n {
-            if i == j && !include_same {
-                continue;
-            }
-            res.push((i, j));
-        }
-    }
-    res
-}
-
-
 
 #[test]
 fn test_controller() {
@@ -50,6 +36,7 @@ fn test_controller() {
                 .len()
         );
     }
+    // TODO: make it to assertion
 } // WORKS 2023-03-28 20:13:33
 
 #[test]

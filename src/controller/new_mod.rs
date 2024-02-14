@@ -3,7 +3,6 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Description:
 //    a new controller implementation that supports multiple hash types
-// 
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
 

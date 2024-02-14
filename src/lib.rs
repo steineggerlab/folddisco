@@ -27,7 +27,7 @@ pub struct MotifSearch {
     pub controller: controller::Controller,
 }
 
-pub fn run() {}
+
 
 pub mod prelude {
     pub use crate::controller::Controller;

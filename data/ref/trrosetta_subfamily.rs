@@ -26,6 +26,33 @@ use std::hash::Hasher;
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(u64);
 
+
+impl GeometricHash for HashValue {
+    fn perfect_hash(&self, feature: Vec<f32>) -> Self {
+        let cb_dist = feature[0];
+        let omega = feature[1];
+        let theta1 = feature[2];
+        let theta2 = feature[3];
+        let phi1 = feature[4];
+        let phi2 = feature[5];
+        HashValue::perfect_hash(cb_dist, omega, theta1, theta2, phi1, phi2)
+    }
+    fn reverse_hash(&self, hash: u64) -> Vec<f32> {
+        let values = self.reverse_hash();
+        vec![
+            continuize_value(values[0] as u64, 2.0, 20.0, 16.0),
+            continuize_value(values[1] as u64, -1.0, 1.0, 4.0),
+            continuize_value(values[2] as u64, -1.0, 1.0, 8.0),
+            continuize_value(values[3] as u64, -1.0, 1.0, 8.0),
+            continuize_value(values[4] as u64, 0.0, 180.0, 16.0),
+            continuize_value(values[5] as u64, 0.0, 180.0, 16.0),
+        ]
+    }
+    fn hash_type(&self) -> HashType {
+        HashType::TRRosettaHash
+    }
+}
+
 impl HashValue {
     pub fn from_u64(hashvalue: u64) -> Self {
         HashValue(hashvalue)
@@ -167,35 +194,3 @@ pub fn continuize_value(val: u64, min: f32, max: f32, num_bin: f32) -> f32 {
 pub fn normalize_angle_degree(val: f32, min: f32, max: f32) -> f32 {
     (val - min) / (max - min)
 }
-
-// impl GeometricHash for HashValue {
-//     fn from_u64(hash: u64) -> Self {
-//         HashValue(hash)
-//     }
-//     fn to_u64(&self) -> u64 {
-//         self.0
-//     }
-//     fn perfect_hash(&self, feature: Vec<f32>) -> u64 {
-//         let cb_dist = feature[0];
-//         let omega = feature[1];
-//         let theta1 = feature[2];
-//         let theta2 = feature[3];
-//         let phi1 = feature[4];
-//         let phi2 = feature[5];
-//         HashValue::perfect_hash(cb_dist, omega, theta1, theta2, phi1, phi2).0
-//     }
-//     fn reverse_hash(&self, hash: u64) -> Vec<f32> {
-//         let values = self.reverse_hash();
-//         vec![
-//             continuize_value(values[0] as u64, 2.0, 20.0, 16.0),
-//             continuize_value(values[1] as u64, -1.0, 1.0, 4.0),
-//             continuize_value(values[2] as u64, -1.0, 1.0, 8.0),
-//             continuize_value(values[3] as u64, -1.0, 1.0, 8.0),
-//             continuize_value(values[4] as u64, 0.0, 180.0, 16.0),
-//             continuize_value(values[5] as u64, 0.0, 180.0, 16.0),
-//         ]
-//     }
-//     fn hash_type(&self) -> HashType {
-//         HashType::TRRosettaHash
-//     }
-// }

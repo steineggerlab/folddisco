@@ -148,17 +148,3 @@ impl fmt::Display for HashValue {
 
 pub type HashCollection = Vec<HashValue>;
 
-pub fn discretize_value(val: f32, min: f32, max: f32, num_bin: f32) -> u64 {
-    let cont_f = (max - min) / (num_bin - 1.0_f32);
-    let disc_f = 1.0_f32 / cont_f;
-    (val * (disc_f) + 0.5) as u64
-}
-
-pub fn continuize_value(val: u64, min: f32, max: f32, num_bin: f32) -> f32 {
-    let cont_f = (max - min) / (num_bin - 1.0_f32);
-    (val as f32) * (cont_f)
-}
-
-pub fn normalize_angle_degree(val: f32, min: f32, max: f32) -> f32 {
-    (val - min) / (max - min)
-}

@@ -20,23 +20,32 @@
 // Dihedral 16 bins = 22.5 degree; u8 * 3
 // Planar 8 bins = 22.5 degree; u8 * 2
 // 16^5 * 20;
-
+ 
 use std::fmt;
-use std::hash::Hasher;
+use crate::geometry::core::GeometricHash;
+use crate::geometry::core::HashType;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(u64);
 
+impl GeometricHash for HashValue {
+    fn perfect_hash(feature: Vec<f32>) -> Self {
+        let res1 = feature[0] as u64;
+        let res2 = feature[1] as u64;
+        HashValue::perfect_hash(
+            res1, res2, feature[2], feature[3],
+            feature[4], feature[5], feature[6], feature[7]
+        )
+    }
+    fn reverse_hash(&self) -> Vec<f32> {
+        self.reverse_hash().to_vec()
+    }
+    fn hash_type(&self) -> super::core::HashType {
+        HashType::FoldDiscoDefault
+    }
+}
+
 impl HashValue {
-    pub fn from_u64(hashvalue: u64) -> Self {
-        HashValue(hashvalue)
-    }
-    pub fn as_u64(&self) -> u64 {
-        self.0
-    }
-    pub fn as_usize(&self) -> usize {
-        self.0 as usize
-    }
 
     pub fn perfect_hash(
         res1: u64, res2: u64, 
@@ -101,6 +110,17 @@ impl HashValue {
         ]
     }
     
+    pub fn from_u64(hashvalue: u64) -> Self {
+        HashValue(hashvalue)
+    }
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
+
+    
     pub fn neighbors(&self, include_self: bool) -> Vec<HashValue> {
         let mut neighbors = Vec::new();
         // Get neighbors for each feature
@@ -130,18 +150,7 @@ impl HashValue {
         }
         neighbors
     }
-    
 }
-
-// impl Hasher for HashValue {
-//     fn finish(&self) -> u64 {
-//         self.0
-//     }
-
-//     fn write(&mut self, _bytes: &[u8]) {
-//         unimplemented!()
-//     }
-// }
 
 impl fmt::Debug for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -177,4 +186,57 @@ pub fn continuize_value(val: u64, min: f32, max: f32, num_bin: f32) -> f32 {
 
 pub fn normalize_angle_degree(val: f32, min: f32, max: f32) -> f32 {
     (val - min) / (max - min)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_discretize_value() {
+        let val = 1.0;
+        let min = 0.0;
+        let max = 2.0;
+        let num_bin = 3.0;
+        let res = discretize_value(val, min, max, num_bin);
+        assert_eq!(res, 1);
+    }
+    #[test]
+    fn test_continuize_value() {
+        let val = 1;
+        let min = 0.0;
+        let max = 2.0;
+        let num_bin = 3.0;
+        let res = continuize_value(val, min, max, num_bin);
+        assert_eq!(res, 1.0);
+    }
+    #[test]
+    fn test_perfect_hash() {
+        let res1 = 1;
+        let res2 = 2;
+        let cb_dist = 10.0;
+        let omega = 0.0;
+        let theta1 = 0.0;
+        let theta2 = 0.0;
+        let phi1 = 0.0;
+        let phi2 = 0.0;
+        let hash = HashValue::perfect_hash(res1, res2, cb_dist, omega, theta1, theta2, phi1, phi2);
+        let values = hash.reverse_hash();
+        assert_eq!(values[0], 1.0);
+        assert_eq!(values[1], 10.0);
+        assert_eq!(values[2], 0.0);
+        assert_eq!(values[3], 0.0);
+        assert_eq!(values[4], 0.0);
+        assert_eq!(values[5], 0.0);
+    }
+    #[test]
+    fn test_reverse_hash() {
+        let hash = HashValue(0x0000000000000000);
+        let values = hash.reverse_hash();
+        assert_eq!(values[0], 0.0);
+        assert_eq!(values[1], 0.0);
+        assert_eq!(values[2], 0.0);
+        assert_eq!(values[3], 0.0);
+        assert_eq!(values[4], 0.0);
+        assert_eq!(values[5], 0.0);
+    }
 }

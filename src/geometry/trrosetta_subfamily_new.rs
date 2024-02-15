@@ -1,4 +1,5 @@
 // Geometric features from trRosetta paper
+// IMPORTANT: Keep this without amino acid information. Let's compare with other methods
 // https://doi.org/10.1073/pnas.1914677117
 // Paper bin size: 0.5A, 15 degree
 // Original Features
@@ -19,7 +20,6 @@
 // 16^5 * 20;
 
 use std::fmt;
-use std::hash::Hasher;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(u64);

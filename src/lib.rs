@@ -31,7 +31,7 @@ pub struct MotifSearch {
 
 pub mod prelude {
     pub use crate::controller::Controller;
-    pub use crate::geometry::trrosetta_subfamily::{HashCollection, HashValue};
+    pub use crate::geometry::trrosetta_subfamily_new::{HashCollection, HashValue};
     pub use crate::index::builder::IndexBuilder;
     pub use crate::index::query_multiple_with_neighbors;
     pub use crate::index::{IndexTablePrinter, query_single, query_multiple};

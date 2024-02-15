@@ -3,7 +3,7 @@ use crate::structure::coordinate::{approx_cb, CarbonCoordinateVector, Coordinate
 use crate::structure::feature::{Torsion, TorsionType};
 use crate::utils::calculator::Calculate;
 
-use crate::structure::coordinate::{calc_angle_point, calc_torsion_angle};
+use crate::structure::coordinate::{calc_angle_point, calc_cos2_torsion_angle};
 
 use super::coordinate::{calc_torsion_radian, calc_angle_radian};
 
@@ -344,9 +344,9 @@ impl CompactStructure {
             (ca1, ca2, cb1, cb2, n1, n2)
         {
             let cb_dist = cb1.calc_distance(&cb2);
-            let omega = calc_torsion_angle(&ca1, &cb1, &cb2, &ca2);
-            let theta1 = calc_torsion_angle(&n1, &ca1, &cb1, &cb2);
-            let theta2 = calc_torsion_angle(&cb1, &cb2, &ca2, &n2);
+            let omega = calc_cos2_torsion_angle(&ca1, &cb1, &cb2, &ca2);
+            let theta1 = calc_cos2_torsion_angle(&n1, &ca1, &cb1, &cb2);
+            let theta2 = calc_cos2_torsion_angle(&cb1, &cb2, &ca2, &n2);
             let phi1 = calc_angle_point(&ca1, &cb1, &cb2);
             let phi2 = calc_angle_point(&cb1, &cb2, &ca2);
             let feature = [cb_dist, omega, theta1, theta2, phi1, phi2];

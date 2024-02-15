@@ -10,7 +10,7 @@ use crate::geometry::core::GeometricHash;
 // use crate::geometry::triad_hash::{HashCollection, HashValue};
 // use crate::geometry::ppf::{HashCollection, HashValue};
 // use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
-use crate::geometry::trrosetta_subfamily::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
+use crate::geometry::trrosetta_subfamily_new::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
 // use crate::geometry::aa_pair::{HashCollection, HashValue, discretize_value, map_aa_to_u8};
 // use crate::geometry::trrosetta_reduced::*;
 use crate::index::builder::IndexBuilder;
@@ -23,7 +23,6 @@ pub struct Controller {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
     pub hash_collection_vec: Vec<HashCollection>,
-    pub hash_new_collection_vec: Vec<crate::geometry::two_float::HashCollection>, // WARNING: TEMPORARY
     pub res_pair_vec: Vec<Vec<(u64, u64, [u8; 3], [u8; 3])>>, // WARNING: TEMPORARY
     pub remove_redundancy: bool,
     pub num_threads_file: usize,
@@ -36,7 +35,7 @@ impl Controller {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
             hash_collection_vec: Vec::new(),
-            hash_new_collection_vec: Vec::new(),
+            // hash_new_collection_vec: Vec::new(),
             res_pair_vec: Vec::new(), // WARNING: TEMPORARY
             remove_redundancy: false,
             num_threads_file: 3,
@@ -84,7 +83,8 @@ impl Controller {
             let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
             let structure = pdb_reader.read_structure().expect("structure read failed");
             let compact = structure.to_compact();
-            let mut hash_collector = GeometryHashCollector::new();
+            // let mut hash_collector = GeometryHashCollector::new();
+            let mut hash_collector = HashCollection::new();
 
             let mut res_pairs: Vec<(u64, u64, [u8; 3], [u8; 3])> = Vec::new(); // WARNING: TEMPORARY
 
@@ -109,6 +109,7 @@ impl Controller {
                     let hash_value =
                         HashValue::perfect_hash(
                             // compact.residue_serial[n], compact.residue_serial[m],
+                            0, 0, // IMPORTANT: WARNING: 
                             trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                         );
                     // let hash_value = GeometricHash::perfect_hash(trr);
@@ -122,16 +123,17 @@ impl Controller {
                     // let res1_u8 = map_aa_to_u8(&res1_str);
                     // let res2_u8 = map_aa_to_u8(&res2_str);
                     // let hash_value = HashValue::perfect_hash(res1_u8, res2_u8, n as usize, m as usize, trr[0]);
-                    hash_collector.collect_hash(hash_value);
+                    hash_collector.push(hash_value);
                     
                     res_pairs.push((res1, res2, res1_str, res2_str));
                 }
             }
             if self.remove_redundancy {
-                hash_collector.remove_redundancy();
+                hash_collector.sort();
+                hash_collector.dedup();
             }
             self.hash_collection_vec
-                .push(hash_collector.hash_collection);
+                .push(hash_collector);
             self.res_pair_vec.push(res_pairs); // For debug
         }
         // TEMPORARY
@@ -179,7 +181,7 @@ impl Controller {
                     let logdist = ((n as i32 - m as i32).abs() + 1).ilog2();
                     let hash_value =
                         HashValue::perfect_hash(
-                            // res1, res2,
+                            res1, res2,
                             trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                         );
 
@@ -231,13 +233,13 @@ impl Controller {
         let mut file = std::fs::File::create(path).expect("Unable to create file");
         file.write_all(b"hash\tval1\tval2\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
             .expect("Unable to write header");
-        println!("{}", self.hash_new_collection_vec.len());
-        for i in 0..self.hash_new_collection_vec.len() {
+        println!("{}", self.hash_collection_vec.len());
+        for i in 0..self.hash_collection_vec.len() {
             let pdb_path = &self.path_vec[i];
             // let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
             // println!("Saving to {}", new_path);
             // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header"); // ppf
-            let hash_collection = &self.hash_new_collection_vec[i];
+            let hash_collection = &self.hash_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
             println!(
                 "{}: {} hashes, {} pairs",
@@ -268,12 +270,12 @@ impl Controller {
         file.write_all(b"hash\tval1\tval2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
             .expect("Unable to write header");
         // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
-        for i in 0..self.hash_new_collection_vec.len() {
+        for i in 0..self.hash_collection_vec.len() {
             let pdb_path = self.path_vec[i].split("/").last().unwrap();
             if !res_pair_filter.contains_key(pdb_path) {
                 continue;
             }
-            let hash_collection = &self.hash_new_collection_vec[i];
+            let hash_collection = &self.hash_collection_vec[i];
             let res_pair_vec = &self.res_pair_vec[i];
             println!(
                 "Saving filtered {}: {} hashes, {} pairs",
@@ -362,6 +364,7 @@ fn par_get_feature_per_structure(pdb_path: &String, num_threads: usize) -> Vec<H
                 }
                 let hash_value = HashValue::perfect_hash(
                     // compact.residue_serial[n], compact.residue_serial[m],
+                    0, 0,
                     trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                 );
                 hash_value

@@ -4,7 +4,6 @@ pub mod alloc;
 pub mod builder;
 pub mod index_table;
 pub mod lookup;
-pub mod delta;
 pub mod io;
 
 pub mod new_alloc;

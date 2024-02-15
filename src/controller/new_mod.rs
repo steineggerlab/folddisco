@@ -5,7 +5,6 @@
 //    a new controller implementation that supports multiple hash types
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-
 use std::io::Write;
 
 // External imports
@@ -121,9 +120,7 @@ fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
     res
 }
 
-pub fn get_geometric_hash_from_structure<H: GeometricHash>(
-    structure: &CompactStructure, hash_type: HashType
-) -> Vec<H> {
+pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType) -> Vec<GeometricHash> {
     let mut hash_vec = Vec::new();
 
     let res_bound = get_all_combination(
@@ -131,6 +128,7 @@ pub fn get_geometric_hash_from_structure<H: GeometricHash>(
     );
 
     res_bound.iter().for_each(|(i, j)| {
+        let feature =
         match hash_type {
             HashType::PDBMotif => {
                 
@@ -142,7 +140,8 @@ pub fn get_geometric_hash_from_structure<H: GeometricHash>(
                     );
                     hash_vec.push(hash);
                 }
-                hash_vec.push(hash);
+                // hash_vec.push(hash);
+                vec![0.0_f32, 0.0_f32]
             },
             HashType::FoldDiscoDefault => {
                 let feature = structure.get_trrosetta_feature2(*i, *j);
@@ -155,7 +154,7 @@ pub fn get_geometric_hash_from_structure<H: GeometricHash>(
         }
         
         
-        let hash = H::perfect_hash(feature);
+        let hash = GeometricHash::perfect_hash(feature, hash_type);
         hash_vec.push(hash);
     });
     

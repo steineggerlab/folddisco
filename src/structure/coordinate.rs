@@ -154,7 +154,7 @@ pub fn approx_cb(ca: &Coordinate, n: &Coordinate, c: &Coordinate) -> Coordinate 
     cb
 }
 
-pub fn calc_torsion_angle(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate) -> f32 {
+pub fn calc_cos2_torsion_angle(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate) -> f32 {
     let v1 = b.sub(a);
     let v2 = c.sub(b);
     let v3 = d.sub(c);
@@ -227,7 +227,7 @@ impl CoordinateVector {
             y: d_y,
             z: d_z,
         };
-        calc_torsion_angle(&a, &b, &c, &d)
+        calc_cos2_torsion_angle(&a, &b, &c, &d)
     }
 
     pub fn calc_all_torsion_angles(&self) -> Vec<f32> {
@@ -321,7 +321,7 @@ impl CarbonCoordinateVector {
             z: d_z.unwrap(),
         };
 
-        Some(calc_torsion_angle(&a, &b, &c, &d))
+        Some(calc_cos2_torsion_angle(&a, &b, &c, &d))
     }
 
     pub fn calc_all_torsion_angles(&self) -> Vec<Option<f32>> {
@@ -409,7 +409,7 @@ mod coordinate_tests {
         };
 
         let actual_phi = -71.21515;
-        let test_phi = calc_torsion_angle(&a, &b, &c, &d);
+        let test_phi = calc_cos2_torsion_angle(&a, &b, &c, &d);
 
         println!("actual_phi: {:?}", actual_phi);
         println!("test_phi: {:?}", test_phi);

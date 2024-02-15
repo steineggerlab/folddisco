@@ -91,6 +91,7 @@ pub fn build_index(env: AppArgs) {
                                 }
                                 let hash_value = HashValue::perfect_hash(
                                     // compact.residue_serial[n] as u64, compact.residue_serial[m] as u64,
+                                    0, 0, // TEMP, IMPORTANT: WARNING: ERASE THIS 
                                     trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
                                 );
                                 hash_value.as_u64()

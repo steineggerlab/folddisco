@@ -300,6 +300,10 @@ impl CompactStructure {
         let feature = vec![ca_dist, cb_dist, angle];
         feature
     }
+    
+    pub fn get_res_name(&self, idx: usize) -> &[u8; 3] {
+        &self.residue_name[idx]
+    }
 
     pub fn get_res_serial(&self, idx1: usize, idx2: usize) -> (u64, u64) {
         (self.residue_serial[idx1], self.residue_serial[idx2])
@@ -350,6 +354,29 @@ impl CompactStructure {
             let phi1 = calc_angle_point(&ca1, &cb1, &cb2);
             let phi2 = calc_angle_point(&cb1, &cb2, &ca2);
             let feature = [cb_dist, omega, theta1, theta2, phi1, phi2];
+            Some(feature)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_default_feature(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
+        let ca1 = self.get_ca(idx1);
+        let ca2 = self.get_ca(idx2);
+        let cb1 = self.get_cb(idx1);
+        let cb2 = self.get_cb(idx2);
+        let n1 = self.get_n(idx1);
+        let n2 = self.get_n(idx2);
+        if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2)) =
+            (ca1, ca2, cb1, cb2, n1, n2)
+        {
+            let cb_dist = cb1.calc_distance(&cb2);
+            let omega = calc_torsion_radian(&ca1, &cb1, &cb2, &ca2);
+            let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
+            let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
+            let phi1 = calc_angle_radian(&ca1, &cb1, &cb2);
+            let phi2 = calc_angle_radian(&cb1, &cb2, &ca2);
+            let feature = vec![cb_dist, omega, theta1, theta2, phi1, phi2];
             Some(feature)
         } else {
             None

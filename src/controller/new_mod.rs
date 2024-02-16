@@ -12,23 +12,27 @@ use dashmap::DashMap;
 use rayon::prelude::*;
 
 // Internal imports
-use crate::PDBReader;
+use crate::{PDBReader, HashableSync};
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::index::new_alloc::{ IndexBuilder, HashableSync };
+use crate::geometry::util::map_aa_to_u8;
+use crate::index::new_alloc::IndexBuilder;
 use crate::structure::core::CompactStructure;
 use crate::utils::log::{ log_msg, INFO, FAIL, WARN, DONE };
 
-pub struct FoldDisco<K: HashableSync> {
+use super::io::convert_hashmap_to_offset_and_values;
+
+pub struct FoldDisco {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
-    pub hash_collection: Vec<Vec<K>>,
-    pub index_builder: IndexBuilder<K, usize>,
+    pub hash_collection: Vec<Vec<GeometricHash>>,
+    pub index_builder: IndexBuilder<usize, GeometricHash>,
     pub remove_redundancy: bool,
     pub num_threads: usize,
+    pub output_path: String,
 }
 
-impl<K: HashableSync> FoldDisco<K> {
-    pub fn new(path_vec: Vec<String>) -> FoldDisco<K> {
+impl FoldDisco {
+    pub fn new(path_vec: Vec<String>) -> FoldDisco {
         FoldDisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
@@ -36,7 +40,11 @@ impl<K: HashableSync> FoldDisco<K> {
             index_builder: IndexBuilder::empty(),
             remove_redundancy: false,
             num_threads: 4,
+            output_path: String::new(),
         }
+    }
+    pub fn set_output_path(&mut self, output_path: String) {
+        self.output_path = output_path;
     }
 
     pub fn collect_hash(&mut self) {
@@ -57,7 +65,7 @@ impl<K: HashableSync> FoldDisco<K> {
                         log_msg(FAIL, "Failed to read structure").as_str()
                     );
                     let hash_vec = get_geometric_hash_from_structure(
-                        &compact, HashType::FoldDiscoDefault
+                        &compact.to_compact(), HashType::FoldDiscoDefault
                     );
                     // Drop intermediate variables
                     drop(compact);
@@ -65,7 +73,7 @@ impl<K: HashableSync> FoldDisco<K> {
                     hash_vec
                 })
             })
-            .collect::<Vec<Vec<K>>>();
+            .collect::<Vec<Vec<GeometricHash>>>();
         self.hash_collection = output;
     }
 
@@ -83,7 +91,9 @@ impl<K: HashableSync> FoldDisco<K> {
         allocation_size
     }
 
-    pub fn save_raw_feature(&mut self, path: &str, discretize: bool) {}
+    pub fn save_raw_feature(&mut self, path: &str, discretize: bool) {
+        todo!("Implement save_raw_feature method!!!");
+    }
 
     pub fn fill_numeric_id_vec(&mut self) {
         string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
@@ -99,6 +109,27 @@ impl<K: HashableSync> FoldDisco<K> {
                 .expect("Unable to write data");
         }
     }
+    
+    pub fn set_index_table(&mut self) {
+        let mut index_builder = IndexBuilder::new(
+            &self.numeric_id_vec, &self.hash_collection,
+            self.num_threads, self.get_allocation_size(),
+            format!("{}.offset", self.output_path), // offset file path
+            format!("{}.index", self.output_path), // data file path
+        );
+        self.index_builder = index_builder;
+    }
+    
+    // TODO: IMPORTANT:
+    // pub fn fill_index_table(&mut self) {
+    //     let index_map = self.index_builder.fill_and_return_dashmap()
+    //     let (offset_map, value_vec) = convert_hashmap_to_offset_and_values(index_map);
+    // }
+    
+    // pub fn save_index_table(&self) {
+    //     self.index_builder.save();
+    // }
+    
 }
 
 fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut Vec<usize>) {
@@ -121,55 +152,64 @@ fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
 }
 
 pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType) -> Vec<GeometricHash> {
-    let mut hash_vec = Vec::new();
-
     let res_bound = get_all_combination(
         structure.num_residues, false
     );
+    let mut hash_vec = Vec::new();
 
     res_bound.iter().for_each(|(i, j)| {
-        let feature =
-        match hash_type {
+        // Get residue name and convert to f32
+        let res1 = structure.get_res_name(*i);
+        let res2 = structure.get_res_name(*j);
+        let res1 = map_aa_to_u8(res1) as f32;
+        let res2 = map_aa_to_u8(res2) as f32;
+        
+        let feature = match &hash_type {
             HashType::PDBMotif => {
-                
-                let dist = structure.get_distance(*i, *j);
-                let angle = structure.get_angle(*i, *j);
-                if dist.is_some() && angle.is_some() {
-                    let hash = HashType::perfect_hash(
-                        vec![dist.unwrap(), angle.unwrap()]
-                    );
-                    hash_vec.push(hash);
+                let ca_dist = structure.get_ca_distance(*i, *j);
+                let cb_dist = structure.get_cb_distance(*i, *j);
+                let ca_cb_angle = structure.get_ca_cb_angle(*i, *j); // degree
+                if ca_dist.is_some() && cb_dist.is_some() && ca_cb_angle.is_some() {
+                    let feature = vec![
+                        res1, res2, ca_dist.unwrap(), cb_dist.unwrap(), ca_cb_angle.unwrap()
+                    ];
+                    feature
+                } else {
+                    vec![0.0; 5]
                 }
-                // hash_vec.push(hash);
-                vec![0.0_f32, 0.0_f32]
             },
             HashType::FoldDiscoDefault => {
-                let feature = structure.get_trrosetta_feature2(*i, *j);
-                let hash = H::perfect_hash(feature);
-                hash_vec.push(hash);
+                let feature = structure.get_default_feature(*i, *j);
+                if feature.is_some() {
+                    // Concatenate res1 and res2 to the feature
+                    let mut feature = feature.unwrap();
+                    feature.insert(0, res1);
+                    feature.insert(1, res2);
+                    feature
+                } else {
+                    vec![0.0; 8]
+                }
             },
             _ => {
-                unimplemented!();
+                todo!("Implement feature-collection methods for other hash types here");
             }
-        }
-        
-        
+        };
         let hash = GeometricHash::perfect_hash(feature, hash_type);
         hash_vec.push(hash);
     });
     
-
     hash_vec
 }
 
-
-
-
 //
 
+                        // // Filter out invalid residue pairs & deduplicate
+                        // hash_collection.sort_unstable();
+                        // hash_collection.dedup();
+                        
+                        // // drop unnecessary variables
+                        // drop(compact);
+                        // drop(pdb_reader);
+                        // hash_collection.shrink_to_fit();
+// let (offset_table, value_vec) = convert_hashmap_to_offset_and_values(index_table);
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-}

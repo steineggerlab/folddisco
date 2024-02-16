@@ -1,7 +1,6 @@
 //! # About project
 //!
 //! Motifsearch is a tool for finding discontinuous motifs in protein structures.
-
 //! # Things to keep in mind when developing
 //! * No dependencies between huge modules
 //!   * geometry ←→ structure ←→ index
@@ -11,6 +10,8 @@
 //!   * Unit tests at source files
 //!   * Integration tests at `tests/`
 
+use std::hash::Hash;
+use std::fmt::Debug;
 pub mod cli;
 pub mod controller;
 pub mod geometry;
@@ -26,6 +27,21 @@ pub struct MotifSearch {
     // pub pdb_table: HashMap<index, PDB>,
     pub controller: controller::Controller,
 }
+
+// Declare a new trait that supports required traits
+pub trait HashableSync: Clone + Copy + Hash + Sync + Send + Eq + PartialEq + Ord + Debug + 'static {}
+
+impl HashableSync for usize {}
+impl HashableSync for u64 {}
+impl HashableSync for u32 {}
+impl HashableSync for u16 {}
+impl HashableSync for u8 {}
+impl HashableSync for isize {}
+impl HashableSync for i64 {}
+impl HashableSync for i32 {}
+impl HashableSync for i16 {}
+impl HashableSync for i8 {}
+impl HashableSync for char {}
 
 
 

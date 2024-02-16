@@ -3,7 +3,9 @@
 // Description: Core geometric hash enum and types
 
 use std::fmt;
+use crate::HashableSync;
 
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum HashType {
     PDBMotif,
     PDBMotifSinCos,
@@ -11,11 +13,14 @@ pub enum HashType {
     Other,
 }
 
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum GeometricHash {
     PDBMotif(super::pdb_motif::HashValue),
     PDBMotifSinCos(super::pdb_motif_sincos::HashValue),
     FoldDiscoDefault(super::default::HashValue),
 }
+
+impl HashableSync for GeometricHash {}
 
 impl GeometricHash {
     pub fn perfect_hash(feature: Vec<f32>, hash_type: HashType) -> Self {

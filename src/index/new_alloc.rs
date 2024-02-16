@@ -16,24 +16,10 @@ use std::thread;
 use std::hash::Hash;
 // Measure time
 use crate::measure_time;
+use crate::HashableSync;
 
 const DEFAULT_NUM_THREADS: usize = 4;
 const DEFAULT_ALLOCATION_SIZE: usize = 1024;
-
-// Declare a new trait that supports required traits
-pub trait HashableSync: Clone + Copy + Hash + Sync + Send + Eq + PartialEq + Ord + 'static {}
-
-impl HashableSync for usize {}
-impl HashableSync for u64 {}
-impl HashableSync for u32 {}
-impl HashableSync for u16 {}
-impl HashableSync for u8 {}
-impl HashableSync for isize {}
-impl HashableSync for i64 {}
-impl HashableSync for i32 {}
-impl HashableSync for i16 {}
-impl HashableSync for i8 {}
-impl HashableSync for char {}
 
 pub struct HugeAllocation<T: HashableSync> {
     pub allocation: UnsafeCell<Vec<T>>,
@@ -83,7 +69,7 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
     
     // Constructor
     pub fn new(
-        ids: Vec<K>, data: Vec<Vec<V>>,
+        ids: &Vec<K>, data: &Vec<Vec<V>>,
         num_threads: usize, allocation_size: usize,
         offset_path: String, data_path: String,
     ) -> IndexBuilder<K, V> {
@@ -97,8 +83,8 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         IndexBuilder {
             offset: DashMap::new(),
             allocation: Arc::new(HugeAllocation::new(allocation_size)),
-            ids: Arc::new(ids),
-            data: Arc::new(data),
+            ids: Arc::new(ids.to_owned()),
+            data: Arc::new(data.to_owned()),
             data_dashmap: Arc::new(DashMap::new()),
             num_threads,
             allocation_size,
@@ -204,6 +190,34 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
             handle.join().unwrap();
         }
     }
+
+    pub fn fill_and_return_dashmap(&mut self) -> DashMap<K, Vec<V>>  {
+        let output = Arc::new(DashMap::new());
+        let mut handles = vec![];
+        let data_index = Arc::new(AtomicUsize::new(0));
+        for _ in 0..self.num_threads {
+            // Clone Arcs to move into threads
+            let data = self.data.clone();   
+            let ids = self.ids.clone();
+            let data_index = data_index.clone();
+            let output_ref_inner = output.clone();
+            let handle = thread::spawn(move || {
+                while data_index.load(Ordering::Relaxed) < data.len() {
+                    let data_index = data_index.fetch_add(1, Ordering::Relaxed);
+                    if data_index >= data.len() {
+                        break;
+                    }
+                    let data_inner = &data[data_index];
+                    output_ref_inner.insert(ids[data_index], data_inner.clone());
+                }
+            });
+            handles.push(handle);
+        }
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        Arc::try_unwrap(output).unwrap()
+    }
     
     
     // Allocate memory with allocation size
@@ -242,9 +256,31 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         }
         
     }
+
+    pub fn convert_hashmap_to_offset_and_values(
+        orig_map: DashMap<u64, Vec<u64>>
+    ) -> (FxHashMap<u64, (usize, usize)>, Vec<u64>) {
+        // OffsetMap - key: hash, value: (offset, length)
+        // Vec - all values concatenated
+        let mut offset_map = FxHashMap::default();
+         let mut vec: Vec<u64> = Vec::new();
+         let mut offset: usize = 0;
+         for (key, value) in orig_map {
+             offset_map.insert(key, (offset, value.len()));
+             offset += value.len();
+             vec.extend(value);
+         }
+         (offset_map, vec)
+    }
+
+
     // fn fill_inner
     // Write dashmap to file
     // pub fn 
+
+    
+    
+    
     
 }
 
@@ -271,7 +307,7 @@ mod tests {
         let data = create_test_data(40000, 10000);
         let ids = (0..40000).collect::<Vec<usize>>();
         let index_builder = IndexBuilder::new(
-            ids, data, 6, 1000, String::from(""), String::from("")
+            &ids, &data, 6, 1000, String::from(""), String::from("")
         );
         measure_time!(assert_eq!(index_builder.estimate_size(), 40000 * 10000));
     }
@@ -281,7 +317,7 @@ mod tests {
         let data = create_test_data(40000, 10000);
         let ids = (0..40000).collect::<Vec<usize>>();
         let mut index_builder = IndexBuilder::new(
-            ids, data, 6, 1000, String::from(""), String::from("")
+            &ids, &data, 6, 1000, String::from(""), String::from("")
         );
         measure_time!(index_builder.fill_with_dashmap());
         assert_eq!(index_builder.data_dashmap.len(), 40000);
@@ -293,7 +329,7 @@ mod tests {
         let data = create_test_data(40000, 10000);
         let ids = (0..40000).collect::<Vec<usize>>();
         let mut index_builder = IndexBuilder::new(
-            ids, data, 6, 1000, String::from(""), String::from("")
+            &ids, &data, 6, 1000, String::from(""), String::from("")
         );
         index_builder.fill_offset_map();
         assert_eq!(index_builder.offset.len(), 40000);

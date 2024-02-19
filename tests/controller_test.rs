@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use motifsearch::controller::{self, Controller};
 use motifsearch::controller::new_mod::FoldDisco;
+use motifsearch::geometry::core::HashType;
 // use motifsearch::geometry::trrosetta::{HashCollection, HashValue};
 // use motifsearch::geometry::trrosetta_subfamily::{HashCollection, HashValue};
 // use motifsearch::geometry::aa_pair::{HashCollection, HashValue};
@@ -12,6 +13,7 @@ use motifsearch::index::query_multiple_with_neighbors;
 use motifsearch::index::{IndexTablePrinter, query_single, query_multiple};
 use motifsearch::PDBReader;
 use motifsearch::index::index_table;
+use motifsearch::measure_time;
 
 use rayon::prelude::*;
 
@@ -19,21 +21,46 @@ mod common;
 use common::loader;
 
 #[test]
-fn test_fold_disco() {
-    let pdb_paths = loader::load_homeobox_toy();
+fn test_folddisco_default() {
+    // Test if the default hashing schemes are working
+    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
     let mut fold_disco = FoldDisco::new(pdb_paths);
+    measure_time!(fold_disco.collect_hash());
+    fold_disco.fill_numeric_id_vec();
+    for i in 0..fold_disco.hash_collection.len() {
+        println!(
+            "{:?} | {:?} | {:?} hashes | {:?}",
+            fold_disco.numeric_id_vec.get(i).unwrap(),
+            fold_disco.path_vec.get(i).unwrap(),
+            fold_disco.hash_collection.get(i).unwrap_or(&Vec::new()).len(),
+            fold_disco.hash_collection.get(i).unwrap().get(0).unwrap(), 
+        );
+    }
+    measure_time!(fold_disco.set_index_table());
+    measure_time!(fold_disco.fill_index_table());
+}
+
+#[test]
+fn test_folddisco_pdbmotif() {
+    // Test if the default hashing schemes are working
+    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotif);
     fold_disco.collect_hash();
     fold_disco.fill_numeric_id_vec();
     for i in 0..fold_disco.hash_collection.len() {
         println!(
-            "{:?} | {:?} | {:?} hashes",
+            "{:?} | {:?} | {:?} hashes | {:?}",
             fold_disco.numeric_id_vec.get(i).unwrap(),
             fold_disco.path_vec.get(i).unwrap(),
             fold_disco.hash_collection.get(i).unwrap_or(&Vec::new()).len(),
+            fold_disco.hash_collection.get(i).unwrap().get(0).unwrap(), 
         );
     }
-    
+    fold_disco.set_index_table();
+    fold_disco.fill_index_table();
 }
+
+
 
 
 

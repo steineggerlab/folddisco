@@ -13,11 +13,11 @@ use crate::geometry::util::continuize_u64_value_into_f32 as continuize_value;
 // 1. for cb_dist
 const MIN_DIST: f32 = 2.0;
 const MAX_DIST: f32 = 20.0;
-const NBIN_DIST: f32 = 16.0;
+const NBIN_DIST: f32 = 8.0;
 // 2. NEW IDEA for encoding angles; represent as sin and cos
 const MIN_SIN_COS: f32 = -1.0;
 const MAX_SIN_COS: f32 = 1.0;
-const NBIN_SIN_COS: f32 = 6.0;
+const NBIN_SIN_COS: f32 = 5.0;
 // Bitmasks
 const BITMASK64_4BIT: u64 = 0x000000000000000F;
 const BITMASK64_5BIT: u64 = 0x000000000000001F;

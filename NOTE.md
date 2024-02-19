@@ -33,7 +33,7 @@
   - [ ] unit test (object level)
     - [x] geometry: pdb_motif, default
     - [ ] controller
-      - [ ] hashing with pdb_motif
+      - [x] hashing with pdb_motif
       - [x] hashing with default
       - [ ] indexing
       - [ ] querying
@@ -56,7 +56,7 @@
 
 <!-- https://stats.stackexchange.com/questions/218407/encoding-angle-data-for-neural-network -->
 
-> 2024-02-16 19:27:55
+> 2024-02-16 19:27:55 Integration of geometry is done
 ```sh
     Finished test [optimized + debuginfo] target(s) in 0.63s
      Running tests/controller_test.rs (target/debug/deps/controller_test-28fe139faa771367)

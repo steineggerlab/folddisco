@@ -3,19 +3,21 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
+use rayon::iter::ParallelIterator;
 // external crates
 use rustc_hash::{FxHashMap, FxHashSet};
 use dashmap::DashMap;
 
 use std::collections::BTreeMap;
 // 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::hash::Hash;
 // Measure time
 use crate::measure_time;
+use crate::structure::atom::Atom;
 use crate::HashableSync;
 
 const DEFAULT_NUM_THREADS: usize = 4;
@@ -41,7 +43,7 @@ pub struct IndexBuilder<K: HashableSync, V: HashableSync> {
     pub data: Arc<Vec<Vec<V>>>,
     // Alternatively, sort with dashmap and save it. 
     // This will be tested with allocating approach
-    pub data_dashmap: Arc<DashMap<K, Vec<V>>>,
+    pub data_dashmap: Arc<DashMap<V, Vec<K>>>,
     // Configurations
     pub num_threads: usize,
     pub allocation_size: usize,
@@ -181,7 +183,20 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
                         break;
                     }
                     let data_inner = &data[data_index];
-                    data_dashmap.insert(ids[data_index], data_inner.clone());
+                    let curr_id = ids[data_index];
+                    for j in 0..data_inner.len() {
+                        // If data_dashmap contains data_inner[j], append ids[data_index] to the value
+                        if data_dashmap.contains_key(&data_inner[j]) {
+                            let mut value = data_dashmap.get_mut(&data_inner[j]).unwrap();
+                            if !value.contains(&curr_id) {
+                                value.push(curr_id);
+                            }
+                        } else {
+                            // If data_dashmap does not contain data_inner[j], insert ids[data_index] to the value
+                            data_dashmap.insert(data_inner[j].clone(), vec![curr_id]);
+                        }
+                    }
+                    
                 }
             });
             handles.push(handle);
@@ -191,8 +206,8 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         }
     }
 
-    pub fn fill_and_return_dashmap(&mut self) -> DashMap<K, Vec<V>>  {
-        let output = Arc::new(DashMap::new());
+    pub fn fill_and_return_dashmap(&mut self) -> DashMap<V, Vec<K>>  {
+        let output = Arc::new(DashMap::<V, Vec<K>>::new());
         let mut handles = vec![];
         let data_index = Arc::new(AtomicUsize::new(0));
         for _ in 0..self.num_threads {
@@ -202,13 +217,21 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
             let data_index = data_index.clone();
             let output_ref_inner = output.clone();
             let handle = thread::spawn(move || {
-                while data_index.load(Ordering::Relaxed) < data.len() {
-                    let data_index = data_index.fetch_add(1, Ordering::Relaxed);
-                    if data_index >= data.len() {
+                while data_index.load(Ordering::Acquire) < data.len() {
+                    if data_index.load(Ordering::Acquire) >= data.len() {
                         break;
                     }
-                    let data_inner = &data[data_index];
-                    output_ref_inner.insert(ids[data_index], data_inner.clone());
+                    let i = data_index.fetch_add(1, Ordering::Release);
+                    let data_inner = &data[i];
+                    let curr_id = ids[i];
+                    println!("thread is handling {}th data which is {:?}", i, curr_id);
+                    data_inner.iter().for_each(|curr_hash| {
+                        let value = output_ref_inner.get_mut(curr_hash);
+                        match value {
+                            Some(mut v) => { v.push(curr_id); },
+                            None => { output_ref_inner.insert(curr_hash.clone(), vec![curr_id]); }
+                        }
+                    });
                 }
             });
             handles.push(handle);
@@ -258,19 +281,39 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
     }
 
     pub fn convert_hashmap_to_offset_and_values(
-        orig_map: DashMap<u64, Vec<u64>>
-    ) -> (FxHashMap<u64, (usize, usize)>, Vec<u64>) {
+        &self,
+        orig_map: DashMap<V, Vec<K>>
+    ) -> (DashMap<V, (usize, usize)>, Vec<K>) {
         // OffsetMap - key: hash, value: (offset, length)
         // Vec - all values concatenated
-        let mut offset_map = FxHashMap::default();
-         let mut vec: Vec<u64> = Vec::new();
-         let mut offset: usize = 0;
-         for (key, value) in orig_map {
-             offset_map.insert(key, (offset, value.len()));
-             offset += value.len();
-             vec.extend(value);
-         }
-         (offset_map, vec)
+        println!("Orig map length: {}", orig_map.len());
+        let mut offset_map = DashMap::new();
+        let mut vec: Arc<Mutex<Vec<K>>> = Arc::new(Mutex::new(Vec::with_capacity(orig_map.len())));
+        let mut offset = AtomicUsize::new(0);
+        
+        // Parallel 
+        orig_map.par_iter_mut().for_each(|entry| {
+            
+            let hash = entry.key().to_owned();
+            let ids = entry.value();
+            offset_map.insert(
+                hash,
+                (offset.fetch_add(ids.len(), Ordering::Relaxed), ids.len())
+            );
+            let vec_inner = vec.clone();
+            vec_inner.lock().unwrap().extend_from_slice(ids);
+        });
+        
+        // orig_map.iter().for_each(|entry| {
+        //     let hash = entry.key().to_owned();
+        //     let ids = entry.value();
+        //     offset_map.insert(
+        //         hash,
+        //         (offset.fetch_add(ids.len(), Ordering::Relaxed), ids.len())
+        //     );
+        //     vec.extend_from_slice(ids);
+        // });
+        (offset_map, Arc::try_unwrap(vec).unwrap().into_inner().unwrap())
     }
 
 

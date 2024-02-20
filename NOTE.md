@@ -1,44 +1,29 @@
 # Development note
 
 ## TODOs 
+
+- [ ] working examples
 - [ ] IMPORTANT: Clean up unnecessary files in these directories
-  - [x] data: Keep minimal dataset for testing. REMOVE INTERMEDIATE FILES
-  - [x] example
+  - [ ] IMPORTANT: organize index directory / code
+  - [ ] delete unnecessary codes in index module
   - [ ] src
     - [ ] cli
     - [ ] controller
-      - [ ] Integration 
-        - [x] Structure
-        - [x] Geometry
-        - [x] Index
-      - [x] rename controller object as folddisco
-    - [x] geometry
-      - [x] core: changed to use enum for hash variants
-      - [x] pdb_motif
-      - [x] default
-      - [x] changed angle representation to use sin and cos
-        - [ ] confirm if sin & cos representation is working
-      - [x] first keep pdb_motif & trrosetta / remove others
-      - [x] confirmed
-      - [x] moved hash-related utils to geometry::util
-    - [ ] index
-      - [ ] organize 
+        - [ ] confirm if sin & cos representation is working IMPORTANT: 
   - [ ] lib.rs
-    - [x] moved hashablesync trait to top level
+    - [ ] expose necessary functions with prelude
   - [ ] tests
 - [ ] Push only working code to the repository
   - [x] pass cargo check - 2024-02-20 18:30:00
 - [ ] Add tests to the code
   - [ ] unit test (object level)
-    - [x] geometry: pdb_motif, default
     - [ ] controller
-      - [x] hashing with pdb_motif
-      - [x] hashing with default
-      - [x] indexing
       - [ ] querying
   - [ ] integration test (module level)
       - [ ] cli
         - [x] build_index
+        - [ ] query
+        - [ ] benchmark
   - [ ] project level test
 
 - [ ] After finishing the above tasks, start working on the followings

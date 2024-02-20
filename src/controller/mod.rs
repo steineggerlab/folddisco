@@ -1,51 +1,134 @@
+// File: mod.rs
+// Created: 2024-01-18 15:47:16
+// Description:
+//    a new controller implementation that supports multiple hash types
+// Author: Hyunbin Kim (khb7840@gmail.com)
+// Copyright © 2024 Hyunbin Kim, All rights reserved
+
+pub mod feature;
+pub mod io;
 pub mod query;
-pub mod new_mod;
 
-use std::collections::{HashMap, HashSet};
 use std::io::Write;
-use std::sync::atomic::AtomicUsize;
-
-use crate::geometry::core::GeometricHash;
-// use crate::geometry::simple_hash::{HashCollection, HashValue};
-// use crate::geometry::triad_hash::{HashCollection, HashValue};
-// use crate::geometry::ppf::{HashCollection, HashValue};
-// use crate::geometry::trrosetta::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
-use crate::geometry::trrosetta_subfamily_new::{normalize_angle_degree, HashCollection, HashValue, discretize_value};
-// use crate::geometry::aa_pair::{HashCollection, HashValue, discretize_value, map_aa_to_u8};
-// use crate::geometry::trrosetta_reduced::*;
-use crate::index::builder::IndexBuilder;
-use crate::index::*;
-use crate::structure::core::CompactStructure;
-use crate::structure::io::pdb::Reader as PDBReader;
+// External imports
 use rayon::prelude::*;
 
-pub struct Controller {
+// Internal imports
+use crate::prelude::print_log_msg;
+use crate::{measure_time, PDBReader};
+use crate::geometry::core::{GeometricHash, HashType};
+use crate::index::new_alloc::IndexBuilder;
+use crate::utils::log::{ log_msg, INFO, FAIL, WARN, DONE };
+use crate::controller::feature::get_geometric_hash_from_structure;
+
+const DEFAULT_REMOVE_REDUNDANCY: bool = true;
+const DEFAULT_NUM_THREADS: usize = 4;
+const DEFAULT_HASH_TYPE: HashType = HashType::FoldDiscoDefault;
+
+pub struct FoldDisco {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
-    pub hash_collection_vec: Vec<HashCollection>,
-    pub res_pair_vec: Vec<Vec<(u64, u64, [u8; 3], [u8; 3])>>, // WARNING: TEMPORARY
+    pub hash_collection: Vec<Vec<GeometricHash>>,
+    pub index_builder: IndexBuilder<usize, GeometricHash>,
+    pub hash_type: HashType,
     pub remove_redundancy: bool,
-    pub num_threads_file: usize,
-    pub num_threads_hash: usize,
+    pub num_threads: usize,
+    pub output_path: String,
+    pub flags: SubProcessFlags,
 }
 
-impl Controller {
-    pub fn new(path_vec: Vec<String>) -> Controller {
-        Controller {
-            path_vec: path_vec,
-            numeric_id_vec: Vec::new(),
-            hash_collection_vec: Vec::new(),
-            // hash_new_collection_vec: Vec::new(),
-            res_pair_vec: Vec::new(), // WARNING: TEMPORARY
-            remove_redundancy: false,
-            num_threads_file: 3,
-            num_threads_hash: 2,
+pub struct SubProcessFlags {
+    pub fill_numeric_id_vec: bool,
+    pub collect_hash: bool,
+    pub set_index_table: bool,
+    pub fill_index_table: bool,
+    pub convert_index: bool,
+    pub save_index_table: bool,
+}
+impl SubProcessFlags {
+    pub fn new() -> SubProcessFlags {
+        SubProcessFlags {
+            fill_numeric_id_vec: false,
+            collect_hash: false,
+            set_index_table: false,
+            fill_index_table: false,
+            convert_index: false,
+            save_index_table: false,
         }
     }
+}
+
+impl FoldDisco {
+    pub fn new(path_vec: Vec<String>) -> FoldDisco {
+        FoldDisco {
+            path_vec: path_vec,
+            numeric_id_vec: Vec::new(),
+            hash_collection: Vec::new(),
+            index_builder: IndexBuilder::empty(),
+            hash_type: DEFAULT_HASH_TYPE,
+            remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
+            num_threads: DEFAULT_NUM_THREADS,
+            output_path: String::new(),
+            flags: SubProcessFlags::new(),
+        }
+    }
+    pub fn new_with_hash_type(path_vec: Vec<String>, hash_type: HashType) -> FoldDisco {
+        FoldDisco {
+            path_vec: path_vec,
+            numeric_id_vec: Vec::new(),
+            hash_collection: Vec::new(),
+            index_builder: IndexBuilder::empty(),
+            hash_type: hash_type,
+            remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
+            num_threads: DEFAULT_NUM_THREADS,
+            output_path: String::new(),
+            flags: SubProcessFlags::new(),
+        }
+    }
+
+    pub fn new_with_params(
+        path_vec: Vec<String>, hash_type: HashType, remove_redundancy: bool,
+        num_threads: usize, output_path: String
+    ) -> FoldDisco {
+        FoldDisco {
+            path_vec: path_vec,
+            numeric_id_vec: Vec::new(),
+            hash_collection: Vec::new(),
+            index_builder: IndexBuilder::empty(),
+            hash_type: hash_type,
+            remove_redundancy: remove_redundancy,
+            num_threads: num_threads,
+            output_path: output_path,
+            flags: SubProcessFlags::new(),
+        }
+    }
+    // Setters
+    pub fn set_path_vec(&mut self, path_vec: Vec<String>) {
+        self.path_vec = path_vec;
+    }
+    pub fn set_hash_type(&mut self, hash_type: HashType) {
+        self.hash_type = hash_type;
+    }
+    pub fn set_remove_redundancy(&mut self, remove_redundancy: bool) {
+        self.remove_redundancy = remove_redundancy;
+    }
+    pub fn set_num_threads(&mut self, num_threads: usize) {
+        self.num_threads = num_threads;
+    }
+    pub fn set_output_path(&mut self, output_path: String) {
+        self.output_path = output_path;
+    }
+
+    // Main methods
+    pub fn fill_numeric_id_vec(&mut self) {
+        string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
+        self.flags.fill_numeric_id_vec = true;
+    }
+
     pub fn collect_hash(&mut self) {
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(self.num_threads_file)
+            .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating files");
         // For iterating files, apply multi-threading with num_threads_for_file
@@ -53,169 +136,51 @@ impl Controller {
             self.path_vec
                 .par_iter()
                 .map(|pdb_path| {
-                    let hash_collection = par_get_feature_per_structure(pdb_path, self.num_threads_hash);
-                    hash_collection
+                    let pdb_reader = PDBReader::from_file(pdb_path).expect(
+                        log_msg(FAIL, "PDB file not found").as_str()
+                    );
+                    let compact = pdb_reader.read_structure().expect(
+                        log_msg(FAIL, "Failed to read structure").as_str()
+                    );
+                    let hash_vec = get_geometric_hash_from_structure(
+                        &compact.to_compact(), self.hash_type
+                    );
+                    // Drop intermediate variables
+                    drop(compact);
+                    drop(pdb_reader);
+                    // If remove_redundancy is true, remove duplicates
+                    if self.remove_redundancy {
+                        let mut hash_vec = hash_vec;
+                        hash_vec.sort_unstable();
+                        hash_vec.dedup();
+                        hash_vec
+                    } else {
+                        hash_vec
+                    }
                 })
-                .collect::<Vec<HashCollection>>()
-        }) as Vec<HashCollection>;
+            })
+            .collect::<Vec<Vec<GeometricHash>>>();
         
-        println!("Collected {} pdbs", output.len()); // TEMP
-        println!("Hash collection: {:?}", output[0][0]); // TEMP
-        self.hash_collection_vec = output;
-        // Delete pool
-        
+        self.hash_collection = output;
+        self.flags.collect_hash = true;
     }
-    
+
     pub fn get_allocation_size(&self) -> usize {
         let mut allocation_size = 0usize;
         self.path_vec.iter().for_each(|pdb_path| {
-            let pdb_reader = PDBReader::from_file(pdb_path).expect("PDB file not found");
-            let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
+            let pdb_reader = PDBReader::from_file(pdb_path).expect(
+            log_msg(FAIL, "PDB file not found").as_str()
+            );
+            let compact = pdb_reader.read_structure().expect(
+                log_msg(FAIL, "Failed to read structure").as_str()
+            );
             allocation_size += compact.num_residues * (compact.num_residues - 1);
         });
         allocation_size
     }
-    
-    pub fn _collect_hash(&mut self) {
-        // let vae = load_vae();
-        for i in 0..self.path_vec.len() {
-            let pdb_path = &self.path_vec[i];
-            let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
-            let structure = pdb_reader.read_structure().expect("structure read failed");
-            let compact = structure.to_compact();
-            // let mut hash_collector = GeometryHashCollector::new();
-            let mut hash_collector = HashCollection::new();
-
-            let mut res_pairs: Vec<(u64, u64, [u8; 3], [u8; 3])> = Vec::new(); // WARNING: TEMPORARY
-
-            for n in 0..compact.num_residues {
-                for m in 0..compact.num_residues {
-                    if n == m {
-                        continue;
-                    }
-                    // if n.abs_diff(m) < 3 { // WARNING: TEMPORARY FOR CHECKING IF ACCUMULATED TORSION WORKS
-                    //     continue;
-                    // }
-
-                    let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]).to_vec();
-                    // let ppf = compact.get_ppf(n, m).expect("cannot get ppf");
-                    // let angle = compact.get_accumulated_torsion(n, m).expect("cannot get accumulated torsion angle");
-                    if trr[0] < 2.0 || trr[0] > 20.0 {
-                        continue;
-                    }
-
-                    // let reduced_trr = reduce_with_vae(trr, &vae);
-                    // let hash_value = HashValue::perfect_hash(reduced_trr[0], reduced_trr[1]);
-                    let hash_value =
-                        HashValue::perfect_hash(
-                            // compact.residue_serial[n], compact.residue_serial[m],
-                            0, 0, // IMPORTANT: WARNING: 
-                            trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
-                        );
-                    // let hash_value = GeometricHash::perfect_hash(trr);
-                    
-                    // WARNING: TEMPORARY
-                    let res1 = compact.residue_serial[n];
-                    let res2 = compact.residue_serial[m];
-                    let res1_str = compact.residue_name[n];
-                    let res2_str = compact.residue_name[m];
-                    // Convert amino acid three letter code to one letter code
-                    // let res1_u8 = map_aa_to_u8(&res1_str);
-                    // let res2_u8 = map_aa_to_u8(&res2_str);
-                    // let hash_value = HashValue::perfect_hash(res1_u8, res2_u8, n as usize, m as usize, trr[0]);
-                    hash_collector.push(hash_value);
-                    
-                    res_pairs.push((res1, res2, res1_str, res2_str));
-                }
-            }
-            if self.remove_redundancy {
-                hash_collector.sort();
-                hash_collector.dedup();
-            }
-            self.hash_collection_vec
-                .push(hash_collector);
-            self.res_pair_vec.push(res_pairs); // For debug
-        }
-        // TEMPORARY
-        println!("Collected {} pdbs", self.hash_collection_vec.len()); // TEMP
-    }
 
     pub fn save_raw_feature(&mut self, path: &str, discretize: bool) {
-        let mut file = std::fs::File::create(path).expect("cannot create file");
-        for i in 0..self.path_vec.len() {
-            let pdb_path = &self.path_vec[i];
-            if i == 100 {
-                println!("Processing {}th pdb - {}", i, pdb_path);
-            }
-            let pdb_reader = PDBReader::from_file(pdb_path).expect("pdb file not found");
-            let structure = pdb_reader.read_structure().expect("structure read failed");
-            let compact = structure.to_compact();
-            for n in 0..compact.num_residues {
-                for m in 0..compact.num_residues {
-                    if n == m {
-                        continue;
-                    }
-                    let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
-                    if trr[0] < 2.0 || trr[0] > 20.0 {
-                        continue;
-                    }
-                    let res1 = compact.residue_serial[n];
-                    let res2 = compact.residue_serial[m];
-                    // [u8;3] to String
-                    let res1_aa = String::from_utf8_lossy(&compact.residue_name[n]).to_string();
-                    let res2_aa = String::from_utf8_lossy(&compact.residue_name[m]).to_string();
-                    // let res1_str = compact.residue_name[n];
-                    // let res2_str = compact.residue_name[m];
-                    // // Convert amino acid three letter code to one letter code
-                    // let res1_u8 = map_aa_to_u8(&res1_str);
-                    // let res2_u8 = map_aa_to_u8(&res2_str);
-
-                    // normalize trr[0]
-                    // let n_cb_dist = (trr[0] - 2.0) / 18.0;
-                    let n_cb_dist = trr[0];
-                    let omega = trr[1];
-                    let phi1 = trr[2];
-                    let phi2 = trr[3];
-                    let psi1 = trr[4];
-                    let psi2 = trr[5];
-                    let logdist = ((n as i32 - m as i32).abs() + 1).ilog2();
-                    let hash_value =
-                        HashValue::perfect_hash(
-                            res1, res2,
-                            trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
-                        );
-
-                    // let hash_value = HashValue::perfect_hash(res1_u8, res2_u8, n as usize, m as usize, trr[0]);
-                    let mut line = format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                        pdb_path, res1, res2, res1_aa, res2_aa, logdist,
-                        n_cb_dist, omega, phi1, phi2, psi1, psi2, hash_value
-                    );
-
-                    if discretize == true {
-                        let n_cb_dist = discretize_value(n_cb_dist, 2.0, 20.0, 12.0);
-                        // Torsion angles
-                        let omega = discretize_value(omega, -1.0, 1.0, 6.0);
-                        let phi1 = discretize_value(phi1, -1.0, 1.0, 6.0);
-                        let phi2 = discretize_value(phi2, -1.0, 1.0, 6.0);
-                        // Planar angles
-                        let psi1 = discretize_value(psi1, 0.0, 180.0, 6.0);
-                        let psi2 = discretize_value(psi2, 0.0, 180.0, 6.0);
-                        let logdist = ((n as i32 - m as i32).abs() + 1).ilog2();
-                        line = format!(
-                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                            pdb_path, res1, res2, res1_aa, res2_aa, logdist,
-                            n_cb_dist, omega, phi1, phi2, psi1, psi2, hash_value
-                        );
-                    }
-                    file.write_all(line.as_bytes()).expect("cannot write file");
-                }
-            }
-        }
-    }
-
-    pub fn fill_numeric_id_vec(&mut self) {
-        string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
+        todo!("Implement save_raw_feature method!!!");
     }
 
     pub fn save_id_vec(&self, path: &str) {
@@ -229,81 +194,62 @@ impl Controller {
         }
     }
     
-    pub fn save_hash_per_pair(&self, path: &str) {
-        let mut file = std::fs::File::create(path).expect("Unable to create file");
-        file.write_all(b"hash\tval1\tval2\tn1_n2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
-            .expect("Unable to write header");
-        println!("{}", self.hash_collection_vec.len());
-        for i in 0..self.hash_collection_vec.len() {
-            let pdb_path = &self.path_vec[i];
-            // let new_path = format!("{}_{}.tsv", path, pdb_path.split("/").last().unwrap());
-            // println!("Saving to {}", new_path);
-            // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header"); // ppf
-            let hash_collection = &self.hash_collection_vec[i];
-            let res_pair_vec = &self.res_pair_vec[i];
-            println!(
-                "{}: {} hashes, {} pairs",
-                pdb_path,
-                hash_collection.len(),
-                res_pair_vec.len()
-            );
-            for j in 0..res_pair_vec.len() {
-                let hash_value = hash_collection[j];
-                let res1 = res_pair_vec[j].0;
-                let res2 = res_pair_vec[j].1;
-                let res1_str = res_pair_vec[j].2;
-                let res2_str = res_pair_vec[j].3;
-                file.write_all(
-                    format!(
-                        "{}\t{}\t{}\t{:?}\t{:?}\t{}\n",
-                        hash_value, res1, res2, res1_str, res2_str, pdb_path
-                    )
-                    .as_bytes(),
-                )
-                .expect("Unable to write data");
-            }
+    pub fn set_index_table(&mut self) {
+        // Check if hash_collection is filled
+        if !self.flags.collect_hash {
+            print_log_msg(FAIL, "Hash collection is not filled yet");
+            return;
         }
+        if !self.flags.fill_numeric_id_vec {
+            print_log_msg(WARN, "Numeric ID vector is not filled yet. Filling numeric ID vector...");
+            self.fill_numeric_id_vec();
+        }
+        let index_builder = IndexBuilder::new(
+            &self.numeric_id_vec, &self.hash_collection,
+            self.num_threads, self.get_allocation_size(),
+            format!("{}.offset", self.output_path), // offset file path
+            format!("{}.index", self.output_path), // data file path
+        );
+        self.index_builder = index_builder;
+        self.flags.set_index_table = true;
     }
+    
+    pub fn fill_index_table(&mut self) {
+        // Check if index_table is set
+        if !self.flags.set_index_table {
+            print_log_msg(WARN, "Index table is not set yet. Setting index table...");
+            self.set_index_table();
+        }
+        // self.index_builder.fill_with_dashmap();
+        let index_map = measure_time!(self.index_builder.fill_and_return_dashmap());
+        self.flags.fill_index_table = true;
 
-    pub fn save_filtered_hash_pair(&self, path: &str, res_pair_filter: &HashMap<String, Vec<u64>>) {
-        let mut file = std::fs::File::create(path).expect("Unable to create file");
-        file.write_all(b"hash\tval1\tval2\tres1_ind\tres2_ind\tres1\tres2\tpdb\n")
-            .expect("Unable to write header");
-        // file.write_all(b"hash\tdist\tn1_nd\tn2_nd\tn1_n2\tres1_ind\tres2_ind\tpdb\n").expect("Unable to write header");
-        for i in 0..self.hash_collection_vec.len() {
-            let pdb_path = self.path_vec[i].split("/").last().unwrap();
-            if !res_pair_filter.contains_key(pdb_path) {
-                continue;
-            }
-            let hash_collection = &self.hash_collection_vec[i];
-            let res_pair_vec = &self.res_pair_vec[i];
-            println!(
-                "Saving filtered {}: {} hashes, {} pairs",
-                pdb_path,
-                hash_collection.len(),
-                res_pair_vec.len()
-            );
-            for j in 0..res_pair_vec.len() {
-                let hash_value = hash_collection[j];
-                let res1 = res_pair_vec[j].0;
-                let res2 = res_pair_vec[j].1;
-                let res1_str = res_pair_vec[j].2.to_ascii_uppercase();
-                let res2_str = res_pair_vec[j].3.to_ascii_uppercase();
-                if res_pair_filter[pdb_path].contains(&res1)
-                    && res_pair_filter[pdb_path].contains(&res2)
-                {
-                    file.write_all(
-                        format!(
-                            "{}\t{}\t{}\t{:?}\t{:?}\t{}\n",
-                            hash_value, res1, res2, res1_str, res2_str, pdb_path
-                        )
-                        .as_bytes(),
-                    )
-                    .expect("Unable to write data");
-                }
-            }
-        }
+        // THIS IS NOT FINISHED YET
+        // TODO: IMPORTANT: Move this.
+        let (offset_map, value_vec) = measure_time!(self.index_builder.convert_hashmap_to_offset_and_values(index_map));
+        self.flags.convert_index = true;
+        
+        // self.index_builder.offset_table = offset_map;
+        // println!("offset_map: {:?}", offset_map);
+        println!("value_vec: {:?}", value_vec.len());
     }
+    
+    
+    pub fn save_offset_map(&self) {
+        // Check if index_table is filled
+        if !self.flags.fill_index_table {
+            print_log_msg(FAIL, "Index table is not filled yet");
+            return;
+        }
+        todo!("Implement save_offset_map method");
+        // self.index_builder.save_offset_map();
+    }
+    
+    pub fn save_index_table(&self) {
+        // self.index_builder.save();
+        todo!("Implement save_index_table method");
+    }
+    
 }
 
 fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut Vec<usize>) {
@@ -312,103 +258,3 @@ fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut V
     }
 }
 
-// Temporary function for testing
-fn _write_hash_with_res_pair(
-    hash_collection: &Vec<HashValue>,
-    res_pair_vec: &Vec<(u64, u64)>,
-    path: &str,
-) {
-    let mut file = std::fs::File::create(path).expect("Unable to create file");
-    file.write_all(b"hash\tdist\tangle\tres1\tres2\n")
-        .expect("Unable to write header");
-
-    for j in 0..hash_collection.len() {
-        let hash_value = hash_collection[j];
-        let res1 = res_pair_vec[j].0;
-        let res2 = res_pair_vec[j].1;
-        file.write_all(format!("{}\t{}\t{}\n", hash_value, res1, res2).as_bytes())
-            .expect("Unable to write data");
-    }
-}
-
-fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
-    let mut res = Vec::new();
-    for i in 0..n {
-        for j in 0..n {
-            if i == j && !include_same {
-                continue;
-            }
-            res.push((i, j));
-        }
-    }
-    res
-}
-
-fn par_get_feature_per_structure(pdb_path: &String, num_threads: usize) -> Vec<HashValue> {
-    let pdb_reader = PDBReader::from_file(pdb_path).expect("PDB file not found");
-    let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
-    let compact = compact.to_compact();
-    let res_bound = get_all_combination(compact.num_residues, false);
-    // Set number of threads
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
-        .build()
-        .expect("Failed to build thread pool for iterating residues");
-    let output =  pool.install(|| {
-        res_bound
-            .into_par_iter()
-            .map(|(n, m)| {
-                let trr = compact.get_trrosetta_feature(n, m).unwrap_or([0.0; 6]);
-                if trr[0] >= 2.0 && trr[0] <= 20.0 {
-                    return HashValue::from_u64(0u64);
-                }
-                let hash_value = HashValue::perfect_hash(
-                    // compact.residue_serial[n], compact.residue_serial[m],
-                    0, 0,
-                    trr[0], trr[1], trr[2], trr[3], trr[4], trr[5]
-                );
-                hash_value
-
-            })
-            .filter(|x| x != &HashValue::from_u64(0u64))
-            .collect::<Vec<HashValue>>()
-    });
-    output
-}
-
-#[cfg(test)]
-mod tests {
-    use core::num;
-
-    #[test]
-    fn test_get_all_combination() {
-        let res = super::get_all_combination(3, false);
-        assert_eq!(res, vec![(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)]);
-        let res = super::get_all_combination(3, true);
-        assert_eq!(res, vec![(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)]);
-    }
-    
-    #[test]
-    fn test_par_get_feature_per_structure() {
-        let pdb_path = String::from("data/homeobox/1akha-.pdb");
-        let num_threads = 1;
-
-        let start = std::time::Instant::now();
-        let hash_collection = super::par_get_feature_per_structure(&pdb_path, num_threads);
-        let end = std::time::Instant::now();
-        println!("Time elapsed {}: {:?}", num_threads, end - start);
-        // println!("Hash collection: {:?}", hash_collection);
-        let num_threads = 2;
-        let start = std::time::Instant::now();
-        let hash_collection = super::par_get_feature_per_structure(&pdb_path, num_threads);
-        let end = std::time::Instant::now();
-        println!("Time elapsed {}: {:?}", num_threads, end - start);
-        // println!("Hash collection: {:?}", hash_collection);
-        let num_threads = 4;
-        let start = std::time::Instant::now();
-        let hash_collection = super::par_get_feature_per_structure(&pdb_path, num_threads);
-        let end = std::time::Instant::now();
-        println!("Time elapsed {}: {:?}", num_threads, end - start);
-        // println!("Hash collection: {:?}", hash_collection);
-    }
-}

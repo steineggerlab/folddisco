@@ -6,11 +6,9 @@
 // This file contains the workflow for querying PDB files
 // When querying PDB files, we need index table and query file.
 
-use std::collections::HashSet;
-
 use crate::cli::*;
 use crate::controller::query::make_query;
-use crate::index::io::{read_offset_map, read_u64_vector, get_values_with_offset};
+use crate::controller::io::{read_offset_map, read_usize_vector, get_values_with_offset};
 use crate::index::lookup::{load_lookup_from_file};
 use rayon::prelude::*;
 use crate::prelude::*;
@@ -47,23 +45,27 @@ pub fn query_pdb(env: AppArgs) {
             let offset_path = format!("{}.offset", index_path.clone()); 
             let value_path = format!("{}.value", index_path.clone());
             let lookup_path = format!("{}.lookup", index_path.clone());
-            println!("offset_path: {}", offset_path);
-            println!("value_path: {}", value_path);
-            println!("lookup_path: {}", lookup_path);
-
+            let hash_type_path = format!("{}.type", index_path.clone());
+            // let hash_type = HashType::load_from_file(&hash_type_path);
+            let hash_type = HashType::FoldDiscoDefault;
+            
             // Load index table
-            let value_vec = measure_time!(read_u64_vector(&value_path).expect("[ERROR] Failed to load value vector"));
-            let offset_table = measure_time!(read_offset_map(&offset_path).expect("[ERROR] Failed to load offset table"));
+            let (mmap, value_vec) = measure_time!(read_usize_vector(&value_path).expect("[ERROR] Failed to load value vector"));
+            let offset_table = measure_time!(
+                read_offset_map(&offset_path, hash_type).expect("[ERROR] Failed to load offset table")
+            );
             let (path_vec, numeric_id_vec, optional_vec) = measure_time!(load_lookup_from_file(&lookup_path));
             let lookup = measure_time!(load_lookup_from_file(&lookup_path));
 
             // Make query with pdb
-            //
             let pdb_dir = "/fast/hyunbin/motif/swissprot_benchmark/swissprot_v4_raw";
             let pdb_path = "AF-P00766-F1-model_v4.pdb";
             
             let pdb_path = format!("{}/{}", pdb_dir, pdb_path);
-            let pdb_query =  make_query(&pdb_path, &vec![75u64, 120u64, 213u64]);
+            let pdb_query =  make_query(
+                &pdb_path, &vec![(b'A', 75u64), (b'A', 120u64), (b'A', 213u64)],
+                hash_type
+            );
 
             // Get values with offset
             let offset_to_query = pdb_query.iter().map(|&x| offset_table.get(&x).unwrap()).collect::<Vec<_>>();
@@ -75,8 +77,9 @@ pub fn query_pdb(env: AppArgs) {
                     intersection = single_queried_values.to_vec();
                 } else {
                     // Filter intersection with single_queried_values
-                    intersection = intersection.par_iter().filter(|&&x| single_queried_values.contains(&x)).map(|&x| x).collect::<Vec<_>>();
-
+                    intersection = intersection.par_iter().filter(
+                        |&&x| single_queried_values.contains(&x)
+                    ).map(|&x| x).collect::<Vec<_>>();
                 }
             }
             println!("queried size: {:?}", intersection.len());

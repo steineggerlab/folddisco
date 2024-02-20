@@ -28,6 +28,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
         Some("index") => Ok(AppArgs::Index {
             pdb_dir: args.opt_value_from_str(["-d", "--pdb-dir"])?,
             pdb_path_vec: Vec::new(),
+            hash_type: args.value_from_str(["-H", "--hash-type"]).unwrap_or("default".into()),
             index_path: args.value_from_str(["-i", "--index-path"])?,
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             verbose: args.contains(["-v", "--verbose"]),
@@ -51,7 +52,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
 
 fn main() {
     // Init
-    print_fold_disco_logo();
+    print_logo();
 
     let parsed_args = parse_arg().unwrap_or_else(|e| {
         eprintln!("Error: {}", e);

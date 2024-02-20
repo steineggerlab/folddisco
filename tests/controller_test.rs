@@ -2,8 +2,7 @@ use std::collections::HashMap;
 // Import unique
 use std::collections::HashSet;
 
-use motifsearch::controller::{self, Controller};
-use motifsearch::controller::new_mod::FoldDisco;
+use motifsearch::controller::FoldDisco;
 use motifsearch::geometry::core::HashType;
 // use motifsearch::geometry::trrosetta::{HashCollection, HashValue};
 // use motifsearch::geometry::trrosetta_subfamily::{HashCollection, HashValue};
@@ -60,6 +59,47 @@ fn test_folddisco_pdbmotif() {
     fold_disco.fill_index_table();
 }
 
+
+#[test]
+fn test_folddisco_pdbmotifsincos() {
+    // Test if the default hashing schemes are working
+    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
+    fold_disco.collect_hash();
+    fold_disco.fill_numeric_id_vec();
+    for i in 0..fold_disco.hash_collection.len() {
+        println!(
+            "{:?} | {:?} | {:?} hashes | {:?}",
+            fold_disco.numeric_id_vec.get(i).unwrap(),
+            fold_disco.path_vec.get(i).unwrap(),
+            fold_disco.hash_collection.get(i).unwrap_or(&Vec::new()).len(),
+            fold_disco.hash_collection.get(i).unwrap().get(0).unwrap(), 
+        );
+    }
+    fold_disco.set_index_table();
+    fold_disco.fill_index_table();
+}
+
+
+#[test]
+fn test_folddisco_trrosetta() {
+    // Test if the default hashing schemes are working
+    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::TrRosetta);
+    fold_disco.collect_hash();
+    fold_disco.fill_numeric_id_vec();
+    for i in 0..fold_disco.hash_collection.len() {
+        println!(
+            "{:?} | {:?} | {:?} hashes | {:?}",
+            fold_disco.numeric_id_vec.get(i).unwrap(),
+            fold_disco.path_vec.get(i).unwrap(),
+            fold_disco.hash_collection.get(i).unwrap_or(&Vec::new()).len(),
+            fold_disco.hash_collection.get(i).unwrap().get(0).unwrap(), 
+        );
+    }
+    fold_disco.set_index_table();
+    fold_disco.fill_index_table();
+}
 
 
 

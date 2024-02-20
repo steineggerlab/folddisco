@@ -9,6 +9,8 @@ use std::mem::{self, size_of};
 // Using FxHashMap
 use rustc_hash::FxHashMap;
 
+use crate::prelude::GeometricHash;
+
 pub fn write_u64_vector(path: &str, vec: &Vec<u64>) -> Result<(), Error> {
     let mut file = OpenOptions::new()
         .read(true)
@@ -68,7 +70,7 @@ pub fn get_values_with_offset(vec: &[u64], offset: usize, length: usize) -> &[u6
     &vec[offset..offset + length]
 }
 
-pub fn save_offset_map(path: &str, offset_map: &FxHashMap<u64, (usize, usize)>) -> Result<(), Error> {
+fn _save_offset_map(path: &str, offset_map: &FxHashMap<u64, (usize, usize)>) -> Result<(), Error> {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -84,20 +86,6 @@ pub fn save_offset_map(path: &str, offset_map: &FxHashMap<u64, (usize, usize)>) 
         writer.write_all(&value.1.to_le_bytes())?;
     }
     Ok(())
-}
-
-pub fn read_offset_map(path: &str) -> Result<FxHashMap<u64, (usize, usize)>, Error> {
-    let file = File::open(path)?;
-    let mmap = unsafe { Mmap::map(&file)? };
-    let mut offset_map = FxHashMap::default();
-    let mut offset = 0;
-    while offset < mmap.len() {
-        let key = u64::from_le_bytes(mmap[offset..offset + 8].try_into().unwrap());
-        let value = (usize::from_le_bytes(mmap[offset + 8..offset + 16].try_into().unwrap()), usize::from_le_bytes(mmap[offset + 16..offset + 24].try_into().unwrap()));
-        offset_map.insert(key, value);
-        offset += 24;
-    }
-    Ok(offset_map)
 }
 
 #[cfg(test)]

@@ -224,7 +224,6 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
                     let i = data_index.fetch_add(1, Ordering::Release);
                     let data_inner = &data[i];
                     let curr_id = ids[i];
-                    println!("thread is handling {}th data which is {:?}", i, curr_id);
                     data_inner.iter().for_each(|curr_hash| {
                         let value = output_ref_inner.get_mut(curr_hash);
                         match value {

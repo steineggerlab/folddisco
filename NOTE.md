@@ -10,7 +10,7 @@
       - [ ] Integration 
         - [x] Structure
         - [x] Geometry
-        - [ ] Index
+        - [x] Index
       - [x] rename controller object as folddisco
     - [x] geometry
       - [x] core: changed to use enum for hash variants
@@ -23,22 +23,22 @@
       - [x] moved hash-related utils to geometry::util
     - [ ] index
       - [ ] organize 
-    - [ ] structure
-    - [ ] utils
   - [ ] lib.rs
     - [x] moved hashablesync trait to top level
   - [ ] tests
 - [ ] Push only working code to the repository
+  - [x] pass cargo check - 2024-02-20 18:30:00
 - [ ] Add tests to the code
   - [ ] unit test (object level)
     - [x] geometry: pdb_motif, default
     - [ ] controller
       - [x] hashing with pdb_motif
       - [x] hashing with default
-      - [ ] indexing
+      - [x] indexing
       - [ ] querying
   - [ ] integration test (module level)
       - [ ] cli
+        - [x] build_index
   - [ ] project level test
 
 - [ ] After finishing the above tasks, start working on the followings
@@ -70,3 +70,9 @@ test test_fold_disco ... ok
 
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 ```
+
+> 2024-02-20 18:30:23 Organized 4 hash types
+> - PDBMotif (angle binned with degree)
+> - PDBMotifSinCos (angle binned with sin and cos)
+> - FoldDiscoDefault (trrosetta feature + aa pair)
+> - TrRosetta (trrosetta feature)

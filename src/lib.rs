@@ -22,12 +22,6 @@ pub mod utils;
 /* re-export: pub use */
 pub use structure::io::pdb::Reader as PDBReader;
 
-pub struct MotifSearch {
-    pub pdb_files: Vec<String>,
-    // pub pdb_table: HashMap<index, PDB>,
-    pub controller: controller::Controller,
-}
-
 // Declare a new trait that supports required traits
 pub trait HashableSync: Clone + Copy + Hash + Sync + Send + Eq + PartialEq + Ord + Debug + 'static {}
 
@@ -44,19 +38,22 @@ impl HashableSync for i8 {}
 impl HashableSync for char {}
 
 
-
 pub mod prelude {
-    pub use crate::controller::Controller;
-    pub use crate::geometry::trrosetta_subfamily_new::{HashCollection, HashValue};
+    pub use crate::PDBReader;
+    pub use crate::HashableSync;
+    pub use crate::measure_time;
+
+    pub use crate::controller::FoldDisco;
+    
+    pub use crate::geometry::core::{GeometricHash, HashType};
+    
     pub use crate::index::builder::IndexBuilder;
     pub use crate::index::query_multiple_with_neighbors;
     pub use crate::index::{IndexTablePrinter, query_single, query_multiple};
     pub use crate::index::alloc::IndexAllocator;
-    pub use crate::PDBReader;
     pub use crate::index::index_table::IndexTable;
-    pub use crate::index::io::save_offset_map;
+
     pub use crate::utils::loader::{load_path, get_all_combination};
     pub use crate::utils::benchmark::{Metrics, calculate_metrics, compare_target_answer};
     pub use crate::utils::log::{INFO, FAIL, WARN, DONE, log_msg, print_log_msg};
-    pub use crate::measure_time;
 }

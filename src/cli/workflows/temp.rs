@@ -2,8 +2,9 @@ use std::collections::HashSet;
 
 use crate::cli::*;
 use crate::index::lookup::load_lookup_from_file;
-use rayon::prelude::*;
 use crate::prelude::*;
+
+//TODO: Change this to benchmark
 
 pub fn query_test_for_swissprot(env: AppArgs) {
     match env {
@@ -21,15 +22,9 @@ pub fn query_test_for_swissprot(env: AppArgs) {
             if verbose { println!("[INFO ] Time elapsed for loading index table {:?}", lap2 - lap1); }
             // Measure time
             let queries = vec![
-                // HashValue::from_u64(6597069965577u64),
-                // HashValue::from_u64(4398046577927u64),
-                // HashValue::from_u64(8800438323719u64),
-                // HashValue::from_u64(5501903505417u64),
-                // HashValue::from_u64(5497558337804u64),
-                // HashValue::from_u64(7696631925513u64),
-                HashValue::from_u64(2203335001092u64),
-                HashValue::from_u64(3298551727108u64),
-                HashValue::from_u64(3298551661828u64),
+                GeometricHash::from_u64(2203335001092u64, HashType::FoldDiscoDefault),
+                GeometricHash::from_u64(3298551727108u64, HashType::FoldDiscoDefault),
+                GeometricHash::from_u64(3298551661828u64, HashType::FoldDiscoDefault),
             ];
             let queries_u64 = queries.iter().map(|x| x.as_u64()).collect::<Vec<u64>>();
             let result = index_table.query_multiple_with_connectivity(&queries_u64, 2);

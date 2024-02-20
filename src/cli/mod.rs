@@ -15,6 +15,7 @@ pub enum AppArgs {
     Index {
         pdb_dir: Option<String>,
         pdb_path_vec: Vec<String>,
+        hash_type: String,
         index_path: String,
         num_threads: usize,
         verbose: bool,
@@ -31,7 +32,7 @@ pub enum AppArgs {
     }
 }
 
-pub fn print_fold_disco_logo() {
+pub fn print_logo() {
     let logo = [
         "",
         "\x1b[91m░█▀▀░█▀█░█░░░█▀▄░\x1b[93m█▀▄░▀█▀░█▀▀░█▀▀░█▀█\x1b[0m",

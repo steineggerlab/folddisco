@@ -3,15 +3,15 @@
 ## TODOs 
 
 - [ ] working examples
-- [ ] IMPORTANT: Clean up unnecessary files in these directories
-  - [ ] IMPORTANT: organize index directory / code
-  - [ ] delete unnecessary codes in index module
+- [x] IMPORTANT: Clean up unnecessary files in these directories
+  - [x] IMPORTANT: organize index directory / code
+  - [x] delete unnecessary codes in index module
   - [ ] src
     - [ ] cli
     - [ ] controller
         - [ ] confirm if sin & cos representation is working IMPORTANT: 
   - [ ] lib.rs
-    - [ ] expose necessary functions with prelude
+    - [x] expose necessary functions with prelude
   - [ ] tests
 - [ ] Push only working code to the repository
   - [x] pass cargo check - 2024-02-20 18:30:00

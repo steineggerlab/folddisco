@@ -7,18 +7,9 @@
 // For building index table, we need a directory containing PDB files, 
 // and the path to save the index table.
 
-use std::hash;
 
 use crate::cli::*;
-
-// TODO: THESE SHOULD BE HANDLED IN PRELUDE
-use crate::index::index_table::{Value, self};
-use crate::index::lookup::{save_lookup_to_file, load_lookup_from_file};
-use crate::controller::io::{read_offset_map, save_offset_map, write_usize_vector};
-
 use crate::prelude::*;
-
-// TODO: Generated. need to be
 
 const HELP_INDEX: &str = "\
 USAGE: motifsearch index [OPTIONS]

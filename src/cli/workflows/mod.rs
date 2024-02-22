@@ -8,4 +8,4 @@
 
 pub mod build_index;
 pub mod query_pdb;
-pub mod temp;
+pub mod benchmark;

@@ -17,7 +17,7 @@ use rayon::prelude::*;
 use crate::prelude::print_log_msg;
 use crate::{measure_time, PDBReader};
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::index::new_alloc::IndexBuilder;
+use crate::index::alloc::IndexBuilder;
 use crate::utils::log::{ log_msg, INFO, FAIL, WARN, DONE };
 use crate::controller::feature::get_geometric_hash_from_structure;
 

@@ -44,14 +44,12 @@ pub mod prelude {
     pub use crate::measure_time;
 
     pub use crate::controller::FoldDisco;
+    pub use crate::controller::io::{read_offset_map, save_offset_map, write_usize_vector};
     
     pub use crate::geometry::core::{GeometricHash, HashType};
     
-    pub use crate::index::builder::IndexBuilder;
-    pub use crate::index::query_multiple_with_neighbors;
-    pub use crate::index::{IndexTablePrinter, query_single, query_multiple};
-    pub use crate::index::alloc::IndexAllocator;
-    pub use crate::index::index_table::IndexTable;
+    pub use crate::index::lookup::{save_lookup_to_file, load_lookup_from_file};
+    pub use crate::index::alloc::IndexBuilder;
 
     pub use crate::utils::loader::{load_path, get_all_combination};
     pub use crate::utils::benchmark::{Metrics, calculate_metrics, compare_target_answer};

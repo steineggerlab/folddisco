@@ -2,17 +2,7 @@ use std::collections::HashMap;
 // Import unique
 use std::collections::HashSet;
 
-use motifsearch::controller::FoldDisco;
-use motifsearch::geometry::core::HashType;
-// use motifsearch::geometry::trrosetta::{HashCollection, HashValue};
-// use motifsearch::geometry::trrosetta_subfamily::{HashCollection, HashValue};
-// use motifsearch::geometry::aa_pair::{HashCollection, HashValue};
-use motifsearch::index::builder::IndexBuilder;
-use motifsearch::index::query_multiple_with_neighbors;
-use motifsearch::index::{IndexTablePrinter, query_single, query_multiple};
-use motifsearch::PDBReader;
-use motifsearch::index::index_table;
-use motifsearch::measure_time;
+use motifsearch::prelude::*;
 
 use rayon::prelude::*;
 

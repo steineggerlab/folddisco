@@ -4,7 +4,7 @@
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
 // use crate::*;
-use motifsearch::cli::{workflows::{build_index, temp, query_pdb}, *};
+use motifsearch::cli::{workflows::{build_index, benchmark, query_pdb}, *};
 use motifsearch::prelude::*;
 const HELP: &str = "\
 USAGE: motifsearch index [OPTIONS] <PDBS...>
@@ -80,8 +80,8 @@ fn main() {
             }
         }
         AppArgs::Test { .. } => {
-            eprintln!("Testing");
-            temp::query_test_for_swissprot(parsed_args);
+            println!("Testing");
+            // temp::query_test_for_swissprot(parsed_args);
         }
     }
 }

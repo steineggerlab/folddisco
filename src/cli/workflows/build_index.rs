@@ -11,7 +11,7 @@
 use crate::cli::*;
 use crate::prelude::*;
 
-const HELP_INDEX: &str = "\
+pub const HELP_INDEX: &str = "\
 USAGE: motifsearch index [OPTIONS]
 Options:
     -d, --pdb-dir <PDB_DIR>         Directory containing PDB files

@@ -26,15 +26,18 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
         .as_deref()
     {
         Some("index") => Ok(AppArgs::Index {
+            // TODO: NOTE: Change to parse positional arguments for input PDBs
             pdb_dir: args.opt_value_from_str(["-d", "--pdb-dir"])?,
             pdb_path_vec: Vec::new(),
             hash_type: args.value_from_str(["-H", "--hash-type"]).unwrap_or("default".into()),
-            index_path: args.value_from_str(["-i", "--index-path"])?,
+            index_path: args.value_from_str(["-i", "--index-path"]).unwrap_or("folddisco_index".into()),
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),
         Some("query") => Ok(AppArgs::Query {
+            pdb_path: args.free_from_str().unwrap_or("".into()),
+            query_string: args.free_from_str().unwrap_or("".into()),
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             index_path: args.opt_value_from_str(["-i", "--index-path"])?,
             help: args.contains(["-h", "--help"]),
@@ -60,23 +63,20 @@ fn main() {
     });
     match parsed_args {
         AppArgs::Global { help } => {
-            if !help { eprintln!("No subcommand specified."); }
             eprintln!("{}", HELP);
         }
         AppArgs::Index { help, .. } => {
             if help {
-                eprintln!("{}", HELP);
+                eprintln!("{}", workflows::build_index::HELP_INDEX);
             } else {
                 build_index::build_index(parsed_args);
             }
         }
         AppArgs::Query { help, threads, .. } => {
             if help {
-                eprintln!("{}", HELP);
+                eprintln!("{}", workflows::query_pdb::HELP_QUERY);
             } else {
-                eprintln!("{} Querying with {} threads...",  INFO, threads);
                 query_pdb::query_pdb(parsed_args);
-                eprintln!("Querying done.");
             }
         }
         AppArgs::Test { .. } => {

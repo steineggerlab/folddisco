@@ -2,7 +2,7 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Description: Core geometric hash enum and types
 
-use std::{fmt, io::Write};
+use std::{fmt, io::{BufRead, Write}};
 use crate::HashableSync;
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
@@ -48,17 +48,23 @@ impl HashType {
         file.write_all(format!("{:?}", self).as_bytes()).unwrap();
         println!("{:?}", self);
     }
-    
-    // pub load_from_file(path: &str) -> Self {
-    //     let file = std::fs::File::open(path).unwrap();
-    //     let reader = std::io::BufReader::new(file);
-    //     let mut hash_type = HashType::Other;
-    //     for line in reader.lines() {
-    //         let line = line.unwrap();
-    //         // byte to enum
-    //     }
-    //     hash_type
-    // }
+
+    pub fn load_from_file(path: &str) -> Self {
+        let file = std::fs::File::open(path).unwrap();
+        let reader = std::io::BufReader::new(file);
+        let mut hash_type = HashType::FoldDiscoDefault;
+        for line in reader.lines() {
+            let line = line.unwrap();
+            hash_type = match line.as_str() {
+                "PDBMotif" => HashType::PDBMotif,
+                "PDBMotifSinCos" => HashType::PDBMotifSinCos,
+                "TrRosetta" => HashType::TrRosetta,
+                "FoldDiscoDefault" => HashType::FoldDiscoDefault,
+                _ => HashType::Other,
+            };
+        }
+        hash_type
+    }
 }
 
 #[cfg(test)]

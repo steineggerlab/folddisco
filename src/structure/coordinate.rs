@@ -1,7 +1,8 @@
 use std::collections::btree_map::Iter;
-
 use crate::utils::calculator::Calculate;
-use crate::utils::constants::CA_CB_DIST;
+
+pub const CA_CB_DIST: f32 = 1.5336;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Coordinate {
     pub x: f32,

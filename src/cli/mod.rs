@@ -1,4 +1,10 @@
-// pub mod somemodule;
+// File: mod.rs
+// Created: 2023-09-05 16:36:23
+// Author: Hyunbin Kim (khb7840@gmail.com)
+// Copyright © 2024 Hyunbin Kim, All rights reserved
+
+// Arguments of CLI app are defined here
+
 pub mod workflows;
 
 #[derive(Debug)]
@@ -22,6 +28,8 @@ pub enum AppArgs {
         help: bool,
     },
     Query {
+        pdb_path: String,
+        query_string: String,
         threads: usize,
         index_path: Option<String>,
         help: bool,

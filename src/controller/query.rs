@@ -3,7 +3,9 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-use crate::{prelude::{GeometricHash, HashType}, PDBReader};
+use crate::geometry::core::{GeometricHash, HashType};
+use crate::prelude::PDBReader;
+use crate::utils::log::{log_msg, FAIL};
 use super::feature::get_single_feature;
 // TODO: Make this to handle multiple hash types
 // TODO: Query should be able to consider both chain & residue index
@@ -39,7 +41,40 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
     hash_collection
 }
 
-
+pub fn parse_query_string(query_string: &str) -> Vec<(u8, u64)> {
+    let mut query_residues = Vec::new();
+    let mut chain = b' ';
+    let mut residue = String::new();
+    for c in query_string.chars() {
+        if c.is_ascii_alphabetic() {
+            chain = c as u8;
+        } else if c.is_ascii_digit() {
+            residue.push(c);
+        } else if c == ',' {
+            let res_u64 = residue.parse::<u64>().expect(
+                &log_msg(FAIL,  "Failed to parse residue")
+            );
+            if chain == b' ' {
+                chain = b'A';
+            }
+            query_residues.push((chain, res_u64));
+            // Reset
+            chain = b' ';
+            residue.clear();
+        } else if c == ' ' {
+            continue;
+        } else {
+            panic!("Invalid character in query string");
+        }
+    }
+    // Push the last residue
+    if chain == b' ' {
+        chain = b'A';
+    }
+    let res_u64 = residue.parse::<u64>().expect("Failed to parse residue");
+    query_residues.push((chain, res_u64));
+    query_residues
+}
 
 // ADD TEST
 #[cfg(test)]
@@ -54,5 +89,24 @@ mod tests {
         let hash_type = HashType::FoldDiscoDefault;
         let hash_collection = make_query(&path, &query_residues, hash_type);
         println!("{:?}", hash_collection);
+    }
+    #[test]
+    fn test_parse_query_string() {
+        let query_string = "A250,B232,C269";
+        let query_residues = parse_query_string(query_string);
+        assert_eq!(query_residues, vec![(b'A', 250), (b'B', 232), (b'C', 269)]);
+    }
+    #[test]
+    fn test_parse_query_string_with_space() {
+        let query_string = "A250, A232, A269";
+        let query_residues = parse_query_string(query_string);
+        assert_eq!(query_residues, vec![(b'A', 250), (b'A', 232), (b'A', 269)]);
+    }
+    
+    #[test]
+    fn test_parse_query_string_with_space_and_no_chain() {
+        let query_string = "250, 232, 269";
+        let query_residues = parse_query_string(query_string);
+        assert_eq!(query_residues, vec![(b'A', 250), (b'A', 232), (b'A', 269)]);
     }
 }

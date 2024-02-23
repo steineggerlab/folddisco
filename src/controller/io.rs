@@ -9,6 +9,8 @@ use std::io::{BufWriter, Write, Error};
 use memmap2::Mmap;
 use crate::prelude::{GeometricHash, HashType};
 use std::mem::size_of;
+
+
 pub fn save_offset_map(
     path: &str, offset_map: &DashMap<GeometricHash, (usize, usize)>
 ) -> Result<(), Error> {
@@ -17,7 +19,14 @@ pub fn save_offset_map(
         .write(true)
         .create(true)
         .open(path)?;
-    let total_size: u64 = 24 * offset_map.len() as u64;
+
+    // Get hash type
+    let hash_type = offset_map.iter().next().unwrap().key().hash_type();
+    let total_size = match hash_type.encoding_type() {
+        32 => 20 * offset_map.len() as u64,
+        64 => 24 * offset_map.len() as u64,
+        _ => { panic!("Invalid hash type"); }
+    };
     file.set_len(total_size as u64)?;
     // Write as whole
     let mut writer = BufWriter::new(file);
@@ -42,22 +51,21 @@ pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<Geomet
     let mut offset_map = DashMap::default();
     let mut offset = 0;
     while offset < mmap.len() {
-        let key = match hash_type.encoding_type() {
+        let (key, w): (GeometricHash, usize) = match hash_type.encoding_type() {
             32 => {
-                GeometricHash::from_u32(
+                (GeometricHash::from_u32(
                     u32::from_le_bytes(mmap[offset..offset + 4].try_into().unwrap()),
                     hash_type
-                )
+                ), 4_usize)
             },
             64 => {
-                GeometricHash::from_u64(
+                (GeometricHash::from_u64(
                     u64::from_le_bytes(mmap[offset..offset + 8].try_into().unwrap()),
                     hash_type
-                )
+                ), 8_usize)
             },
             _ => { panic!("Invalid hash type"); }
         };
-        let w = hash_type.encoding_type() / 8;
         let value = (
             usize::from_le_bytes(mmap[offset + w..offset + w + 8].try_into().unwrap()),
             usize::from_le_bytes(mmap[offset + w + 8..offset + w + 16].try_into().unwrap())
@@ -111,6 +119,8 @@ mod tests {
         offset_map.insert(GeometricHash::from_u64(0, HashType::PDBMotif), (0, 10));
         offset_map.insert(GeometricHash::from_u64(1, HashType::PDBMotif), (10, 10));
         offset_map.insert(GeometricHash::from_u64(2, HashType::PDBMotif), (20, 10));
+        println!("{:?}", offset_map);
+
         save_offset_map("test_offset_map_io.offset", &offset_map).unwrap();
         let offset_map = read_offset_map("test_offset_map_io.offset", HashType::PDBMotif).unwrap();
         offset_map.iter().for_each(|entry| {
@@ -119,4 +129,12 @@ mod tests {
             println!("{:?} -> {:?}", key, value);
         });
     }
+    #[test]
+    fn test_usize_vector_io() {
+        let vec = vec![1, 2, 3, 4, 5];
+        write_usize_vector("test_usize_vector_io.value", &vec).unwrap();
+        let (mmap, vec) = read_usize_vector("test_usize_vector_io.value").unwrap();
+        assert_eq!(vec, &[1, 2, 3, 4, 5]);
+    }
+    
 }

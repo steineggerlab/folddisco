@@ -59,8 +59,6 @@ pub fn build_index(env: AppArgs) {
                 );
 
                 // Main workflow
-                // 1. Fill numeric id vec
-                fold_disco.fill_numeric_id_vec();
                 // 2. Collect hash
                 fold_disco.collect_hash();
                 // 3. Setting
@@ -72,9 +70,10 @@ pub fn build_index(env: AppArgs) {
                 // Convert to offset table
                 let mut index_table = fold_disco.index_builder.fill_and_return_dashmap();
                 index_table.remove(&GeometricHash::from_u64(0, hash_type));
+
                 let (offset_table, value_vec) =
                     fold_disco.index_builder.convert_hashmap_to_offset_and_values(index_table);
- 
+                    
                 // Save offset table
                 let offset_path = format!("{}.offset", index_path);
                 save_offset_map(&offset_path, &offset_table).expect(
@@ -85,16 +84,17 @@ pub fn build_index(env: AppArgs) {
                 write_usize_vector(&value_path, &value_vec).expect(
                     &log_msg(FAIL, "Failed to save values")
                 );
+
                 // Save lookup. The path to lookup table is the same as the index table with .lookup extension
                 let lookup_path = format!("{}.lookup", index_path);
                 save_lookup_to_file(
                     &lookup_path, &fold_disco.path_vec,
                      &fold_disco.numeric_id_vec, None
                 );
+
                 // Save hash type
                 let hash_type_path = format!("{}.type", index_path);
                 hash_type.save_to_file(&hash_type_path);
-                
                 
                 if verbose { print_log_msg(DONE, "Done."); }
             }

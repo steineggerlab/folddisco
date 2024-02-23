@@ -225,10 +225,9 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
                     let data_inner = &data[i];
                     let curr_id = ids[i];
                     data_inner.iter().for_each(|curr_hash| {
-                        let value = output_ref_inner.get_mut(curr_hash);
-                        match value {
-                            Some(mut v) => { v.push(curr_id); },
-                            None => { output_ref_inner.insert(curr_hash.clone(), vec![curr_id]); }
+                        let mut entry = output_ref_inner.entry(curr_hash.clone()).or_insert(Vec::new());
+                        if !entry.contains(&curr_id) {
+                            entry.push(curr_id);
                         }
                     });
                 }
@@ -287,32 +286,19 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         // Vec - all values concatenated
         println!("Orig map length: {}", orig_map.len());
         let mut offset_map = DashMap::new();
-        let mut vec: Arc<Mutex<Vec<K>>> = Arc::new(Mutex::new(Vec::with_capacity(orig_map.len())));
+        let mut vec: Vec<K> = Vec::new();
         let mut offset = AtomicUsize::new(0);
         
-        // Parallel 
-        orig_map.par_iter_mut().for_each(|entry| {
-            
+        orig_map.iter().for_each(|entry| {
             let hash = entry.key().to_owned();
             let ids = entry.value();
             offset_map.insert(
                 hash,
                 (offset.fetch_add(ids.len(), Ordering::Relaxed), ids.len())
             );
-            let vec_inner = vec.clone();
-            vec_inner.lock().unwrap().extend_from_slice(ids);
+            vec.extend_from_slice(ids);
         });
-        
-        // orig_map.iter().for_each(|entry| {
-        //     let hash = entry.key().to_owned();
-        //     let ids = entry.value();
-        //     offset_map.insert(
-        //         hash,
-        //         (offset.fetch_add(ids.len(), Ordering::Relaxed), ids.len())
-        //     );
-        //     vec.extend_from_slice(ids);
-        // });
-        (offset_map, Arc::try_unwrap(vec).unwrap().into_inner().unwrap())
+        (offset_map, vec)
     }
 
 

@@ -41,8 +41,6 @@ pub fn query_pdb(env: AppArgs) {
                 eprintln!("{}", HELP_QUERY);
                 std::process::exit(1);
             }
-
-            println!("Querying PDB...");
             
             // Get path. formatting without quotation marks
             let index_path = index_path.unwrap();
@@ -65,7 +63,6 @@ pub fn query_pdb(env: AppArgs) {
             let pdb_query =  make_query(
                 &pdb_path, &query_residues, hash_type
             );
-            println!("Querying PDB with {:?}", pdb_query);
 
             // Get values with offset
             // let offset_to_query = pdb_query.iter().map(|&x| offset_table.get(&x).unwrap()).collect::<Vec<_>>();
@@ -77,16 +74,10 @@ pub fn query_pdb(env: AppArgs) {
                 // Get offset map values
                 offset_to_query.push(*offset);
             }
-            println!("offset_to_query: {:?}", offset_to_query);
             
             let mut intersection = Vec::new();
             for i in 0..offset_to_query.len() {
-                println!("offset_to_query: {:?}", offset_to_query[i]);
                 let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
-                for i in 0..single_queried_values.len() {
-                    println!("{:?}", single_queried_values[i]);
-                    println!("{:?}", lookup.0[single_queried_values[i] as usize]);
-                }
                 if i == 0 {
                     intersection = single_queried_values.to_vec();
                 } else {
@@ -96,7 +87,7 @@ pub fn query_pdb(env: AppArgs) {
                     ).map(|&x| x).collect::<Vec<_>>();
                 }
             }
-            println!("queried size: {:?}", intersection.len());
+
             for i in 0..intersection.len() {
                 let nid = lookup.1[intersection[i] as usize];
                 println!("{:?}", lookup.0[nid]);

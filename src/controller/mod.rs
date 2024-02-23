@@ -10,6 +10,7 @@ pub mod io;
 pub mod query;
 
 use std::io::Write;
+use std::sync::Arc;
 // External imports
 use rayon::prelude::*;
 
@@ -120,22 +121,26 @@ impl FoldDisco {
     }
 
     // Main methods
-    pub fn fill_numeric_id_vec(&mut self) {
-        string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
-        self.flags.fill_numeric_id_vec = true;
-    }
+    // pub fn fill_numeric_id_vec(&mut self) {
+    //     string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
+        
+    // }
 
     pub fn collect_hash(&mut self) {
+        let mut path_order: Arc<Vec<usize>> = Arc::new(Vec::with_capacity(self.path_vec.len()));
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating files");
         // For iterating files, apply multi-threading with num_threads_for_file
-        let output = pool.install(|| {
+        let (output, positions): (Vec<Vec<GeometricHash>>, Vec<usize>) = pool.install(|| {
             self.path_vec
                 .par_iter()
                 .map(|pdb_path| {
+                    let mut path_order = path_order.clone();
+                    // let mut path_order = Arc::make_mut(&mut path_order);
+                    let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
                     let pdb_reader = PDBReader::from_file(pdb_path).expect(
                         log_msg(FAIL, "PDB file not found").as_str()
                     );
@@ -153,16 +158,18 @@ impl FoldDisco {
                         let mut hash_vec = hash_vec;
                         hash_vec.sort_unstable();
                         hash_vec.dedup();
-                        hash_vec
+                        (hash_vec, pdb_pos)
                     } else {
-                        hash_vec
+                        (hash_vec, pdb_pos)
                     }
                 })
-            })
-            .collect::<Vec<Vec<GeometricHash>>>();
-        
+            }).unzip();
+        println!("output: {:?}", output.len());
+        println!("positions: {:?}", positions.len());
         self.hash_collection = output;
+        self.numeric_id_vec = positions;
         self.flags.collect_hash = true;
+        self.flags.fill_numeric_id_vec = true;
     }
 
     pub fn get_allocation_size(&self) -> usize {
@@ -199,10 +206,6 @@ impl FoldDisco {
         if !self.flags.collect_hash {
             print_log_msg(FAIL, "Hash collection is not filled yet");
             return;
-        }
-        if !self.flags.fill_numeric_id_vec {
-            print_log_msg(WARN, "Numeric ID vector is not filled yet. Filling numeric ID vector...");
-            self.fill_numeric_id_vec();
         }
         let index_builder = IndexBuilder::new(
             &self.numeric_id_vec, &self.hash_collection,

@@ -165,47 +165,6 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         self.allocation_size = total_size;
     }
     
-    
-    pub fn fill_with_dashmap(&mut self) {
-        let mut handles = vec![];
-        let data_index = Arc::new(AtomicUsize::new(0));
-        // 
-        for _ in 0..self.num_threads {
-            // Clone Arcs to move into threads
-            let data = self.data.clone();   
-            let ids = self.ids.clone();
-            let data_index = data_index.clone();
-            let data_dashmap = self.data_dashmap.clone();
-            let handle = thread::spawn(move || {
-                while data_index.load(Ordering::Relaxed) < data.len() {
-                    let data_index = data_index.fetch_add(1, Ordering::Relaxed);
-                    if data_index >= data.len() {
-                        break;
-                    }
-                    let data_inner = &data[data_index];
-                    let curr_id = ids[data_index];
-                    for j in 0..data_inner.len() {
-                        // If data_dashmap contains data_inner[j], append ids[data_index] to the value
-                        if data_dashmap.contains_key(&data_inner[j]) {
-                            let mut value = data_dashmap.get_mut(&data_inner[j]).unwrap();
-                            if !value.contains(&curr_id) {
-                                value.push(curr_id);
-                            }
-                        } else {
-                            // If data_dashmap does not contain data_inner[j], insert ids[data_index] to the value
-                            data_dashmap.insert(data_inner[j].clone(), vec![curr_id]);
-                        }
-                    }
-                    
-                }
-            });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
-        }
-    }
-
     pub fn fill_and_return_dashmap(&mut self) -> DashMap<V, Vec<K>>  {
         let output = Arc::new(DashMap::<V, Vec<K>>::new());
         let mut handles = vec![];

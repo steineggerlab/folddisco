@@ -294,6 +294,32 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
     
 }
 
+
+pub fn convert_sorted_pairs_to_offset_and_values<V: HashableSync, K:HashableSync> (
+    sorted_pairs: Vec<(V, K)>
+) -> (DashMap<V, (usize, usize)>, Vec<K>) {
+    // OffsetMap - key: hash, value: (offset, length)
+    // Vec - all values concatenated
+    let mut offset_map = DashMap::new();
+    let mut vec: Vec<K> = Vec::new();
+    let mut offset = AtomicUsize::new(0);
+    
+    sorted_pairs.iter().for_each(|pair| {
+        // If offset_map does not contain the key, insert it
+        if !offset_map.contains_key(&pair.0) {
+            offset_map.insert(pair.0, (offset.load(Ordering::Relaxed), 1));
+        } else {
+            // If offset_map contains the key, increment the offset, size and push the value to vec
+            let mut entry = offset_map.get_mut(&pair.0).unwrap();
+            entry.1 += 1;
+        }
+        vec.push(pair.1);
+        offset.fetch_add(1, Ordering::Relaxed);
+    });
+    
+    (offset_map, vec)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -67,3 +67,48 @@ testing commands
 # Querying
 ./target/release/motifsearch query -i data/index/serine_peptidases_filtered data/serine_peptidases_filtered/1aq2.pdb A250,A232,A269
 ```
+
+## Built inverted index with sorting
+> 2024-02-26 23:29:13
+```sh
+(base) hyunbin@ramda:/fast/hyunbin/motif/swissprot_benchmark$ \time -v ~/Projects/06_Motifsearch/motifsearch/target/release/motifsearch index2 -d ./swissprot_v4_raw/ -i ./folddisco_swissprot_v4/swissprot_v4_pdb -t 64 -v -H pdb
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+This is build_index2
+[INFO] Building index table...
+Time elapsed in "fold_disco.collect_hash_pairs()": 1861.898393297s # Sorting is included here
+Time elapsed in "fold_disco.fill_numeric_id_vec()": 12.445695ms
+Time elapsed in "fold_disco.set_index_table()": 743.989634429s     # This should be skipped
+Time elapsed in "fold_disco.index_builder.convert_sorted_pairs_to_offset_and_values(fold_disco.hash_id_pairs)": 2970.673529343s # Current: Single threaded. NEED TO BE PARALLELIZED
+Time elapsed in "save_offset_map(&offset_path,\n        &offset_table).expect(&log_msg(FAIL, \"Failed to save offset table\"))": 226.487304ms
+Time elapsed in "write_usize_vector(&value_path,\n        &value_vec).expect(&log_msg(FAIL, \"Failed to save values\"))": 470.925270564s
+Time elapsed in "save_lookup_to_file(&lookup_path, &fold_disco.path_vec,\n    &fold_disco.numeric_id_vec, None)": 185.856063ms
+PDBMotifSinCos
+[DONE] Done.
+	Command being timed: "/home/hyunbin/Projects/06_Motifsearch/motifsearch/target/release/motifsearch index2 -d ./swissprot_v4_raw/ -i ./folddisco_swissprot_v4/swissprot_v4_pdb -t 64 -v -H pdb"
+	User time (seconds): 33875.19
+	System time (seconds): 2044.77
+	Percent of CPU this job got: 593%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:40:57
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1682107388
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 12
+	Minor (reclaiming a frame) page faults: 150143064
+	Voluntary context switches: 22725972
+	Involuntary context switches: 224439
+	Swaps: 0
+	File system inputs: 22735136
+	File system outputs: 559279392
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+```

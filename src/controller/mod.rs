@@ -30,6 +30,7 @@ pub struct FoldDisco {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
     pub hash_collection: Vec<Vec<GeometricHash>>,
+    pub hash_id_pairs: Vec<(GeometricHash, usize)>,
     pub index_builder: IndexBuilder<usize, GeometricHash>,
     pub hash_type: HashType,
     pub remove_redundancy: bool,
@@ -65,6 +66,7 @@ impl FoldDisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
             hash_collection: Vec::new(),
+            hash_id_pairs: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: DEFAULT_HASH_TYPE,
             remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
@@ -78,6 +80,7 @@ impl FoldDisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
             hash_collection: Vec::new(),
+            hash_id_pairs: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: hash_type,
             remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
@@ -95,6 +98,7 @@ impl FoldDisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::new(),
             hash_collection: Vec::new(),
+            hash_id_pairs: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: hash_type,
             remove_redundancy: remove_redundancy,
@@ -121,10 +125,10 @@ impl FoldDisco {
     }
 
     // Main methods
-    // pub fn fill_numeric_id_vec(&mut self) {
-    //     string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
+    pub fn fill_numeric_id_vec(&mut self) {
+        string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
         
-    // }
+    }
 
     pub fn collect_hash(&mut self) {
         let mut path_order: Arc<Vec<usize>> = Arc::new(Vec::with_capacity(self.path_vec.len()));
@@ -168,6 +172,48 @@ impl FoldDisco {
         println!("positions: {:?}", positions.len());
         self.hash_collection = output;
         self.numeric_id_vec = positions;
+        self.flags.collect_hash = true;
+        self.flags.fill_numeric_id_vec = true;
+    }
+
+    pub fn collect_hash_pairs(&mut self) {
+        // Set file threads
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            .build()
+            .expect("Failed to build thread pool for iterating files");
+        // For iterating files, apply multi-threading with num_threads_for_file
+        let mut collected: Vec<(GeometricHash, usize)> = pool.install(|| {
+            self.path_vec
+                .par_iter()
+                .map(|pdb_path| {
+                    // let mut path_order = Arc::make_mut(&mut path_order);
+                    let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                    let pdb_reader = PDBReader::from_file(pdb_path).expect(
+                        log_msg(FAIL, "PDB file not found").as_str()
+                    );
+                    let compact = pdb_reader.read_structure().expect(
+                        log_msg(FAIL, "Failed to read structure").as_str()
+                    );
+                    let hash_vec = get_geometric_hash_from_structure(
+                        &compact.to_compact(), self.hash_type
+                    );
+                    // Drop intermediate variables
+                    drop(compact);
+                    drop(pdb_reader);
+                    // If remove_redundancy is true, remove duplicates
+                    if self.remove_redundancy {
+                        let mut hash_vec = hash_vec;
+                        hash_vec.sort_unstable();
+                        hash_vec.dedup();
+                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect::<Vec<(GeometricHash, usize)>>()
+                    } else {
+                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect::<Vec<(GeometricHash, usize)>>()
+                    }
+                }).flatten().collect()
+            });
+        collected.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        self.hash_id_pairs = collected;
         self.flags.collect_hash = true;
         self.flags.fill_numeric_id_vec = true;
     }

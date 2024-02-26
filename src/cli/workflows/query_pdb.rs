@@ -17,10 +17,12 @@ pub const HELP_QUERY: &str = "\
 USAGE: motifsearch query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
 Example: motifsearch query -i index_table.index -t 6 1aq2.pdb A250,A232,A269
 Options:
-    -i, --index-path <INDEX_PATH>   Path of index table to load
-    -t, --threads <THREADS>     Number of threads to use
-    -v, --verbose               Print verbose messages
-    -h, --help                  Print this help menu
+    -d, --pdb <PDB_PATH>          Path of PDB file to query
+    -q, --query <QUERY_STRING>  Query string
+    -i, --index <INDEX_PATH>      Path of index table to load
+    -t, --threads <THREADS>            Number of threads to use
+    -v, --verbose                      Print verbose messages
+    -h, --help                         Print this help menu
 ";
 
 pub fn query_pdb(env: AppArgs) {
@@ -33,11 +35,13 @@ pub fn query_pdb(env: AppArgs) {
             help,
         } => {
             if help {
+                println!("THIS is query1");
                 eprintln!("{}", HELP_QUERY);
                 std::process::exit(0);
             }
             // Check if arguments are valid
             if index_path.is_none() {
+                                println!("THIS is query2");
                 eprintln!("{}", HELP_QUERY);
                 std::process::exit(1);
             }
@@ -75,9 +79,11 @@ pub fn query_pdb(env: AppArgs) {
                 offset_to_query.push(*offset);
             }
             
+            println!("{:?}", offset_to_query);
             let mut intersection = Vec::new();
             for i in 0..offset_to_query.len() {
                 let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
+                println!("{:?}", single_queried_values);
                 if i == 0 {
                     intersection = single_queried_values.to_vec();
                 } else {

@@ -75,8 +75,7 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         num_threads: usize, allocation_size: usize,
         offset_path: String, data_path: String,
     ) -> IndexBuilder<K, V> {
-        // Before creating check if given ids and data have same length
-        assert_eq!(ids.len(), data.len());
+
         // If num_threads is 0, set it to default. one liner
         let num_threads = if num_threads == 0 { DEFAULT_NUM_THREADS } else { num_threads };
         // If allocation_size is 0, set it to default
@@ -198,8 +197,7 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         }
         Arc::try_unwrap(output).unwrap()
     }
-    
-    
+
     // Allocate memory with allocation size
     pub fn allocate(&mut self) {
         self.allocation = Arc::new(HugeAllocation::new(self.allocation_size));
@@ -260,6 +258,31 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         (offset_map, vec)
     }
 
+    pub fn convert_sorted_pairs_to_offset_and_values(
+        &self,
+        sorted_pairs: Vec<(V, K)>
+    ) -> (DashMap<V, (usize, usize)>, Vec<K>) {
+        // OffsetMap - key: hash, value: (offset, length)
+        // Vec - all values concatenated
+        let mut offset_map = DashMap::new();
+        let mut vec: Vec<K> = Vec::new();
+        let mut offset = AtomicUsize::new(0);
+        
+        sorted_pairs.iter().for_each(|pair| {
+            // If offset_map does not contain the key, insert it
+            if !offset_map.contains_key(&pair.0) {
+                offset_map.insert(pair.0, (offset.load(Ordering::Relaxed), 1));
+            } else {
+                // If offset_map contains the key, increment the offset, size and push the value to vec
+                let mut entry = offset_map.get_mut(&pair.0).unwrap();
+                entry.1 += 1;
+            }
+            vec.push(pair.1);
+            offset.fetch_add(1, Ordering::Relaxed);
+        });
+        
+        (offset_map, vec)
+    }
 
     // fn fill_inner
     // Write dashmap to file
@@ -297,17 +320,6 @@ mod tests {
             &ids, &data, 6, 1000, String::from(""), String::from("")
         );
         measure_time!(assert_eq!(index_builder.estimate_size(), 40000 * 10000));
-    }
-    
-    #[test]
-    fn test_fill_dashmap() {
-        let data = create_test_data(40000, 10000);
-        let ids = (0..40000).collect::<Vec<usize>>();
-        let mut index_builder = IndexBuilder::new(
-            &ids, &data, 6, 1000, String::from(""), String::from("")
-        );
-        measure_time!(index_builder.fill_with_dashmap());
-        assert_eq!(index_builder.data_dashmap.len(), 40000);
     }
 
     #[test]

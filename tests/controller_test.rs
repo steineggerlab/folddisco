@@ -55,7 +55,32 @@ fn test_folddisco_pdbmotifsincos() {
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
     let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
-    fold_disco.collect_hash();
+    measure_time!(fold_disco.collect_hash_pairs());
+    fold_disco.fill_numeric_id_vec();
+    let mut hashes = fold_disco.hash_id_pairs.clone();
+    // Get the memory usage of hashes
+    let size = std::mem::size_of_val(&hashes);
+    let total_size = std::mem::size_of_val(&hashes[0]) * hashes.len();
+    // sort hashes
+    measure_time!(hashes.par_sort_by(|a, b| a.0.cmp(&b.0)));
+    println!("{:?}", &hashes.len());
+    println!("{:?}", &size);
+    println!("Total size of hashes: {} bytes", total_size);
+    println!("{:?}", &hashes.get(1000000).unwrap());
+    
+    fold_disco.set_index_table();
+    let (offset, values) = measure_time!(fold_disco.index_builder.convert_sorted_pairs_to_offset_and_values(hashes));
+    println!("{:?}", &offset.len());
+    println!("{:?}", &values.len());
+}
+
+
+#[test]
+fn test_folddisco_pdbmotifsincos_dashmap() {
+    // Test if the default hashing schemes are working
+    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
+    measure_time!(fold_disco.collect_hash());
     // fold_disco.fill_numeric_id_vec();
     for i in 0..fold_disco.hash_collection.len() {
         println!(
@@ -66,9 +91,10 @@ fn test_folddisco_pdbmotifsincos() {
             fold_disco.hash_collection.get(i).unwrap().get(0).unwrap(), 
         );
     }
-    fold_disco.set_index_table();
-    fold_disco.fill_index_table();
+    measure_time!(fold_disco.set_index_table());
+    measure_time!(fold_disco.fill_index_table());
 }
+
 
 
 #[test]

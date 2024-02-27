@@ -6,9 +6,12 @@
 // This file contains the workflow for querying PDB files
 // When querying PDB files, we need index table and query file.
 
+use std::collections::HashMap;
+
 use crate::cli::*;
 use crate::controller::io::{read_offset_map, read_usize_vector, get_values_with_offset};
 use crate::index::lookup::{load_lookup_from_file};
+use dashmap::DashMap;
 use rayon::prelude::*;
 use crate::prelude::*;
 
@@ -24,6 +27,7 @@ Options:
     -v, --verbose                      Print verbose messages
     -h, --help                         Print this help menu
 ";
+
 
 pub fn query_pdb(env: AppArgs) {
     match env {
@@ -74,30 +78,56 @@ pub fn query_pdb(env: AppArgs) {
             // Get offset from offset_table with query
             let mut offset_to_query = Vec::new();
             for i in 0..pdb_query.len() {
-                let offset = offset_table.get(&pdb_query[i]).unwrap();
+                let offset = offset_table.get(&pdb_query[i]);
                 // Get offset map values
-                offset_to_query.push(*offset);
-            }
-            
-            println!("{:?}", offset_to_query);
-            let mut intersection = Vec::new();
-            for i in 0..offset_to_query.len() {
-                let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
-                println!("{:?}", single_queried_values);
-                if i == 0 {
-                    intersection = single_queried_values.to_vec();
+                if offset.is_none() {
+                    continue;
                 } else {
-                    // Filter intersection with single_queried_values
-                    intersection = intersection.par_iter().filter(
-                        |&&x| single_queried_values.contains(&x)
-                    ).map(|&x| x).collect::<Vec<_>>();
+                    offset_to_query.push(*offset.unwrap());
                 }
             }
 
-            for i in 0..intersection.len() {
-                let nid = lookup.1[intersection[i] as usize];
-                println!("{:?}", lookup.0[nid]);
+            // Make union of values queried
+            let mut query_count_map: HashMap<usize, usize> = HashMap::new();
+            for i in 0..offset_to_query.len() {
+                let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
+                for j in 0..single_queried_values.len() {
+                    let nid = lookup.1[single_queried_values[j] as usize];
+                    let count = query_count_map.get(&nid);
+                    if count.is_none() {
+                        query_count_map.insert(nid, 1);
+                    } else {
+                        query_count_map.insert(nid, count.unwrap() + 1);
+                    }
+                }
             }
+            // Sort by count and print
+            let mut query_count_vec: Vec<_> = query_count_map.iter().collect();
+            query_count_vec.sort_by(|a, b| b.1.cmp(a.1));
+            for (nid, count) in query_count_vec {
+                if *count > 1_usize {
+                    println!("{}: {}", lookup.0[*nid], count);
+                }
+            }
+            
+            // let mut intersection = Vec::new();
+            // for i in 0..offset_to_query.len() {
+            //     let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
+            //     println!("{:?}", single_queried_values);
+            //     if i == 0 {
+            //         intersection = single_queried_values.to_vec();
+            //     } else {
+            //         // Filter intersection with single_queried_values
+            //         intersection = intersection.par_iter().filter(
+            //             |&&x| single_queried_values.contains(&x)
+            //         ).map(|&x| x).collect::<Vec<_>>();
+            //     }
+            // }
+
+            // for i in 0..intersection.len() {
+            //     let nid = lookup.1[intersection[i] as usize];
+            //     println!("{:?}", lookup.0[nid]);
+            // }
         },
         _ => {
             eprintln!("{}", HELP_QUERY);

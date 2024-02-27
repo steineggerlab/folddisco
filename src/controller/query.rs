@@ -11,6 +11,8 @@ use super::feature::get_single_feature;
 // TODO: Query should be able to consider both chain & residue index
 
 
+const CHECK_NEARBY: bool = false;
+
 // Query is expected to be given as a path, and a list of tuples of chain and residue index
 
 pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType) -> Vec<GeometricHash> {
@@ -36,6 +38,17 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
             );
             if feature.is_some() {
                 let feature = feature.unwrap();
+                if CHECK_NEARBY {
+                    let mut feature_near = feature.clone();
+                    let mut feature_far = feature.clone();
+                    feature_near[2] -= 0.5;
+                    feature_far[2] += 0.5;
+                    let hash_near = GeometricHash::perfect_hash(feature_near, hash_type);
+                    let hash_far = GeometricHash::perfect_hash(feature_far, hash_type);
+                    hash_collection.push(hash_near);
+                    hash_collection.push(hash_far);
+                }
+
                 let hash_value = GeometricHash::perfect_hash(feature, hash_type);
                 hash_collection.push(hash_value);
             }

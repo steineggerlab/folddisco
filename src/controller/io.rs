@@ -45,6 +45,39 @@ pub fn save_offset_map(
     Ok(())
 }
 
+pub fn save_offset_vec(
+    path: &str, offset_map: &Vec<(GeometricHash, usize, usize)>
+) -> Result<(), Error> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(path)?;
+
+    // Get hash type
+    let hash_type = offset_map[0].0.hash_type();
+    let total_size = match hash_type.encoding_type() {
+        32 => 20 * offset_map.len() as u64,
+        64 => 24 * offset_map.len() as u64,
+        _ => { panic!("Invalid hash type"); }
+    };
+    file.set_len(total_size as u64)?;
+    // Write as whole
+    let mut writer = BufWriter::new(file);
+    // Iterate through vector
+    offset_map.iter().for_each(|(key, offset, length)| {
+        match key.hash_type().encoding_type() {
+            32 => { writer.write_all(&key.as_u32().to_le_bytes()).unwrap(); },
+            64 => { writer.write_all(&key.as_u64().to_le_bytes()).unwrap(); },
+            _ => { panic!("Invalid hash type"); }
+        }
+        writer.write_all(&offset.to_le_bytes()).unwrap();
+        writer.write_all(&length.to_le_bytes()).unwrap();
+    });
+
+    Ok(())
+}
+
 pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<GeometricHash, (usize, usize)>, Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };

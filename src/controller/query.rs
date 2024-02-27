@@ -34,8 +34,11 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
             let feature = get_single_feature(
                 indices[i], indices[j], &compact, hash_type
             );
-            let hash_value = GeometricHash::perfect_hash(feature, hash_type);
-            hash_collection.push(hash_value);
+            if feature.is_some() {
+                let feature = feature.unwrap();
+                let hash_value = GeometricHash::perfect_hash(feature, hash_type);
+                hash_collection.push(hash_value);
+            }
         }
     }
     hash_collection

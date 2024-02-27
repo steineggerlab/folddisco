@@ -1,15 +1,15 @@
 # Development note
 
 ## TODOs 
-- [ ] IMPORTANT:  working examples
-- [ ] IMPORTANT:  querying
-- [ ] IMPORTANT:  confirm if sin & cos representation is working 
-
+- [ ] working examples
+- [ ] Reduce memory usage
+- [x] querying
+- [ ] IMPORTANT: Concat multiple index tables
+- [ ] IMPORTANT: confirm if sin & cos representation is working 
   - [ ] lib.rs
     - [x] expose necessary functions with prelude
   - [ ] tests
-- [ ] Push only working code to the repository
-  - [x] pass cargo check - 2024-02-20 18:30:00
+- NOTE: Push only working code to the repository
 - [ ] Check all structs and methods are working within tests
   - [ ] structure
   - [ ] geometry
@@ -112,3 +112,29 @@ PDBMotifSinCos
 	Page size (bytes): 4096
 	Exit status: 0
 ```
+
+```sh
+[INFO] 
+INITIAL - 0.031378746MB
+SETUP - 0.03885269MB
+collected: 3346869
+memory_usage: 76MB
+[INFO] fold_disco.collect_hash_pairs: 2.150621215s
+AFTER COLLECTION - 76.672455MB
+[INFO] fold_disco.sort_hash_pairs: 79.670447ms
+AFTER SORTING - 76.68631MB
+[INFO] fold_disco.fill_numeric_id_vec: 12.194µs
+FILL NUM ID - 76.67482MB
+[INFO] fold_disco.index_builder.convert_sorted_pairs_to_offset_and_values: 754.514141ms
+OFFSET CONVERSION - 164.07326MB
+[INFO] save_offset_map: 93.874368ms
+SAVE OFFSET - 32.071117MB
+[INFO] write_usize_vector: 10.31571ms
+SAVE VALUE- 0.07117081MB
+[INFO] save_lookup_to_file: 2.254281ms
+SAVE LOOKUP - 0.07122421MB
+FoldDiscoDefault
+FINAL - 0.07127762MB
+[DONE] Done.
+```
+

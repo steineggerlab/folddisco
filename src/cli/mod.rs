@@ -27,15 +27,6 @@ pub enum AppArgs {
         verbose: bool,
         help: bool,
     },
-    Index2 {
-        pdb_dir: Option<String>,
-        pdb_path_vec: Vec<String>,
-        hash_type: String,
-        index_path: String,
-        num_threads: usize,
-        verbose: bool,
-        help: bool,
-    },
     Query {
         pdb_path: String,
         query_string: String,

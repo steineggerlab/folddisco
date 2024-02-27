@@ -12,6 +12,23 @@ pub const DONE: &str = "\x1b[1;34m[DONE]\x1b[0m";
 pub fn log_msg(prefix: &str, msg: &str) -> String { format!("{} {}", prefix, msg) }
 pub fn print_log_msg(prefix: &str, msg: &str) { eprintln!("{}", log_msg(prefix, msg)); }
 
+// Macro for measuring time for a function
+// measure_time gets two arguments; function and its name
+#[macro_export]
+macro_rules! measure_time {
+    ($x:expr) => {{
+        let start = std::time::Instant::now();
+        let result = $x;
+        let duration = start.elapsed();
+        // Print only the name of the function
+        let mut fn_name = stringify!($x);
+        fn_name = fn_name.split("(").collect::<Vec<&str>>()[0];
+        // Don't print quotation marks around the function name
+        eprintln!("\x1b[1;32m[INFO]\x1b[0m {}: {:?}", fn_name, duration);
+        result
+    }}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

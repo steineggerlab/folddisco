@@ -35,16 +35,6 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),
-        Some("index2") => Ok(AppArgs::Index2 {
-            // TODO: NOTE: Change to parse positional arguments for input PDBs
-            pdb_dir: args.opt_value_from_str(["-d", "--pdbs"])?,
-            pdb_path_vec: Vec::new(),
-            hash_type: args.value_from_str(["-H", "--hash"]).unwrap_or("default".into()),
-            index_path: args.value_from_str(["-i", "--index"]).unwrap_or("folddisco_index".into()),
-            num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
-            verbose: args.contains(["-v", "--verbose"]),
-            help: args.contains(["-h", "--help"]),
-        }),
         Some("query") => Ok(AppArgs::Query {
             pdb_path: args.value_from_str(["-d", "--pdb"]).unwrap_or("".into()),
             query_string: args.value_from_str(["-q", "--query"]).unwrap_or("".into()),
@@ -80,13 +70,6 @@ fn main() {
                 eprintln!("{}", workflows::build_index::HELP_INDEX);
             } else {
                 build_index::build_index(parsed_args);
-            }
-        }
-        AppArgs::Index2 { help, .. } => {
-            if help {
-                eprintln!("{}", workflows::build_index2::HELP_INDEX);
-            } else {
-                workflows::build_index2::build_index(parsed_args);
             }
         }
         AppArgs::Query { help, threads, .. } => {

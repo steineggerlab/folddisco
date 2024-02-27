@@ -12,19 +12,19 @@ use crate::cli::*;
 use crate::prelude::*;
 
 pub const HELP_INDEX: &str = "\
-USAGE: motifsearch index2 [OPTIONS]
+USAGE: motifsearch index [OPTIONS]
 Options:
-    -d, --pdbs <PDB_DIR>         Directory containing PDB files
+    -d, --pdb <PDB_DIR>        Directory containing PDB files
     -H, --hash <HASH_TYPE>     Hash type to use (pdb, trrosetta, default)
     -i, --index <INDEX_PATH>   Path to save the index table
-    -t, --threads <THREADS>         Number of threads to use
-    -v, --verbose                   Print verbose messages
-    -h, --help                      Print this help menu
+    -t, --threads <THREADS>    Number of threads to use
+    -v, --verbose              Print verbose messages
+    -h, --help                 Print this help menu
 ";
 
 pub fn build_index(env: AppArgs) {
     match env {
-        AppArgs::Index2 {
+        AppArgs::Index {
             pdb_dir,
             pdb_path_vec,
             hash_type,
@@ -33,17 +33,12 @@ pub fn build_index(env: AppArgs) {
             verbose,
             help,
         } => {
-            println!("This is build_index2");
             // Check if arguments are valid
             if pdb_dir.is_none() && pdb_path_vec.is_empty() {
-            println!("This is build_index2-1");
-
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(1);
             }
             if help {
-            println!("This is build_index2-2");
-
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(0);
             } else {
@@ -65,13 +60,19 @@ pub fn build_index(env: AppArgs) {
 
                 // Main workflow
                 // 2. Collect hash
-                measure_time!(fold_disco.collect_hash_pairs());
-                measure_time!(fold_disco.fill_numeric_id_vec());
+                measure_time!(fold_disco.collect_hash());
                 // 3. Setting
                 measure_time!(fold_disco.set_index_table());
+                // 4. Fill index table
+                measure_time!(fold_disco.fill_index_table());
+
+                // index_table.remove(&0u64); // Remove invalid hash
+                // Convert to offset table
+                let mut index_table = measure_time!(fold_disco.index_builder.fill_and_return_dashmap());
+                index_table.remove(&GeometricHash::from_u64(0, hash_type));
 
                 let (offset_table, value_vec) =
-                    measure_time!(fold_disco.index_builder.convert_sorted_pairs_to_offset_and_values(fold_disco.hash_id_pairs));
+                    measure_time!(fold_disco.index_builder.convert_hashmap_to_offset_and_values(index_table));
                     
                 // Save offset table
                 let offset_path = format!("{}.offset", index_path);
@@ -99,7 +100,6 @@ pub fn build_index(env: AppArgs) {
             }
         }
         _ => {
-            println!("This is build_index2-3");
             eprintln!("{}", HELP_INDEX);
             std::process::exit(1);
         }

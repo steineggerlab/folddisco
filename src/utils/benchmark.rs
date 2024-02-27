@@ -75,16 +75,3 @@ pub fn compare_target_answer<T: Eq + PartialEq>(target: &Vec<T>, answer: &Vec<T>
 
     Metrics::new(true_pos, true_neg, false_pos, false_neg)
 }
-
-// Macro for measuring time for a function
-// measure_time gets two arguments; function and its name
-#[macro_export]
-macro_rules! measure_time {
-    ($x:expr) => {{
-        let start = std::time::Instant::now();
-        let result = $x;
-        let duration = start.elapsed();
-        println!("Time elapsed in {:?}: {:?}", stringify!($x), duration);
-        result
-    }}
-}

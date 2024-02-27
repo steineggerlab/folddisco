@@ -175,7 +175,7 @@ impl FoldDisco {
         self.flags.collect_hash = true;
         self.flags.fill_numeric_id_vec = true;
     }
-
+    
     pub fn collect_hash_pairs(&mut self) {
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
@@ -195,7 +195,7 @@ impl FoldDisco {
                     let compact = pdb_reader.read_structure().expect(
                         log_msg(FAIL, "Failed to read structure").as_str()
                     );
-                    let hash_vec = get_geometric_hash_from_structure(
+                    let mut hash_vec = get_geometric_hash_from_structure(
                         &compact.to_compact(), self.hash_type
                     );
                     // Drop intermediate variables
@@ -203,7 +203,6 @@ impl FoldDisco {
                     drop(pdb_reader);
                     // If remove_redundancy is true, remove duplicates
                     if self.remove_redundancy {
-                        let mut hash_vec = hash_vec;
                         hash_vec.sort_unstable();
                         hash_vec.dedup();
                         hash_vec.iter().map(|x| (*x, pdb_pos)).collect::<Vec<(GeometricHash, usize)>>()
@@ -212,12 +211,31 @@ impl FoldDisco {
                     }
                 }).flatten().collect()
             });
-        collected.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+
+        // WARNING: TEMP: Print the size of collected hash pairs
+        println!("collected: {:?}", collected.len());
+        let mut memory_usage = 0usize;
+        for i in 0..collected.len() {
+            memory_usage += std::mem::size_of_val(&collected[i]);
+        }
+        // WARNING: END
+
+        println!("memory_usage: {:?}MB", memory_usage / 1024 / 1024);
         self.hash_id_pairs = collected;
         self.flags.collect_hash = true;
         self.flags.fill_numeric_id_vec = true;
     }
 
+    pub fn sort_hash_pairs(&mut self) {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            .build()
+            .expect(&log_msg(FAIL, "Failed to build thread pool for sorting"));
+        pool.install(|| {
+            self.hash_id_pairs.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        });
+    }
+    
     pub fn get_allocation_size(&self) -> usize {
         let mut allocation_size = 0usize;
         self.path_vec.iter().for_each(|pdb_path| {
@@ -248,6 +266,7 @@ impl FoldDisco {
     }
     
     pub fn set_index_table(&mut self) {
+        // Deprecated
         // Check if hash_collection is filled
         if !self.flags.collect_hash {
             print_log_msg(FAIL, "Hash collection is not filled yet");
@@ -264,6 +283,7 @@ impl FoldDisco {
     }
     
     pub fn fill_index_table(&mut self) {
+        // Deprecated
         // Check if index_table is set
         if !self.flags.set_index_table {
             print_log_msg(WARN, "Index table is not set yet. Setting index table...");

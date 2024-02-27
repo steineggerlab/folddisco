@@ -4,6 +4,7 @@
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
 use rayon::iter::ParallelIterator;
+use rayon::prelude::*;
 // external crates
 use rustc_hash::{FxHashMap, FxHashSet};
 use dashmap::DashMap;
@@ -318,6 +319,55 @@ pub fn convert_sorted_pairs_to_offset_and_values<V: HashableSync, K:HashableSync
     });
     
     (offset_map, vec)
+}
+
+
+pub fn estimate_hash_size<V: HashableSync, K:HashableSync> (
+    sorted_pairs: &Vec<(V, K)>
+) -> (usize, usize) {
+    let mut total_hashes = 0usize;
+    let mut total_values = 0usize;
+    let mut curr = &sorted_pairs[0].0;
+    for i in 0..sorted_pairs.len() {
+        if curr != &sorted_pairs[i].0 {
+            total_hashes += 1;
+            curr = &sorted_pairs[i].0;
+        }
+        total_values += 1;
+    }
+    (total_hashes, total_values)
+}
+
+pub fn convert_sorted_pairs_to_offset_and_values_vec<V: HashableSync, K:HashableSync> (
+    sorted_pairs: Vec<(V, K)>
+) -> (Vec<(V, usize, usize)>, Vec<K>) {
+    let (total_hashes, total_values) = estimate_hash_size(&sorted_pairs);
+    let mut offset_list: Vec<(V, usize, usize)> = Vec::with_capacity(total_hashes);
+    let mut vec: Vec<K> = Vec::with_capacity(total_values);
+
+    if let Some((first_hash, _)) = sorted_pairs.first() {
+        let mut current_hash = first_hash;
+        let mut current_offset = 0;
+        let mut current_count = 0;
+
+        for (index, pair) in sorted_pairs.iter().enumerate() {
+            if pair.0 == *current_hash {
+                current_count += 1;
+            } else {
+                offset_list.push((*current_hash, current_offset, current_count));
+                current_hash = &pair.0;
+                current_offset = index;
+                current_count = 1;
+            }
+            vec.push(pair.1);
+        }
+
+        offset_list.push((*current_hash, current_offset, current_count));
+    }
+    // Shrink offset_list and vec
+    offset_list.shrink_to_fit();
+    vec.shrink_to_fit();
+    (offset_list, vec)
 }
 
 #[cfg(test)]

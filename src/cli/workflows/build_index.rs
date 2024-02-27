@@ -9,17 +9,23 @@
 
 
 use crate::cli::*;
+use crate::controller::io::save_offset_vec;
+use crate::index::alloc::convert_sorted_pairs_to_offset_and_values_vec;
 use crate::prelude::*;
+use peak_alloc::PeakAlloc;
+
+#[global_allocator]
+static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 pub const HELP_INDEX: &str = "\
 USAGE: motifsearch index [OPTIONS]
 Options:
-    -d, --pdb <PDB_DIR>        Directory containing PDB files
+    -d, --pdbs <PDB_DIR>         Directory containing PDB files
     -H, --hash <HASH_TYPE>     Hash type to use (pdb, trrosetta, default)
     -i, --index <INDEX_PATH>   Path to save the index table
-    -t, --threads <THREADS>    Number of threads to use
-    -v, --verbose              Print verbose messages
-    -h, --help                 Print this help menu
+    -t, --threads <THREADS>         Number of threads to use
+    -v, --verbose                   Print verbose messages
+    -h, --help                      Print this help menu
 ";
 
 pub fn build_index(env: AppArgs) {
@@ -42,10 +48,12 @@ pub fn build_index(env: AppArgs) {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(0);
             } else {
-                if verbose { print_log_msg(INFO, "Building index table..."); } // NEED TO BE CHANGED
+                if verbose { print_log_msg(INFO, ""); } // TODO: NEED TO BE CHANGED
                 // Setup multithreading
                 rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global().unwrap();
-
+                
+                eprintln!("INITIAL - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                
                 // Load PDB files
                 let pdb_path_vec = if pdb_dir.is_some() {
                     load_path(&pdb_dir.unwrap())
@@ -57,45 +65,49 @@ pub fn build_index(env: AppArgs) {
                 let mut fold_disco = FoldDisco::new_with_params(
                     pdb_path_vec, hash_type, true, num_threads, index_path.clone()
                 );
-
+                eprintln!("SETUP - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                
                 // Main workflow
                 // 2. Collect hash
-                measure_time!(fold_disco.collect_hash());
-                // 3. Setting
-                measure_time!(fold_disco.set_index_table());
-                // 4. Fill index table
-                measure_time!(fold_disco.fill_index_table());
-
-                // index_table.remove(&0u64); // Remove invalid hash
-                // Convert to offset table
-                let mut index_table = measure_time!(fold_disco.index_builder.fill_and_return_dashmap());
-                index_table.remove(&GeometricHash::from_u64(0, hash_type));
+                measure_time!(fold_disco.collect_hash_pairs());
+                eprintln!("AFTER COLLECTION - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                measure_time!(fold_disco.sort_hash_pairs());
+                eprintln!("AFTER SORTING - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                measure_time!(fold_disco.fill_numeric_id_vec());
+                eprintln!("FILL NUM ID - {}MB", PEAK_ALLOC.current_usage_as_mb());
 
                 let (offset_table, value_vec) =
-                    measure_time!(fold_disco.index_builder.convert_hashmap_to_offset_and_values(index_table));
-                    
+                    // measure_time!(fold_disco.index_builder.convert_sorted_pairs_to_offset_and_values(fold_disco.hash_id_pairs));
+                    measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_pairs));
+                    eprintln!("OFFSET CONVERSION - {}MB", PEAK_ALLOC.current_usage_as_mb());
+
                 // Save offset table
                 let offset_path = format!("{}.offset", index_path);
-                measure_time!(save_offset_map(&offset_path, &offset_table).expect(
+                // measure_time!(save_offset_map(&offset_path, &offset_table).expect(
+                measure_time!(save_offset_vec(&offset_path, &offset_table).expect(
                     &log_msg(FAIL, "Failed to save offset table")
                 ));
+                drop(offset_table);
+                eprintln!("SAVE OFFSET - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 // Save value vector  
                 let value_path = format!("{}.value", index_path);
                 measure_time!(write_usize_vector(&value_path, &value_vec).expect(
                     &log_msg(FAIL, "Failed to save values")
                 ));
-
+                drop(value_vec);
+                eprintln!("SAVE VALUE- {}MB", PEAK_ALLOC.current_usage_as_mb());
                 // Save lookup. The path to lookup table is the same as the index table with .lookup extension
                 let lookup_path = format!("{}.lookup", index_path);
                 measure_time!(save_lookup_to_file(
                     &lookup_path, &fold_disco.path_vec,
                      &fold_disco.numeric_id_vec, None
                 ));
-
+                eprintln!("SAVE LOOKUP - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 // Save hash type
                 let hash_type_path = format!("{}.type", index_path);
                 hash_type.save_to_file(&hash_type_path);
                 
+                eprintln!("FINAL - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 if verbose { print_log_msg(DONE, "Done."); }
             }
         }

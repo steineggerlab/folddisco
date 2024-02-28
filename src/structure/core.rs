@@ -331,11 +331,12 @@ impl CompactStructure {
         Some(torsion)
     }
 
-    pub fn get_ppf(&self, idx1: usize, idx2: usize) -> Option<[f32; 4]> {
+    pub fn get_ppf(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
         if ca1.is_some() && ca2.is_some() {
             let ppf = ca1.unwrap().get_ppf(&ca2.unwrap());
+            let ppf = ppf.to_vec();
             Some(ppf)
         } else {
             None

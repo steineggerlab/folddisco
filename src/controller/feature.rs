@@ -75,6 +75,22 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
                 None
             }
         },
+        HashType::PointPairFeature => {
+            let feature = structure.get_ppf(i, j);
+            if feature.is_some() {
+                let mut feature = feature.unwrap();
+                if feature[2] > 20.0 {
+                    None
+                } else {
+                    feature.insert(0, res1);
+                    feature.insert(1, res2);
+                    Some(feature)
+                }
+            } else {
+                None
+            }
+        }
+        // append new hash type here
         _ => {
             None
         }

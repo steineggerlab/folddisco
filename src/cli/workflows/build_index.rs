@@ -12,10 +12,10 @@ use crate::cli::*;
 use crate::controller::io::save_offset_vec;
 use crate::index::alloc::convert_sorted_pairs_to_offset_and_values_vec;
 use crate::prelude::*;
-use peak_alloc::PeakAlloc;
+// use peak_alloc::PeakAlloc;
 
-#[global_allocator]
-static PEAK_ALLOC: PeakAlloc = PeakAlloc;
+// #[global_allocator]
+// static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 pub const HELP_INDEX: &str = "\
 USAGE: motifsearch index [OPTIONS]
@@ -27,6 +27,8 @@ Options:
     -v, --verbose                   Print verbose messages
     -h, --help                      Print this help menu
 ";
+// TODO: ADD MONITOR_MEMORY AS A PARAMETER
+// TODO: ADD NBIN_ANGLE, NBIN_DIST AS PARAMETERS
 
 pub fn build_index(env: AppArgs) {
     match env {
@@ -52,7 +54,7 @@ pub fn build_index(env: AppArgs) {
                 // Setup multithreading
                 rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global().unwrap();
                 
-                eprintln!("INITIAL - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("INITIAL - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 
                 // Load PDB files
                 let pdb_path_vec = if pdb_dir.is_some() {
@@ -65,21 +67,21 @@ pub fn build_index(env: AppArgs) {
                 let mut fold_disco = FoldDisco::new_with_params(
                     pdb_path_vec, hash_type, true, num_threads, index_path.clone()
                 );
-                eprintln!("SETUP - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("SETUP - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 
                 // Main workflow
                 // 2. Collect hash
                 measure_time!(fold_disco.collect_hash_pairs());
-                eprintln!("AFTER COLLECTION - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("AFTER COLLECTION - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 measure_time!(fold_disco.sort_hash_pairs());
-                eprintln!("AFTER SORTING - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("AFTER SORTING - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 measure_time!(fold_disco.fill_numeric_id_vec());
-                eprintln!("FILL NUM ID - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("FILL NUM ID - {}MB", PEAK_ALLOC.current_usage_as_mb());
 
                 let (offset_table, value_vec) =
                     // measure_time!(fold_disco.index_builder.convert_sorted_pairs_to_offset_and_values(fold_disco.hash_id_pairs));
                     measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_pairs));
-                    eprintln!("OFFSET CONVERSION - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                    // eprintln!("OFFSET CONVERSION - {}MB", PEAK_ALLOC.current_usage_as_mb());
 
                 // Save offset table
                 let offset_path = format!("{}.offset", index_path);
@@ -88,26 +90,26 @@ pub fn build_index(env: AppArgs) {
                     &log_msg(FAIL, "Failed to save offset table")
                 ));
                 drop(offset_table);
-                eprintln!("SAVE OFFSET - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("SAVE OFFSET - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 // Save value vector  
                 let value_path = format!("{}.value", index_path);
                 measure_time!(write_usize_vector(&value_path, &value_vec).expect(
                     &log_msg(FAIL, "Failed to save values")
                 ));
                 drop(value_vec);
-                eprintln!("SAVE VALUE- {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("SAVE VALUE- {}MB", PEAK_ALLOC.current_usage_as_mb());
                 // Save lookup. The path to lookup table is the same as the index table with .lookup extension
                 let lookup_path = format!("{}.lookup", index_path);
                 measure_time!(save_lookup_to_file(
                     &lookup_path, &fold_disco.path_vec,
                      &fold_disco.numeric_id_vec, None
                 ));
-                eprintln!("SAVE LOOKUP - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("SAVE LOOKUP - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 // Save hash type
                 let hash_type_path = format!("{}.type", index_path);
                 hash_type.save_to_file(&hash_type_path);
                 
-                eprintln!("FINAL - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                // eprintln!("FINAL - {}MB", PEAK_ALLOC.current_usage_as_mb());
                 if verbose { print_log_msg(DONE, "Done."); }
             }
         }
@@ -123,11 +125,74 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_build_index() {
+    fn test_build_index_ppf() {
+        let pdb_dir = "data/serine_peptidases_filtered";
+        let pdb_path_vec = load_path(pdb_dir);
+        let hash_type = "ppf";
+        let index_path = "data/test/serine_peptidases_ppf";
+        let num_threads = 6;
+        let verbose = true;
+        let help = false;
+        let env = AppArgs::Index {
+            pdb_dir: Some(pdb_dir.to_string()),
+            pdb_path_vec,
+            hash_type: hash_type.to_string(),
+            index_path: index_path.to_string(),
+            num_threads,
+            verbose,
+            help,
+        };
+        build_index(env);
+    }
+    
+    #[test]
+    fn test_build_index_pdb() {
+        let pdb_dir = "data/serine_peptidases_filtered";
+        let pdb_path_vec = load_path(pdb_dir);
+        let hash_type = "pdb";
+        let index_path = "data/test/serine_peptidases_pdb";
+        let num_threads = 6;
+        let verbose = true;
+        let help = false;
+        let env = AppArgs::Index {
+            pdb_dir: Some(pdb_dir.to_string()),
+            pdb_path_vec,
+            hash_type: hash_type.to_string(),
+            index_path: index_path.to_string(),
+            num_threads,
+            verbose,
+            help,
+        };
+        build_index(env);
+    }
+    
+        #[test]
+    fn test_build_index_trrosetta() {
         let pdb_dir = "data/serine_peptidases_filtered";
         let pdb_path_vec = load_path(pdb_dir);
         let hash_type = "trrosetta";
-        let index_path = "data/serine_peptidases_index";
+        let index_path = "data/test/serine_peptidases_trrosetta";
+        let num_threads = 6;
+        let verbose = true;
+        let help = false;
+        let env = AppArgs::Index {
+            pdb_dir: Some(pdb_dir.to_string()),
+            pdb_path_vec,
+            hash_type: hash_type.to_string(),
+            index_path: index_path.to_string(),
+            num_threads,
+            verbose,
+            help,
+        };
+        build_index(env);
+    }
+    
+    #[test]
+    fn test_build_index() {
+        let pdb_dir = "data/serine_peptidases_filtered";
+        let pdb_path_vec = load_path(pdb_dir);
+        let hash_type = "default";
+        let index_path = "data/test/serine_peptidases_default";
         let num_threads = 6;
         let verbose = true;
         let help = false;

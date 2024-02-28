@@ -5,6 +5,8 @@
 - [ ] Reduce memory usage
 - [x] querying
 - [ ] TODO: IMPORTANT: make binning and querying parameters configurable
+- [ ] TODO: Score output (RMSD maybe?)
+- [ ] TODO: allowing different amino acid pairs.
 - [ ] TODO: FEATURE: multiple queries
 - [ ] TODO: Benchmarking -- IMPORTANT: build CLI for this
 - [ ] Benchmarking -- set benchmarking dataset based on PDB's approach
@@ -12,6 +14,7 @@
 - [ ] TODO: Add more hash types
 - [ ] IMPORTANT: Concat multiple index tables
 - [ ] WARNING: IDEA: default hash type uses 64 bit integer and the hash seems to be too large. Find a way to reduce the size of the hash into 32 bit integer or less than 64.
+- [ ] IMPORTANT: Reduce memory usage with delta encoding (Make this as an option). DELTA ENCODING!!!
 - [ ] TODO: REMOVE MEMORY MONITORING PART AFTER THE MEMORY USAGE IS REDUCED ENOUGH
 - [ ] IMPORTANT: confirm if sin & cos representation is working 
   - [ ] 2024-02-28 16:13:22 Current SIN & COS representation seems to be working. NEED TO BE TESTED
@@ -252,3 +255,6 @@ pdb with aa pair (binning just angle)
 
 > 2024-02-28 16:18:03
 Confirmed zinc finger motif works
+
+1ed8
+https://pubs.acs.org/doi/10.1021/bi050155p

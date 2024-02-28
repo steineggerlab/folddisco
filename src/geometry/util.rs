@@ -76,3 +76,15 @@ pub fn map_u8_to_aa(aa: u8) -> &'static str {
         _ => panic!("Invalid AA"),
     }
 }
+
+pub fn map_aa_pair_to_u32(aa1: &[u8; 3], aa2: &[u8; 3]) -> u32 {
+    let output = (map_aa_to_u8(aa1) as u32) * 20 + map_aa_to_u8(aa2) as u32;
+    assert!(output < 512);
+    output
+}
+
+pub fn map_u32_to_aa_pair(pair: u32) -> (String, String) {
+    let aa1 = (pair / 20) as u8;
+    let aa2 = (pair % 20) as u8;
+    (map_u8_to_aa(aa1).to_string() , map_u8_to_aa(aa2).to_string())
+}

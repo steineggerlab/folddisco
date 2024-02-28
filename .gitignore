@@ -38,3 +38,4 @@ data/test_write_hashmap_to_file
 test_write_u64_vector
 data/huge_map
 data/test_write_hashmap_to_file
+temp

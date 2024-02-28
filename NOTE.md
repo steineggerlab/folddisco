@@ -4,6 +4,7 @@
 - [ ] working examples
 - [ ] Reduce memory usage
 - [x] querying
+- [ ] TODO: Merge branch to main
 - [ ] TODO: IMPORTANT: make binning and querying parameters configurable
 - [ ] TODO: Score output (RMSD maybe?)
 - [ ] TODO: allowing different amino acid pairs.

@@ -50,6 +50,6 @@ pub fn print_logo() {
     ];
 
     for line in &logo {
-        println!("{}", line);
+        eprintln!("{}", line);
     }
 }

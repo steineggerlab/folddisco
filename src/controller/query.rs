@@ -27,6 +27,9 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
     for (chain, ri) in query_residues {
         let index = compact.get_index(chain, ri);
         if let Some(index) = index {
+            // convert u8 array to string
+            let residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
+            eprintln!("Found index: {}/{:?} {}", *chain as char, ri, residue); // TODO: Change this to appropriate log level
             indices.push(index);
         }
     }

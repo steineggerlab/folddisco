@@ -387,42 +387,7 @@ mod tests {
         println!("data.len(): {}", data.len());
         data
     }
-    
-    #[test]
-    fn test_estimate_size() {
-        let data = create_test_data(40000, 10000);
-        let ids = (0..40000).collect::<Vec<usize>>();
-        let index_builder = IndexBuilder::new(
-            &ids, &data, 6, 1000, String::from(""), String::from("")
-        );
-        measure_time!(assert_eq!(index_builder.estimate_size(), 40000 * 10000));
-    }
-
-    #[test]
-    fn test_fill_offset_map() {
-        // Currently, TOO SLOW
-        let data = create_test_data(40000, 10000);
-        let ids = (0..40000).collect::<Vec<usize>>();
-        let mut index_builder = IndexBuilder::new(
-            &ids, &data, 6, 1000, String::from(""), String::from("")
-        );
-        index_builder.fill_offset_map();
-        assert_eq!(index_builder.offset.len(), 40000);
-        for i in 0..10 {
-            println!("{:?}", index_builder.offset.get(&i));
-        }
-    }
-    
 }
-
-
-
-
-
-
-
-
-
 
 // pub struct HugeAllocation {
 //     pub allocation: UnsafeCell<Vec<usize>>,

@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use motifsearch::prelude::*;
-
 use rayon::prelude::*;
 
 mod common;
@@ -63,15 +62,7 @@ fn test_folddisco_pdbmotifsincos() {
     let total_size = std::mem::size_of_val(&hashes[0]) * hashes.len();
     // sort hashes
     measure_time!(hashes.par_sort_by(|a, b| a.0.cmp(&b.0)));
-    println!("{:?}", &hashes.len());
-    println!("{:?}", &size);
-    println!("Total size of hashes: {} bytes", total_size);
-    println!("{:?}", &hashes.get(1000000).unwrap());
-    
-    fold_disco.set_index_table();
-    let (offset, values) = measure_time!(fold_disco.index_builder.convert_sorted_pairs_to_offset_and_values(hashes));
-    println!("{:?}", &offset.len());
-    println!("{:?}", &values.len());
+    let (offset, values) = measure_time!(convert_sorted_pairs_to_offset_and_values_vec(hashes));
 }
 
 

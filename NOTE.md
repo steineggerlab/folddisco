@@ -10,10 +10,9 @@ GEOMETRY
 - [x] DONE: SOLVED: PDBSinCos - uniqueness is not guaranteed
 - [x] DONE: default hash type uses 64 bit integer and the hash seems to be too large. 
   - [x] Reduced default to use 32bit
-
+- [x] DONE: Merge branch to main
 ## TODOs 
 BIG THINGS
-- [ ] TODO: Merge branch to main
 - [ ] Reduce memory usage
 - [ ] TODO: REMOVE MEMORY MONITORING PART AFTER THE MEMORY USAGE IS REDUCED ENOUGH
 - [ ] IMPORTANT: confirm if sin & cos representation is working 
@@ -53,7 +52,8 @@ DEV
 - [ ] TODO: Write rustdoc
 - NOTE: Push only working code to the repository
 
-TEST
+TEST DONE:
+- [x] Testing with github action
 - [ ] Check all structs and methods are working within tests
   - [ ] structure
   - [ ] geometry
@@ -274,3 +274,36 @@ Confirmed zinc finger motif works
 
 1ed8
 https://pubs.acs.org/doi/10.1021/bi050155p
+
+
+```sh
+# TODO: Pass cargo test
+
+
+warning: unused variable: `mmap`
+  --> src/cli/workflows/query_pdb.rs:61:18
+   |
+Error:           let (mmap, value_vec) = measure_time!(read_usize_vector(&value_path).expect("[ERROR] Failed to load value vector"));
+   |                  ^^^^ help: if this is intentional, prefix it with an underscore: `_mmap`
+
+warning: unused variable: `path_vec`
+  --> src/cli/workflows/query_pdb.rs:65:18
+running 33 tests
+test cli::workflows::build_index::tests::test_build_index_pdb ... FAILED
+test cli::workflows::build_index::tests::test_build_index_ppf ... FAILED
+test cli::workflows::build_index::tests::test_build_index_trrosetta ... FAILED
+test cli::workflows::query_pdb::tests::test_query_pdb_workflow ... FAILED
+test controller::io::tests::test_offset_map_io ... ok
+test controller::io::tests::test_usize_vector_io ... ok
+test controller::query::tests::test_make_query ... ok
+test controller::query::tests::test_parse_query_string ... ok
+test controller::query::tests::test_parse_query_string_with_space ... ok
+test controller::query::tests::test_parse_query_string_with_space_and_no_chain ... ok
+test geometry::core::tests::test_hash_type ... ok
+test geometry::default::tests::test_default_hash_works ... FAILED
+test geometry::default_32bit::tests::test_default_hash_works ... ok
+test geometry::pdb_motif::tests::test_hash_works ... ok
+test geometry::pdb_motif_sincos::tests::test_geometrichash_works ... ok
+test geometry::ppf::tests::test_hashvalue ... ok
+test cli::workflows::build_index::tests::test_build_index ... FAILED
+```

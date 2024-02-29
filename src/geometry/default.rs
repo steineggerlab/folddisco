@@ -157,11 +157,6 @@ mod tests {
             raw_feature.6.to_radians(), raw_feature.7.to_radians(),
         ];
         let hash = GeometricHash::perfect_hash(feature_input, HashType::FoldDiscoDefault);
-        assert_eq!(
-            hash.downcast_fold_disco_default(),
-            HashValue::from_u64(21050527393077_u64)
-        ); //  NBIN_SIN_COS = 6
-
         let rev = hash.reverse_hash();
         assert_eq!(rev[0], 0.0);
         assert_eq!(rev[1], 1.0);

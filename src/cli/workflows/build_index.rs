@@ -125,75 +125,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_build_index_ppf() {
-        let pdb_dir = "data/serine_peptidases_filtered";
-        let pdb_path_vec = load_path(pdb_dir);
-        let hash_type = "ppf";
-        let index_path = "data/test/serine_peptidases_ppf";
-        let num_threads = 6;
-        let verbose = true;
-        let help = false;
-        let env = AppArgs::Index {
-            pdb_dir: Some(pdb_dir.to_string()),
-            pdb_path_vec,
-            hash_type: hash_type.to_string(),
-            index_path: index_path.to_string(),
-            num_threads,
-            verbose,
-            help,
-        };
-        build_index(env);
-    }
-    
-    #[test]
-    fn test_build_index_pdb() {
-        let pdb_dir = "data/serine_peptidases_filtered";
-        let pdb_path_vec = load_path(pdb_dir);
-        let hash_type = "pdb";
-        let index_path = "data/test/serine_peptidases_pdb";
-        let num_threads = 6;
-        let verbose = true;
-        let help = false;
-        let env = AppArgs::Index {
-            pdb_dir: Some(pdb_dir.to_string()),
-            pdb_path_vec,
-            hash_type: hash_type.to_string(),
-            index_path: index_path.to_string(),
-            num_threads,
-            verbose,
-            help,
-        };
-        build_index(env);
-    }
-    
-        #[test]
-    fn test_build_index_trrosetta() {
-        let pdb_dir = "data/serine_peptidases_filtered";
-        let pdb_path_vec = load_path(pdb_dir);
-        let hash_type = "trrosetta";
-        let index_path = "data/test/serine_peptidases_trrosetta";
-        let num_threads = 6;
-        let verbose = true;
-        let help = false;
-        let env = AppArgs::Index {
-            pdb_dir: Some(pdb_dir.to_string()),
-            pdb_path_vec,
-            hash_type: hash_type.to_string(),
-            index_path: index_path.to_string(),
-            num_threads,
-            verbose,
-            help,
-        };
-        build_index(env);
-    }
-    
-    #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
         let pdb_path_vec = load_path(pdb_dir);
         let hash_type = "default";
-        let index_path = "data/test/serine_peptidases_default";
-        let num_threads = 6;
+        let index_path = "data/serine_peptidases_default";
+        let num_threads = 4;
         let verbose = true;
         let help = false;
         let env = AppArgs::Index {

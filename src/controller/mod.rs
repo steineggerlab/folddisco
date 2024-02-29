@@ -8,6 +8,7 @@
 pub mod feature;
 pub mod io;
 pub mod query;
+pub mod retrieve;
 
 use std::io::Write;
 use std::sync::Arc;

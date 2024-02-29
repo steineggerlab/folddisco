@@ -1,33 +1,59 @@
 # Development note
 
+## TODOs 240229
+RANKING & SCORING
+- [x] DONE: Lookup original PDB file and retrieve the original structure. (Quite slow)
+STRUCTURE
+- [x] DONE: Last residue is not included in the motif
+GEOMETRY
+- [x] DONE: Modify PPF to use local CA as a reference point
+- [x] DONE: SOLVED: PDBSinCos - uniqueness is not guaranteed
+- [x] DONE: default hash type uses 64 bit integer and the hash seems to be too large. 
+  - [x] Reduced default to use 32bit
+
 ## TODOs 
-- [ ] working examples
-- [ ] Reduce memory usage
-- [x] querying
+BIG THINGS
 - [ ] TODO: Merge branch to main
-- [ ] TODO: IMPORTANT: make binning and querying parameters configurable
-- [ ] TODO: Score output (RMSD maybe?)
+- [ ] Reduce memory usage
+- [ ] TODO: REMOVE MEMORY MONITORING PART AFTER THE MEMORY USAGE IS REDUCED ENOUGH
+- [ ] IMPORTANT: confirm if sin & cos representation is working 
+
+QUERYING
 - [ ] TODO: allowing different amino acid pairs.
 - [ ] TODO: FEATURE: multiple queries
+
+GEOMETRY
+- [ ] TODO: Add 3Di hash
+- [ ] TODO: IMPORTANT: make binning and querying parameters configurable
+
+INDEX
+- [ ] IMPORTANT: Reduce memory usage with delta encoding (Make this as an option). DELTA ENCODING!!!
+- [ ] IMPORTANT: Concat multiple index tables
+
+BENCHMARK
 - [ ] TODO: Benchmarking -- IMPORTANT: build CLI for this
 - [ ] Benchmarking -- set benchmarking dataset based on PDB's approach
 - [ ] TODO: Gather data
-- [ ] TODO: Add more hash types
-- [ ] IMPORTANT: Concat multiple index tables
-- [ ] WARNING: IDEA: default hash type uses 64 bit integer and the hash seems to be too large. Find a way to reduce the size of the hash into 32 bit integer or less than 64.
-- [ ] IMPORTANT: Reduce memory usage with delta encoding (Make this as an option). DELTA ENCODING!!!
-- [ ] TODO: REMOVE MEMORY MONITORING PART AFTER THE MEMORY USAGE IS REDUCED ENOUGH
-- [ ] IMPORTANT: confirm if sin & cos representation is working 
-  - [ ] 2024-02-28 16:13:22 Current SIN & COS representation seems to be working. NEED TO BE TESTED
+
+RANKING & SCORING
+- [ ] TODO: Score output (RMSD maybe?)
+
+IDEAS
 - [ ] IDEA: Sukhwan: How powerful is amino acid pair? revival of aa_pair
 - [ ] Longer motifs?
 - [ ] IDEA: MINOR: residue matching strategy 
 - [ ] IDEA: Naming of the project
-  - [ ] lib.rs
-    - [x] expose necessary functions with prelude
-  - [ ] tests
+- [ ] IndexTable with allocation (Priority: Middle)
+
+DEV
+- [ ] TODO:Polish logging
+- [ ] Print original query
+- [ ] TODO: expose necessary functions with prelude
+- [ ] working examples
+- [ ] TODO: Write rustdoc
 - NOTE: Push only working code to the repository
-- [ ] Polish logging
+
+TEST
 - [ ] Check all structs and methods are working within tests
   - [ ] structure
   - [ ] geometry
@@ -41,17 +67,6 @@
         - [ ] query
         - [ ] benchmark
   - [ ] project level test
-
-- [ ] After finishing the above tasks, start working on the followings
-    - [ ] Add feature for handling multiple hash types to the project
-
-- NEEDED FEATURES
-  - [ ] IndexTable with allocation (Priority: Middle)
-  - [ ] Multiple hash types (Priority: High)
-  - [ ] Working solution for this project (Priority: High)
-
-- ADDITIONAL TODOS
-  - [ ] Write rustdoc
 
 <!-- https://stats.stackexchange.com/questions/218407/encoding-angle-data-for-neural-network -->
 

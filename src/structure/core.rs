@@ -138,7 +138,7 @@ impl CompactStructure {
         let mut gly_c: Option<Coordinate> = None;
 
         for idx in 0..origin.num_atoms {
-            if prev_res_serial != Some(model.get_res_serial(idx)) {
+            if prev_res_serial != Some(model.get_res_serial(idx)) || idx == origin.num_atoms - 1 {
                 // Save previous 'CA' and 'CB'
                 match (n, ca, cb) {
                     (Some(n), Some(ca), Some(cb)) => {
@@ -204,6 +204,7 @@ impl CompactStructure {
                 }
             }
         }
+
         let ca_torsion_vec = ca_vec.calc_all_torsion_angles();
 
         CompactStructure {
@@ -333,9 +334,12 @@ impl CompactStructure {
 
     pub fn get_ppf(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
         let ca1 = self.get_ca(idx1);
-        let ca2 = self.get_ca(idx2);
-        if ca1.is_some() && ca2.is_some() {
-            let ppf = ca1.unwrap().get_ppf(&ca2.unwrap());
+        let cb1 = self.get_cb(idx1);
+        let cb2 = self.get_cb(idx2);
+        if ca1.is_some() && cb1.is_some() && cb2.is_some() {
+            let rel_cb1 = cb1.unwrap().sub(&ca1.unwrap());
+            let rel_cb2 = cb2.unwrap().sub(&ca1.unwrap());
+            let ppf = rel_cb1.get_ppf(&rel_cb2);
             let ppf = ppf.to_vec();
             Some(ppf)
         } else {
@@ -447,7 +451,7 @@ impl CompactStructure {
 mod structure_tests {
     #[test]
     fn test_gly_integration() {
-        let data = crate::structure::io::pdb::Reader::from_file("data/111l_alpha.pdb")
+        let data = crate::structure::io::pdb::Reader::from_file("data/homeobox/1akha-.pdb")
             .expect("Unable to read test file");
         let structure = &data.read_structure().expect("Unable to read structure");
         let compact = &structure.to_compact();
@@ -468,5 +472,7 @@ mod structure_tests {
                 assert!(cb.is_some());
             }
         }
+        println!("{:?}", compact.get_res_name(compact.num_residues - 1));
+        assert_eq!(compact.num_residues, structure.num_residues);
     }
 }

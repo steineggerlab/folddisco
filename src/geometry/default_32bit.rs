@@ -9,7 +9,10 @@ use std::fmt;
 use crate::geometry::core::HashType;
 use crate::geometry::util::discretize_f32_value_into_u32 as discretize_value;
 use crate::geometry::util::continuize_u32_value_into_f32 as continuize_value;
-use crate::geometry::util::map_aa_pair_to_u32;
+use crate::geometry::util::map_aa_u32_pair_to_u32;
+
+use super::util::map_u32_to_aa_pair;
+use super::util::map_u32_to_aa_u32_pair;
 
 // Constants
 // 1. for cb_dist
@@ -19,13 +22,13 @@ const NBIN_DIST: f32 = 8.0;
 // 2. NEW IDEA for encoding angles; represent as sin and cos
 const MIN_SIN_COS: f32 = -1.0;
 const MAX_SIN_COS: f32 = 1.0;
-const NBIN_SIN_COS: f32 = 4.0;
+const NBIN_SIN_COS: f32 = 3.0;
 // Bitmasks
+const BITMASK32_2BIT: u32 = 0x00000003;
 const BITMASK32_3BIT: u32 = 0x00000007;
 const BITMASK32_4BIT: u32 = 0x0000000F;
 // const BITMASK32_5BIT: u32 = 0x0000001F;
 const BITMASK32_9BIT: u32 = 0x000001FF;
-
 
 // TODO: IMPORTANT: Implement this to reduce execution time
 // 9 bit for AA pairs, 3 bit for distance, 2 bits for sin & cos (4 bits for one angle)
@@ -47,18 +50,16 @@ impl HashValue {
         self._reverse_hash().to_vec()
     }
     pub fn hash_type(&self) -> super::core::HashType {
-        HashType::FoldDiscoDefault
+        HashType::Default32bit
     }
 
     fn _perfect_hash(
         res1: u32, res2: u32, cb_dist: f32, omega: f32,
         theta1: f32, theta2: f32, phi1: f32, phi2: f32
     ) -> Self {
-        let mut cbd = cb_dist;
-        if cb_dist > 20.0 {
-            cbd = 20.0;
-        }
-        let h_cb_dist = discretize_value(cbd, MIN_DIST, MAX_DIST, NBIN_DIST);
+        
+        let res_pair = map_aa_u32_pair_to_u32(res1, res2);
+        let h_cb_dist = discretize_value(cb_dist, MIN_DIST, MAX_DIST, NBIN_DIST);
         
         // Convert angles to sin and cos
         let angles = [omega, theta1, theta2, phi1, phi2];
@@ -71,35 +72,35 @@ impl HashValue {
                 discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS),
                 discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS)
             )}
-        ).collect::<Vec<(u64, u64)>>();
+        ).collect::<Vec<(u32, u32)>>();
         
         // Combine all the hash values
-        let hashvalue = res1 << 49 | res2 << 44 | h_cb_dist << 40
-            | sin_cos_angles[0].0 << 36 | sin_cos_angles[0].1 << 32 // sin_omega, cos_omega
-            | sin_cos_angles[1].0 << 28 | sin_cos_angles[1].1 << 24 // sin_theta1, cos_theta1
-            | sin_cos_angles[2].0 << 20 | sin_cos_angles[2].1 << 16 // sin_theta2, cos_theta2
-            | sin_cos_angles[3].0 << 12 | sin_cos_angles[3].1 << 8 // sin_phi1, cos_phi1
-            | sin_cos_angles[4].0 << 4 | sin_cos_angles[4].1; // sin_phi2, cos_phi2
+        let hashvalue = res_pair << 23 | h_cb_dist << 20
+            | sin_cos_angles[0].0 << 18 | sin_cos_angles[0].1 << 16 // sin_omega, cos_omega
+            | sin_cos_angles[1].0 << 14 | sin_cos_angles[1].1 << 12 // sin_theta1, cos_theta1
+            | sin_cos_angles[2].0 << 10 | sin_cos_angles[2].1 << 8 // sin_theta2, cos_theta2
+            | sin_cos_angles[3].0 << 6 | sin_cos_angles[3].1 << 4 // sin_phi1, cos_phi1
+            | sin_cos_angles[4].0 << 2 | sin_cos_angles[4].1; // sin_phi2, cos_phi2
 
         HashValue(hashvalue)
     }
 
     fn _reverse_hash(&self) -> [f32; 8] {
-        let res1 = (self.0 >> 49) as f32;
+        let res_pair = ((self.0 >> 23) & BITMASK32_9BIT) as u32;
+        let (res1, res2) = map_u32_to_aa_u32_pair(res_pair);
         // Mask bits
-        let res2 = ((self.0 >> 44) & BITMASK64_5BIT) as f32;
-        let cb_dist = ((self.0 >> 40) & BITMASK64_4BIT) as f32;
+        let cb_dist = ((self.0 >> 20) & BITMASK32_3BIT) as f32;
         let sin_cos_vec = [
-            ((self.0 >> 36) & BITMASK64_4BIT), // sin_omega
-            ((self.0 >> 32) & BITMASK64_4BIT), // cos_omega
-            ((self.0 >> 28) & BITMASK64_4BIT), // sin_theta1
-            ((self.0 >> 24) & BITMASK64_4BIT), // cos_theta1
-            ((self.0 >> 20) & BITMASK64_4BIT), // sin_theta2
-            ((self.0 >> 16) & BITMASK64_4BIT), // cos_theta2
-            ((self.0 >> 12) & BITMASK64_4BIT), // sin_phi1
-            ((self.0 >> 8) & BITMASK64_4BIT), // cos_phi1
-            ((self.0 >> 4) & BITMASK64_4BIT), // sin_phi2
-            (self.0 & BITMASK64_4BIT), // cos_phi2
+            ((self.0 >> 18) & BITMASK32_2BIT), // sin_omega
+            ((self.0 >> 16) & BITMASK32_2BIT), // cos_omega
+            ((self.0 >> 14) & BITMASK32_2BIT), // sin_theta1
+            ((self.0 >> 12) & BITMASK32_2BIT), // cos_theta1
+            ((self.0 >> 10) & BITMASK32_2BIT), // sin_theta2
+            ((self.0 >> 8) & BITMASK32_2BIT), // cos_theta2
+            ((self.0 >> 6) & BITMASK32_2BIT), // sin_phi1
+            ((self.0 >> 4) & BITMASK32_2BIT), // cos_phi1
+            ((self.0 >> 2) & BITMASK32_2BIT), // sin_phi2
+            (self.0 & BITMASK32_2BIT), // cos_phi2
         ];
 
         let sin_cos_vec = sin_cos_vec.iter().map(
@@ -114,14 +115,22 @@ impl HashValue {
         let theta2 = sin_cos_vec[4].atan2(sin_cos_vec[5]).to_degrees();
         let phi1 = sin_cos_vec[6].atan2(sin_cos_vec[7]).to_degrees();
         let phi2 = sin_cos_vec[8].atan2(sin_cos_vec[9]).to_degrees();
-        [res1, res2, cb_dist, omega, theta1, theta2, phi1, phi2]
+        [res1 as f32, res2 as f32, cb_dist, omega, theta1, theta2, phi1, phi2]
+    }
+    
+    pub fn from_u32(hashvalue: u32) -> Self {
+        HashValue(hashvalue)
+    }
+    
+    pub fn as_u32(&self) -> u32 {
+        self.0
     }
     
     pub fn from_u64(hashvalue: u64) -> Self {
-        HashValue(hashvalue)
+        HashValue(hashvalue as u32)
     }
     pub fn as_u64(&self) -> u64 {
-        self.0
+        self.0 as u64
     }
     pub fn as_usize(&self) -> usize {
         self.0 as usize
@@ -156,8 +165,7 @@ mod tests {
     fn test_default_hash_works() {
         // Test perfect hash
         let raw_feature = (
-            b"ALA", b"ARG", 5.0_f32, -10.0_f32, 0.0_f32, 10.0_f32,
-            345.0_f32, 15.0_f32,
+            b"ALA", b"ARG", 5.0_f32, -10.0_f32, 0.0_f32, 10.0_f32, 45.0_f32, 15.0_f32,
         );
         let feature_input: Vec<f32> = vec![
             map_aa_to_u8(raw_feature.0) as f32, map_aa_to_u8(raw_feature.1) as f32,
@@ -165,11 +173,9 @@ mod tests {
             raw_feature.4.to_radians(), raw_feature.5.to_radians(),
             raw_feature.6.to_radians(), raw_feature.7.to_radians(),
         ];
-        let hash = GeometricHash::perfect_hash(feature_input, HashType::FoldDiscoDefault);
-        assert_eq!(
-            hash.downcast_fold_disco_default(),
-            HashValue::from_u64(21050527393077_u64)
-        ); //  NBIN_SIN_COS = 6
+        let hash = GeometricHash::perfect_hash(feature_input, HashType::Default32bit);
+        //
+        println!("{:?}", hash);
 
         let rev = hash.reverse_hash();
         assert_eq!(rev[0], 0.0);

@@ -4,7 +4,7 @@
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::prelude::PDBReader;
+use crate::prelude::{print_log_msg, PDBReader, INFO};
 use crate::utils::log::{log_msg, FAIL};
 use super::feature::get_single_feature;
 // TODO: Make this to handle multiple hash types
@@ -29,7 +29,7 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
         if let Some(index) = index {
             // convert u8 array to string
             let residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
-            eprintln!("Found index: {}/{:?} {}", *chain as char, ri, residue); // TODO: Change this to appropriate log level
+            print_log_msg(INFO, &format!("Found index: {}:{:?}({})", *chain as char, ri, residue));
             indices.push(index);
         }
     }
@@ -57,6 +57,9 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
             }
         }
     }
+    let mut hash_collection = hash_collection;
+    hash_collection.sort_unstable();
+    hash_collection.dedup();
     hash_collection
 }
 

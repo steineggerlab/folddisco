@@ -59,7 +59,7 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
                 None
             }
         },
-        HashType::FoldDiscoDefault => {
+        HashType::FoldDiscoDefault | HashType::Default32bit => {
             let feature = structure.get_default_feature(i, j);
             if feature.is_some() {
                 // Concatenate res1 and res2 to the feature

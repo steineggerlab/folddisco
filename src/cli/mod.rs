@@ -33,6 +33,7 @@ pub enum AppArgs {
         threads: usize,
         index_path: Option<String>,
         help: bool,
+        retrieve: bool,
     },
     Test {
         index_path: String,

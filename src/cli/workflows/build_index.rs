@@ -50,7 +50,7 @@ pub fn build_index(env: AppArgs) {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(0);
             } else {
-                if verbose { print_log_msg(INFO, ""); } // TODO: NEED TO BE CHANGED
+                if verbose { print_log_msg(INFO, &format!("Indexing {:?} with {} threads", pdb_dir, num_threads)); } 
                 // Setup multithreading
                 rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global().unwrap();
                 

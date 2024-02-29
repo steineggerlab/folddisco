@@ -10,9 +10,8 @@ use std::collections::HashMap;
 
 use crate::cli::*;
 use crate::controller::io::{read_offset_map, read_usize_vector, get_values_with_offset};
+use crate::controller::retrieve::{connected, res_vec_as_string, retrieve_residue_with_hash};
 use crate::index::lookup::{load_lookup_from_file};
-use dashmap::DashMap;
-use rayon::prelude::*;
 use crate::prelude::*;
 
 
@@ -20,12 +19,13 @@ pub const HELP_QUERY: &str = "\
 USAGE: motifsearch query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
 Example: motifsearch query -i index_table.index -t 6 1aq2.pdb A250,A232,A269
 Options:
-    -d, --pdb <PDB_PATH>          Path of PDB file to query
-    -q, --query <QUERY_STRING>  Query string
-    -i, --index <INDEX_PATH>      Path of index table to load
-    -t, --threads <THREADS>            Number of threads to use
-    -v, --verbose                      Print verbose messages
-    -h, --help                         Print this help menu
+    -d, --pdb <PDB_PATH>         Path of PDB file to query
+    -q, --query <QUERY_STRING>   Query string
+    -i, --index <INDEX_PATH>     Path of index table to load
+    -t, --threads <THREADS>      Number of threads to use
+    -v, --verbose                Print verbose messages
+    --retrieve                   Retrieve matched residues (Need PDB files)
+    -h, --help                   Print this help menu
 ";
 
 
@@ -37,15 +37,14 @@ pub fn query_pdb(env: AppArgs) {
             threads,
             index_path,
             help,
+            retrieve
         } => {
             if help {
-                println!("THIS is query1");
                 eprintln!("{}", HELP_QUERY);
                 std::process::exit(0);
             }
             // Check if arguments are valid
             if index_path.is_none() {
-                                println!("THIS is query2");
                 eprintln!("{}", HELP_QUERY);
                 std::process::exit(1);
             }
@@ -104,9 +103,26 @@ pub fn query_pdb(env: AppArgs) {
             // Sort by count and print
             let mut query_count_vec: Vec<_> = query_count_map.iter().collect();
             query_count_vec.sort_by(|a, b| b.1.cmp(a.1));
+            let count_cut = query_residues.len() / 2;
             for (nid, count) in query_count_vec {
-                if *count > 1_usize {
-                    println!("{}: {}", lookup.0[*nid], count);
+                if *count >= count_cut {
+                    if retrieve {
+                        let retrieved = retrieve_residue_with_hash(&pdb_query, &lookup.0[*nid]);
+                        if retrieved.is_some() {
+                            let retrieved = retrieved.unwrap();
+                            let connected = connected(&retrieved, query_residues.len());
+                            let total_matches = retrieved.len();
+                            if connected > 0 {
+                                println!(
+                                    "{};uniq_matches={};total_matches={};connected={};{:?}",
+                                    lookup.0[*nid], count, total_matches,
+                                    connected, res_vec_as_string(&retrieved)
+                                );
+                            }
+                        }
+                    } else {
+                        println!("{}:{}", lookup.0[*nid], count);
+                    }
                 }
             }
             
@@ -146,12 +162,14 @@ mod tests {
         let threads = 6;
         let index_path = Some(String::from("data/index/serine_peptidases_filtered"));
         let help = false;
+        let retrieve = false;
         let env = AppArgs::Query {
             pdb_path,
             query_string,
             threads,
             index_path,
             help,
+            retrieve,
         };
         query_pdb(env);
     }

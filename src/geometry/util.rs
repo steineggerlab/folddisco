@@ -83,6 +83,18 @@ pub fn map_aa_pair_to_u32(aa1: &[u8; 3], aa2: &[u8; 3]) -> u32 {
     output
 }
 
+pub fn map_aa_u32_pair_to_u32(aa1: u32, aa2: u32) -> u32 {
+    let output = aa1 * 20 + aa2;
+    assert!(output < 512);
+    output
+}
+
+pub fn map_u32_to_aa_u32_pair(pair: u32) -> (u32, u32) {
+    let aa1 = (pair / 20) as u32;
+    let aa2 = (pair % 20) as u32;
+    (aa1, aa2)
+}
+
 pub fn map_u32_to_aa_pair(pair: u32) -> (String, String) {
     let aa1 = (pair / 20) as u8;
     let aa2 = (pair % 20) as u8;

@@ -41,6 +41,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             index_path: args.opt_value_from_str(["-i", "--index"])?,
             help: args.contains(["-h", "--help"]),
+            retrieve: args.contains(["-R", "--retrieve"]),
         }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,

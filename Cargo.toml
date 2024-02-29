@@ -17,7 +17,12 @@ opt-level = 3
 name = "motifsearch"
 path = "src/cli/main.rs"
 
-
-
 [dependencies]
 rand = "0.8.5"
+pico-args = { version = "0.5.0", features = ["combined-flags"], path = "lib/pico-args" }
+rayon = "1.8.0"
+byteorder = "1.5.0"
+memmap2 = "0.9.0"
+dashmap = { version = "5.5.3", features = ["rayon"] }
+rustc-hash = "1.1.0"
+peak_alloc = "0.2.1"

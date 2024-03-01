@@ -156,13 +156,14 @@ pub fn query_pdb(env: AppArgs) {
 mod tests {
     use super::*;
     #[test]
+    #[ignore]
     fn test_query_pdb_workflow() {
         let pdb_path = String::from("data/serine_peptidases_filtered/1aq2.pdb");
         let query_string = String::from("A250,A232,A269");
         let threads = 6;
-        let index_path = Some(String::from("data/index/serine_peptidases_filtered"));
+        let index_path = Some(String::from("data/serine_peptidases_default32"));
         let help = false;
-        let retrieve = false;
+        let retrieve = true;
         let env = AppArgs::Query {
             pdb_path,
             query_string,

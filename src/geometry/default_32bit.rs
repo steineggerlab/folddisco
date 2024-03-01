@@ -22,7 +22,8 @@ const NBIN_DIST: f32 = 8.0;
 // 2. NEW IDEA for encoding angles; represent as sin and cos
 const MIN_SIN_COS: f32 = -1.0;
 const MAX_SIN_COS: f32 = 1.0;
-const NBIN_SIN_COS: f32 = 3.0;
+const NBIN_TORSION_SIN_COS: f32 = 2.0;
+const NBIN_PLANE_SIN_COS: f32 = 3.0;
 // Bitmasks
 const BITMASK32_2BIT: u32 = 0x00000003;
 const BITMASK32_3BIT: u32 = 0x00000007;
@@ -67,11 +68,20 @@ impl HashValue {
             |&x| (x.sin(), x.cos())
         ).collect::<Vec<(f32, f32)>>();
         // Discretize sin and cos
-        let sin_cos_angles = sin_cos_angles.iter().map(
-            |&(sin, cos)| {(
-                discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS),
-                discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS)
-            )}
+        let sin_cos_angles = sin_cos_angles.iter().enumerate().map(
+            |(i, &(sin, cos))| {
+                if i < 3 {
+                    (
+                        discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, NBIN_TORSION_SIN_COS),
+                        discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, NBIN_TORSION_SIN_COS)
+                    )
+                } else {
+                    (
+                        discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, NBIN_PLANE_SIN_COS),
+                        discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, NBIN_PLANE_SIN_COS)
+                    )
+                }
+            }
         ).collect::<Vec<(u32, u32)>>();
         
         // Combine all the hash values
@@ -103,10 +113,18 @@ impl HashValue {
             (self.0 & BITMASK32_2BIT), // cos_phi2
         ];
 
-        let sin_cos_vec = sin_cos_vec.iter().map(
-            |&x| continuize_value(
-                x, MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS
-            )
+        let sin_cos_vec = sin_cos_vec.iter().enumerate().map(
+            |(i, &x)| {
+                if i < 6 {
+                    continuize_value(
+                        x, MIN_SIN_COS, MAX_SIN_COS, NBIN_TORSION_SIN_COS
+                    )
+                } else {
+                    continuize_value(
+                        x, MIN_SIN_COS, MAX_SIN_COS, NBIN_PLANE_SIN_COS
+                    )
+                }
+            }
         ).collect::<Vec<f32>>();
         
         // Restores original angles

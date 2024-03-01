@@ -123,13 +123,12 @@ pub fn build_index(env: AppArgs) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
         let pdb_path_vec = load_path(pdb_dir);
-        let hash_type = "default";
-        let index_path = "data/serine_peptidases_default";
+        let hash_type = "default32";
+        let index_path = "data/serine_peptidases_default32";
         let num_threads = 4;
         let verbose = true;
         let help = false;

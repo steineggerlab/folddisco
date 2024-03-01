@@ -58,7 +58,6 @@ impl HashType {
     pub fn save_to_file(&self, path: &str) {
         let mut file = std::fs::File::create(path).unwrap();
         file.write_all(format!("{:?}", self).as_bytes()).unwrap();
-        println!("{:?}", self);
     }
 
     pub fn load_from_file(path: &str) -> Self {

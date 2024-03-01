@@ -212,16 +212,6 @@ impl FoldDisco {
                     }
                 }).flatten().collect()
             });
-
-        // WARNING: TEMP: Print the size of collected hash pairs
-        println!("collected: {:?}", collected.len());
-        let mut memory_usage = 0usize;
-        for i in 0..collected.len() {
-            memory_usage += std::mem::size_of_val(&collected[i]);
-        }
-        // WARNING: END
-
-        println!("memory_usage: {:?}MB", memory_usage / 1024 / 1024);
         self.hash_id_pairs = collected;
         self.flags.collect_hash = true;
         self.flags.fill_numeric_id_vec = true;

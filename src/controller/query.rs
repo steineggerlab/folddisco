@@ -29,7 +29,7 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
         if let Some(index) = index {
             // convert u8 array to string
             let residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
-            print_log_msg(INFO, &format!("Found index: {}:{:?}({})", *chain as char, ri, residue));
+            print_log_msg(INFO, &format!("Found residue: {}:{:?}({})", *chain as char, ri, residue));
             indices.push(index);
         }
     }

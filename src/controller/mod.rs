@@ -13,7 +13,7 @@ pub mod retrieve;
 use std::io::Write;
 use std::sync::Arc;
 // External imports
-use rayon::prelude::*;
+use rayon::{prelude::*, ThreadPool};
 
 // Internal imports
 use crate::prelude::print_log_msg;
@@ -175,6 +175,8 @@ impl FoldDisco {
         self.numeric_id_vec = positions;
         self.flags.collect_hash = true;
         self.flags.fill_numeric_id_vec = true;
+        // Remove  thread pool
+        drop(pool);
     }
     
     pub fn collect_hash_pairs(&mut self) {
@@ -215,6 +217,7 @@ impl FoldDisco {
         self.hash_id_pairs = collected;
         self.flags.collect_hash = true;
         self.flags.fill_numeric_id_vec = true;
+        drop(pool);
     }
 
     pub fn sort_hash_pairs(&mut self) {
@@ -225,6 +228,7 @@ impl FoldDisco {
         pool.install(|| {
             self.hash_id_pairs.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
         });
+        drop(pool);
     }
     
     pub fn get_allocation_size(&self) -> usize {

@@ -60,9 +60,6 @@ pub fn build_index(env: AppArgs) {
                         )
                     );
                 }
-                // Setup multithreading
-                rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global().unwrap();
-                
                 // Load PDB files
                 let pdb_path_vec = if pdb_dir.is_some() {
                     load_path(&pdb_dir.unwrap())
@@ -78,7 +75,11 @@ pub fn build_index(env: AppArgs) {
                 // Main workflow
                 // 2. Collect hash
                 measure_time!(fold_disco.collect_hash_pairs());
-                if verbose { print_log_msg(INFO, &format!("Hash collected (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
+                if verbose {
+                    print_log_msg(INFO, 
+                        &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pairs.len(), PEAK_ALLOC.current_usage_as_mb())
+                    );
+                }
                 measure_time!(fold_disco.sort_hash_pairs());
                 if verbose { print_log_msg(INFO, &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
                 measure_time!(fold_disco.fill_numeric_id_vec());

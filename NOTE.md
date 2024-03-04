@@ -1,16 +1,21 @@
 # Development note
 
-## TODOs 240229
-RANKING & SCORING
-- [x] DONE: Lookup original PDB file and retrieve the original structure. (Quite slow)
-STRUCTURE
-- [x] DONE: Last residue is not included in the motif
+## TODOs 240304
 GEOMETRY
-- [x] DONE: Modify PPF to use local CA as a reference point
-- [x] DONE: SOLVED: PDBSinCos - uniqueness is not guaranteed
-- [x] DONE: default hash type uses 64 bit integer and the hash seems to be too large. 
-  - [x] Reduced default to use 32bit
-- [x] DONE: Merge branch to main
+- [ ] TODO: Add 3Di hash
+- [ ] TODO: IMPORTANT: make binning and querying parameters configurable
+
+BENCHMARK
+- [ ] TODO: Benchmarking -- IMPORTANT: build CLI for this
+- [ ] Benchmarking -- set benchmarking dataset based on PDB's approach
+- [ ] TODO: Gather data
+- [ ] TODO: Download PDB
+
+DEV
+- [ ] TODO:Polish logging
+- [ ] TODO: Print original query
+- [ ] TODO: expose necessary functions with prelude
+
 ## TODOs 
 BIG THINGS
 - [ ] Reduce memory usage
@@ -307,3 +312,47 @@ test geometry::pdb_motif_sincos::tests::test_geometrichash_works ... ok
 test geometry::ppf::tests::test_hashvalue ... ok
 test cli::workflows::build_index::tests::test_build_index ... FAILED
 ```
+
+
+running 1 test
+[INFO] Indexing data/serine_peptidases_filtered with 4 threads
+[INFO] fold_disco.collect_hash_pairs: 2.106823529s
+[INFO] Total 3228509 hashes collected (Allocated 73.949684MB)
+[INFO] fold_disco.sort_hash_pairs: 74.154872ms
+[INFO] Hash sorted (Allocated 73.957146MB)
+[INFO] fold_disco.fill_numeric_id_vec: 1.128µs
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 133.454276ms
+[INFO] Converted to offsets (Allocated 74.8718MB)
+[INFO] save_offset_vec: 39.108513ms
+[INFO] write_usize_vector: 8.053151ms
+[INFO] save_lookup_to_file: 219.252µs
+[DONE] Done.
+
+running 1 test
+[INFO] Indexing data/serine_peptidases_filtered with 4 threads
+[INFO] fold_disco.collect_hash_pairs: 2.607902484s
+[INFO] Total 1195107 hashes collected (Allocated 27.411839MB)
+[INFO] fold_disco.sort_hash_pairs: 20.52749ms
+[INFO] Hash sorted (Allocated 27.414333MB)
+[INFO] fold_disco.fill_numeric_id_vec: 1.303µs
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 21.74806ms
+[INFO] Converted to offsets (Allocated 14.493169MB)
+[INFO] save_offset_vec: 4.258504ms
+[INFO] write_usize_vector: 3.430338ms
+[INFO] save_lookup_to_file: 219.809µs
+[DONE] Done.
+
+running 1 test
+[INFO] Indexing data/serine_peptidases_filtered with 4 threads
+[INFO] fold_disco.collect_hash_pairs: 597.892004ms
+[INFO] Total 607023 hashes collected (Allocated 13.939382MB)
+[INFO] fold_disco.sort_hash_pairs: 11.692878ms
+[INFO] Hash sorted (Allocated 13.954213MB)
+[INFO] fold_disco.fill_numeric_id_vec: 954ns
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 17.915253ms
+[INFO] Converted to offsets (Allocated 10.009801MB)
+[INFO] save_offset_vec: 7.152273ms
+[INFO] write_usize_vector: 1.818618ms
+[INFO] save_lookup_to_file: 286.759µs
+[DONE] Done.
+test cli::workflows::build_index::tests::test_build_index ... ok

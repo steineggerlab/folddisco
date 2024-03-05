@@ -52,7 +52,14 @@ pub fn build_index(env: AppArgs) {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(0);
             } else {
+                
                 let pdb_dir_clone = pdb_dir.clone();
+                // Load PDB files
+                let pdb_path_vec = if pdb_dir.is_some() {
+                    load_path(&pdb_dir.unwrap())
+                } else {
+                    pdb_path_vec
+                };
                 let chunk_size = if chunk_size > u16::max_value() as usize { u16::max_value() as usize } else { chunk_size };
                 let num_chunks = if pdb_path_vec.len() < chunk_size { 1 } else { (pdb_path_vec.len() as f64 / chunk_size as f64).ceil() as usize };
                 if verbose { 
@@ -64,17 +71,8 @@ pub fn build_index(env: AppArgs) {
                         )
                     );
                 }
-                // Load PDB files
-                let pdb_path_vec = if pdb_dir.is_some() {
-                    load_path(&pdb_dir.unwrap())
-                } else {
-                    pdb_path_vec
-                };
                 let hash_type = HashType::get_with_str(hash_type.as_str());
-
-                
                 let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);
-                
                 pdb_path_chunks.into_iter().enumerate().for_each(|(i, pdb_path_vec)| {
                     let index_path = if num_chunks == 1 {
                         if verbose { print_log_msg(INFO, "Indexing all PDB files in one chunk"); }

@@ -24,6 +24,7 @@ pub enum AppArgs {
         hash_type: String,
         index_path: String,
         num_threads: usize,
+        chunk_size: usize,
         verbose: bool,
         help: bool,
     },

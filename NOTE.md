@@ -1,6 +1,9 @@
 # Development note
 
 ## TODOs 240304
+INDEX
+- [x] DONE: IDEA: Divide index table into multiple files (chunking)
+
 GEOMETRY
 - [ ] TODO: Add 3Di hash
 - [ ] TODO: IMPORTANT: make binning and querying parameters configurable

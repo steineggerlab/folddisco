@@ -13,7 +13,7 @@ pub mod retrieve;
 use std::io::Write;
 use std::sync::Arc;
 // External imports
-use rayon::{prelude::*, ThreadPool};
+use rayon::prelude::*;
 
 // Internal imports
 use crate::prelude::print_log_msg;
@@ -219,6 +219,7 @@ impl FoldDisco {
         self.flags.fill_numeric_id_vec = true;
         drop(pool);
     }
+    
 
     pub fn sort_hash_pairs(&mut self) {
         let pool = rayon::ThreadPoolBuilder::new()

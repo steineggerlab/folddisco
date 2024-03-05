@@ -116,7 +116,8 @@ pub fn write_usize_vector(path: &str, vec: &Vec<usize>) -> Result<(), Error> {
         .write(true)
         .create(true)
         .open(path)?;
-    let total_size: u64 = 8 * vec.len() as u64;
+    // let total_size: u64 = 8 * vec.len() as u64;
+    let total_size: u64 = (size_of::<usize>() * vec.len()) as u64;
     file.set_len(total_size as u64)?;
     // Write as whole
     let mut writer = BufWriter::new(file);
@@ -141,7 +142,96 @@ pub fn read_usize_vector(path: &str)-> Result<(Mmap, &'static [u64]), Error> {
 pub fn get_values_with_offset(vec: &[u64], offset: usize, length: usize) -> &[u64] {
     &vec[offset..offset + length]
 }
+pub fn get_values_with_offset_u16(vec: &[u16], offset: usize, length: usize) -> &[u16] {
+    &vec[offset..offset + length]
+}
+pub fn get_values_with_offset_u32(vec: &[u32], offset: usize, length: usize) -> &[u32] {
+    &vec[offset..offset + length]
+}
+pub fn get_values_with_offset_u8(vec: &[u8], offset: usize, length: usize) -> &[u8] {
+    &vec[offset..offset + length]
+}
 
+pub fn write_usize_vector_in_bits(path: &str, vec: &Vec<usize>, num_bits: usize) -> Result<(), Error> {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(path)?;
+    // let total_size: u64 = 8 * vec.len() as u64;
+    let total_size: u64 = match num_bits {
+        8 => (size_of::<u8>() * vec.len()) as u64,
+        16 => (size_of::<u16>() * vec.len()) as u64,
+        32 => (size_of::<u32>() * vec.len()) as u64,
+        _ => { panic!("Invalid number of bits"); }
+    };
+    file.set_len(total_size as u64)?;
+    // Write after converting usize to matched integer type
+    let mut writer = BufWriter::new(file);
+    match num_bits {
+        8 => {
+            let vec_u8 = vec.iter().map(|&x| x as u8).collect::<Vec<u8>>();
+            let vec_bytes = unsafe { 
+                std::slice::from_raw_parts(vec_u8.as_ptr() as *const u8, 
+                total_size as usize) 
+            };
+            writer.write_all(vec_bytes)?;
+        },
+        16 => {
+            let vec_u16 = vec.iter().map(|&x| x as u16).collect::<Vec<u16>>();
+            let vec_bytes = unsafe { 
+                std::slice::from_raw_parts(vec_u16.as_ptr() as *const u8, 
+                total_size as usize) 
+            };
+            writer.write_all(vec_bytes)?;
+        },
+        32 => {
+            let vec_u32 = vec.iter().map(|&x| x as u32).collect::<Vec<u32>>();
+            let vec_bytes = unsafe { 
+                std::slice::from_raw_parts(vec_u32.as_ptr() as *const u8, 
+                total_size as usize) 
+            };
+            writer.write_all(vec_bytes)?;
+        },
+        64 => {
+            let vec_bytes = unsafe { 
+                std::slice::from_raw_parts(vec.as_ptr() as *const u8,
+                total_size as usize) 
+            };
+            writer.write_all(vec_bytes)?;
+        },
+        _ => { panic!("Invalid number of bits"); }
+    }    
+    Ok(())
+}
+
+pub fn read_u8_vector(path: &str)-> Result<(Mmap, &'static [u8]), Error> {
+    let file = File::open(path)?;
+    let mmap = unsafe { Mmap::map(&file)? };
+    let vec = unsafe {
+        std::slice::from_raw_parts(mmap.as_ptr() as *const u8,
+        mmap.len() / size_of::<u8>())
+    };
+    Ok((mmap, vec))
+}
+pub fn read_u16_vector(path: &str)-> Result<(Mmap, &'static [u16]), Error> {
+    let file = File::open(path)?;
+    let mmap = unsafe { Mmap::map(&file)? };
+    let vec = unsafe {
+        std::slice::from_raw_parts(mmap.as_ptr() as *const u16,
+        mmap.len() / size_of::<u16>())
+    };
+    Ok((mmap, vec))
+}
+pub fn read_u32_vector(path: &str)-> Result<(Mmap, &'static [u32]), Error> {
+    let file = File::open(path)?;
+    let mmap = unsafe { Mmap::map(&file)? };
+    let vec = unsafe {
+        std::slice::from_raw_parts(mmap.as_ptr() as *const u32,
+        mmap.len() / size_of::<u32>())
+    };
+    Ok((mmap, vec))
+}
 
 #[cfg(test)]
 mod tests {

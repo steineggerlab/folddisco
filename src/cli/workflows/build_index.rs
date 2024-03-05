@@ -9,7 +9,7 @@
 
 
 use crate::cli::*;
-use crate::controller::io::save_offset_vec;
+use crate::controller::io::{save_offset_vec, write_usize_vector_in_bits};
 use crate::index::alloc::convert_sorted_pairs_to_offset_and_values_vec;
 use crate::prelude::*;
 use peak_alloc::PeakAlloc;
@@ -24,6 +24,7 @@ Options:
     -H, --hash <HASH_TYPE>     Hash type to use (pdb, trrosetta, default)
     -i, --index <INDEX_PATH>   Path to save the index table
     -t, --threads <THREADS>         Number of threads to use
+    -c, --chunk <CHUNK_SIZE>        Number of PDB files to index at once (default 1000, max 65535)
     -v, --verbose                   Print verbose messages
     -h, --help                      Print this help menu
 ";
@@ -38,6 +39,7 @@ pub fn build_index(env: AppArgs) {
             hash_type,
             index_path,
             num_threads,
+            chunk_size,
             verbose,
             help,
         } => {
@@ -51,12 +53,14 @@ pub fn build_index(env: AppArgs) {
                 std::process::exit(0);
             } else {
                 let pdb_dir_clone = pdb_dir.clone();
+                let chunk_size = if chunk_size > u16::max_value() as usize { u16::max_value() as usize } else { chunk_size };
+                let num_chunks = if pdb_path_vec.len() < chunk_size { 1 } else { (pdb_path_vec.len() as f64 / chunk_size as f64).ceil() as usize };
                 if verbose { 
                     print_log_msg(
                         INFO,&format!(
-                            "Indexing {} with {} threads", 
+                            "Indexing {} with {} threads and {} chunks",
                             pdb_dir_clone.unwrap_or("None".to_string()),
-                            num_threads
+                            num_threads, num_chunks
                         )
                     );
                 }
@@ -68,42 +72,20 @@ pub fn build_index(env: AppArgs) {
                 };
                 let hash_type = HashType::get_with_str(hash_type.as_str());
 
-                let mut fold_disco = FoldDisco::new_with_params(
-                    pdb_path_vec, hash_type, true, num_threads, index_path.clone()
-                );
                 
-                // Main workflow
-                let USE_DASHMAP = true;
-                if USE_DASHMAP {
-                    measure_time!(fold_disco.collect_hash());
-                    if verbose {
-                        print_log_msg(INFO, 
-                            &format!("Hash collected (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
-                        );
-                    }
-                    // 3. Setting
-                    measure_time!(fold_disco.set_index_table());
-                    if verbose { print_log_msg(INFO, &format!("Setting done (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
-                    // 4. Fill index table
-                    let mut index_table = measure_time!(fold_disco.index_builder.fill_and_return_dashmap());
-                    index_table.remove(&GeometricHash::from_u64(0, hash_type));
-                    if verbose { print_log_msg(INFO, &format!("Filling done (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
-                    // Convert to offset table
-                    let (offset_table, value_vec) =
-                        measure_time!(fold_disco.index_builder.convert_hashmap_to_offset_and_values(index_table));
-                    if verbose { print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
-                        // Save offset table
-                    let offset_path = format!("{}.offset", index_path);
-                    measure_time!(save_offset_map(&offset_path, &offset_table).expect(
-                        &log_msg(FAIL, "Failed to save offset table")
-                    ));
-                    // Save value vector  
-                    let value_path = format!("{}.value", index_path);
-                    measure_time!(write_usize_vector(&value_path, &value_vec).expect(
-                        &log_msg(FAIL, "Failed to save values")
-                    ));
-                } else {
-                    // 2. Collect hash
+                let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);
+                
+                pdb_path_chunks.into_iter().enumerate().for_each(|(i, pdb_path_vec)| {
+                    let index_path = if num_chunks == 1 {
+                        if verbose { print_log_msg(INFO, "Indexing all PDB files in one chunk"); }
+                        index_path.clone()
+                    } else {
+                        if verbose { print_log_msg(INFO, &format!("Indexing chunk {}", i)); }
+                        format!("{}_{}", index_path, i)
+                    };
+                    let mut fold_disco = FoldDisco::new_with_params(
+                        pdb_path_vec.to_vec(), hash_type, true, num_threads, index_path.clone()
+                    );
                     measure_time!(fold_disco.collect_hash_pairs());
                     if verbose {
                         print_log_msg(INFO, 
@@ -112,39 +94,27 @@ pub fn build_index(env: AppArgs) {
                     }
                     measure_time!(fold_disco.sort_hash_pairs());
                     if verbose { print_log_msg(INFO, &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
-                    measure_time!(fold_disco.fill_numeric_id_vec());
-
+                    fold_disco.fill_numeric_id_vec();
                     let (offset_table, value_vec) =
-                        // measure_time!(fold_disco.index_builder.convert_sorted_pairs_to_offset_and_values(fold_disco.hash_id_pairs));
                         measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_pairs));
-                    if verbose { print_log_msg(INFO, &format!("Converted to offsets (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
-                    // Save offset table
+                    if verbose { print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
                     let offset_path = format!("{}.offset", index_path);
-                    // measure_time!(save_offset_map(&offset_path, &offset_table).expect(
                     measure_time!(save_offset_vec(&offset_path, &offset_table).expect(
                         &log_msg(FAIL, "Failed to save offset table")
                     ));
-                    drop(offset_table);
-
-                    // Save value vector  
                     let value_path = format!("{}.value", index_path);
-                    measure_time!(write_usize_vector(&value_path, &value_vec).expect(
+                    measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 16).expect(
                         &log_msg(FAIL, "Failed to save values")
                     ));
-                    drop(value_vec);
-                }
-                // Save lookup. The path to lookup table is the same as the index table with .lookup extension
-                let lookup_path = format!("{}.lookup", index_path);
-                measure_time!(save_lookup_to_file(
-                    &lookup_path, &fold_disco.path_vec,
-                     &fold_disco.numeric_id_vec, None
-                ));
-
-                // Save hash type
-                let hash_type_path = format!("{}.type", index_path);
-                hash_type.save_to_file(&hash_type_path);
-                
-                // eprintln!("FINAL - {}MB", PEAK_ALLOC.current_usage_as_mb());
+                    let lookup_path = format!("{}.lookup", index_path);
+                    measure_time!(save_lookup_to_file(
+                        &lookup_path, &fold_disco.path_vec,
+                        &fold_disco.numeric_id_vec, None
+                    ));
+                    let hash_type_path = format!("{}.type", index_path);
+                    hash_type.save_to_file(&hash_type_path);
+                    if verbose { print_log_msg(DONE, &format!("Indexing done for chunk {} - {}", i, index_path)); }
+                });
                 if verbose { print_log_msg(DONE, "Done."); }
             }
         }
@@ -162,9 +132,10 @@ mod tests {
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
         let pdb_path_vec = load_path(pdb_dir);
-        let hash_type = "pdb";
-        let index_path = "data/serine_peptidases_pdb";
+        let hash_type = "default32";
+        let index_path = "data/serine_peptidases_default32";
         let num_threads = 4;
+        let chunk_size = 10;
         let verbose = true;
         let help = false;
         let env = AppArgs::Index {
@@ -173,6 +144,7 @@ mod tests {
             hash_type: hash_type.to_string(),
             index_path: index_path.to_string(),
             num_threads,
+            chunk_size,
             verbose,
             help,
         };

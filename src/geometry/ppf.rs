@@ -10,7 +10,7 @@ use crate::geometry::util::map_u8_to_aa;
 // 1. for cb_dist
 const MIN_DIST: f32 = 2.0;
 const MAX_DIST: f32 = 20.0;
-const NBIN_DIST: f32 = 16.0;
+const NBIN_DIST: f32 = 12.0;
 // 2. NEW IDEA for encoding angles; represent as sin and cos
 const MIN_SIN_COS: f32 = -1.0;
 const MAX_SIN_COS: f32 = 1.0;

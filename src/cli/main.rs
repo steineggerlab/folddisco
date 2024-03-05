@@ -32,6 +32,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             hash_type: args.value_from_str(["-H", "--hash"]).unwrap_or("default".into()),
             index_path: args.value_from_str(["-i", "--index"]).unwrap_or("folddisco_index".into()),
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(1000),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),

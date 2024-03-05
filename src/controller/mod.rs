@@ -260,6 +260,12 @@ impl FoldDisco {
         }
     }
     
+    pub fn return_hash_collection(&mut self) -> Vec<Vec<GeometricHash>> {
+        // Move self.hash_collection and clear it
+        let hash_collection = std::mem::take(&mut self.hash_collection);
+        hash_collection
+    }
+
     pub fn set_index_table(&mut self) {
         // Deprecated
         // Check if hash_collection is filled
@@ -268,8 +274,8 @@ impl FoldDisco {
             return;
         }
         let index_builder = IndexBuilder::new(
-            &self.numeric_id_vec, &self.hash_collection,
-            self.num_threads, self.get_allocation_size(),
+            self.numeric_id_vec.clone(), self.return_hash_collection(),
+            self.num_threads, 1,
             format!("{}.offset", self.output_path), // offset file path
             format!("{}.index", self.output_path), // data file path
         );

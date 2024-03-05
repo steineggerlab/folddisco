@@ -72,7 +72,7 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
     
     // Constructor
     pub fn new(
-        ids: &Vec<K>, data: &Vec<Vec<V>>,
+        ids: Vec<K>, data: Vec<Vec<V>>,
         num_threads: usize, allocation_size: usize,
         offset_path: String, data_path: String,
     ) -> IndexBuilder<K, V> {
@@ -85,7 +85,7 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         IndexBuilder {
             offset: DashMap::new(),
             allocation: Arc::new(HugeAllocation::new(allocation_size)),
-            ids: Arc::new(ids.to_owned()),
+            ids: Arc::new(ids),
             data: Arc::new(data.to_owned()),
             data_dashmap: Arc::new(DashMap::new()),
             num_threads,

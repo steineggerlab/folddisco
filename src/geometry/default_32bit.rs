@@ -22,7 +22,7 @@ const NBIN_DIST: f32 = 8.0;
 // 2. NEW IDEA for encoding angles; represent as sin and cos
 const MIN_SIN_COS: f32 = -1.0;
 const MAX_SIN_COS: f32 = 1.0;
-const NBIN_TORSION_SIN_COS: f32 = 2.0;
+const NBIN_TORSION_SIN_COS: f32 = 3.0;
 const NBIN_PLANE_SIN_COS: f32 = 3.0;
 // Bitmasks
 const BITMASK32_2BIT: u32 = 0x00000003;

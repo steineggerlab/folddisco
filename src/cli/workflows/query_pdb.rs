@@ -118,26 +118,27 @@ pub fn query_pdb(env: AppArgs) {
                     }
                     
                     // Make union of values queried
-                    let mut query_count_map: HashMap<usize, usize> = HashMap::new();
+                    let mut query_count_map: HashMap<usize, (usize, f32)> = HashMap::new();
                     for i in 0..offset_to_query.len() {
                         // let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
                         let single_queried_values = get_values_with_offset_u16(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
+                        let hash_count = offset_to_query[i].1;
                         for j in 0..single_queried_values.len() {
                             let nid = lookup.1[single_queried_values[j] as usize];
                             let count = query_count_map.get(&nid);
                             if count.is_none() {
-                                query_count_map.insert(nid, 1);
+                                query_count_map.insert(nid, (1, (offset_table.len() as f32 / hash_count as f32).log2()));
                             } else {
-                                query_count_map.insert(nid, count.unwrap() + 1);
+                                query_count_map.insert(nid, (count.unwrap().0 + 1, (offset_table.len() as f32 / hash_count as f32).log2() + count.unwrap().1));
                             }
                         }
                     }
                     // Sort by count and print
                     let mut query_count_vec: Vec<_> = query_count_map.iter().collect();
-                    query_count_vec.sort_by(|a, b| b.1.cmp(a.1));
+                    query_count_vec.sort_by(|a, b| b.1.1.partial_cmp(&a.1.1).unwrap());
                     let count_cut = query_residues.len() / 2;
                     for (nid, count) in query_count_vec {
-                        if *count >= count_cut {
+                        if count.0 > count_cut {
                             if retrieve {
                                 let retrieved = retrieve_residue_with_hash(&pdb_query, &lookup.0[*nid]);
                                 if retrieved.is_some() {
@@ -147,13 +148,13 @@ pub fn query_pdb(env: AppArgs) {
                                     if connected > 0 {
                                         println!(
                                             "{};uniq_matches={};total_matches={};connected={};{:?}",
-                                            lookup.0[*nid], count, total_matches,
+                                            lookup.0[*nid], count.0, total_matches,
                                             connected, res_vec_as_string(&retrieved)
                                         );
                                     }
                                 }
                             } else {
-                                println!("{}:{}", lookup.0[*nid], count);
+                                println!("{}:{}:{}", lookup.0[*nid], count.0, count.1);
                             }
                         }
                     }

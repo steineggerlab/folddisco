@@ -24,12 +24,22 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
     
     // Convert residue indices to vector indices
     let mut indices = Vec::new();
+    let mut query_residues = query_residues.clone();
+    if query_residues.is_empty() {
+        // Iterate over all residues and set to query_residues
+        for i in 0..compact.num_residues {
+            let chain = compact.chain_per_residue[i];
+            let residue_index = compact.residue_serial[i];
+            query_residues.push((chain, residue_index));
+        }
+    }
+
     for (chain, ri) in query_residues {
-        let index = compact.get_index(chain, ri);
+        let index = compact.get_index(&chain, &ri);
         if let Some(index) = index {
             // convert u8 array to string
             let residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
-            print_log_msg(INFO, &format!("Found residue: {}:{:?}({})", *chain as char, ri, residue));
+            print_log_msg(INFO, &format!("Found residue: {}:{:?}({})", chain as char, ri, residue));
             indices.push(index);
         }
     }
@@ -64,7 +74,10 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
 }
 
 pub fn parse_query_string(query_string: &str) -> Vec<(u8, u64)> {
-    let mut query_residues = Vec::new();
+    let mut query_residues: Vec<(u8, u64)> = Vec::new();
+    if query_string.is_empty() {
+        return query_residues;
+    }
     let mut chain = b' ';
     let mut residue = String::new();
     for c in query_string.chars() {

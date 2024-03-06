@@ -25,6 +25,7 @@ Options:
     -i, --index <INDEX_PATH>   Path to save the index table
     -t, --threads <THREADS>         Number of threads to use
     -c, --chunk <CHUNK_SIZE>        Number of PDB files to index at once (default 1000, max 65535)
+    -r, --recursive                 Index PDB files in subdirectories
     -v, --verbose                   Print verbose messages
     -h, --help                      Print this help menu
 ";
@@ -35,16 +36,16 @@ pub fn build_index(env: AppArgs) {
     match env {
         AppArgs::Index {
             pdb_dir,
-            pdb_path_vec,
             hash_type,
             index_path,
             num_threads,
             chunk_size,
+            recursive,
             verbose,
             help,
         } => {
             // Check if arguments are valid
-            if pdb_dir.is_none() && pdb_path_vec.is_empty() {
+            if pdb_dir.is_none() {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(1);
             }
@@ -56,9 +57,11 @@ pub fn build_index(env: AppArgs) {
                 let pdb_dir_clone = pdb_dir.clone();
                 // Load PDB files
                 let pdb_path_vec = if pdb_dir.is_some() {
-                    load_path(&pdb_dir.unwrap())
+                    load_path(&pdb_dir.unwrap(), recursive)
                 } else {
-                    pdb_path_vec
+                    print_log_msg(FAIL, "Directory containing PDB files is not provided");
+                    eprintln!("{}", HELP_INDEX);
+                    std::process::exit(1);
                 };
                 let chunk_size = if chunk_size > u16::max_value() as usize { u16::max_value() as usize } else { chunk_size };
                 let num_chunks = if pdb_path_vec.len() < chunk_size { 1 } else { (pdb_path_vec.len() as f64 / chunk_size as f64).ceil() as usize };
@@ -129,20 +132,20 @@ mod tests {
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
-        let pdb_path_vec = load_path(pdb_dir);
         let hash_type = "default32";
         let index_path = "data/serine_peptidases_default32";
         let num_threads = 4;
         let chunk_size = 10;
+        let recursive = true;
         let verbose = true;
         let help = false;
         let env = AppArgs::Index {
             pdb_dir: Some(pdb_dir.to_string()),
-            pdb_path_vec,
             hash_type: hash_type.to_string(),
             index_path: index_path.to_string(),
             num_threads,
             chunk_size,
+            recursive,
             verbose,
             help,
         };

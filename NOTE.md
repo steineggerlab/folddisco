@@ -1,18 +1,32 @@
 # Development note
 
-## TODOs 240304
-INDEX
-- [x] DONE: IDEA: Divide index table into multiple files (chunking)
+## TODOs 240306
+PREREQUISITE FOR BUILDING INDEX OF PDB
+- [x] DONE: Download PDB
+- [x] DONE: if query string is empty, use whole pdb as query
+- [x] DONE: Recursive indexing is needed
+- [x] DONE: Read Gzipped PDB
 
-GEOMETRY
-- [ ] TODO: Add 3Di hash
-- [ ] TODO: IMPORTANT: make binning and querying parameters configurable
-
-BENCHMARK
+IMPORTANT: BENCHMARK 
+- [ ] Check if the query from other lab works or not
 - [ ] TODO: Benchmarking -- IMPORTANT: build CLI for this
 - [ ] Benchmarking -- set benchmarking dataset based on PDB's approach
 - [ ] TODO: Gather data
-- [ ] TODO: Download PDB
+- [ ] Read MASTER, PDB realtime motif, pyscomotif on how they benchmarked
+
+QUERYING
+- [ ] TODO: IDEA: interactive mode that saves all the offsets in RAM
+- [ ] TODO: FEATURE: multiple queries
+
+INDEX
+- [ ] IN_PROGRESS: Build Swissprot index (with max chunk size)
+- [x] DONE: IDEA: Divide index table into multiple files (chunking)
+
+GEOMETRY
+- [ ] TODO: Add 3Di hash 
+  - [x] DONE: make an empty module
+  - [ ] TODO: Fill in and integrate with the rest of the code
+- [ ] TODO: IMPORTANT: make binning and querying parameters configurable
 
 DEV
 - [ ] TODO:Polish logging
@@ -21,7 +35,7 @@ DEV
 
 ## TODOs 
 BIG THINGS
-- [ ] Reduce memory usage
+- [x] DONE: Reduce memory usage
 - [ ] TODO: REMOVE MEMORY MONITORING PART AFTER THE MEMORY USAGE IS REDUCED ENOUGH
 - [ ] IMPORTANT: confirm if sin & cos representation is working 
 
@@ -75,6 +89,12 @@ TEST DONE:
         - [ ] query
         - [ ] benchmark
   - [ ] project level test
+
+
+NOTE: Our algorithm is making a record-level inverted index, not a word-level inverted index.
+TODO: Justify why we are using record-level inverted index and show the use case.
+One of applications would be prefiltering for the next step of the analysis.
+
 
 <!-- https://stats.stackexchange.com/questions/218407/encoding-angle-data-for-neural-network -->
 
@@ -359,3 +379,79 @@ running 1 test
 [INFO] save_lookup_to_file: 286.759µs
 [DONE] Done.
 test cli::workflows::build_index::tests::test_build_index ... ok
+
+
+```sh
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing analysis/raw_ecoli with 6 threads and 1 chunks
+[INFO] Indexing all PDB files in one chunk
+[INFO] fold_disco.collect_hash_pairs: 75.025886562s
+[INFO] Total 92442306 hashes collected (Allocated 2116.5344MB)
+[INFO] fold_disco.sort_hash_pairs: 2.835071084s
+[INFO] Hash sorted (Allocated 2116.5508MB)
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 1.654009301s
+[INFO] Offset & values acquired (Allocated 714.9261MB)
+[INFO] save_offset_vec: 17.190798ms
+[INFO] write_usize_vector_in_bits: 350.628364ms
+[INFO] save_lookup_to_file: 6.863039ms
+[DONE] Indexing done for chunk 0 - analysis/raw_ecoli_pdb
+[DONE] Done.
+-rw-r--r--      1 hbk  staff   221K Mar  6 12:31 raw_ecoli_pdb.lookup
+-rw-r--r--      1 hbk  staff   5.5M Mar  6 12:31 raw_ecoli_pdb.offset
+-rw-r--r--      1 hbk  staff    14B Mar  6 12:31 raw_ecoli_pdb.type
+-rw-r--r--      1 hbk  staff   176M Mar  6 12:31 raw_ecoli_pdb.value
+hbk@Hyunbinui-MacBookPro motifsearch % ./target/release/motifsearch index -d analysis/h_sapiens -i analysis/h_sapiens_index -t 6 -v -H pdb -c 2400
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing analysis/h_sapiens with 6 threads and 10 chunks
+[INFO] Indexing chunk 0
+[INFO] fold_disco.collect_hash_pairs: 174.94383012s
+[INFO] Total 66828939 hashes collected (Allocated 1531.52MB)
+[INFO] fold_disco.sort_hash_pairs: 1.703404673s
+[INFO] Hash sorted (Allocated 1531.5333MB)
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 769.431081ms
+[INFO] Offset & values acquired (Allocated 520.72797MB)
+[INFO] save_offset_vec: 9.896456ms
+[INFO] write_usize_vector_in_bits: 192.254408ms
+[INFO] save_lookup_to_file: 4.285185ms
+```
+
+
+-rw-rw-r-- 1 hyunbin steineggerlab 1904485972 Mar  6 13:09 swissprot_default32_84.value
+-rw-rw-r-- 1 hyunbin steineggerlab     358986 Mar  6 03:29 swissprot_default32_9.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab  696379300 Mar  6 03:29 swissprot_default32_9.offset
+-rw-rw-r-- 1 hyunbin steineggerlab         12 Mar  6 03:29 swissprot_default32_9.type
+-rw-rw-r-- 1 hyunbin steineggerlab 1837116642 Mar  6 03:29 swissprot_default32_9.value
+
+```sh
+Command being timed: "/home/hyunbin/Projects/06_Motifsearch/motifsearch/target/release/motifsearch index -d ./swissprot_benchmark/swissprot_v4_raw/ -i ./swissprot_benchmark/default/swissprot_default32 -v -t 100 -H default32 -c 5000"
+User time (seconds): 4258543.22
+System time (seconds): 13097.09
+Percent of CPU this job got: 8487%
+Elapsed (wall clock) time (h:mm:ss or m:ss): 13:58:50
+Average shared text size (kbytes): 0
+Average unshared data size (kbytes): 0
+Average stack size (kbytes): 0
+Average total size (kbytes): 0
+Maximum resident set size (kbytes): 46282292
+Average resident set size (kbytes): 0
+Major (requiring I/O) page faults: 24987
+Minor (reclaiming a frame) page faults: 732009010
+Voluntary context switches: 88365756
+Involuntary context switches: 12901302
+Swaps: 0
+File system inputs: 73534872
+File system outputs: 528036232
+Socket messages sent: 0
+Socket messages received: 0
+Signals delivered: 0
+Page size (bytes): 4096
+Exit status: 0
+  ```

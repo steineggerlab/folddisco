@@ -20,11 +20,11 @@ pub enum AppArgs {
     },
     Index {
         pdb_dir: Option<String>,
-        pdb_path_vec: Vec<String>,
         hash_type: String,
         index_path: String,
         num_threads: usize,
         chunk_size: usize,
+        recursive: bool,
         verbose: bool,
         help: bool,
     },

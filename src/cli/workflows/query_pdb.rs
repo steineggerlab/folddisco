@@ -127,9 +127,9 @@ pub fn query_pdb(env: AppArgs) {
                             let nid = lookup.1[single_queried_values[j] as usize];
                             let count = query_count_map.get(&nid);
                             if count.is_none() {
-                                query_count_map.insert(nid, (1, (offset_table.len() as f32 / hash_count as f32).log2()));
+                                query_count_map.insert(nid, (1, (lookup.0.len() as f32 / hash_count as f32).log2()));
                             } else {
-                                query_count_map.insert(nid, (count.unwrap().0 + 1, (offset_table.len() as f32 / hash_count as f32).log2() + count.unwrap().1));
+                                query_count_map.insert(nid, (count.unwrap().0 + 1, (lookup.0.len() as f32 / hash_count as f32).log2() + count.unwrap().1));
                             }
                         }
                     }

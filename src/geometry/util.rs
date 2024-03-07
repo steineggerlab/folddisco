@@ -52,7 +52,7 @@ pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
         b"TRP" | b"DTR" | b"TRQ" | b"TOX" | b"0AF" => 17, // TRP, W, total 5
         b"TYR" | b"PTR" | b"TYS" | b"TPQ" | b"DTY" | b"OMY" => 18,
         b"VAL" | b"DVA" | b"MVA" | b"FVA" => 19,
-        _ => panic!("Invalid AA"),
+        _ => 255,
     }
 }
 pub fn map_u8_to_aa(aa: u8) -> &'static str {
@@ -77,7 +77,7 @@ pub fn map_u8_to_aa(aa: u8) -> &'static str {
         17 => "TRP",
         18 => "TYR",
         19 => "VAL",
-        _ => panic!("Invalid AA"),
+        _ => "UNK",
     }
 }
 

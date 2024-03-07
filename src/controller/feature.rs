@@ -8,6 +8,9 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
     let res2 = structure.get_res_name(j);
     let res1 = map_aa_to_u8(res1) as f32;
     let res2 = map_aa_to_u8(res2) as f32;
+    if res1 == 255.0 || res2 == 255.0 {
+        return None;
+    }
     match &hash_type {
         HashType::PDBMotif => {
             let ca_dist = structure.get_ca_distance(i, j);

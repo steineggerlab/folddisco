@@ -116,7 +116,7 @@ pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type
             hash_vec.push(hash);
         }
         let elapsed = start.elapsed().as_secs_f64();
-        if elapsed > 30.0 {
+        if elapsed > 60.0 {
             eprintln!("Elapsed time: {:.2} seconds", elapsed);
             // Print length of hash_vec
             eprintln!("Length of hash_vec: {}", hash_vec.len());

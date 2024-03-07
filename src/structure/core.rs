@@ -113,12 +113,10 @@ pub struct CompactStructure {
     pub n_vector: CarbonCoordinateVector,
     pub ca_vector: CarbonCoordinateVector,
     pub cb_vector: CarbonCoordinateVector,
-    pub ca_torsion_vector: Vec<Option<f32>>,
 }
 
 impl CompactStructure {
     pub fn build(origin: &Structure) -> CompactStructure {
-        let start = std::time::Instant::now();
         // Store only backbone atoms
         let model = &origin.atom_vector;
 
@@ -204,24 +202,7 @@ impl CompactStructure {
                     _ => (),
                 }
             }
-            let elapsed = start.elapsed().as_secs_f64();
-            if elapsed > 60.0 {
-            // Print all information available
-            eprintln!("Elapsed time: {:.2} seconds", elapsed);
-            eprintln!("Origin info: {:?}", origin);
-            eprintln!("Total {} atoms", origin.num_atoms);
-            eprintln!("Atom: {:?}", model.atom_name);
-
-            eprintln!("Residue serial: {:?}", res_serial_vec);
-            eprintln!("Residue name: {:?}", res_name_vec);
-            eprintln!("Chain per residue: {:?}", chain_per_residue);
-            eprintln!("Current index: {}", idx);
-            // Terminate
-            std::process::exit(1);
         }
-        }
-
-        let ca_torsion_vec = ca_vec.calc_all_torsion_angles();
 
         CompactStructure {
             num_chains: origin.num_chains,
@@ -233,7 +214,6 @@ impl CompactStructure {
             n_vector: n_vec,
             ca_vector: ca_vec,
             cb_vector: cb_vec,
-            ca_torsion_vector: ca_torsion_vec,
         }
     }
 
@@ -335,19 +315,6 @@ impl CompactStructure {
         (self.residue_serial[idx1], self.residue_serial[idx2])
     }
 
-    pub fn get_accumulated_torsion(&self, idx1: usize, idx2: usize) -> Option<f32> {
-        if idx1.abs_diff(idx2) < 3 {
-            return None;
-        }
-        let start_ind = idx1;
-        let end_ind = idx2 - 3;
-        let mut torsion = 0.0;
-        for idx in start_ind..end_ind {
-            torsion += self.ca_torsion_vector[idx].unwrap_or(0.0);
-        }
-        Some(torsion)
-    }
-
     pub fn get_ppf(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -361,10 +328,6 @@ impl CompactStructure {
         } else {
             None
         }
-    }
-
-    pub fn get_torsion(&self, idx: usize) -> Option<f32> {
-        self.ca_torsion_vector[idx]
     }
 
     fn _get_trrosetta_feature(&self, idx1: usize, idx2: usize) -> Option<[f32; 6]> {

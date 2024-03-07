@@ -65,39 +65,28 @@ impl Reader<File> {
         // println!("{structure:?}");
         Ok(structure)
     }
-    
+
     pub fn read_structure_from_gz(&self) -> Result<Structure, &str> {
-        // Read the file with GzDecoder
+        // Create a new GzDecoder
         let reader = BufReader::new(&self.reader);
         let mut decoder = GzDecoder::new(reader);
-        let mut buffer = String::new();
-        decoder.read_to_string(&mut buffer).unwrap();
-        // Parse the string
-        let mut structure = Structure::new(); // revise
+        // Create a new Structure
+        let mut structure = Structure::new();
         let mut record = (b' ', 0);
-        // Iterate over lines of the string
-        for (idx, line) in buffer.lines().enumerate() {
-            let atomline = line.to_string();
-            match &atomline[..6] {
-                "ATOM  " => {
-                    let atom = parse_line(&atomline);
-                    match atom {
-                        Ok(atom) => {
-                            structure.update(atom, &mut record);
-                        }
-                        Err(e) => {
-                            // Conversion error. Jusk skip the line.
-                            // If verbose, print message (NOT IMPLEMENTED)
-                            // println!("Skipping line{}: {}", idx, e);
-                            continue;
-                        }
-                    }
+        // Create a buffer for each chunk
+        let mut buffer = Vec::new();
+        // Read the file into the buffer
+        decoder.read_to_end(&mut buffer).unwrap();
+        // Convert the buffer to a string
+        let s = String::from_utf8(buffer).unwrap();
+        // Process the string line by line
+        for line in s.lines() {
+            if line.starts_with("ATOM  ") {
+                if let Ok(atom) = parse_line(&line.to_string()) {
+                    structure.update(atom, &mut record);
                 }
-                _ => continue,
-            };
+            }
         }
-        // println!("{structure:?}");
-        // Flush the buffer
         Ok(structure)
     }
     

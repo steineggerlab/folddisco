@@ -76,7 +76,7 @@ pub fn build_index(env: AppArgs) {
                 }
                 let hash_type = HashType::get_with_str(hash_type.as_str());
                 let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);
-                let start = std::time::Instant::now();
+
                 pdb_path_chunks.into_iter().enumerate().for_each(|(i, pdb_path_vec)| {
                     let index_path = if num_chunks == 1 {
                         if verbose { print_log_msg(INFO, "Indexing all PDB files in one chunk"); }

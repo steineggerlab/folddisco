@@ -2,7 +2,8 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 
-use flate2::bufread::GzDecoder;
+use flate2::read::GzDecoder;
+use rayon::collections::binary_heap;
 
 use super::super::core::*;
 use super::parser::*;
@@ -67,26 +68,47 @@ impl Reader<File> {
     }
 
     pub fn read_structure_from_gz(&self) -> Result<Structure, &str> {
-        // Create a new GzDecoder
-        let reader = BufReader::new(&self.reader);
-        let mut decoder = GzDecoder::new(reader);
+        // Load whole file and close the file
+        let mut decoder = GzDecoder::new(&self.reader);
+        let mut binary = Vec::new();
+        decoder.read_to_end(&mut binary).unwrap();
+        // Close the decoder after flushing
+        decoder.flush().unwrap();
+        // Drop the decoder
+        drop(decoder);
+
         // Create a new Structure
         let mut structure = Structure::new();
         let mut record = (b' ', 0);
-        // Create a buffer for each chunk
-        let mut buffer = Vec::new();
-        // Read the file into the buffer
-        decoder.read_to_end(&mut buffer).unwrap();
-        // Convert the buffer to a string
-        let s = String::from_utf8(buffer).unwrap();
-        // Process the string line by line
-        for line in s.lines() {
-            if line.starts_with("ATOM  ") {
-                if let Ok(atom) = parse_line(&line.to_string()) {
-                    structure.update(atom, &mut record);
+        
+        // Read binary as a string. Conver
+        let reader = BufReader::new(&binary[..]);
+        // Convert to string
+        for (idx, line) in reader.lines().enumerate() {
+            if let Ok(atomline) = line {
+                match &atomline[..6] {
+                    "ATOM  " => {
+                        let atom = parse_line(&atomline);
+                        match atom {
+                            Ok(atom) => {
+                                structure.update(atom, &mut record);
+                            }
+                            Err(e) => {
+                                // Conversion error. Jusk skip the line.
+                                // If verbose, print message (NOT IMPLEMENTED)
+                                // println!("Skipping line{}: {}", idx, e);
+                                continue;
+                            }
+                        }
+                    }
+                    _ => continue,
                 }
-            }
+            } else {
+                return Err("Error reading line");
+            };
         }
+        // Drop the binary
+        drop(binary);
         Ok(structure)
     }
     

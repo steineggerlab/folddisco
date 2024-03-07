@@ -101,9 +101,11 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
 }
 
 pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType) -> Vec<GeometricHash> {
+    let start = std::time::Instant::now();
     let res_bound = get_all_combination(
         structure.num_residues, false
     );
+
     let mut hash_vec = Vec::with_capacity(res_bound.len());
 
     res_bound.iter().for_each(|(i, j)| {
@@ -112,6 +114,14 @@ pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type
             let feature = feature.unwrap();
             let hash = GeometricHash::perfect_hash(feature, hash_type);
             hash_vec.push(hash);
+        }
+        let elapsed = start.elapsed().as_secs_f64();
+        if elapsed > 10.0 {
+            eprintln!("Elapsed time: {:.2} seconds", elapsed);
+            // Print length of hash_vec
+            eprintln!("Length of hash_vec: {}", hash_vec.len());
+            // Terminate
+            std::process::exit(1);
         }
     });
 

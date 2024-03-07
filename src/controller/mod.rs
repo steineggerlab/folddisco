@@ -156,6 +156,7 @@ impl FoldDisco {
                     if compact.num_residues > DEFAULT_MAX_RESIDUE {
                         print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                     }
+                    
                     let hash_vec = get_geometric_hash_from_structure(
                         &compact.to_compact(), self.hash_type
                     );

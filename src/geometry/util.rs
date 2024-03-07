@@ -27,27 +27,31 @@ pub fn normalize_f32_value(val: f32, min: f32, max: f32) -> f32 {
 
 
 pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
+    // Applied to handle the case of non-standard amino acids
+    // reference: gemmi/blob/master/src/resinfo.cpp (https://github.com/project-gemmi/gemmi)
     match aa {
-        b"ALA" => 0,
-        b"ARG" => 1,
-        b"ASN" => 2,
-        b"ASP" => 3,
-        b"CYS" => 4,
-        b"GLN" => 5,
-        b"GLU" => 6,
-        b"GLY" => 7,
-        b"HIS" => 8,
-        b"ILE" => 9,
-        b"LEU" => 10,
-        b"LYS" => 11,
-        b"MET" => 12,
-        b"PHE" => 13,
-        b"PRO" => 14,
-        b"SER" => 15,
-        b"THR" => 16,
-        b"TRP" => 17,
-        b"TYR" => 18,
-        b"VAL" => 19,
+        b"ALA" | b"ABA" | b"ORN" | b"DAL" | b"AIB" | b"ALC" | b"MDO" | b"MAA" | b"DAB" => 0, // ALA, A, total 9
+        b"ARG" | b"DAR" | b"CIR" | b"AGM" => 1, // ARG, R, total 4
+        b"ASN" | b"DSG" | b"MEN" | b"SNN" => 2, // ASN, N, total 4
+        b"ASP" | b"0TD" | b"DAS" | b"IAS" | b"PHD" | b"BFD" | b"ASX" => 3, // ASP, D, total 7, ASX is included here
+        b"CYS" | b"CSO" | b"CSD" | b"CME" | b"OCS" | b"CAS" | b"CSX" | b"CSS" | 
+        b"YCM" | b"DCY" | b"SMC" | b"SCH" | b"SCY" | b"CAF" | b"SNC" | b"SEC" => 4, // CYS, C, total 16, SEC is included here
+        b"GLN" | b"DGN" | b"CRQ" | b"MEQ" => 5, // GLN, Q, total 4
+        b"GLU" | b"PCA" | b"DGL" | b"CGU" | b"FGA" | b"B3E" | b"GLX" => 6, // GLU, E, total 7, GLX is included here
+        b"GLY" | b"CR2" | b"SAR" | b"GHP" | b"GL3" => 7, // GLY, G, total 5
+        b"HIS" | b"HIC" | b"DHI" | b"NEP" | b"CR8" | b"MHS" => 8, // HIS, H, total 6
+        b"ILE" | b"DIL" => 9, // ILE, I, total 2
+        b"LEU" | b"DLE" | b"NLE" | b"MLE" | b"MK8"=> 10, // LEU, L, total 5
+        b"LYS" | b"KCX" | b"LLP" | b"MLY" | b"M3L" | b"ALY" | b"MLZ" | b"DLY" | 
+        b"KPI" | b"PYL" => 11, // LYS, K, total 10, PYL is included here
+        b"MET" | b"MSE" | b"FME" | b"NRQ" | b"CXM" | b"SME" | b"MHO" | b"MED" => 12, // MET, M, total 8
+        b"PHE" | b"DPN" | b"PHI" | b"MEA" | b"PHL" => 13, // PHE, F, total 5
+        b"PRO" | b"HYP" | b"DPR" => 14, // PRO, P, total 3
+        b"SER" | b"CSH" | b"SEP" | b"DSN" | b"SAC" | b"GYS" | b"DHA" | b"OAS" => 15, // SER, S, total 8
+        b"THR" | b"TPO" | b"CRO" | b"DTH" | b"BMT" | b"CRF" => 16, // THR, T, total 6
+        b"TRP" | b"DTR" | b"TRQ" | b"TOX" | b"0AF" => 17, // TRP, W, total 5
+        b"TYR" | b"PTR" | b"TYS" | b"TPQ" | b"DTY" | b"OMY" => 18,
+        b"VAL" | b"DVA" | b"MVA" | b"FVA" => 19,
         _ => panic!("Invalid AA"),
     }
 }

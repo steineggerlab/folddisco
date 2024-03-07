@@ -1,13 +1,11 @@
 # Development note
 
-## TODOs 240306
-PREREQUISITE FOR BUILDING INDEX OF PDB
-- [x] DONE: Download PDB
-- [x] DONE: if query string is empty, use whole pdb as query
-- [x] DONE: Recursive indexing is needed
-- [x] DONE: Read Gzipped PDB
-
+## TODOs 240307
 IMPORTANT: BENCHMARK 
+- [ ] Build an index of PDB database
+  - [ ] Problem observed: Memory usage is too high (Seems to be related to gzip)
+  - [ ] Problem observed: There are unusual amino acids observed in the PDB database
+
 - [ ] Check if the query from other lab works or not
 - [ ] TODO: Benchmarking -- IMPORTANT: build CLI for this
 - [ ] Benchmarking -- set benchmarking dataset based on PDB's approach

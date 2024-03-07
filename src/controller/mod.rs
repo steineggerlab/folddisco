@@ -193,14 +193,10 @@ impl FoldDisco {
             self.path_vec
                 .par_iter()
                 .map(|pdb_path| {
-                    // let mut path_order = Arc::make_mut(&mut path_order);
                     let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
-                    println!("Start reading {}", pdb_path);
                     let pdb_reader = PDBReader::from_file(pdb_path).expect(
                         log_msg(FAIL, "PDB file not found").as_str()
                     );
-                    println!("Done reading {}", pdb_path);
-                    println!("Start converting {}", pdb_path);
                     let compact = if pdb_path.ends_with(".gz") {
                         pdb_reader.read_structure_from_gz().expect(
                             log_msg(FAIL, "Failed to read structure").as_str()
@@ -210,7 +206,6 @@ impl FoldDisco {
                             log_msg(FAIL, "Failed to read structure").as_str()
                         )
                     };
-                    println!("End converting {}", pdb_path);
                     if compact.num_residues > DEFAULT_MAX_RESIDUE {
                         print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                     }
@@ -220,6 +215,7 @@ impl FoldDisco {
                     // Drop intermediate variables
                     drop(compact);
                     drop(pdb_reader);
+                    println!("{} is okay", pdb_path);
                     // If remove_redundancy is true, remove duplicates
                     if self.remove_redundancy {
                         hash_vec.sort_unstable();

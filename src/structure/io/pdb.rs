@@ -38,17 +38,8 @@ impl Reader<File> {
         let reader = BufReader::new(&self.reader);
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
-        let start = std::time::Instant::now();
         // Reading each line of PDB, parse and build atomvector.
         for (idx, line) in reader.lines().enumerate() {
-            // If reading doesn't stop, report everything.
-            if start.elapsed().as_secs() > 10 {
-                eprintln!("{} lines read", idx);
-                // Print path
-                eprintln!("{:?}", self.reader);
-                std::process::exit(1);
-            }
-            
             if let Ok(atomline) = line {
                 match &atomline[..6] {
                     "ATOM  " => {
@@ -58,9 +49,6 @@ impl Reader<File> {
                                 structure.update(atom, &mut record);
                             }
                             Err(e) => {
-                                // Conversion error. Jusk skip the line.
-                                // If verbose, print message (NOT IMPLEMENTED)
-                                // println!("Skipping line{}: {}", idx, e);
                                 continue;
                             }
                         }

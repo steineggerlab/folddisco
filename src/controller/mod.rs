@@ -215,7 +215,6 @@ impl FoldDisco {
                     // Drop intermediate variables
                     drop(compact);
                     drop(pdb_reader);
-                    println!("{} is okay", pdb_path);
                     // If remove_redundancy is true, remove duplicates
                     if self.remove_redundancy {
                         hash_vec.sort_unstable();

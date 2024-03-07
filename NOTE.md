@@ -1,18 +1,25 @@
 # Development note
 
 ## TODOs 240307
-IMPORTANT: BENCHMARK 
-- [ ] Build an index of PDB database
-  - [ ] Problem observed: Memory usage is too high (Seems to be related to gzip)
-  - [ ] Problem observed: There are unusual amino acids observed in the PDB database
 
+GEOMETRY
+- [ ] TODO: IMPORTANT: URGENT: make binning and querying parameters configurable
+  - [ ] Major binning parameters: NBIN_DIST, NBIN_ANGLE
+  - [ ] This should be saved in the type file or config file
+    - [ ] Let's make a config file
+  - [ ] THIS IS NEEDED FOR BENCHMARKING
+
+IMPORTANT: BENCHMARK 
+- [ ] Build an index of PDB database (Running)
+  - [x] Problem observed: Memory usage is too high (Seems to be related to gzip)
+    - [x] Due to nucleotides in PDB. Solved by removing unnecessary torsion angle calculation
+  - [x] DONE: Solved: There are unusual amino acids observed in the PDB database
 - [ ] Check if the query from other lab works or not
-- [ ] TODO: Benchmarking -- IMPORTANT: build CLI for this
-- [ ] Benchmarking -- set benchmarking dataset based on PDB's approach
-- [ ] TODO: Gather data
 - [ ] Read MASTER, PDB realtime motif, pyscomotif on how they benchmarked
+- [ ] Compare with pyscomotif
 
 QUERYING
+- [x] DONE: IDF seems to be working now.
 - [ ] TODO: IDEA: interactive mode that saves all the offsets in RAM
 - [ ] TODO: FEATURE: multiple queries
 
@@ -24,12 +31,12 @@ GEOMETRY
 - [ ] TODO: Add 3Di hash 
   - [x] DONE: make an empty module
   - [ ] TODO: Fill in and integrate with the rest of the code
-- [ ] TODO: IMPORTANT: make binning and querying parameters configurable
 
 DEV
-- [ ] TODO:Polish logging
+- [ ] TODO: Polish logging
 - [ ] TODO: Print original query
 - [ ] TODO: expose necessary functions with prelude
+- [ ] TODO: Setup output format --> easy to parse (tsv or other)
 
 ## TODOs 
 BIG THINGS

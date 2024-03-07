@@ -9,6 +9,7 @@ use crate::geometry::util::discretize_f32_value_into_u32 as discretize_value;
 use crate::geometry::util::continuize_u32_value_into_f32 as continuize_value;
 
 // Residue 1: 5 bits; Residue 2: 5 bits; Distances: 16 bins 4 bits; 
+// 16 & 6 seems to be too strict. TODO: NEED TO OPTIMIZE
 const MIN_DIST: f32 = 2.0;
 const MAX_DIST: f32 = 20.0;
 const NBIN_DIST: f32 = 16.0;

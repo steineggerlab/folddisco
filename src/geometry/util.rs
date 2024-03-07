@@ -1,3 +1,24 @@
+// Constants
+// 1. for cb_dist
+pub const MIN_DIST: f32 = 2.0;
+pub const MAX_DIST: f32 = 20.0;
+pub const NBIN_DIST: f32 = 8.0;
+// 2. NEW IDEA for encoding angles; represent as sin and cos
+pub const MIN_SIN_COS: f32 = -1.0;
+pub const MAX_SIN_COS: f32 = 1.0;
+pub const NBIN_TORSION_SIN_COS: f32 = 3.0;
+pub const NBIN_PLANE_SIN_COS: f32 = 3.0;
+pub const NBIN_SIN_COS: f32 = 3.0;
+// Bitmasks
+pub const BITMASK32_2BIT: u32 = 0x00000003;
+pub const BITMASK32_3BIT: u32 = 0x00000007;
+pub const BITMASK32_4BIT: u32 = 0x0000000F;
+pub const BITMASK32_5BIT: u32 = 0x0000001F;
+pub const BITMASK32_9BIT: u32 = 0x000001FF;
+
+pub const BITMASK64_4BIT: u64 = 0x000000000000000F;
+pub const BITMASK64_5BIT: u64 = 0x000000000000001F;
+
 // Discretizers 
 pub fn discretize_f32_value_into_u64(val: f32, min: f32, max: f32, num_bin: f32) -> u64 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);

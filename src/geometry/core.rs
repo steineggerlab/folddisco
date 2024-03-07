@@ -32,7 +32,7 @@ impl HashType {
     }
     pub fn get_with_str(hash_type: &str) -> Self {
         match hash_type {
-            "0" | "PDBMotif" | "oldpdb" => HashType::PDBMotif,
+            "0" | "PDBMotif" | "pyscomotif" => HashType::PDBMotif,
             "1" | "PDBMotifSinCos" | "pdb" => HashType::PDBMotifSinCos,
             "2" | "TrRosetta" | "trrosetta" => HashType::TrRosetta,
             "3" | "FoldDiscoDefault" | "default" => HashType::FoldDiscoDefault,
@@ -118,80 +118,97 @@ pub enum GeometricHash {
 impl HashableSync for GeometricHash {}
 
 impl GeometricHash {
-    pub fn perfect_hash(feature: Vec<f32>, hash_type: HashType) -> Self {
+    pub fn perfect_hash_default(feature: Vec<f32>, hash_type: HashType) -> Self {
         match hash_type {
             HashType::PDBMotif => GeometricHash::PDBMotif(
-                super::pdb_motif::HashValue::perfect_hash(feature)
+                super::pdb_motif::HashValue::perfect_hash_default(feature)
             ),
             HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
-                super::pdb_motif_sincos::HashValue::perfect_hash(feature)
+                super::pdb_motif_sincos::HashValue::perfect_hash_default(feature)
             ),
             HashType::TrRosetta => GeometricHash::TrRosetta(
-                super::trrosetta::HashValue::perfect_hash(feature)
+                super::trrosetta::HashValue::perfect_hash_default(feature)
             ),
             HashType::FoldDiscoDefault => GeometricHash::FoldDiscoDefault(
-                super::default::HashValue::perfect_hash(feature)
+                super::default::HashValue::perfect_hash_default(feature)
             ),
             HashType::Default32bit => GeometricHash::Default32bit(
-                super::default_32bit::HashValue::perfect_hash(feature)
+                super::default_32bit::HashValue::perfect_hash_default(feature)
             ),
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
-                super::ppf::HashValue::perfect_hash(feature)
+                super::ppf::HashValue::perfect_hash_default(feature)
             ),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
     }
     
-    pub fn perfect_hash_with_nbin(
+    pub fn perfect_hash(
         feature: Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
     ) -> Self {
-        todo!() // TODO: Implement these methods
-        // match hash_type {
-        //     HashType::PDBMotif => GeometricHash::PDBMotif(
-        //         super::pdb_motif::HashValue::perfect_hash_with_nbin(
-        //             feature, nbin_dist, nbin_angle
-        //         )
-        //     ),
-        //     HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
-        //         super::pdb_motif_sincos::HashValue::perfect_hash_with_nbin(
-        //             feature, nbin_dist, nbin_angle
-        //         )
-        //     ),
-        //     HashType::TrRosetta => GeometricHash::TrRosetta(
-        //         super::trrosetta::HashValue::perfect_hash_with_nbin(
-        //             feature, nbin_dist, nbin_angle
-        //         )
-        //     ),
-        //     HashType::FoldDiscoDefault => GeometricHash::FoldDiscoDefault(
-        //         super::default::HashValue::perfect_hash_with_nbin(
-        //             feature, nbin_dist, nbin_angle
-        //         )
-        //     ),
-        //     HashType::PointPairFeature => GeometricHash::PointPairFeature(
-        //         super::ppf::HashValue::perfect_hash_with_nbin(
-        //             feature, nbin_dist, nbin_angle
-        //         )
-        //     ),
-        //     // append new hash type here
-        //     _ => panic!("Invalid hash type"),
-        // }
+            match hash_type {
+                HashType::PDBMotif => GeometricHash::PDBMotif(
+                    super::pdb_motif::HashValue::perfect_hash(
+                        feature, nbin_dist, nbin_angle
+                    )
+                ),
+                HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
+                    super::pdb_motif_sincos::HashValue::perfect_hash(
+                        feature, nbin_dist, nbin_angle
+                    )
+                ),
+                HashType::TrRosetta => GeometricHash::TrRosetta(
+                    super::trrosetta::HashValue::perfect_hash(
+                        feature, nbin_dist, nbin_angle
+                    )
+                ),
+                HashType::FoldDiscoDefault => GeometricHash::FoldDiscoDefault(
+                    super::default::HashValue::perfect_hash(
+                        feature, nbin_dist, nbin_angle
+                    )
+                ),
+                HashType::Default32bit => GeometricHash::Default32bit(
+                    super::default_32bit::HashValue::perfect_hash(
+                        feature, nbin_dist, nbin_angle
+                    )
+                ),
+                HashType::PointPairFeature => GeometricHash::PointPairFeature(
+                    super::ppf::HashValue::perfect_hash(
+                        feature, nbin_dist, nbin_angle
+                    )
+                ),
+                // append new hash type here
+                _ => panic!("Invalid hash type"),
+            }
     }
     
     
-    pub fn reverse_hash(&self) -> Vec<f32> {
+    pub fn reverse_hash_default(&self) -> Vec<f32> {
         match self {
-            GeometricHash::PDBMotif(hash) => hash.reverse_hash(),
-            GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash(),
-            GeometricHash::TrRosetta(hash) => hash.reverse_hash(),
-            GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash(),
-            GeometricHash::Default32bit(hash) => hash.reverse_hash(),
-            GeometricHash::PointPairFeature(hash) => hash.reverse_hash(),
+            GeometricHash::PDBMotif(hash) => hash.reverse_hash_default(),
+            GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash_default(),
+            GeometricHash::TrRosetta(hash) => hash.reverse_hash_default(),
+            GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash_default(),
+            GeometricHash::Default32bit(hash) => hash.reverse_hash_default(),
+            GeometricHash::PointPairFeature(hash) => hash.reverse_hash_default(),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
     }
 
+    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> Vec<f32> {
+        match self {
+            GeometricHash::PDBMotif(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            GeometricHash::TrRosetta(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            GeometricHash::Default32bit(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            GeometricHash::PointPairFeature(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            // append new hash type here
+            _ => panic!("Invalid hash type"),
+        }
+    }
+    
     pub fn hash_type(&self) -> HashType {
         match self {
             GeometricHash::PDBMotif(hash) => hash.hash_type(),

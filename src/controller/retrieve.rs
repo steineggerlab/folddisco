@@ -5,7 +5,7 @@ use crate::prelude::*;
 use super::feature::get_single_feature;
 
 pub fn retrieve_residue_with_hash(
-    hash_vec: &Vec<GeometricHash>, path: &str
+    hash_vec: &Vec<GeometricHash>, path: &str, nbin_dist: usize, nbin_angle: usize
 ) -> Option<Vec<((u8, u8), (u64, u64))>> {
     let file = File::open(path).expect("File not found");
     let pdb = PDBReader::new(file);
@@ -18,7 +18,11 @@ pub fn retrieve_residue_with_hash(
         let feature = get_single_feature(*i, *j, &compact, hash_type);
         if feature.is_some() {
             let feature = feature.unwrap();
-            let curr_hash = GeometricHash::perfect_hash(feature, hash_type);
+            let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
+                GeometricHash::perfect_hash_default(feature, hash_type)
+            } else {
+                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+            };
             for hash in hash_vec {
                 if curr_hash == *hash {
                     output.push((

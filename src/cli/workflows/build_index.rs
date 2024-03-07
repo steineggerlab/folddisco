@@ -8,6 +8,7 @@
 // and the path to save the index table.
 
 
+use crate::cli::workflows::config::write_config_to_file;
 use crate::cli::*;
 use crate::controller::io::{save_offset_vec, write_usize_vector_in_bits};
 use crate::index::alloc::convert_sorted_pairs_to_offset_and_values_vec;
@@ -20,14 +21,16 @@ static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 pub const HELP_INDEX: &str = "\
 USAGE: motifsearch index [OPTIONS]
 Options:
-    -d, --pdbs <PDB_DIR>         Directory containing PDB files
-    -H, --hash <HASH_TYPE>     Hash type to use (pdb, trrosetta, default)
-    -i, --index <INDEX_PATH>   Path to save the index table
-    -t, --threads <THREADS>         Number of threads to use
-    -c, --chunk <CHUNK_SIZE>        Number of PDB files to index at once (default 1000, max 65535)
-    -r, --recursive                 Index PDB files in subdirectories
-    -v, --verbose                   Print verbose messages
-    -h, --help                      Print this help menu
+    -p, --pdbs <PDB_DIR>         Directory containing PDB files
+    -H, --hash <HASH_TYPE>       Hash type to use (pdb, trrosetta, default)
+    -i, --index <INDEX_PATH>     Path to save the index table
+    -t, --threads <THREADS>      Number of threads to use
+    -d, --distance <NBIN_DIST>   Number of distance bins (default 0, zero means default)
+    -a, --angle <NBIN_ANGLE>     Number of angle bins (default 0, zero means default)
+    -c, --chunk <CHUNK_SIZE>     Number of PDB files to index at once (default 1000, max 65535)
+    -r, --recursive              Index PDB files in subdirectories
+    -v, --verbose                Print verbose messages
+    -h, --help                   Print this help menu
 ";
 // TODO: ADD MONITOR_MEMORY AS A PARAMETER
 // TODO: ADD NBIN_ANGLE, NBIN_DIST AS PARAMETERS
@@ -40,6 +43,8 @@ pub fn build_index(env: AppArgs) {
             index_path,
             num_threads,
             chunk_size,
+            num_bin_dist,
+            num_bin_angle,
             recursive,
             verbose,
             help,
@@ -86,7 +91,8 @@ pub fn build_index(env: AppArgs) {
                         format!("{}_{}", index_path, i)
                     };
                     let mut fold_disco = FoldDisco::new_with_params(
-                        pdb_path_vec.to_vec(), hash_type, true, num_threads, index_path.clone()
+                        pdb_path_vec.to_vec(), hash_type, true, num_threads, 
+                        num_bin_dist, num_bin_angle, index_path.clone()
                     );
                     measure_time!(fold_disco.collect_hash_pairs());
                     if verbose {
@@ -114,7 +120,7 @@ pub fn build_index(env: AppArgs) {
                         &fold_disco.numeric_id_vec, None
                     ));
                     let hash_type_path = format!("{}.type", index_path);
-                    hash_type.save_to_file(&hash_type_path);
+                    write_config_to_file(&hash_type_path, hash_type, num_bin_dist, num_bin_angle);
                     if verbose { print_log_msg(DONE, &format!("Indexing done for chunk {} - {}", i, index_path)); }
                 });
                 if verbose { print_log_msg(DONE, "Done."); }
@@ -133,9 +139,11 @@ mod tests {
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
-        let hash_type = "default32";
-        let index_path = "data/serine_peptidases_default32";
+        let hash_type = "pdb";
+        let index_path = "data/serine_peptidases_pdb";
         let num_threads = 4;
+        let num_bin_dist = 9;
+        let num_bin_angle = 3;
         let chunk_size = 10;
         let recursive = true;
         let verbose = true;
@@ -145,6 +153,8 @@ mod tests {
             hash_type: hash_type.to_string(),
             index_path: index_path.to_string(),
             num_threads,
+            num_bin_dist,
+            num_bin_angle,
             chunk_size,
             recursive,
             verbose,

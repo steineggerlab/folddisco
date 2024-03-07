@@ -11,11 +11,12 @@ use super::feature::get_single_feature;
 // TODO: Query should be able to consider both chain & residue index
 
 
-const CHECK_NEARBY: bool = false;
-
 // Query is expected to be given as a path, and a list of tuples of chain and residue index
 
-pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType) -> Vec<GeometricHash> {
+pub fn make_query(
+    path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
+    nbin_dist: usize, nbin_angle: usize, check_nearby: bool
+) -> Vec<GeometricHash> {
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
     let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
     let compact = compact.to_compact();
@@ -51,19 +52,31 @@ pub fn make_query(path: &String, query_residues: &Vec<(u8, u64)>, hash_type: Has
             );
             if feature.is_some() {
                 let feature = feature.unwrap();
-                if CHECK_NEARBY {
+                if check_nearby {
                     let mut feature_near = feature.clone();
                     let mut feature_far = feature.clone();
-                    feature_near[2] -= 0.5;
+                    feature_near[2] -= 0.5; // TODO: need to be improved
                     feature_far[2] += 0.5;
-                    let hash_near = GeometricHash::perfect_hash(feature_near, hash_type);
-                    let hash_far = GeometricHash::perfect_hash(feature_far, hash_type);
-                    hash_collection.push(hash_near);
-                    hash_collection.push(hash_far);
+                    if nbin_dist == 0 || nbin_angle == 0 {
+                        let hash_near = GeometricHash::perfect_hash_default(feature_near, hash_type);
+                        let hash_far = GeometricHash::perfect_hash_default(feature_far, hash_type);
+                        hash_collection.push(hash_near);
+                        hash_collection.push(hash_far);
+                    } else {
+                        let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
+                        let hash_far = GeometricHash::perfect_hash(feature_far, hash_type, nbin_dist, nbin_angle);
+                        hash_collection.push(hash_near);
+                        hash_collection.push(hash_far);
+                    }
+                } else {
+                    if nbin_dist == 0 || nbin_angle == 0 {
+                        let hash_value = GeometricHash::perfect_hash_default(feature, hash_type);
+                        hash_collection.push(hash_value);
+                    } else {
+                        let hash_value = GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle);
+                        hash_collection.push(hash_value);
+                    }
                 }
-
-                let hash_value = GeometricHash::perfect_hash(feature, hash_type);
-                hash_collection.push(hash_value);
             }
         }
     }
@@ -122,7 +135,7 @@ mod tests {
             (b'A', 250), (b'A', 232), (b'A', 269)
         ];
         let hash_type = HashType::FoldDiscoDefault;
-        let hash_collection = make_query(&path, &query_residues, hash_type);
+        let hash_collection = make_query(&path, &query_residues, hash_type, 0, 0, false);
         println!("{:?}", hash_collection);
     }
     #[test]

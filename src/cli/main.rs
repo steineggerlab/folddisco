@@ -27,22 +27,25 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
     {
         Some("index") => Ok(AppArgs::Index {
             // TODO: NOTE: Change to parse positional arguments for input PDBs
-            pdb_dir: args.opt_value_from_str(["-d", "--pdbs"])?,
+            pdb_dir: args.opt_value_from_str(["-p", "--pdbs"])?,
             hash_type: args.value_from_str(["-H", "--hash"]).unwrap_or("default".into()),
             index_path: args.value_from_str(["-i", "--index"]).unwrap_or("folddisco_index".into()),
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            num_bin_dist: args.value_from_str(["-d", "--distance"]).unwrap_or(0),
+            num_bin_angle: args.value_from_str(["-a", "--angle"]).unwrap_or(0),
             chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(1000),
             recursive: args.contains(["-r", "--recursive"]),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),
         Some("query") => Ok(AppArgs::Query {
-            pdb_path: args.value_from_str(["-d", "--pdb"]).unwrap_or("".into()),
+            pdb_path: args.value_from_str(["-p", "--pdb"]).unwrap_or("".into()),
             query_string: args.value_from_str(["-q", "--query"]).unwrap_or("".into()),
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             index_path: args.opt_value_from_str(["-i", "--index"])?,
-            help: args.contains(["-h", "--help"]),
+            check_nearby: args.contains(["-c", "--check-nearby"]),
             retrieve: args.contains(["-R", "--retrieve"]),
+            help: args.contains(["-h", "--help"]),
         }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,

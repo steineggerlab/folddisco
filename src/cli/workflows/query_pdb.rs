@@ -6,10 +6,12 @@
 // This file contains the workflow for querying PDB files
 // When querying PDB files, we need index table and query file.
 
+use core::num;
 use std::collections::HashMap;
 
 use rayon::prelude::*;
 
+use crate::cli::workflows::config::read_config_from_file;
 use crate::cli::*;
 use crate::controller::io::{get_values_with_offset, get_values_with_offset_u16, read_offset_map, read_u16_vector, read_usize_vector};
 use crate::controller::retrieve::{connected, res_vec_as_string, retrieve_residue_with_hash};
@@ -26,7 +28,8 @@ Options:
     -i, --index <INDEX_PATH>     Path of index table to load
     -t, --threads <THREADS>      Number of threads to use
     -v, --verbose                Print verbose messages
-    --retrieve                   Retrieve matched residues (Need PDB files)
+    -c, --check-nearby           Check nearby hashes (In development)
+    -R, --retrieve               Retrieve matched residues (Need PDB files)
     -h, --help                   Print this help menu
 ";
 
@@ -38,8 +41,9 @@ pub fn query_pdb(env: AppArgs) {
             query_string,
             threads,
             index_path,
+            check_nearby,
+            retrieve,
             help,
-            retrieve
         } => {
             if help {
                 eprintln!("{}", HELP_QUERY);
@@ -87,12 +91,12 @@ pub fn query_pdb(env: AppArgs) {
                     assert!(std::path::Path::new(&value_path).is_file());
                     assert!(std::path::Path::new(&lookup_path).is_file());
                     assert!(std::path::Path::new(&hash_type_path).is_file());
-                    let hash_type = HashType::load_from_file(&hash_type_path);
+                    let (hash_type, num_bin_dist, num_bin_angle) = read_config_from_file(&hash_type_path);
                     
                     // Make query with pdb
                     let query_residues = parse_query_string(&query_string);
                     let pdb_query =  make_query(
-                        &pdb_path, &query_residues, hash_type
+                        &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, check_nearby
                     );
                     
                     // Load index table
@@ -126,6 +130,7 @@ pub fn query_pdb(env: AppArgs) {
                         for j in 0..single_queried_values.len() {
                             let nid = lookup.1[single_queried_values[j] as usize];
                             let count = query_count_map.get(&nid);
+                            // Added calculation of idf
                             if count.is_none() {
                                 query_count_map.insert(nid, (1, (lookup.0.len() as f32 / hash_count as f32).log2()));
                             } else {
@@ -140,21 +145,21 @@ pub fn query_pdb(env: AppArgs) {
                     for (nid, count) in query_count_vec {
                         if count.0 > count_cut {
                             if retrieve {
-                                let retrieved = retrieve_residue_with_hash(&pdb_query, &lookup.0[*nid]);
+                                let retrieved = retrieve_residue_with_hash(&pdb_query, &lookup.0[*nid], num_bin_dist, num_bin_angle);
                                 if retrieved.is_some() {
                                     let retrieved = retrieved.unwrap();
                                     let connected = connected(&retrieved, query_residues.len());
                                     let total_matches = retrieved.len();
                                     if connected > 0 {
                                         println!(
-                                            "{};uniq_matches={};total_matches={};connected={};{:?}",
-                                            lookup.0[*nid], count.0, total_matches,
+                                            "{};uniq_matches={};idf={};total_matches={};connected={};{}",
+                                            lookup.0[*nid], count.0, count.1, total_matches,
                                             connected, res_vec_as_string(&retrieved)
                                         );
                                     }
                                 }
                             } else {
-                                println!("{}:{}:{}", lookup.0[*nid], count.0, count.1);
+                                println!("{}\t{}\t{}", lookup.0[*nid], count.0, count.1);
                             }
                         }
                     }
@@ -178,16 +183,18 @@ mod tests {
         // let query_string = String::from("A250,A232,A269");
         let query_string = String::from("A110,A294,A266");
         let threads = 6;
-        let index_path = Some(String::from("data/serine_peptidases_default32"));
-        let help = false;
+        let index_path = Some(String::from("data/serine_peptidases_pdb"));
+        let check_nearby = false;
         let retrieve = true;
+        let help = false;
         let env = AppArgs::Query {
             pdb_path,
             query_string,
             threads,
             index_path,
-            help,
+            check_nearby,
             retrieve,
+            help,
         };
         query_pdb(env);
     }

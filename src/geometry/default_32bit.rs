@@ -9,27 +9,10 @@ use std::fmt;
 use crate::geometry::core::HashType;
 use crate::geometry::util::discretize_f32_value_into_u32 as discretize_value;
 use crate::geometry::util::continuize_u32_value_into_f32 as continuize_value;
-use crate::geometry::util::map_aa_u32_pair_to_u32;
+use crate::geometry::util::*;
 
 use super::util::map_u32_to_aa_pair;
 use super::util::map_u32_to_aa_u32_pair;
-
-// Constants
-// 1. for cb_dist
-const MIN_DIST: f32 = 2.0;
-const MAX_DIST: f32 = 20.0;
-const NBIN_DIST: f32 = 8.0;
-// 2. NEW IDEA for encoding angles; represent as sin and cos
-const MIN_SIN_COS: f32 = -1.0;
-const MAX_SIN_COS: f32 = 1.0;
-const NBIN_TORSION_SIN_COS: f32 = 3.0;
-const NBIN_PLANE_SIN_COS: f32 = 3.0;
-// Bitmasks
-const BITMASK32_2BIT: u32 = 0x00000003;
-const BITMASK32_3BIT: u32 = 0x00000007;
-const BITMASK32_4BIT: u32 = 0x0000000F;
-// const BITMASK32_5BIT: u32 = 0x0000001F;
-const BITMASK32_9BIT: u32 = 0x000001FF;
 
 // TODO: IMPORTANT: Implement this to reduce execution time
 // 9 bit for AA pairs, 3 bit for distance, 2 bits for sin & cos (4 bits for one angle)
@@ -39,28 +22,44 @@ const BITMASK32_9BIT: u32 = 0x000001FF;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    pub fn perfect_hash(feature: Vec<f32>) -> Self {
+    pub fn perfect_hash(feature: Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> Self {
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         HashValue::_perfect_hash(
             res1, res2, feature[2], feature[3],
-            feature[4], feature[5], feature[6], feature[7]
+            feature[4], feature[5], feature[6], feature[7],
+            nbin_dist as f32, nbin_angle as f32
         )
     }
-    pub fn reverse_hash(&self) -> Vec<f32> {
-        self._reverse_hash().to_vec()
+    pub fn perfect_hash_default(feature: Vec<f32>) -> Self {
+        let res1 = feature[0] as u32;
+        let res2 = feature[1] as u32;
+        HashValue::_perfect_hash(
+            res1, res2, feature[2], feature[3],
+            feature[4], feature[5], feature[6], feature[7],
+            NBIN_DIST as f32, NBIN_SIN_COS as f32
+        )
+    }
+    pub fn reverse_hash(&self, nbin_dist:usize, nbin_angle:usize) -> Vec<f32> {
+        self._reverse_hash(nbin_dist as f32, nbin_angle as f32).to_vec()
+    }
+    pub fn reverse_hash_default(&self) -> Vec<f32> {
+        self._reverse_hash(NBIN_DIST, NBIN_SIN_COS).to_vec()
     }
     pub fn hash_type(&self) -> super::core::HashType {
         HashType::Default32bit
     }
 
     fn _perfect_hash(
-        res1: u32, res2: u32, cb_dist: f32, omega: f32,
-        theta1: f32, theta2: f32, phi1: f32, phi2: f32
+        res1: u32, res2: u32, cb_dist: f32, omega: f32, theta1: f32, theta2: f32,
+        phi1: f32, phi2: f32, nbin_dist: f32, nbin_angle: f32
     ) -> Self {
+        // By default, bit for the distance is 3 and angle is 2
+        let nbin_dist = if nbin_dist > 8.0 { 8.0 } else { nbin_dist };
+        let nbin_angle = if nbin_angle > 4.0 { 4.0 } else { nbin_angle };
         
         let res_pair = map_aa_u32_pair_to_u32(res1, res2);
-        let h_cb_dist = discretize_value(cb_dist, MIN_DIST, MAX_DIST, NBIN_DIST);
+        let h_cb_dist = discretize_value(cb_dist, MIN_DIST, MAX_DIST, nbin_dist);
         
         // Convert angles to sin and cos
         let angles = [omega, theta1, theta2, phi1, phi2];
@@ -72,13 +71,13 @@ impl HashValue {
             |(i, &(sin, cos))| {
                 if i < 3 {
                     (
-                        discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, NBIN_TORSION_SIN_COS),
-                        discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, NBIN_TORSION_SIN_COS)
+                        discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, nbin_angle),
+                        discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, nbin_angle)
                     )
                 } else {
                     (
-                        discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, NBIN_PLANE_SIN_COS),
-                        discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, NBIN_PLANE_SIN_COS)
+                        discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, nbin_angle),
+                        discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, nbin_angle)
                     )
                 }
             }
@@ -95,7 +94,7 @@ impl HashValue {
         HashValue(hashvalue)
     }
 
-    fn _reverse_hash(&self) -> [f32; 8] {
+    fn _reverse_hash(&self, nbin_dist: f32, nbin_angle: f32) -> [f32; 8] {
         let res_pair = ((self.0 >> 23) & BITMASK32_9BIT) as u32;
         let (res1, res2) = map_u32_to_aa_u32_pair(res_pair);
         // Mask bits
@@ -117,11 +116,11 @@ impl HashValue {
             |(i, &x)| {
                 if i < 6 {
                     continuize_value(
-                        x, MIN_SIN_COS, MAX_SIN_COS, NBIN_TORSION_SIN_COS
+                        x, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
                     )
                 } else {
                     continuize_value(
-                        x, MIN_SIN_COS, MAX_SIN_COS, NBIN_PLANE_SIN_COS
+                        x, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
                     )
                 }
             }
@@ -157,14 +156,14 @@ impl HashValue {
 
 impl fmt::Debug for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let values = self.reverse_hash();
+        let values = self.reverse_hash_default();
         write!(f, "HashValue({}), values={:?}", self.0, values)
     }
 }
 
 impl fmt::Display for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let val = self.reverse_hash();
+        let val = self.reverse_hash_default();
         write!(
             f,
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -191,13 +190,35 @@ mod tests {
             raw_feature.4.to_radians(), raw_feature.5.to_radians(),
             raw_feature.6.to_radians(), raw_feature.7.to_radians(),
         ];
-        let hash = GeometricHash::perfect_hash(feature_input, HashType::Default32bit);
+        let hash = GeometricHash::perfect_hash_default(feature_input, HashType::Default32bit);
         //
         println!("{:?}", hash);
 
-        let rev = hash.reverse_hash();
+        let rev = hash.reverse_hash_default();
         assert_eq!(rev[0], 0.0);
         assert_eq!(rev[1], 1.0);
     }
 
+    #[test]
+    fn test_multiple_bins() {
+        let bin_pairs = vec![(8, 4), (6, 3), (4, 2)];
+        for (nbin_dist, nbin_angle) in bin_pairs {
+            let raw_feature = (
+                b"ALA", b"ARG", 10.0_f32, -10.0_f32, 0.0_f32, 10.0_f32, 45.0_f32, 15.0_f32,
+            );
+            let feature_input: Vec<f32> = vec![
+                map_aa_to_u8(raw_feature.0) as f32, map_aa_to_u8(raw_feature.1) as f32,
+                raw_feature.2, raw_feature.3.to_radians(), 
+                raw_feature.4.to_radians(), raw_feature.5.to_radians(),
+                raw_feature.6.to_radians(), raw_feature.7.to_radians(),
+            ];
+            let hash = GeometricHash::perfect_hash(
+                feature_input, HashType::Default32bit, nbin_dist, nbin_angle
+            );
+            let rev = hash.reverse_hash(nbin_dist, nbin_angle);
+            println!("{:?}", hash);
+            println!("{:?}", rev);
+        }
+    }
+    
 }

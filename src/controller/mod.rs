@@ -37,6 +37,8 @@ pub struct FoldDisco {
     pub hash_type: HashType,
     pub remove_redundancy: bool,
     pub num_threads: usize,
+    pub num_bin_dist: usize,
+    pub num_bin_angle: usize,
     pub output_path: String,
     pub flags: SubProcessFlags,
 }
@@ -73,6 +75,8 @@ impl FoldDisco {
             hash_type: DEFAULT_HASH_TYPE,
             remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
             num_threads: DEFAULT_NUM_THREADS,
+            num_bin_dist: 0,
+            num_bin_angle: 0,
             output_path: String::new(),
             flags: SubProcessFlags::new(),
         }
@@ -87,6 +91,8 @@ impl FoldDisco {
             hash_type: hash_type,
             remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
             num_threads: DEFAULT_NUM_THREADS,
+            num_bin_dist: 0,
+            num_bin_angle: 0,
             output_path: String::new(),
             flags: SubProcessFlags::new(),
         }
@@ -94,7 +100,7 @@ impl FoldDisco {
 
     pub fn new_with_params(
         path_vec: Vec<String>, hash_type: HashType, remove_redundancy: bool,
-        num_threads: usize, output_path: String
+        num_threads: usize, num_bin_dist: usize, num_bin_angle: usize, output_path: String
     ) -> FoldDisco {
         FoldDisco {
             path_vec: path_vec,
@@ -105,6 +111,8 @@ impl FoldDisco {
             hash_type: hash_type,
             remove_redundancy: remove_redundancy,
             num_threads: num_threads,
+            num_bin_dist: num_bin_dist,
+            num_bin_angle: num_bin_angle,
             output_path: output_path,
             flags: SubProcessFlags::new(),
         }
@@ -125,7 +133,13 @@ impl FoldDisco {
     pub fn set_output_path(&mut self, output_path: String) {
         self.output_path = output_path;
     }
-
+    pub fn set_num_bin_dist(&mut self, num_bin_dist: usize) {
+        self.num_bin_dist = num_bin_dist;
+    }
+    pub fn set_num_bin_angle(&mut self, num_bin_angle: usize) {
+        self.num_bin_angle = num_bin_angle;
+    }
+    
     // Main methods
     pub fn fill_numeric_id_vec(&mut self) {
         string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
@@ -158,7 +172,7 @@ impl FoldDisco {
                     }
                     
                     let hash_vec = get_geometric_hash_from_structure(
-                        &compact.to_compact(), self.hash_type
+                        &compact.to_compact(), self.hash_type, self.num_bin_dist, self.num_bin_angle
                     );
                     // Drop intermediate variables
                     drop(compact);
@@ -210,7 +224,7 @@ impl FoldDisco {
                         print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                     }
                     let mut hash_vec = get_geometric_hash_from_structure(
-                        &compact.to_compact(), self.hash_type
+                        &compact.to_compact(), self.hash_type, self.num_bin_dist, self.num_bin_angle
                     );
                     // Drop intermediate variables
                     drop(compact);
@@ -332,6 +346,7 @@ impl FoldDisco {
         todo!("Implement save_index_table method");
     }
     
+
 }
 
 fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut Vec<usize>) {

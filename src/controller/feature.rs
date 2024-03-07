@@ -100,7 +100,7 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
     }
 }
 
-pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType) -> Vec<GeometricHash> {
+pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<GeometricHash> {
     let res_bound = get_all_combination(
         structure.num_residues, false
     );
@@ -111,11 +111,15 @@ pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type
         let feature = get_single_feature(*i, *j, structure, hash_type);
         if feature.is_some() {
             let feature = feature.unwrap();
-            let hash = GeometricHash::perfect_hash(feature, hash_type);
-            hash_vec.push(hash);
+            if nbin_dist == 0 || nbin_angle == 0 {
+                let hash = GeometricHash::perfect_hash_default(feature, hash_type);
+                hash_vec.push(hash);
+            } else {
+                let hash = GeometricHash::perfect_hash(feature,hash_type, nbin_dist, nbin_angle);
+                hash_vec.push(hash);
+            }
         }
     });
-
     // Reduce memory usage
     hash_vec.shrink_to_fit();
     hash_vec

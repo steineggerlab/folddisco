@@ -195,15 +195,9 @@ impl FoldDisco {
                     let pdb_reader = PDBReader::from_file(pdb_path).expect(
                         log_msg(FAIL, "PDB file not found").as_str()
                     );
-                    let compact = if pdb_path.ends_with(".gz") {
-                        pdb_reader.read_structure_from_gz().expect(
-                            log_msg(FAIL, "Failed to read structure").as_str()
-                        )
-                    } else {
-                        pdb_reader.read_structure().expect(
-                            log_msg(FAIL, "Failed to read structure").as_str()
-                        )
-                    };
+                    let compact = pdb_reader.read_structure().expect(
+                        log_msg(FAIL, "Failed to read structure").as_str()
+                    );
                     let mut hash_vec = get_geometric_hash_from_structure(
                         &compact.to_compact(), self.hash_type
                     );

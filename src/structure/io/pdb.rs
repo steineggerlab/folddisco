@@ -1,6 +1,9 @@
 use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
+
+use flate2::read::GzDecoder;
+use rayon::collections::binary_heap;
 
 use super::super::core::*;
 use super::parser::*;
@@ -63,6 +66,52 @@ impl Reader<File> {
         // println!("{structure:?}");
         Ok(structure)
     }
+
+    pub fn read_structure_from_gz(&self) -> Result<Structure, &str> {
+        // Load whole file and close the file
+        let mut decoder = GzDecoder::new(&self.reader);
+        let mut binary = Vec::new();
+        decoder.read_to_end(&mut binary).unwrap();
+        // Close the decoder after flushing
+        decoder.flush().unwrap();
+        // Drop the decoder
+        drop(decoder);
+
+        // Create a new Structure
+        let mut structure = Structure::new();
+        let mut record = (b' ', 0);
+        
+        // Read binary as a string. Conver
+        let reader = BufReader::new(&binary[..]);
+        // Convert to string
+        for (idx, line) in reader.lines().enumerate() {
+            if let Ok(atomline) = line {
+                match &atomline[..6] {
+                    "ATOM  " => {
+                        let atom = parse_line(&atomline);
+                        match atom {
+                            Ok(atom) => {
+                                structure.update(atom, &mut record);
+                            }
+                            Err(e) => {
+                                // Conversion error. Jusk skip the line.
+                                // If verbose, print message (NOT IMPLEMENTED)
+                                // println!("Skipping line{}: {}", idx, e);
+                                continue;
+                            }
+                        }
+                    }
+                    _ => continue,
+                }
+            } else {
+                return Err("Error reading line");
+            };
+        }
+        // Drop the binary
+        drop(binary);
+        Ok(structure)
+    }
+    
 }
 
 #[cfg(test)]
@@ -71,6 +120,7 @@ mod tests {
 
     use super::*;
     use std::fs::File;
+    use std::io::Read;
     use std::path::Path;
     
     
@@ -85,14 +135,28 @@ mod tests {
     }
     
     #[test]
+    fn test_read_pdb_gz() {
+        let path = Path::new("data/homeobox/inner/1akha-.pdb.gz");
+        let file = File::open(&path).unwrap();
+        let reader = Reader::new(file);
+        let structure = reader.read_structure_from_gz().unwrap();
+        let compact = structure.to_compact();
+        assert_eq!(compact.num_residues, 49);
+    }
+    
+    #[test]
     fn test_loading_works() {
-        let dir = "data/homeobox";
+        let dir = "data/io_test";
         let pdb_paths = load_path(dir, true);
         for pdb_path in pdb_paths {
             let file = File::open(&pdb_path).unwrap();
             let reader = Reader::new(file);
             // If the file is gzipped, use the gzipped reader
-            let structure = reader.read_structure().unwrap();
+            let structure = if pdb_path.ends_with(".gz") {
+                reader.read_structure_from_gz().unwrap()
+            } else {
+                reader.read_structure().unwrap()
+            };
             let compact = structure.to_compact();
             println!("{}:{}", pdb_path, compact.num_residues);
         }

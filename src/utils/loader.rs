@@ -3,7 +3,7 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-const ALLOWED_EXTENSIONS: [&str; 2] = ["pdb", "ent"];
+const ALLOWED_EXTENSIONS: [&str; 4] = ["pdb", "ent", "pdb.gz", "ent.gz"];
 
 
 pub fn load_path(dir: &str, recursive: bool) -> Vec<String> {
@@ -80,11 +80,11 @@ mod tests {
 
     #[test]
     fn test_load_path() {
-        let pdb_paths = load_path("data/homeobox", false);
-        assert_eq!(pdb_paths.len(), 4);
+        let pdb_paths = load_path("data/io_test", false);
+        assert_eq!(pdb_paths.len(), 5);
         println!("Flat: {:?}", pdb_paths);
-        let pdb_paths = load_path("data/homeobox", true);
-        assert_eq!(pdb_paths.len(), 6);
+        let pdb_paths = load_path("data/io_test", true);
+        assert_eq!(pdb_paths.len(), 7);
         println!("Recursive: {:?}", pdb_paths);
     }
     

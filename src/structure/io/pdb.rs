@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 
-use flate2::read::GzDecoder;
+use flate2::bufread::GzDecoder;
 
 use super::super::core::*;
 use super::parser::*;
@@ -67,34 +67,34 @@ impl Reader<File> {
     }
     
     pub fn read_structure_from_gz(&self) -> Result<Structure, &str> {
-        let reader = BufReader::new(GzDecoder::new(&self.reader));
-        
+        // Read the file with GzDecoder
+        let reader = BufReader::new(&self.reader);
+        let mut decoder = GzDecoder::new(reader);
+        let mut buffer = String::new();
+        decoder.read_to_string(&mut buffer).unwrap();
         // Parse the string
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
         // Iterate over lines of the string
-        for (idx, line) in reader.lines().enumerate() {
-            if let Ok(atomline) = line {
-                match &atomline[..6] {
-                    "ATOM  " => {
-                        let atom = parse_line(&atomline);
-                        match atom {
-                            Ok(atom) => {
-                                structure.update(atom, &mut record);
-                            }
-                            Err(e) => {
-                                // Conversion error. Jusk skip the line.
-                                // If verbose, print message (NOT IMPLEMENTED)
-                                // println!("Skipping line{}: {}", idx, e);
-                                continue;
-                            }
+        for (idx, line) in buffer.lines().enumerate() {
+            let atomline = line.to_string();
+            match &atomline[..6] {
+                "ATOM  " => {
+                    let atom = parse_line(&atomline);
+                    match atom {
+                        Ok(atom) => {
+                            structure.update(atom, &mut record);
+                        }
+                        Err(e) => {
+                            // Conversion error. Jusk skip the line.
+                            // If verbose, print message (NOT IMPLEMENTED)
+                            // println!("Skipping line{}: {}", idx, e);
+                            continue;
                         }
                     }
-                    _ => continue,
-                };
-            } else {
-                return Err("Error reading line");
-            }
+                }
+                _ => continue,
+            };
         }
         // println!("{structure:?}");
         // Flush the buffer

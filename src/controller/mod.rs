@@ -26,7 +26,7 @@ use crate::controller::feature::get_geometric_hash_from_structure;
 const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
 const DEFAULT_HASH_TYPE: HashType = HashType::FoldDiscoDefault;
-const DEFAULT_MAX_RESIDUE: usize = 1000;
+const DEFAULT_MAX_RESIDUE: usize = 3000;
 
 pub struct FoldDisco {
     pub path_vec: Vec<String>,

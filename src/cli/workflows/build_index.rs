@@ -27,7 +27,7 @@ Options:
     -t, --threads <THREADS>      Number of threads to use
     -d, --distance <NBIN_DIST>   Number of distance bins (default 0, zero means default)
     -a, --angle <NBIN_ANGLE>     Number of angle bins (default 0, zero means default)
-    -c, --chunk <CHUNK_SIZE>     Number of PDB files to index at once (default 1000, max 65535)
+    -c, --chunk <CHUNK_SIZE>     Number of PDB files to index at once (default=5000, max=65535)
     -r, --recursive              Index PDB files in subdirectories
     -v, --verbose                Print verbose messages
     -h, --help                   Print this help menu

@@ -3,11 +3,11 @@
 ## TODOs 240307
 
 GEOMETRY
-- [ ] TODO: IMPORTANT: URGENT: make binning and querying parameters configurable
-  - [ ] Major binning parameters: NBIN_DIST, NBIN_ANGLE
-  - [ ] This should be saved in the type file or config file
-    - [ ] Let's make a config file
-  - [ ] THIS IS NEEDED FOR BENCHMARKING
+- [x] TODO: IMPORTANT: URGENT: make binning and querying parameters configurable
+  - [x] Major binning parameters: NBIN_DIST, NBIN_ANGLE
+  - [x] This should be saved in the type file or config file
+    - [x] Let's make a config file
+  - [x] THIS IS NEEDED FOR BENCHMARKING
 
 IMPORTANT: BENCHMARK 
 - [ ] Build an index of PDB database (Running)
@@ -129,9 +129,16 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 testing commands
 ```sh
 # Indexing
-./target/release/motifsearch index -d data/serine_peptidases_filtered -H default -i data/index/serine_peptidases_filtered -t 4 -v
+./target/release/motifsearch index -p data/serine_peptidases_filtered -H default -i data/index/serine_peptidases_filtered -t 4 -v
+
 # Querying
 ./target/release/motifsearch query -i data/index/serine_peptidases_filtered data/serine_peptidases_filtered/1aq2.pdb A250,A232,A269
+
+./target/release/motifsearch query -i <index> -p <pdb> data/serine_peptidases_filtered/4cha.pdb -q B57,B102,C195
+
+# H. sapiens, serine peptidases
+./target/release/motifsearch index -p analysis/h_sapiens_pdb -i analysis/h_sapiens_db/d8a3/index -t 8 -v -d 8 -a 3 -H pdb -c 65535
+./target/release/motifsearch query -i analysis/h_sapiens_db/d8a3/index  -p data/serine_peptidases_filtered/4cha.pdb -q B57,B102,C195
 ```
 
 ## Built inverted index with sorting
@@ -460,3 +467,26 @@ Signals delivered: 0
 Page size (bytes): 4096
 Exit status: 0
   ```
+  
+```sh
+Latest log
+hbk@arm64-apple-darwin20 motifsearch % ./target/release/motifsearch index -p analysis/h_sapiens_pdb -i analysis/h_sapiens_db/d16a3/index -t 8 -v -d 16 -a 3 -H pdb -c 65535         
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing analysis/h_sapiens_pdb with 8 threads and 1 chunks
+[INFO] Indexing all PDB files in one chunk
+[INFO] fold_disco.collect_hash_pairs: 2037.426889583s
+[INFO] Total 508214706 hashes collected (Allocated 11635.57MB)
+[INFO] fold_disco.sort_hash_pairs: 16.490825333s
+[INFO] Hash sorted (Allocated 11635.64MB)
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 9.149903667s
+[INFO] Offset & values acquired (Allocated 3886.0242MB)
+[INFO] save_offset_vec: 4.082541ms
+[INFO] write_usize_vector_in_bits: 1.458560792s
+[INFO] save_lookup_to_file: 5.792792ms
+[DONE] Indexing done for chunk 0 - analysis/h_sapiens_db/d16a3/index
+[DONE] Done.
+```

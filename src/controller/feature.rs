@@ -2,6 +2,7 @@
 use crate::geometry::util::map_aa_to_u8;
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};
+use crate::utils::combination::CombinationIterator;
 
 pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash_type: HashType) -> Option<Vec<f32>> {
     let res1 = structure.get_res_name(i);
@@ -100,7 +101,7 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
     }
 }
 
-pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<GeometricHash> {
+pub fn _get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<GeometricHash> {
     let res_bound = get_all_combination(
         structure.num_residues, false
     );
@@ -138,3 +139,26 @@ fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
     res
 }
 
+pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<GeometricHash> {
+    let res_bound = CombinationIterator::new(structure.num_residues);
+    let mut hash_vec = Vec::new();
+
+    res_bound.for_each(|(i, j)| {
+        if i == j {
+            return;
+        }
+        let feature = get_single_feature(i, j, structure, hash_type);
+        if let Some(feature) = feature {
+            let hash = if nbin_dist == 0 || nbin_angle == 0 {
+                GeometricHash::perfect_hash_default(feature, hash_type)
+            } else {
+                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+            };
+            hash_vec.push(hash);
+        }
+    });
+
+    // Reduce memory usage
+    hash_vec.shrink_to_fit();
+    hash_vec
+}

@@ -36,19 +36,6 @@ pub fn load_path(dir: &str, recursive: bool) -> Vec<String> {
     pdb_paths
 }
 
-pub fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
-    let mut res = Vec::new();
-    for i in 0..n {
-        for j in 0..n {
-            if i == j && !include_same {
-                continue;
-            }
-            res.push((i, j));
-        }
-    }
-    res
-}
-
 pub fn load_homeobox_toy() -> Vec<String> {
     vec![
         "data/homeobox/1akha-.pdb".to_string(),
@@ -86,12 +73,5 @@ mod tests {
         let pdb_paths = load_path("data/io_test", true);
         assert_eq!(pdb_paths.len(), 7);
         println!("Recursive: {:?}", pdb_paths);
-    }
-    
-    #[test]
-    fn test_get_all_combination() {
-        let combinations = get_all_combination(3, false);
-        assert_eq!(combinations.len(), 6);
-        println!("{:?}", combinations);
     }
 }

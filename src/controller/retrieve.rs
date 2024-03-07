@@ -1,6 +1,6 @@
 // 
 use std::{collections::HashMap, fs::File, hash::Hash};
-use crate::prelude::*;
+use crate::{prelude::*, utils::combination::CombinationIterator};
 
 use super::feature::get_single_feature;
 
@@ -11,11 +11,11 @@ pub fn retrieve_residue_with_hash(
     let pdb = PDBReader::new(file);
     let compact = pdb.read_structure().expect("Error reading structure");
     let compact = compact.to_compact();
-    let comb = get_all_combination(compact.num_residues, false);
+    let comb = CombinationIterator::new(compact.num_residues);
     let hash_type = hash_vec[0].hash_type();
     let mut output: Vec<((u8, u8), (u64, u64))> = Vec::new();
-    for (i, j) in comb.iter() {
-        let feature = get_single_feature(*i, *j, &compact, hash_type);
+    comb.for_each(|(i, j)| {
+        let feature = get_single_feature(i, j, &compact, hash_type);
         if feature.is_some() {
             let feature = feature.unwrap();
             let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
@@ -26,15 +26,15 @@ pub fn retrieve_residue_with_hash(
             for hash in hash_vec {
                 if curr_hash == *hash {
                     output.push((
-                        (compact.chain_per_residue[*i],
-                         compact.chain_per_residue[*j]),
-                        (compact.residue_serial[*i],
-                         compact.residue_serial[*j])
+                        (compact.chain_per_residue[i],
+                         compact.chain_per_residue[j]),
+                        (compact.residue_serial[i],
+                         compact.residue_serial[j])
                     ));
                 }
             }
         }
-    }
+    });
     if output.is_empty() {
         None
     } else {

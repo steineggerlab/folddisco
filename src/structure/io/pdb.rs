@@ -67,38 +67,37 @@ impl Reader<File> {
     }
     
     pub fn read_structure_from_gz(&self) -> Result<Structure, &str> {
-        let mut decoder = GzDecoder::new(&self.reader);
-        let decoded = {
-            let mut s = String::new();
-            decoder.read_to_string(&mut s).unwrap();
-            s
-        };
-        decoder.flush().unwrap();
-        drop(decoder); // TODO: NEED TO CHECK IF THIS REDUCES MEMORY LEAK
+        let reader = BufReader::new(GzDecoder::new(&self.reader));
+        
+        // Parse the string
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
         // Iterate over lines of the string
-        for (idx, line) in decoded.lines().enumerate() {
-            let line = line.to_string();
-            match &line[..6] {
-                "ATOM  " => {
-                    let atom = parse_line(&line);
-                    match atom {
-                        Ok(atom) => {
-                            structure.update(atom, &mut record);
-                        }
-                        Err(e) => {
-                            // Conversion error. Jusk skip the line.
-                            // If verbose, print message (NOT IMPLEMENTED)
-                            // println!("Skipping line{}: {}", idx, e);
-                            continue;
+        for (idx, line) in reader.lines().enumerate() {
+            if let Ok(atomline) = line {
+                match &atomline[..6] {
+                    "ATOM  " => {
+                        let atom = parse_line(&atomline);
+                        match atom {
+                            Ok(atom) => {
+                                structure.update(atom, &mut record);
+                            }
+                            Err(e) => {
+                                // Conversion error. Jusk skip the line.
+                                // If verbose, print message (NOT IMPLEMENTED)
+                                // println!("Skipping line{}: {}", idx, e);
+                                continue;
+                            }
                         }
                     }
-                }
-                _ => continue,
-            };
+                    _ => continue,
+                };
+            } else {
+                return Err("Error reading line");
+            }
         }
         // println!("{structure:?}");
+        // Flush the buffer
         Ok(structure)
     }
     

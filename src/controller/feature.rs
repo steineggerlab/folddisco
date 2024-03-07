@@ -100,9 +100,6 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
     }
 }
 
-
-
-
 pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType) -> Vec<GeometricHash> {
     let res_bound = get_all_combination(
         structure.num_residues, false

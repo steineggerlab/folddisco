@@ -26,6 +26,7 @@ use crate::controller::feature::get_geometric_hash_from_structure;
 const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
 const DEFAULT_HASH_TYPE: HashType = HashType::FoldDiscoDefault;
+const DEFAULT_MAX_RESIDUE: usize = 3000;
 
 pub struct FoldDisco {
     pub path_vec: Vec<String>,
@@ -152,6 +153,9 @@ impl FoldDisco {
                     let compact = pdb_reader.read_structure().expect(
                         log_msg(FAIL, "Failed to read structure").as_str()
                     );
+                    if compact.num_residues > DEFAULT_MAX_RESIDUE {
+                        print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
+                    }
                     let hash_vec = get_geometric_hash_from_structure(
                         &compact.to_compact(), self.hash_type
                     );
@@ -169,8 +173,6 @@ impl FoldDisco {
                     }
                 })
             }).unzip();
-        println!("output: {:?}", output.len());
-        println!("positions: {:?}", positions.len());
         self.hash_collection = output;
         self.numeric_id_vec = positions;
         self.flags.collect_hash = true;
@@ -204,6 +206,9 @@ impl FoldDisco {
                             log_msg(FAIL, "Failed to read structure").as_str()
                         )
                     };
+                    if compact.num_residues > DEFAULT_MAX_RESIDUE {
+                        print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
+                    }
                     let mut hash_vec = get_geometric_hash_from_structure(
                         &compact.to_compact(), self.hash_type
                     );

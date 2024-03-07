@@ -118,6 +118,7 @@ pub struct CompactStructure {
 
 impl CompactStructure {
     pub fn build(origin: &Structure) -> CompactStructure {
+        let start = std::time::Instant::now();
         // Store only backbone atoms
         let model = &origin.atom_vector;
 
@@ -203,6 +204,21 @@ impl CompactStructure {
                     _ => (),
                 }
             }
+            let elapsed = start.elapsed().as_secs_f64();
+            if elapsed > 60.0 {
+            // Print all information available
+            eprintln!("Elapsed time: {:.2} seconds", elapsed);
+            eprintln!("Origin info: {:?}", origin);
+            eprintln!("Total {} atoms", origin.num_atoms);
+            eprintln!("Atom: {:?}", model.atom_name);
+
+            eprintln!("Residue serial: {:?}", res_serial_vec);
+            eprintln!("Residue name: {:?}", res_name_vec);
+            eprintln!("Chain per residue: {:?}", chain_per_residue);
+            eprintln!("Current index: {}", idx);
+            // Terminate
+            std::process::exit(1);
+        }
         }
 
         let ca_torsion_vec = ca_vec.calc_all_torsion_angles();

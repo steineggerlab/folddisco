@@ -120,6 +120,13 @@ pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type
             eprintln!("Elapsed time: {:.2} seconds", elapsed);
             // Print length of hash_vec
             eprintln!("Length of hash_vec: {}", hash_vec.len());
+            eprintln!("Residue boundary: {:?}", res_bound);
+            eprintln!("Structure info: {:?}", structure);
+            eprintln!("Total {} residues", structure.num_residues);
+            eprintln!("Residue: {:?}", structure.residue_serial);
+            eprintln!("Residue name: {:?}", structure.residue_name);
+            eprintln!("Chain: {:?}", structure.chains);
+            eprintln!("Chain per residue: {:?}", structure.chain_per_residue);
             // Terminate
             std::process::exit(1);
         }

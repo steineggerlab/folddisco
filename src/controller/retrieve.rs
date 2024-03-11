@@ -1,20 +1,34 @@
 // 
-use std::{collections::HashMap, fs::File, hash::Hash};
-use crate::{prelude::*, utils::combination::CombinationIterator};
+use std::{collections::{HashMap, HashSet}, fs::File, hash::Hash};
+use crate::{geometry::util::map_aa_to_u8, prelude::*, utils::combination::CombinationIterator};
 
-use super::feature::get_single_feature;
+use super::feature::{self, get_single_feature};
+
+pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
+    let mut output: HashSet<(u32, u32)> = HashSet::new();
+    for hash in hash_vec {
+        let feature = hash.reverse_hash_default(); 
+        output.insert((feature[0] as u32, feature[1] as u32));
+    }
+    output
+}
 
 pub fn retrieve_residue_with_hash(
-    hash_vec: &Vec<GeometricHash>, path: &str, nbin_dist: usize, nbin_angle: usize
+    hash_set: &HashSet<GeometricHash>, aa_filter: &HashSet<(u32, u32)>, path: &str, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
 ) -> Option<Vec<((u8, u8), (u64, u64))>> {
+
     let file = File::open(path).expect("File not found");
     let pdb = PDBReader::new(file);
     let compact = pdb.read_structure().expect("Error reading structure");
     let compact = compact.to_compact();
     let comb = CombinationIterator::new(compact.num_residues);
-    let hash_type = hash_vec[0].hash_type();
     let mut output: Vec<((u8, u8), (u64, u64))> = Vec::new();
+
     comb.for_each(|(i, j)| {
+        let aa_pair = (map_aa_to_u8(&compact.residue_name[i]) as u32, map_aa_to_u8(&compact.residue_name[j]) as u32);
+        if !aa_filter.contains(&aa_pair) {
+            return;
+        }
         let feature = get_single_feature(i, j, &compact, hash_type);
         if feature.is_some() {
             let feature = feature.unwrap();
@@ -23,18 +37,15 @@ pub fn retrieve_residue_with_hash(
             } else {
                 GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
             };
-            for hash in hash_vec {
-                if curr_hash == *hash {
-                    output.push((
-                        (compact.chain_per_residue[i],
-                         compact.chain_per_residue[j]),
-                        (compact.residue_serial[i],
-                         compact.residue_serial[j])
-                    ));
-                }
+            if hash_set.get(&curr_hash).is_some() {
+                output.push((
+                    (compact.chain_per_residue[i], compact.chain_per_residue[j]),
+                    (compact.residue_serial[i], compact.residue_serial[j])
+                ));
             }
         }
     });
+
     if output.is_empty() {
         None
     } else {
@@ -78,4 +89,38 @@ pub fn res_vec_as_string(res_vec: &Vec<((u8, u8), (u64, u64))>) -> String {
         }
     }
     output
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::controller::query::{parse_query_string, make_query};
+
+    #[test]
+    fn test_retrieve_residue_with_hash() {
+        let path = String::from("data/serine_peptidases_filtered/4cha.pdb");
+        let query_string = "B57,B102,C195";
+        let query_residues = parse_query_string(query_string);
+        let hash_type = HashType::PDBMotifSinCos;
+        let nbin_dist = 16;
+        let nbin_angle = 3;
+        let check_nearby = false;
+        let queries = make_query(&path, &query_residues, hash_type, nbin_dist, nbin_angle, check_nearby);
+        let hash_set: HashSet<GeometricHash> = queries.iter().cloned().collect();
+    
+        let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
+        let compact = pdb_loaded.read_structure().expect("Error reading structure");
+        let compact = compact.to_compact();
+        // print num residues
+        println!("Num residues: {}", compact.num_residues);
+        let aa_filter = hash_vec_to_aa_pairs(&queries);
+        println!("{:?}", aa_filter);
+        let retrieved = measure_time!(retrieve_residue_with_hash(
+            &hash_set, &aa_filter, &path, hash_type, nbin_dist, nbin_angle
+        ));
+        println!("{:?}", retrieved);
+        let connected = connected(&retrieved.unwrap(), query_residues.len());
+        println!("{:?}", connected);
+    }
 }

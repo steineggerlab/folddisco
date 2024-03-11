@@ -1,36 +1,32 @@
 # Development note
 
 ## TODOs 240307
+QUERYING
+- [ ] TODO: measure time for querying with retrieval of matched positions
 
 GEOMETRY
-- [x] TODO: IMPORTANT: URGENT: make binning and querying parameters configurable
-  - [x] Major binning parameters: NBIN_DIST, NBIN_ANGLE
-  - [x] This should be saved in the type file or config file
-    - [x] Let's make a config file
-  - [x] THIS IS NEEDED FOR BENCHMARKING
+- [ ] TODO: Add 3Di hash 
+  - [x] DONE: make an empty module
+  - [ ] TODO: Fill in and integrate with the rest of the code
 
 IMPORTANT: BENCHMARK 
-- [ ] Build an index of PDB database (Running)
-  - [x] Problem observed: Memory usage is too high (Seems to be related to gzip)
-    - [x] Due to nucleotides in PDB. Solved by removing unnecessary torsion angle calculation
-  - [x] DONE: Solved: There are unusual amino acids observed in the PDB database
+- [ ] Setup module & script
+- [x] Build an index of PDB database (Running)
+  - [ ] Rebuild one with nbin_dist = 16, nbin_angle = 3
 - [ ] Check if the query from other lab works or not
 - [ ] Read MASTER, PDB realtime motif, pyscomotif on how they benchmarked
 - [ ] Compare with pyscomotif
 
 QUERYING
+- [ ] TODO: measure time for querying with retrieval of matched positions
 - [x] DONE: IDF seems to be working now.
+  - [ ] TODO: Need to be tested
 - [ ] TODO: IDEA: interactive mode that saves all the offsets in RAM
 - [ ] TODO: FEATURE: multiple queries
 
 INDEX
 - [ ] IN_PROGRESS: Build Swissprot index (with max chunk size)
 - [x] DONE: IDEA: Divide index table into multiple files (chunking)
-
-GEOMETRY
-- [ ] TODO: Add 3Di hash 
-  - [x] DONE: make an empty module
-  - [ ] TODO: Fill in and integrate with the rest of the code
 
 DEV
 - [ ] TODO: Polish logging
@@ -40,7 +36,6 @@ DEV
 
 ## TODOs 
 BIG THINGS
-- [x] DONE: Reduce memory usage
 - [ ] TODO: REMOVE MEMORY MONITORING PART AFTER THE MEMORY USAGE IS REDUCED ENOUGH
 - [ ] IMPORTANT: confirm if sin & cos representation is working 
 
@@ -79,8 +74,7 @@ DEV
 - [ ] TODO: Write rustdoc
 - NOTE: Push only working code to the repository
 
-TEST DONE:
-- [x] Testing with github action
+TEST
 - [ ] Check all structs and methods are working within tests
   - [ ] structure
   - [ ] geometry

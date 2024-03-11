@@ -6,15 +6,15 @@
 // This file contains the workflow for querying PDB files
 // When querying PDB files, we need index table and query file.
 
-use core::num;
-use std::collections::HashMap;
+use core::{hash, num};
+use std::collections::{HashMap, HashSet};
 
 use rayon::prelude::*;
 
 use crate::cli::workflows::config::read_config_from_file;
 use crate::cli::*;
 use crate::controller::io::{get_values_with_offset, get_values_with_offset_u16, read_offset_map, read_u16_vector, read_usize_vector};
-use crate::controller::retrieve::{connected, res_vec_as_string, retrieve_residue_with_hash};
+use crate::controller::retrieve::{connected, hash_vec_to_aa_pairs, res_vec_as_string, retrieve_residue_with_hash};
 use crate::index::lookup::{load_lookup_from_file};
 use crate::prelude::*;
 
@@ -142,15 +142,19 @@ pub fn query_pdb(env: AppArgs) {
                     let mut query_count_vec: Vec<_> = query_count_map.iter().collect();
                     query_count_vec.sort_by(|a, b| b.1.1.partial_cmp(&a.1.1).unwrap());
                     let count_cut = query_residues.len() / 2;
+                    let hash_set: HashSet<GeometricHash> = pdb_query.iter().cloned().collect();
+                    let aa_filter = hash_vec_to_aa_pairs(&pdb_query);
                     for (nid, count) in query_count_vec {
                         if count.0 > count_cut {
                             if retrieve {
-                                let retrieved = retrieve_residue_with_hash(&pdb_query, &lookup.0[*nid], num_bin_dist, num_bin_angle);
+                                let retrieved = retrieve_residue_with_hash(
+                                    &hash_set, &aa_filter, &lookup.0[*nid], hash_type, num_bin_dist, num_bin_angle
+                                );
                                 if retrieved.is_some() {
                                     let retrieved = retrieved.unwrap();
                                     let connected = connected(&retrieved, query_residues.len());
                                     let total_matches = retrieved.len();
-                                    if connected > 0 {
+                                    if connected > 0 && total_matches < 2 * count.0 {
                                         println!(
                                             "{};uniq_matches={};idf={};total_matches={};connected={};{}",
                                             lookup.0[*nid], count.0, count.1, total_matches,
@@ -182,8 +186,8 @@ mod tests {
         let pdb_path = String::from("data/serine_peptidases_filtered/1azw.pdb");
         // let query_string = String::from("A250,A232,A269");
         let query_string = String::from("A110,A294,A266");
-        let threads = 6;
-        let index_path = Some(String::from("data/serine_peptidases_pdb"));
+        let threads = 1;
+        let index_path = Some(String::from("data/serine_peptidases_default32"));
         let check_nearby = false;
         let retrieve = true;
         let help = false;

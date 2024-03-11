@@ -154,7 +154,7 @@ pub fn query_pdb(env: AppArgs) {
                                     let retrieved = retrieved.unwrap();
                                     let connected = connected(&retrieved, query_residues.len());
                                     let total_matches = retrieved.len();
-                                    if connected > 0 && total_matches < 2 * count.0 {
+                                    if connected > 0 && total_matches < 4 * count.0 {
                                         println!(
                                             "{};uniq_matches={};idf={};total_matches={};connected={};{}",
                                             lookup.0[*nid], count.0, count.1, total_matches,
@@ -187,7 +187,7 @@ mod tests {
         // let query_string = String::from("A250,A232,A269");
         let query_string = String::from("A110,A294,A266");
         let threads = 1;
-        let index_path = Some(String::from("data/serine_peptidases_default32"));
+        let index_path = Some(String::from("data/serine_peptidases_pdb"));
         let check_nearby = false;
         let retrieve = true;
         let help = false;

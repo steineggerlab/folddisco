@@ -38,10 +38,18 @@ impl Reader<File> {
         let reader = BufReader::new(&self.reader);
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
+        let mut model = 0;
         // Reading each line of PDB, parse and build atomvector.
         for (idx, line) in reader.lines().enumerate() {
             if let Ok(atomline) = line {
+                if model > 1 {
+                    // Current version does not support multiple models in one PDB file
+                    break;
+                }
                 match &atomline[..6] {
+                    "MODEL " => {
+                        model += 1;
+                    }
                     "ATOM  " => {
                         let atom = parse_line(&atomline);
                         match atom {

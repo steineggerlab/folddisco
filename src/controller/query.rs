@@ -5,6 +5,7 @@
 
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::prelude::{print_log_msg, PDBReader, INFO};
+use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
 use super::feature::get_single_feature;
 // TODO: Make this to handle multiple hash types
@@ -45,41 +46,44 @@ pub fn make_query(
         }
     }
     // Make combinations
-    for i in 0..indices.len() {
-        for j in i+1..indices.len() {
-            let feature = get_single_feature(
-                indices[i], indices[j], &compact, hash_type
-            );
-            if feature.is_some() {
-                let feature = feature.unwrap();
-                if check_nearby {
-                    let mut feature_near = feature.clone();
-                    let mut feature_far = feature.clone();
-                    feature_near[2] -= 0.5; // TODO: need to be improved
-                    feature_far[2] += 0.5;
-                    if nbin_dist == 0 || nbin_angle == 0 {
-                        let hash_near = GeometricHash::perfect_hash_default(feature_near, hash_type);
-                        let hash_far = GeometricHash::perfect_hash_default(feature_far, hash_type);
-                        hash_collection.push(hash_near);
-                        hash_collection.push(hash_far);
-                    } else {
-                        let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
-                        let hash_far = GeometricHash::perfect_hash(feature_far, hash_type, nbin_dist, nbin_angle);
-                        hash_collection.push(hash_near);
-                        hash_collection.push(hash_far);
-                    }
+    let comb_iter = CombinationIterator::new(indices.len());
+    comb_iter.for_each(|(i, j)| {
+        if i >= j {
+            return;
+        }
+        let feature = get_single_feature(
+            indices[i], indices[j], &compact, hash_type
+        );
+        if feature.is_some() {
+            let feature = feature.unwrap();
+            if check_nearby {
+                let mut feature_near = feature.clone();
+                let mut feature_far = feature.clone();
+                feature_near[2] -= 0.5; // TODO: need to be improved
+                feature_far[2] += 0.5;
+                if nbin_dist == 0 || nbin_angle == 0 {
+                    let hash_near = GeometricHash::perfect_hash_default(feature_near, hash_type);
+                    let hash_far = GeometricHash::perfect_hash_default(feature_far, hash_type);
+                    hash_collection.push(hash_near);
+                    hash_collection.push(hash_far);
                 } else {
-                    if nbin_dist == 0 || nbin_angle == 0 {
-                        let hash_value = GeometricHash::perfect_hash_default(feature, hash_type);
-                        hash_collection.push(hash_value);
-                    } else {
-                        let hash_value = GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle);
-                        hash_collection.push(hash_value);
-                    }
+                    let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
+                    let hash_far = GeometricHash::perfect_hash(feature_far, hash_type, nbin_dist, nbin_angle);
+                    hash_collection.push(hash_near);
+                    hash_collection.push(hash_far);
+                }
+            } else {
+                if nbin_dist == 0 || nbin_angle == 0 {
+                    let hash_value = GeometricHash::perfect_hash_default(feature, hash_type);
+                    hash_collection.push(hash_value);
+                } else {
+                    let hash_value = GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle);
+                    hash_collection.push(hash_value);
                 }
             }
         }
-    }
+    });
+
     let mut hash_collection = hash_collection;
     hash_collection.sort_unstable();
     hash_collection.dedup();

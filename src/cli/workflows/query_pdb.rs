@@ -106,7 +106,7 @@ pub fn query_pdb(env: AppArgs) {
                     let offset_table = measure_time!(
                         read_offset_map(&offset_path, hash_type).expect("[ERROR] Failed to load offset table")
                     );
-                    let (path_vec, numeric_id_vec, optional_vec) = measure_time!(load_lookup_from_file(&lookup_path));
+                    // let (path_vec, numeric_id_vec, optional_vec) = measure_time!(load_lookup_from_file(&lookup_path));
                     let lookup = measure_time!(load_lookup_from_file(&lookup_path));
 
                     // Get offset from offset_table with query
@@ -183,9 +183,10 @@ mod tests {
     #[test]
     #[ignore]
     fn test_query_pdb_workflow() {
-        let pdb_path = String::from("data/serine_peptidases_filtered/1azw.pdb");
-        // let query_string = String::from("A250,A232,A269");
-        let query_string = String::from("A110,A294,A266");
+        // let pdb_path = String::from("data/serine_peptidases_filtered/1azw.pdb");
+        // let query_string = String::from("A110,A294,A266");
+        let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
+        let query_string = String::from("B57,B102,C195");
         let threads = 1;
         let index_path = Some(String::from("data/serine_peptidases_pdb"));
         let check_nearby = false;

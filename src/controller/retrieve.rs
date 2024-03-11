@@ -23,12 +23,11 @@ pub fn retrieve_residue_with_hash(
     let compact = compact.to_compact();
     let comb = CombinationIterator::new(compact.num_residues);
     let mut output: Vec<((u8, u8), (u64, u64))> = Vec::new();
-
     comb.for_each(|(i, j)| {
-        let aa_pair = (map_aa_to_u8(&compact.residue_name[i]) as u32, map_aa_to_u8(&compact.residue_name[j]) as u32);
-        if !aa_filter.contains(&aa_pair) {
-            return;
-        }
+        // let aa_pair = (map_aa_to_u8(&compact.residue_name[i]) as u32, map_aa_to_u8(&compact.residue_name[j]) as u32);
+        // if !aa_filter.contains(&aa_pair) {
+        //     return;
+        // }
         let feature = get_single_feature(i, j, &compact, hash_type);
         if feature.is_some() {
             let feature = feature.unwrap();
@@ -59,6 +58,9 @@ pub fn connected(res_ind_vec: &Vec<((u8, u8), (u64, u64))>, len: usize) -> usize
         let key1 = format!("{}{}", i.0 as char, j.0);
         let key2 = format!("{}{}", i.1 as char, j.1);
         // if key is not in the set, add it or increment the value
+        if res_set.contains_key(&key1) && res_set.contains_key(&key2) {
+            continue;
+        }
         if !res_set.contains_key(&key1) {
             res_set.insert(key1, 1);
         } else {
@@ -76,6 +78,12 @@ pub fn connected(res_ind_vec: &Vec<((u8, u8), (u64, u64))>, len: usize) -> usize
     let max = res_set.iter().filter(|(_, &v)| v > 1).count();
     max
 }
+
+pub fn cycle(res_ind_vec: &Vec<((u8, u8), (u64, u64))>) -> usize {
+    // Use res_ind_vec as a directed graph and count cycles
+    todo!();
+}
+
 
 pub fn res_vec_as_string(res_vec: &Vec<((u8, u8), (u64, u64))>) -> String {
     let mut output = String::new();
@@ -99,10 +107,10 @@ mod tests {
 
     #[test]
     fn test_retrieve_residue_with_hash() {
-        // let path = String::from("data/serine_peptidases_filtered/4cha.pdb");
-        // let query_string = "B57,B102,C195";
-        let path = String::from("analysis/1g91.pdb");
-        let query_string = "A30,A32,A35";
+        let path = String::from("data/serine_peptidases_filtered/4cha.pdb");
+        let query_string = "B57,B102,C195";
+        // let path = String::from("analysis/1g91.pdb");
+        // let query_string = "A30,A32,A35";
         let query_residues = parse_query_string(query_string);
         let hash_type = HashType::PDBMotifSinCos;
         let nbin_dist = 16;

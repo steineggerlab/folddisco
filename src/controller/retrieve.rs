@@ -57,10 +57,6 @@ pub fn connected(res_ind_vec: &Vec<((u8, u8), (u64, u64))>, len: usize) -> usize
     for (i, j) in res_ind_vec {
         let key1 = format!("{}{}", i.0 as char, j.0);
         let key2 = format!("{}{}", i.1 as char, j.1);
-        // if key is not in the set, add it or increment the value
-        if res_set.contains_key(&key1) && res_set.contains_key(&key2) {
-            continue;
-        }
         if !res_set.contains_key(&key1) {
             res_set.insert(key1, 1);
         } else {

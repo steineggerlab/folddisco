@@ -1,12 +1,14 @@
 # Development note
 
 ## TODOs 240307
-QUERYING
-- [ ] TODO: measure time for querying with retrieval of matched positions
+IMPORTANT: BENCHMARK 
+- [ ] To reduce FPs, filtering out & weighting long structures matter
+- [ ] TODO: saving residue count to lookup
+- [ ] Jointly indexing with different hash types increases accuracy even without scoring
+    - [ ] Current combination: PDBMotifSinCos, TrRosetta
 
 GEOMETRY
 - [ ] TODO: Add 3Di hash 
-  - [x] DONE: make an empty module
   - [ ] TODO: Fill in and integrate with the rest of the code
 
 IMPORTANT: BENCHMARK 
@@ -15,6 +17,7 @@ IMPORTANT: BENCHMARK
   - [ ] Rebuild one with nbin_dist = 16, nbin_angle = 3
 - [ ] Check if the query from other lab works or not
 - [ ] Read MASTER, PDB realtime motif, pyscomotif on how they benchmarked
+- [ ] TODO: check SCOP database
 - [ ] Compare with pyscomotif
 
 QUERYING
@@ -42,6 +45,7 @@ BIG THINGS
 QUERYING
 - [ ] TODO: allowing different amino acid pairs.
 - [ ] TODO: FEATURE: multiple queries
+- [ ] TODO: measure time for querying with retrieval of matched positions
 
 GEOMETRY
 - [ ] TODO: Add 3Di hash
@@ -483,4 +487,49 @@ hbk@arm64-apple-darwin20 motifsearch % ./target/release/motifsearch index -p ana
 [INFO] save_lookup_to_file: 5.792792ms
 [DONE] Indexing done for chunk 0 - analysis/h_sapiens_db/d16a3/index
 [DONE] Done.
+```
+
+### H. sapiens PPF / TrRosetta
+```sh
+(base) hyunbin@hulk:~/Projects/06_Motifsearch/motifsearch$ cd /fast/hyunbin/motif/
+(base) hyunbin@hulk:/fast/hyunbin/motif$ ~/Projects/06_Motifsearch/motifsearch/target/release/motifsearch index -p model_benchmark/h_sapiens/data/ -i ./h_sapiens_db/h_sapiens_ppf -t 200 -v -H ppf -c 65535
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing model_benchmark/h_sapiens/data/ with 200 threads and 1 chunks
+[INFO] Indexing all PDB files in one chunk
+[INFO] fold_disco.collect_hash_pairs: 3740.329732938s
+[INFO] Total 717406066 hashes collected (Allocated 16425.266MB)
+[INFO] fold_disco.sort_hash_pairs: 8.021176973s
+[INFO] Hash sorted (Allocated 16425.34MB)
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 8.130028772s
+[INFO] Offset & values acquired (Allocated 5481.367MB)
+[INFO] save_offset_vec: 93.807158ms
+[INFO] write_usize_vector_in_bits: 3.687907908s
+[INFO] save_lookup_to_file: 45.950435ms
+[DONE] Indexing done for chunk 0 - ./h_sapiens_db/h_sapiens_ppf
+[DONE] Done.
+(base) hyunbin@hulk:/fast/hyunbin/motif$ ~/Projects/06_Motifsearch/motifsearch/target/release/motifsearch index -p model_benchmark/h_sapiens/data/ -i ./h_sapiens_db
+/h_sapiens_trrosetta -t 200 -v -H trrosetta -c 65535
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing model_benchmark/h_sapiens/data/ with 200 threads and 1 chunks
+[INFO] Indexing all PDB files in one chunk
+[INFO] fold_disco.collect_hash_pairs: 2091.266188905s
+[INFO] Total 548859639 hashes collected (Allocated 12567.43MB)
+[INFO] fold_disco.sort_hash_pairs: 11.914579738s
+[INFO] Hash sorted (Allocated 12567.897MB)
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 7.529235546s
+[INFO] Offset & values acquired (Allocated 4195.5864MB)
+[INFO] save_offset_vec: 24.456832ms
+[INFO] write_usize_vector_in_bits: 2.80209816s
+[INFO] save_lookup_to_file: 30.912753ms
+[DONE] Indexing done for chunk 0 - ./h_sapiens_db/h_sapiens_trrosetta
+[DONE] Done.
+
 ```

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 // Import unique
 use std::collections::HashSet;
 
+
 use motifsearch::prelude::*;
 use rayon::prelude::*;
 
@@ -108,3 +109,17 @@ fn test_folddisco_trrosetta() {
     fold_disco.fill_index_table();
 }
 
+// use std::fs::File;
+// TODO: IMPLEMENT WRITING RESIDUE COUNTS TO LOOKUP
+// #[test]
+// fn test_temp() {
+//     let pdb_paths = loader::load_path("analysis/h_sapiens_pdb");
+//     let mut output = File::create("analysis/h_sapiens_pdb/num_residues.txt").unwrap();
+//     for pdb_path in pdb_paths {
+//         let pdb = PDBReader::from_file(pdb_path.clone()).unwrap();
+//         let structure = pdb.read_structure().unwrap();
+//         // Print path and number of residues to a file
+//         use std::io::Write;
+//         writeln!(output, "{}\t{}", pdb_path, structure.num_residues).unwrap();
+//     }
+// }

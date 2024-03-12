@@ -48,7 +48,7 @@ pub fn make_query(
     // Make combinations
     let comb_iter = CombinationIterator::new(indices.len());
     comb_iter.for_each(|(i, j)| {
-        if i >= j {
+        if i == j {
             return;
         }
         let feature = get_single_feature(

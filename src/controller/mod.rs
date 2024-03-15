@@ -43,6 +43,7 @@ pub struct FoldDisco {
     pub flags: SubProcessFlags,
 }
 
+// TODO: delete this
 pub struct SubProcessFlags {
     pub fill_numeric_id_vec: bool,
     pub collect_hash: bool,

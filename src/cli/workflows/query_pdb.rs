@@ -30,6 +30,10 @@ Options:
     -v, --verbose                Print verbose messages
     -c, --check-nearby           Check nearby hashes (In development)
     -R, --retrieve               Retrieve matched residues (Need PDB files)
+    -m, --match <MATCH_CUTOFF>   Match cutoff (default 0.0)
+    -s, --score <SCORE_CUTOFF>   Score cutoff (default 0.0)
+    -n, --num-res <NUM_RES_CUTOFF> Number of residues cutoff (default 3000)
+    -l, --plddt <PLDDT_CUTOFF>   PLDDT cutoff (default 0.0)
     -h, --help                   Print this help menu
 ";
 
@@ -43,6 +47,10 @@ pub fn query_pdb(env: AppArgs) {
             index_path,
             check_nearby,
             retrieve,
+            match_cutoff,
+            score_cutoff,
+            num_res_cutoff,
+            plddt_cutoff,
             help,
         } => {
             if help {
@@ -141,11 +149,12 @@ pub fn query_pdb(env: AppArgs) {
                     // Sort by count and print
                     let mut query_count_vec: Vec<_> = query_count_map.iter().collect();
                     query_count_vec.sort_by(|a, b| b.1.1.partial_cmp(&a.1.1).unwrap());
-                    let count_cut = query_residues.len() / 2;
+                    let count_cut = (query_residues.len() * (query_residues.len() - 1)) / 2;
+                    // let count_cut = 0;
                     let hash_set: HashSet<GeometricHash> = pdb_query.iter().cloned().collect();
                     let aa_filter = hash_vec_to_aa_pairs(&pdb_query);
                     for (nid, count) in query_count_vec {
-                        if count.0 > count_cut {
+                        if count.0 >= count_cut {
                             if retrieve {
                                 let retrieved = retrieve_residue_with_hash(
                                     &hash_set, &aa_filter, &lookup.0[*nid], hash_type, num_bin_dist, num_bin_angle
@@ -192,6 +201,10 @@ mod tests {
         let check_nearby = false;
         let retrieve = false;
         let help = false;
+        let match_cutoff = 0.0;
+        let score_cutoff = 0.0;
+        let num_res_cutoff = 3000;
+        let plddt_cutoff = 0.0;
         let env = AppArgs::Query {
             pdb_path,
             query_string,
@@ -199,6 +212,10 @@ mod tests {
             index_path,
             check_nearby,
             retrieve,
+            match_cutoff,
+            score_cutoff,
+            num_res_cutoff,
+            plddt_cutoff,
             help,
         };
         query_pdb(env);

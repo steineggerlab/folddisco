@@ -1,11 +1,26 @@
 # Development note
 
-## TODOs 240307
-IMPORTANT: BENCHMARK 
-- [ ] To reduce FPs, filtering out & weighting long structures matter
-- [ ] TODO: saving residue count to lookup
-- [ ] Jointly indexing with different hash types increases accuracy even without scoring
+## TODOs 240315
+INDEX
+- [ ] IMPORTANT:TODO: saving residue count & average plddt (for AFDB) to lookup
+    - [ ] Filter
+- [ ] NOTE: Jointly indexing with different hash types increases accuracy even without scoring
     - [ ] Current combination: PDBMotifSinCos, TrRosetta
+    - [ ] As this doubles the size of the index, let's try with binning with smaller bins and modifying the querying schemes
+
+IMPORTANT: BENCHMARK 
+- [x] To reduce FPs, filtering out & weighting long structures matter
+  - [ ] TODO: scoring metric that takes into account the length of the structure & IDFs
+
+CLI
+- [ ] Additional arguments requried
+  Query
+  - [ ] matched count cutoff (both absolute and relative: if integer, it's absolute. If float, it's relative)
+  - [ ] score cutoff (float, default: 0)
+  - [ ] num_residue cutoff <- MAKE THIS AS QUERY OPTION
+  - [ ] plddt_cutoff <- THIS SHOULD BE SAVED IN LOOKUP TOO
+  - [ ] TODO: IMPORTANT: Add option to do wider search (dist_bin_threshold, angle_bin_threshold)
+- [x] DONE: Set default chunk size to max (65535)
 
 GEOMETRY
 - [ ] TODO: Add 3Di hash 
@@ -13,12 +28,13 @@ GEOMETRY
 
 IMPORTANT: BENCHMARK 
 - [ ] Setup module & script
-- [x] Build an index of PDB database (Running)
-  - [ ] Rebuild one with nbin_dist = 16, nbin_angle = 3
+- [ ] Build an index of PDB database (Running)
+  - [ ] TODO: Rebuild one with nbin_dist = 16, nbin_angle = 3
 - [ ] Check if the query from other lab works or not
 - [ ] Read MASTER, PDB realtime motif, pyscomotif on how they benchmarked
 - [ ] TODO: check SCOP database
 - [ ] Compare with pyscomotif
+  - [ ] TODO: IMPORTANT: Download and rerun pyscomotif
 
 QUERYING
 - [ ] TODO: measure time for querying with retrieval of matched positions
@@ -29,7 +45,6 @@ QUERYING
 
 INDEX
 - [ ] IN_PROGRESS: Build Swissprot index (with max chunk size)
-- [x] DONE: IDEA: Divide index table into multiple files (chunking)
 
 DEV
 - [ ] TODO: Polish logging
@@ -39,7 +54,6 @@ DEV
 
 ## TODOs 
 BIG THINGS
-- [ ] TODO: REMOVE MEMORY MONITORING PART AFTER THE MEMORY USAGE IS REDUCED ENOUGH
 - [ ] IMPORTANT: confirm if sin & cos representation is working 
 
 QUERYING

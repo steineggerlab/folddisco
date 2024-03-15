@@ -37,6 +37,11 @@ pub enum AppArgs {
         index_path: Option<String>,
         check_nearby: bool,
         retrieve: bool,
+        // Cutoffs
+        match_cutoff: f32,
+        score_cutoff: f32,
+        num_res_cutoff: usize,
+        plddt_cutoff: f32,
         help: bool,
     },
     Test {

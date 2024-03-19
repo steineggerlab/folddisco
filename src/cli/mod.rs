@@ -26,6 +26,7 @@ pub enum AppArgs {
         num_bin_dist: usize,
         num_bin_angle: usize,
         chunk_size: usize,
+        max_residue: usize,
         recursive: bool,
         verbose: bool,
         help: bool,
@@ -35,8 +36,11 @@ pub enum AppArgs {
         query_string: String,
         threads: usize,
         index_path: Option<String>,
-        check_nearby: bool,
+        exact_match: bool,
         retrieve: bool,
+        // Match thresholds
+        dist_threshold: Option<String>,
+        angle_threshold: Option<String>,
         // Cutoffs
         match_cutoff: f32,
         score_cutoff: f32,

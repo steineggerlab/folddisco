@@ -16,7 +16,7 @@ use super::feature::get_single_feature;
 
 pub fn make_query(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
-    nbin_dist: usize, nbin_angle: usize, check_nearby: bool
+    nbin_dist: usize, nbin_angle: usize, exact_match: bool,
 ) -> Vec<GeometricHash> {
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
     let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
@@ -56,7 +56,7 @@ pub fn make_query(
         );
         if feature.is_some() {
             let feature = feature.unwrap();
-            if check_nearby {
+            if !exact_match {
                 let mut feature_near = feature.clone();
                 let mut feature_far = feature.clone();
                 feature_near[2] -= 0.5; // TODO: need to be improved
@@ -90,11 +90,17 @@ pub fn make_query(
     hash_collection
 }
 
-pub fn parse_query_string(query_string: &str) -> Vec<(u8, u64)> {
+pub fn parse_query_string(query_string: &str, default_chain: u8) -> Vec<(u8, u64)> {
     let mut query_residues: Vec<(u8, u64)> = Vec::new();
     if query_string.is_empty() {
         return query_residues;
     }
+    let mut default_chain = default_chain;
+    // If default chain is not alphabetic, just use A as default
+    if !default_chain.is_ascii_alphabetic() {
+        default_chain = b'A';
+    }
+
     let mut chain = b' ';
     let mut residue = String::new();
     for c in query_string.chars() {
@@ -107,7 +113,7 @@ pub fn parse_query_string(query_string: &str) -> Vec<(u8, u64)> {
                 &log_msg(FAIL,  "Failed to parse residue")
             );
             if chain == b' ' {
-                chain = b'A';
+                chain = default_chain;
             }
             query_residues.push((chain, res_u64));
             // Reset
@@ -145,20 +151,20 @@ mod tests {
     #[test]
     fn test_parse_query_string() {
         let query_string = "A250,B232,C269";
-        let query_residues = parse_query_string(query_string);
+        let query_residues = parse_query_string(query_string, b'A');
         assert_eq!(query_residues, vec![(b'A', 250), (b'B', 232), (b'C', 269)]);
     }
     #[test]
     fn test_parse_query_string_with_space() {
         let query_string = "A250, A232, A269";
-        let query_residues = parse_query_string(query_string);
+        let query_residues = parse_query_string(query_string, b'A');
         assert_eq!(query_residues, vec![(b'A', 250), (b'A', 232), (b'A', 269)]);
     }
     
     #[test]
     fn test_parse_query_string_with_space_and_no_chain() {
         let query_string = "250, 232, 269";
-        let query_residues = parse_query_string(query_string);
+        let query_residues = parse_query_string(query_string, b'A');
         assert_eq!(query_residues, vec![(b'A', 250), (b'A', 232), (b'A', 269)]);
     }
 }

@@ -28,12 +28,13 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
         Some("index") => Ok(AppArgs::Index {
             // TODO: NOTE: Change to parse positional arguments for input PDBs
             pdb_dir: args.opt_value_from_str(["-p", "--pdbs"])?,
-            hash_type: args.value_from_str(["-H", "--hash"]).unwrap_or("default".into()),
+            hash_type: args.value_from_str(["-y", "--type"]).unwrap_or("default".into()),
             index_path: args.value_from_str(["-i", "--index"]).unwrap_or("folddisco_index".into()),
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             num_bin_dist: args.value_from_str(["-d", "--distance"]).unwrap_or(0),
             num_bin_angle: args.value_from_str(["-a", "--angle"]).unwrap_or(0),
             chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(65535),
+            max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(3000),
             recursive: args.contains(["-r", "--recursive"]),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
@@ -43,11 +44,13 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             query_string: args.value_from_str(["-q", "--query"]).unwrap_or("".into()),
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             index_path: args.opt_value_from_str(["-i", "--index"])?,
-            check_nearby: args.contains(["-c", "--check-nearby"]),
-            retrieve: args.contains(["-R", "--retrieve"]),
-            match_cutoff: args.value_from_str(["-m", "--match"]).unwrap_or(0.0),
+            exact_match: args.contains(["-e", "--exact"]),
+            retrieve: args.contains(["-v", "--retrieve"]),
+            dist_threshold: args.opt_value_from_str(["-d", "--distance"])?,
+            angle_threshold: args.opt_value_from_str(["-a", "--angle"])?,
+            match_cutoff: args.value_from_str(["-m", "--match"]).unwrap_or(0.0), // 0,0: no cutoff; 0.0 < cutoff < 1.0: relative cutoff; 1.0 < cutoff: count cutoff
             score_cutoff: args.value_from_str(["-s", "--score"]).unwrap_or(0.0),
-            num_res_cutoff: args.value_from_str(["-n", "--num-res"]).unwrap_or(3000),
+            num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(1400), // Return result with less than this number of residues
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
             help: args.contains(["-h", "--help"]),
         }),

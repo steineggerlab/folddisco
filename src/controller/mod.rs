@@ -11,7 +11,7 @@ pub mod query;
 pub mod retrieve;
 
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 // External imports
 use rayon::prelude::*;
 
@@ -19,18 +19,21 @@ use rayon::prelude::*;
 use crate::prelude::print_log_msg;
 use crate::{measure_time, PDBReader};
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::index::alloc::IndexBuilder;
+use crate::index::alloc::{IndexBuilder};
 use crate::utils::log::{ log_msg, INFO, FAIL, WARN, DONE };
 use crate::controller::feature::get_geometric_hash_from_structure;
 
 const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
-const DEFAULT_HASH_TYPE: HashType = HashType::FoldDiscoDefault;
-const DEFAULT_MAX_RESIDUE: usize = 1200;
+const DEFAULT_HASH_TYPE: HashType = HashType::PDBMotifSinCos;
+const DEFAULT_MAX_RESIDUE: usize = 5000;
+
 
 pub struct FoldDisco {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
+    pub nres_vec: Vec<usize>,
+    pub plddt_vec: Vec<f32>,
     pub hash_collection: Vec<Vec<GeometricHash>>,
     pub hash_id_pairs: Vec<(GeometricHash, usize)>,
     pub index_builder: IndexBuilder<usize, GeometricHash>,
@@ -40,36 +43,17 @@ pub struct FoldDisco {
     pub num_bin_dist: usize,
     pub num_bin_angle: usize,
     pub output_path: String,
-    pub flags: SubProcessFlags,
-}
-
-// TODO: delete this
-pub struct SubProcessFlags {
-    pub fill_numeric_id_vec: bool,
-    pub collect_hash: bool,
-    pub set_index_table: bool,
-    pub fill_index_table: bool,
-    pub convert_index: bool,
-    pub save_index_table: bool,
-}
-impl SubProcessFlags {
-    pub fn new() -> SubProcessFlags {
-        SubProcessFlags {
-            fill_numeric_id_vec: false,
-            collect_hash: false,
-            set_index_table: false,
-            fill_index_table: false,
-            convert_index: false,
-            save_index_table: false,
-        }
-    }
+    pub max_residue: usize,
 }
 
 impl FoldDisco {
     pub fn new(path_vec: Vec<String>) -> FoldDisco {
+        let length = path_vec.len();
         FoldDisco {
             path_vec: path_vec,
-            numeric_id_vec: Vec::new(),
+            numeric_id_vec: Vec::with_capacity(length),
+            nres_vec: Vec::with_capacity(length),
+            plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
             index_builder: IndexBuilder::empty(),
@@ -79,13 +63,16 @@ impl FoldDisco {
             num_bin_dist: 0,
             num_bin_angle: 0,
             output_path: String::new(),
-            flags: SubProcessFlags::new(),
+            max_residue: DEFAULT_MAX_RESIDUE,
         }
     }
     pub fn new_with_hash_type(path_vec: Vec<String>, hash_type: HashType) -> FoldDisco {
+        let length = path_vec.len();
         FoldDisco {
             path_vec: path_vec,
-            numeric_id_vec: Vec::new(),
+            numeric_id_vec: Vec::with_capacity(length),
+            nres_vec: Vec::with_capacity(length),
+            plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
             index_builder: IndexBuilder::empty(),
@@ -95,7 +82,7 @@ impl FoldDisco {
             num_bin_dist: 0,
             num_bin_angle: 0,
             output_path: String::new(),
-            flags: SubProcessFlags::new(),
+            max_residue: DEFAULT_MAX_RESIDUE,
         }
     }
 
@@ -103,9 +90,12 @@ impl FoldDisco {
         path_vec: Vec<String>, hash_type: HashType, remove_redundancy: bool,
         num_threads: usize, num_bin_dist: usize, num_bin_angle: usize, output_path: String
     ) -> FoldDisco {
+        let length = path_vec.len();
         FoldDisco {
             path_vec: path_vec,
-            numeric_id_vec: Vec::new(),
+            numeric_id_vec: Vec::with_capacity(length),
+            nres_vec: Vec::with_capacity(length),
+            plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
             index_builder: IndexBuilder::empty(),
@@ -115,7 +105,7 @@ impl FoldDisco {
             num_bin_dist: num_bin_dist,
             num_bin_angle: num_bin_angle,
             output_path: output_path,
-            flags: SubProcessFlags::new(),
+            max_residue: DEFAULT_MAX_RESIDUE,
         }
     }
     // Setters
@@ -140,15 +130,19 @@ impl FoldDisco {
     pub fn set_num_bin_angle(&mut self, num_bin_angle: usize) {
         self.num_bin_angle = num_bin_angle;
     }
+    pub fn set_max_residue(&mut self, max_residue: usize) {
+        self.max_residue = max_residue;
+    }
     
     // Main methods
     pub fn fill_numeric_id_vec(&mut self) {
         string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
-        
     }
 
     pub fn collect_hash(&mut self) {
         let mut path_order: Arc<Vec<usize>> = Arc::new(Vec::with_capacity(self.path_vec.len()));
+        let mut nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
+        let mut plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
@@ -168,14 +162,25 @@ impl FoldDisco {
                     let compact = pdb_reader.read_structure().expect(
                         log_msg(FAIL, "Failed to read structure").as_str()
                     );
-                    if compact.num_residues > DEFAULT_MAX_RESIDUE {
+                    let compact = compact.to_compact();
+                    // Directly write num_residues and avg_plddt to the vectors
+                    let nres = compact.num_residues;
+                    let plddt = compact.get_avg_plddt();
+                    {
+                        let mut nres_vec = nres_vec.lock().unwrap();
+                        let mut plddt_vec = plddt_vec.lock().unwrap();
+                        nres_vec[pdb_pos] = nres;
+                        plddt_vec[pdb_pos] = plddt;
+                    }
+                    // Skip if the number of residues is too large
+                    if compact.num_residues > self.max_residue {
                         print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                         // skip this file
                         return (Vec::new(), pdb_pos);
                     }
-                    
+ 
                     let hash_vec = get_geometric_hash_from_structure(
-                        &compact.to_compact(), self.hash_type, self.num_bin_dist, self.num_bin_angle
+                        &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
                     );
                     // Drop intermediate variables
                     drop(compact);
@@ -193,13 +198,16 @@ impl FoldDisco {
             }).unzip();
         self.hash_collection = output;
         self.numeric_id_vec = positions;
-        self.flags.collect_hash = true;
-        self.flags.fill_numeric_id_vec = true;
+        // Flatten Arc<Mutex<Vec<T>>> to Vec<T>
+        self.nres_vec = Arc::try_unwrap(nres_vec).unwrap().into_inner().unwrap();
+        self.plddt_vec = Arc::try_unwrap(plddt_vec).unwrap().into_inner().unwrap();
         // Remove  thread pool
         drop(pool);
     }
     
     pub fn collect_hash_pairs(&mut self) {
+        let mut nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
+        let mut plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
@@ -223,7 +231,7 @@ impl FoldDisco {
                             log_msg(FAIL, "Failed to read structure").as_str()
                         )
                     };
-                    if compact.num_residues > DEFAULT_MAX_RESIDUE {
+                    if compact.num_residues > self.max_residue {
                         print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                         // skip this file
                         // Drop intermediate variables
@@ -231,8 +239,18 @@ impl FoldDisco {
                         drop(pdb_reader);
                         return Vec::new();
                     }
+                    let compact = compact.to_compact();
+                    // Directly write num_residues and avg_plddt to the vectors
+                    let nres = compact.num_residues;
+                    let plddt = compact.get_avg_plddt();
+                    {
+                        let mut nres_vec = nres_vec.lock().unwrap();
+                        let mut plddt_vec = plddt_vec.lock().unwrap();
+                        nres_vec[pdb_pos] = nres;
+                        plddt_vec[pdb_pos] = plddt;
+                    }
                     let mut hash_vec = get_geometric_hash_from_structure(
-                        &compact.to_compact(), self.hash_type, self.num_bin_dist, self.num_bin_angle
+                        &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
                     );
                     // Drop intermediate variables
                     drop(compact);
@@ -248,8 +266,8 @@ impl FoldDisco {
                 }).flatten().collect()
             });
         self.hash_id_pairs = collected;
-        self.flags.collect_hash = true;
-        self.flags.fill_numeric_id_vec = true;
+        self.nres_vec = Arc::try_unwrap(nres_vec).unwrap().into_inner().unwrap();
+        self.plddt_vec = Arc::try_unwrap(plddt_vec).unwrap().into_inner().unwrap();
         drop(pool);
     }
     
@@ -301,12 +319,6 @@ impl FoldDisco {
     }
 
     pub fn set_index_table(&mut self) {
-        // Deprecated
-        // Check if hash_collection is filled
-        if !self.flags.collect_hash {
-            print_log_msg(FAIL, "Hash collection is not filled yet");
-            return;
-        }
         let index_builder = IndexBuilder::new(
             self.numeric_id_vec.clone(), self.return_hash_collection(),
             self.num_threads, 1,
@@ -314,37 +326,16 @@ impl FoldDisco {
             format!("{}.index", self.output_path), // data file path
         );
         self.index_builder = index_builder;
-        self.flags.set_index_table = true;
     }
     
     pub fn fill_index_table(&mut self) {
-        // Deprecated
-        // Check if index_table is set
-        if !self.flags.set_index_table {
-            print_log_msg(WARN, "Index table is not set yet. Setting index table...");
-            self.set_index_table();
-        }
         // self.index_builder.fill_with_dashmap();
         let index_map = measure_time!(self.index_builder.fill_and_return_dashmap());
-        self.flags.fill_index_table = true;
-
-        // THIS IS NOT FINISHED YET
         // TODO: IMPORTANT: Move this.
         let (offset_map, value_vec) = measure_time!(self.index_builder.convert_hashmap_to_offset_and_values(index_map));
-        self.flags.convert_index = true;
-        
-        // self.index_builder.offset_table = offset_map;
-        // println!("offset_map: {:?}", offset_map);
-        println!("value_vec: {:?}", value_vec.len());
     }
     
-    
     pub fn save_offset_map(&self) {
-        // Check if index_table is filled
-        if !self.flags.fill_index_table {
-            print_log_msg(FAIL, "Index table is not filled yet");
-            return;
-        }
         todo!("Implement save_offset_map method");
         // self.index_builder.save_offset_map();
     }

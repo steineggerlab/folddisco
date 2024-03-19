@@ -54,7 +54,7 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
             let feature = structure.get_trrosetta_feature(i, j);
             if feature.is_some() {
                 let feature = feature.unwrap();
-                if feature[2] > 20.0 {
+                if feature[0] > 20.0 {
                     None
                 } else {
                     Some(feature)
@@ -68,7 +68,7 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
             if feature.is_some() {
                 // Concatenate res1 and res2 to the feature
                 let mut feature = feature.unwrap();
-                if feature[2] > 20.0 {
+                if feature[0] > 20.0 {
                     None
                 } else {
                     feature.insert(0, res1);
@@ -83,7 +83,7 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
             let feature = structure.get_ppf(i, j);
             if feature.is_some() {
                 let mut feature = feature.unwrap();
-                if feature[2] > 20.0 {
+                if feature[0] > 20.0 {
                     None
                 } else {
                     feature.insert(0, res1);
@@ -161,4 +161,36 @@ pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type
     // Reduce memory usage
     hash_vec.shrink_to_fit();
     hash_vec
+}
+
+
+impl HashType {
+    pub fn amino_acid_index(&self) -> Option<Vec<usize>> {
+        match self {
+            HashType::PDBMotif | HashType::PDBMotifSinCos |
+            HashType::FoldDiscoDefault | HashType::Default32bit | 
+            HashType::PointPairFeature => Some(vec![0, 1]),
+            _ => None
+        }
+    }
+
+    pub fn dist_index(&self) -> Option<Vec<usize>> {
+        match self {
+            HashType::PDBMotif | HashType::PDBMotifSinCos => Some(vec![2, 3]),
+            HashType::FoldDiscoDefault | HashType::Default32bit |
+            HashType::PointPairFeature => Some(vec![2]),
+            HashType::TrRosetta => Some(vec![0]),
+            _ => None
+        }
+    }
+    
+    pub fn angle_index(&self) -> Option<Vec<usize>> {
+        match self {
+            HashType::PDBMotif | HashType::PDBMotifSinCos => Some(vec![4]),
+            HashType::TrRosetta => Some(vec![1, 2, 3, 4, 5]),
+            HashType::FoldDiscoDefault | HashType::Default32bit => Some(vec![3, 4, 5, 6, 7]),
+            HashType::PointPairFeature => Some(vec![3, 4, 5]),
+            _ => None
+        }
+    }
 }

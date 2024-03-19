@@ -113,6 +113,7 @@ pub struct CompactStructure {
     pub n_vector: CarbonCoordinateVector,
     pub ca_vector: CarbonCoordinateVector,
     pub cb_vector: CarbonCoordinateVector,
+    pub b_factors: Vec<f32>,
 }
 
 impl CompactStructure {
@@ -122,6 +123,7 @@ impl CompactStructure {
 
         let mut res_serial_vec: Vec<u64> = Vec::new();
         let mut res_name_vec: Vec<[u8; 3]> = Vec::new();
+        let mut b_factors: Vec<f32> = Vec::new();
         let mut n_vec = CarbonCoordinateVector::new();
         let mut ca_vec = CarbonCoordinateVector::new();
         let mut cb_vec = CarbonCoordinateVector::new();
@@ -135,6 +137,7 @@ impl CompactStructure {
 
         let mut gly_n: Option<Coordinate> = None;
         let mut gly_c: Option<Coordinate> = None;
+        
 
         for idx in 0..origin.num_atoms {
             if prev_res_serial != Some(model.get_res_serial(idx)) || idx == origin.num_atoms - 1 {
@@ -149,6 +152,7 @@ impl CompactStructure {
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
                         chain_per_residue.push(origin.atom_vector.chain[idx]);
+                        b_factors.push(origin.atom_vector.b_factor[idx]);
                     }
                     (Some(n), Some(ca), None) => {
                         let resi = prev_res_serial.expect("expected residue serial number");
@@ -158,6 +162,7 @@ impl CompactStructure {
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
                         chain_per_residue.push(origin.atom_vector.chain[idx]);
+                        b_factors.push(origin.atom_vector.b_factor[idx]);
                         if let (Some(b"GLY"), Some(gly_n), Some(gly_c)) =
                             (prev_res_name, &gly_n, &gly_c)
                         {
@@ -214,6 +219,7 @@ impl CompactStructure {
             n_vector: n_vec,
             ca_vector: ca_vec,
             cb_vector: cb_vec,
+            b_factors: b_factors,
         }
     }
 
@@ -424,6 +430,27 @@ impl CompactStructure {
             None
         }
     }
+    
+    pub fn get_bfactor(&self, idx: usize) -> f32 {
+        self.b_factors[idx]
+    }
+    
+    pub fn get_plddt(&self, idx: usize) -> f32 {
+        self.get_bfactor(idx)
+    }
+    
+    pub fn get_avg_bfactor(&self) -> f32 {
+        let mut sum = 0.0;
+        for i in 0..self.num_residues {
+            sum += self.b_factors[i];
+        }
+        sum / self.num_residues as f32
+    }
+    
+    pub fn get_avg_plddt(&self) -> f32 {
+        self.get_avg_bfactor()
+    }
+    
 }
 
 #[cfg(test)]
@@ -453,5 +480,16 @@ mod structure_tests {
         }
         println!("{:?}", compact.get_res_name(compact.num_residues - 1));
         assert_eq!(compact.num_residues, structure.num_residues);
+    }
+    
+    #[test]
+    fn test_avg_bfactor() {
+        let data = crate::structure::io::pdb::Reader::from_file("data/homeobox/1akha-.pdb")
+            .expect("Unable to read test file");
+        let structure = &data.read_structure().expect("Unable to read structure");
+        let compact = &structure.to_compact();
+        let avg_bfactor = compact.get_avg_bfactor();
+        println!("Average B-factor: {}", avg_bfactor);
+        assert!(avg_bfactor > 0.0);
     }
 }

@@ -23,18 +23,20 @@ pub const HELP_QUERY: &str = "\
 USAGE: motifsearch query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
 Example: motifsearch query -i index_table.index -t 6 1aq2.pdb A250,A232,A269
 Options:
-    -d, --pdb <PDB_PATH>         Path of PDB file to query
-    -q, --query <QUERY_STRING>   Query string
-    -i, --index <INDEX_PATH>     Path of index table to load
-    -t, --threads <THREADS>      Number of threads to use
-    -v, --verbose                Print verbose messages
-    -c, --check-nearby           Check nearby hashes (In development)
-    -R, --retrieve               Retrieve matched residues (Need PDB files)
-    -m, --match <MATCH_CUTOFF>   Match cutoff (default 0.0)
-    -s, --score <SCORE_CUTOFF>   Score cutoff (default 0.0)
-    -n, --num-res <NUM_RES_CUTOFF> Number of residues cutoff (default 3000)
-    -l, --plddt <PLDDT_CUTOFF>   PLDDT cutoff (default 0.0)
-    -h, --help                   Print this help menu
+    -d, --pdb <PDB_PATH>             Path of PDB file to query
+    -q, --query <QUERY_STRING>       Query string
+    -i, --index <INDEX_PATH>         Path of index table to load
+    -t, --threads <THREADS>          Number of threads to use
+    -v, --verbose                    Print verbose messages
+    -e, --exact                      Return only exact matches
+    -v, --retrieve                   Retrieve matched residues (Need PDB files)
+    -d, --distance <DIST_CUTOFF>     Distance cutoff (default 0.0)
+    -a, --angle <ANGLE_CUTOFF>       Angle cutoff (default 0.0)
+    -m, --match <MATCH_CUTOFF>       Match cutoff (default 0.0)
+    -s, --score <SCORE_CUTOFF>       Score cutoff (default 0.0)
+    -n, --num-res <NUM_RES_CUTOFF>   Number of residues cutoff (default 3000)
+    -l, --plddt <PLDDT_CUTOFF>       PLDDT cutoff (default 0.0)
+    -h, --help                       Print this help menu
 ";
 
 
@@ -45,8 +47,10 @@ pub fn query_pdb(env: AppArgs) {
             query_string,
             threads,
             index_path,
-            check_nearby,
+            exact_match,
             retrieve,
+            dist_threshold,
+            angle_threshold,
             match_cutoff,
             score_cutoff,
             num_res_cutoff,
@@ -101,10 +105,17 @@ pub fn query_pdb(env: AppArgs) {
                     assert!(std::path::Path::new(&hash_type_path).is_file());
                     let (hash_type, num_bin_dist, num_bin_angle) = read_config_from_file(&hash_type_path);
                     
+                    let pdb_loaded = PDBReader::from_file(&pdb_path).expect(
+                        &log_msg(FAIL, &format!("Failed to read PDB file: {}", &pdb_path))
+                    );
+                    let structure = pdb_loaded.read_structure().expect(
+                        &log_msg(FAIL, &format!("Failed to read the structure from {}", &pdb_path))
+                    );
                     // Make query with pdb
-                    let query_residues = parse_query_string(&query_string);
+                    let query_residues = parse_query_string(&query_string, structure.chains[0]);
                     let pdb_query =  make_query(
-                        &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, check_nearby
+                        &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, exact_match,
+                        
                     );
                     
                     // Load index table
@@ -200,6 +211,8 @@ mod tests {
         let index_path = Some(String::from("data/serine_peptidases_pdb"));
         let check_nearby = false;
         let retrieve = false;
+        let dist_threshold = None;
+        let angle_threshold = None; 
         let help = false;
         let match_cutoff = 0.0;
         let score_cutoff = 0.0;
@@ -210,8 +223,10 @@ mod tests {
             query_string,
             threads,
             index_path,
-            check_nearby,
+            exact_match: check_nearby,
             retrieve,
+            dist_threshold,
+            angle_threshold,
             match_cutoff,
             score_cutoff,
             num_res_cutoff,

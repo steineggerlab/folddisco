@@ -22,7 +22,7 @@ pub const HELP_INDEX: &str = "\
 USAGE: motifsearch index [OPTIONS]
 Options:
     -p, --pdbs <PDB_DIR>         Directory containing PDB files
-    -H, --hash <HASH_TYPE>       Hash type to use (pdb, trrosetta, default)
+    -y, --type <HASH_TYPE>       Hash type to use (pdb, trrosetta, default)
     -i, --index <INDEX_PATH>     Path to save the index table
     -t, --threads <THREADS>      Number of threads to use
     -d, --distance <NBIN_DIST>   Number of distance bins (default 0, zero means default)
@@ -43,6 +43,7 @@ pub fn build_index(env: AppArgs) {
             index_path,
             num_threads,
             chunk_size,
+            max_residue,
             num_bin_dist,
             num_bin_angle,
             recursive,
@@ -117,7 +118,8 @@ pub fn build_index(env: AppArgs) {
                     let lookup_path = format!("{}.lookup", index_path);
                     measure_time!(save_lookup_to_file(
                         &lookup_path, &fold_disco.path_vec,
-                        &fold_disco.numeric_id_vec, None
+                        &fold_disco.numeric_id_vec, Some(&fold_disco.nres_vec),
+                        Some(&fold_disco.plddt_vec)
                     ));
                     let hash_type_path = format!("{}.type", index_path);
                     write_config_to_file(&hash_type_path, hash_type, num_bin_dist, num_bin_angle);
@@ -141,10 +143,11 @@ mod tests {
         let pdb_dir = "data/serine_peptidases_filtered";
         let hash_type = "pdb";
         let index_path = "data/serine_peptidases_pdb";
-        let num_threads = 4;
+        let num_threads = 1;
         let num_bin_dist = 16;
         let num_bin_angle = 3;
         let chunk_size = 10;
+        let max_residue = 3000;
         let recursive = true;
         let verbose = true;
         let help = false;
@@ -156,6 +159,7 @@ mod tests {
             num_bin_dist,
             num_bin_angle,
             chunk_size,
+            max_residue,
             recursive,
             verbose,
             help,

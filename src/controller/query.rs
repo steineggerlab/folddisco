@@ -10,13 +10,11 @@ use crate::utils::log::{log_msg, FAIL};
 use super::feature::get_single_feature;
 // TODO: Make this to handle multiple hash types
 // TODO: Query should be able to consider both chain & residue index
-
-
 // Query is expected to be given as a path, and a list of tuples of chain and residue index
 
 pub fn make_query(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
-    nbin_dist: usize, nbin_angle: usize, exact_match: bool,
+    nbin_dist: usize, nbin_angle: usize, exact_match: bool, dist_thresholds: Vec<f32>, angle_thresholds: Vec<f32>
 ) -> Vec<GeometricHash> {
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
     let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
@@ -45,6 +43,8 @@ pub fn make_query(
             indices.push(index);
         }
     }
+    let dist_indices = hash_type.dist_index();
+    let angle_indices = hash_type.angle_index();
     // Make combinations
     let comb_iter = CombinationIterator::new(indices.len());
     comb_iter.for_each(|(i, j)| {
@@ -56,21 +56,35 @@ pub fn make_query(
         );
         if feature.is_some() {
             let feature = feature.unwrap();
-            if !exact_match {
-                let mut feature_near = feature.clone();
-                let mut feature_far = feature.clone();
-                feature_near[2] -= 0.5; // TODO: need to be improved
-                feature_far[2] += 0.5;
-                if nbin_dist == 0 || nbin_angle == 0 {
-                    let hash_near = GeometricHash::perfect_hash_default(feature_near, hash_type);
-                    let hash_far = GeometricHash::perfect_hash_default(feature_far, hash_type);
-                    hash_collection.push(hash_near);
-                    hash_collection.push(hash_far);
-                } else {
-                    let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
-                    let hash_far = GeometricHash::perfect_hash(feature_far, hash_type, nbin_dist, nbin_angle);
-                    hash_collection.push(hash_near);
-                    hash_collection.push(hash_far);
+            if !exact_match & (dist_thresholds.len() > 0 || angle_thresholds.len() > 0) {
+                if let Some(dist_indices) = &dist_indices {
+                    for dist_threshold in dist_thresholds.iter() {
+                        for dist_index in dist_indices.iter() {
+                            let mut feature_near = feature.clone();
+                            feature_near[*dist_index] -= dist_threshold;
+                            let mut feature_far = feature.clone();
+                            feature_far[*dist_index] += dist_threshold;
+                            append_hash(
+                                nbin_dist, nbin_angle, feature_near, hash_type, feature_far, &mut hash_collection
+                            );
+                        }
+                    }
+                }
+                if angle_indices.is_some() {
+                    if let Some(angle_indices) = &angle_indices {
+                        for angle_threshold in angle_thresholds.iter() {
+                            for angle_index in angle_indices.iter() {
+                                let mut feature_near = feature.clone();
+                                let angle_threshold = angle_threshold.to_radians();
+                                feature_near[*angle_index] -= angle_threshold;
+                                let mut feature_far = feature.clone();
+                                feature_far[*angle_index] += angle_threshold;
+                                append_hash(
+                                    nbin_dist, nbin_angle, feature_near, hash_type, feature_far, &mut hash_collection
+                                );
+                            }
+                        }
+                    }
                 }
             } else {
                 if nbin_dist == 0 || nbin_angle == 0 {
@@ -89,6 +103,41 @@ pub fn make_query(
     hash_collection.dedup();
     hash_collection
 }
+
+fn append_hash(
+    nbin_dist: usize, nbin_angle: usize, feature_near: Vec<f32>, hash_type: HashType, feature_far: Vec<f32>,
+    hash_collection: &mut Vec<GeometricHash>
+) {
+    if nbin_dist == 0 || nbin_angle == 0 {
+        let hash_near = GeometricHash::perfect_hash_default(feature_near, hash_type);
+        let hash_far = GeometricHash::perfect_hash_default(feature_far, hash_type);
+        hash_collection.push(hash_near);
+        hash_collection.push(hash_far);
+    } else {
+        let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
+        let hash_far = GeometricHash::perfect_hash(feature_far, hash_type, nbin_dist, nbin_angle);
+        hash_collection.push(hash_near);
+        hash_collection.push(hash_far);
+    }
+}
+
+pub fn parse_threshold_string(threshold_string: Option<String>) -> Vec<f32> {
+    if threshold_string.is_none() {
+        return Vec::new();
+    }
+    let threshold_string = threshold_string.unwrap();
+    // Remove whitespace
+    let threshold_string = threshold_string.replace(" ", "");
+    let mut thresholds: Vec<f32> = Vec::new();
+    for threshold in threshold_string.split(',') {
+        let threshold = threshold.parse::<f32>().expect(
+            &log_msg(FAIL, "Failed to parse threshold")
+        );
+        thresholds.push(threshold);
+    }
+    thresholds
+}
+
 
 pub fn parse_query_string(query_string: &str, default_chain: u8) -> Vec<(u8, u64)> {
     let mut query_residues: Vec<(u8, u64)> = Vec::new();
@@ -144,9 +193,13 @@ mod tests {
         let query_residues = vec![
             (b'A', 250), (b'A', 232), (b'A', 269)
         ];
-        let hash_type = HashType::FoldDiscoDefault;
-        let hash_collection = make_query(&path, &query_residues, hash_type, 0, 0, false);
+        let dist_thresholds: Vec<f32> = vec![0.5];
+        let angle_thresholds: Vec<f32> = vec![5.0];
+        let hash_type = HashType::PDBMotifSinCos;
+        let hash_collection = make_query(&path, &query_residues, hash_type, 8, 6, false, dist_thresholds, angle_thresholds);
+        // let hash_collection = make_query(&path, &query_residues, hash_type, 8, 3, true, dist_thresholds, angle_thresholds);
         println!("{:?}", hash_collection);
+        println!("{}", hash_collection.len());
     }
     #[test]
     fn test_parse_query_string() {

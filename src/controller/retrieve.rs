@@ -111,8 +111,12 @@ mod tests {
         let hash_type = HashType::PDBMotifSinCos;
         let nbin_dist = 16;
         let nbin_angle = 3;
-        let check_nearby = false;
-        let queries = make_query(&path, &query_residues, hash_type, nbin_dist, nbin_angle, check_nearby);
+        let exact_match = false;
+        let dist_thresholds: Vec<f32> = vec![0.5, 1.0];
+        let angle_thresholds: Vec<f32> = vec![5.0, 10.0, 15.0];
+        let queries = make_query(
+            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds
+        );
         let hash_set: HashSet<GeometricHash> = queries.iter().cloned().collect();
     
         let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));

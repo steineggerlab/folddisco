@@ -19,7 +19,7 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
             let ca_cb_angle = structure.get_ca_cb_angle(i, j); // degree
             if ca_dist.is_some() && cb_dist.is_some() && ca_cb_angle.is_some() {
                 let feature = vec![
-                    res1, res2, ca_dist.unwrap(), cb_dist.unwrap(), ca_cb_angle.unwrap()
+                    res1, res2, ca_dist.unwrap(), cb_dist.unwrap(), ca_cb_angle.unwrap().to_radians()
                 ];
                 // Ignore distant interactions
                 if feature[2] > 20.0 {

@@ -14,6 +14,7 @@ use rayon::prelude::*;
 use crate::cli::workflows::config::read_config_from_file;
 use crate::cli::*;
 use crate::controller::io::{get_values_with_offset, get_values_with_offset_u16, read_offset_map, read_u16_vector, read_usize_vector};
+use crate::controller::query::parse_threshold_string;
 use crate::controller::retrieve::{connected, hash_vec_to_aa_pairs, res_vec_as_string, retrieve_residue_with_hash};
 use crate::index::lookup::{load_lookup_from_file};
 use crate::prelude::*;
@@ -111,12 +112,13 @@ pub fn query_pdb(env: AppArgs) {
                     let structure = pdb_loaded.read_structure().expect(
                         &log_msg(FAIL, &format!("Failed to read the structure from {}", &pdb_path))
                     );
+                    let dist_thresholds = parse_threshold_string(dist_threshold.clone());
+                    let angle_thresholds = parse_threshold_string(angle_threshold.clone());
                     // Make query with pdb
                     let query_residues = parse_query_string(&query_string, structure.chains[0]);
-                    let pdb_query =  make_query(
-                        &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, exact_match,
-                        
-                    );
+                    let pdb_query =  measure_time!(make_query(
+                        &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, exact_match, dist_thresholds, angle_thresholds
+                    ));
                     
                     // Load index table
                     // let (mmap, value_vec) = measure_time!(read_usize_vector(&value_path).expect("[ERROR] Failed to load value vector"));
@@ -127,7 +129,8 @@ pub fn query_pdb(env: AppArgs) {
                     );
                     // let (path_vec, numeric_id_vec, optional_vec) = measure_time!(load_lookup_from_file(&lookup_path));
                     let lookup = measure_time!(load_lookup_from_file(&lookup_path));
-
+                    
+                    
                     // Get offset from offset_table with query
                     let mut offset_to_query = Vec::new();
                     for i in 0..pdb_query.len() {
@@ -148,6 +151,11 @@ pub fn query_pdb(env: AppArgs) {
                         let hash_count = offset_to_query[i].1;
                         for j in 0..single_queried_values.len() {
                             let nid = lookup.1[single_queried_values[j] as usize];
+                            let nres = lookup.2[single_queried_values[j] as usize];
+                            let plddt = lookup.3[single_queried_values[j] as usize];
+                            if nres > num_res_cutoff || plddt < plddt_cutoff {
+                                continue;
+                            }
                             let count = query_count_map.get(&nid);
                             // Added calculation of idf
                             if count.is_none() {
@@ -160,7 +168,7 @@ pub fn query_pdb(env: AppArgs) {
                     // Sort by count and print
                     let mut query_count_vec: Vec<_> = query_count_map.iter().collect();
                     query_count_vec.sort_by(|a, b| b.1.1.partial_cmp(&a.1.1).unwrap());
-                    let count_cut = (query_residues.len() * (query_residues.len() - 1)) / 2;
+                    let count_cut = match_cutoff.round() as usize;
                     // let count_cut = 0;
                     let hash_set: HashSet<GeometricHash> = pdb_query.iter().cloned().collect();
                     let aa_filter = hash_vec_to_aa_pairs(&pdb_query);
@@ -174,15 +182,16 @@ pub fn query_pdb(env: AppArgs) {
                                     let retrieved = retrieved.unwrap();
                                     let connected = connected(&retrieved, query_residues.len());
                                     let total_matches = retrieved.len();
-                                    if connected > 0 && total_matches < 4 * count.0 {
-                                        println!(
-                                            "{};uniq_matches={};idf={};total_matches={};connected={};{}",
-                                            lookup.0[*nid], count.0, count.1, total_matches,
-                                            connected, res_vec_as_string(&retrieved)
-                                        );
-                                    }
+                                    println!(
+                                        "{};uniq_matches={};idf={};total_matches={};connected={};{}",
+                                        lookup.0[*nid], count.0, count.1, total_matches,
+                                        connected, res_vec_as_string(&retrieved)
+                                    );
                                 }
                             } else {
+                                if count.1 < score_cutoff {
+                                    continue;
+                                }
                                 println!("{}\t{}\t{}", lookup.0[*nid], count.0, count.1);
                             }
                         }
@@ -210,9 +219,9 @@ mod tests {
         let threads = 1;
         let index_path = Some(String::from("data/serine_peptidases_pdb"));
         let check_nearby = false;
-        let retrieve = false;
-        let dist_threshold = None;
-        let angle_threshold = None; 
+        let retrieve = true;
+        let dist_threshold = Some(String::from("0.5"));
+        let angle_threshold = Some(String::from("5.0,10.0,15.0"));
         let help = false;
         let match_cutoff = 0.0;
         let score_cutoff = 0.0;

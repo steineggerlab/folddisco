@@ -145,8 +145,8 @@ mod tests {
         let index_path = "data/serine_peptidases_pdb";
         let num_threads = 1;
         let num_bin_dist = 16;
-        let num_bin_angle = 3;
-        let chunk_size = 10;
+        let num_bin_angle = 6;
+        let chunk_size = 30;
         let max_residue = 3000;
         let recursive = true;
         let verbose = true;

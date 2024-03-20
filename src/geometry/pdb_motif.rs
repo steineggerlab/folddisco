@@ -30,7 +30,8 @@ impl HashValue {
         let res2 = feature[1] as u32;
         let ca_dist = discretize_value(feature[2], MIN_DIST, MAX_DIST, nbin_dist);
         let cb_dist = discretize_value(feature[3], MIN_DIST, MAX_DIST, nbin_dist); 
-        let angle = discretize_value(feature[4], MIN_ANGLE, MAX_ANGLE, nbin_angle);
+        let angle = feature[4].to_degrees();
+        let angle = discretize_value(angle, MIN_ANGLE, MAX_ANGLE, nbin_angle);
         let hashvalue = res1 << 20 | res2 << 15 | ca_dist << 10 | cb_dist << 5 | angle;
         HashValue(hashvalue)
     }
@@ -39,7 +40,8 @@ impl HashValue {
         let res2 = feature[1] as u32;
         let ca_dist = discretize_value(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST);
         let cb_dist = discretize_value(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST);
-        let angle = discretize_value(feature[4], MIN_ANGLE, MAX_ANGLE, NBIN_ANGLE);
+        let angle = feature[4].to_degrees();
+        let angle = discretize_value(angle, MIN_ANGLE, MAX_ANGLE, NBIN_ANGLE);
         let hashvalue = res1 << 20 | res2 << 15 | ca_dist << 10 | cb_dist << 5 | angle;
         HashValue(hashvalue)
     }

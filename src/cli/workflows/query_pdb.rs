@@ -144,7 +144,7 @@ pub fn query_pdb(env: AppArgs) {
                     }
                     
                     // Make union of values queried
-                    let mut query_count_map: HashMap<usize, (usize, f32)> = HashMap::new();
+                    let mut query_count_map: HashMap<usize, (usize, f32, usize, f32)> = HashMap::new();
                     for i in 0..offset_to_query.len() {
                         // let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
                         let single_queried_values = get_values_with_offset_u16(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
@@ -158,10 +158,12 @@ pub fn query_pdb(env: AppArgs) {
                             }
                             let count = query_count_map.get(&nid);
                             // Added calculation of idf
+                            let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
+                            let nres_norm = (nres as f32).log2() * -4.0 + 50.0;
                             if count.is_none() {
-                                query_count_map.insert(nid, (1, (lookup.0.len() as f32 / hash_count as f32).log2()));
+                                query_count_map.insert(nid, (1, idf + nres_norm, nres, plddt));
                             } else {
-                                query_count_map.insert(nid, (count.unwrap().0 + 1, (lookup.0.len() as f32 / hash_count as f32).log2() + count.unwrap().1));
+                                query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1, nres, plddt));
                             }
                         }
                     }
@@ -192,7 +194,7 @@ pub fn query_pdb(env: AppArgs) {
                                 if count.1 < score_cutoff {
                                     continue;
                                 }
-                                println!("{}\t{}\t{}", lookup.0[*nid], count.0, count.1);
+                                println!("{}\t{}\t{}\t{}\t{}", lookup.0[*nid], count.0, count.1, count.2, count.3);
                             }
                         }
                     }
@@ -218,7 +220,7 @@ mod tests {
         let query_string = String::from("B57,B102,C195");
         let threads = 1;
         let index_path = Some(String::from("data/serine_peptidases_pdb"));
-        let check_nearby = false;
+        let exact_match = false;
         let retrieve = false;
         let dist_threshold = Some(String::from("0.5"));
         let angle_threshold = Some(String::from("5.0,10.0,15.0"));
@@ -232,7 +234,7 @@ mod tests {
             query_string,
             threads,
             index_path,
-            exact_match: check_nearby,
+            exact_match: exact_match,
             retrieve,
             dist_threshold,
             angle_threshold,

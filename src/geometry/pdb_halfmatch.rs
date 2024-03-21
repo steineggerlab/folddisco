@@ -121,7 +121,7 @@ impl HashValue {
     }
     
     pub fn hash_type(&self) -> HashType {
-        HashType::PDBMotifSinCos
+        HashType::PDBMotifHalf
     }
     pub fn from_u32(hashvalue: u32) -> Self {
         HashValue(hashvalue)
@@ -168,11 +168,11 @@ mod tests {
             map_aa_to_u8(raw_feature.0) as f32, map_aa_to_u8(raw_feature.1) as f32,
             raw_feature.2, raw_feature.3, raw_feature.4.to_radians()
         ];
-        let hash: GeometricHash = GeometricHash::PDBMotifSinCos(
+        let hash: GeometricHash = GeometricHash::PDBMotifHalf(
             HashValue::perfect_hash(raw_feature, 8, 3)
         );
         match hash {
-            GeometricHash::PDBMotifSinCos(hash) => {
+            GeometricHash::PDBMotifHalf(hash) => {
                 println!("{:?}", hash);
             },
             _ => panic!("Invalid hash type"),

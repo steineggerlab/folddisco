@@ -15,17 +15,12 @@ pub struct HashValue(pub u32);
 impl HashValue {
     pub fn perfect_hash(feature: Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> Self {
         // Added one more quantization for distance
-        let nbin_dist_half = nbin_dist / 2usize;
-        let nbin_dist_half = if nbin_dist_half > 16 { 16.0 } else { nbin_dist_half as f32 };
         let nbin_dist = if nbin_dist > 16 { 16.0 } else { nbin_dist as f32 };
         let nbin_angle = if nbin_angle > 16 { 16.0 } else { nbin_angle as f32 };
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         let ca_dist = discretize_value(
             feature[2], MIN_DIST, MAX_DIST, nbin_dist
-        );
-        let ca_dist_halfbin = discretize_value(
-            feature[2], MIN_DIST, MAX_DIST, nbin_dist_half
         );
         let cb_dist = discretize_value(
             feature[3], MIN_DIST, MAX_DIST, nbin_dist
@@ -39,10 +34,8 @@ impl HashValue {
         let cos_angle = discretize_value(
             cos_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         );
-        // let hashvalue = res1 << 21 | res2 << 16 | ca_dist << 12 
-        //     | cb_dist << 8 | sin_angle << 4 | cos_angle;
-        let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16
-            | ca_dist_halfbin << 12 | cb_dist << 8 | sin_angle << 4 | cos_angle;
+        let hashvalue = res1 << 21 | res2 << 16 | ca_dist << 12 
+            | cb_dist << 8 | sin_angle << 4 | cos_angle;
         HashValue(hashvalue)
     }
 
@@ -51,9 +44,6 @@ impl HashValue {
         let res2 = feature[1] as u32;
         let ca_dist = discretize_value(
             feature[2], MIN_DIST, MAX_DIST, NBIN_DIST
-        );
-        let ca_dist_halfbin = discretize_value(
-            feature[2], MIN_DIST, MAX_DIST, NBIN_DIST / 2.0
         );
         let cb_dist = discretize_value(
             feature[3], MIN_DIST, MAX_DIST, NBIN_DIST
@@ -67,16 +57,16 @@ impl HashValue {
         let cos_angle = discretize_value(
             cos_angle, MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS
         );
-        let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16
-           | ca_dist_halfbin << 12 | cb_dist << 8 | sin_angle << 4 | cos_angle;
+        let hashvalue = res1 << 21 | res2 << 16 | ca_dist << 12 
+            | cb_dist << 8 | sin_angle << 4 | cos_angle;
         HashValue(hashvalue)
     }
     
     pub fn reverse_hash_default(&self) -> Vec<f32> {
-        let res1 = ((self.0 >> 25) & BITMASK32_5BIT)as f32;
-        let res2 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
+        let res1 = ((self.0 >> 21) & BITMASK32_5BIT)as f32;
+        let res2 = ((self.0 >> 16) & BITMASK32_5BIT) as f32;
         let ca_dist = continuize_value(
-            (self.0 >> 16) & BITMASK32_4BIT as u32, 
+            (self.0 >> 12) & BITMASK32_4BIT as u32, 
             MIN_DIST, MAX_DIST, NBIN_DIST
         );
         let cb_dist = continuize_value(
@@ -96,10 +86,10 @@ impl HashValue {
     }
     
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> Vec<f32> {
-        let res1 = ((self.0 >> 25) & BITMASK32_5BIT)as f32;
-        let res2 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
+        let res1 = ((self.0 >> 21) & BITMASK32_5BIT)as f32;
+        let res2 = ((self.0 >> 16) & BITMASK32_5BIT) as f32;
         let ca_dist = continuize_value(
-            (self.0 >> 16) & BITMASK32_4BIT as u32, 
+            (self.0 >> 12) & BITMASK32_4BIT as u32, 
             MIN_DIST, MAX_DIST, nbin_dist as f32
         );
         let cb_dist = continuize_value(

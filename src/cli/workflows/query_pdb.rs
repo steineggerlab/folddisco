@@ -219,7 +219,7 @@ mod tests {
         let threads = 1;
         let index_path = Some(String::from("data/serine_peptidases_pdb"));
         let check_nearby = false;
-        let retrieve = true;
+        let retrieve = false;
         let dist_threshold = Some(String::from("0.5"));
         let angle_threshold = Some(String::from("5.0,10.0,15.0"));
         let help = false;

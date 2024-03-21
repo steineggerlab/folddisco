@@ -31,7 +31,7 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
                 None
             }
         },
-        HashType::PDBMotifSinCos => {
+        HashType::PDBMotifSinCos | HashType::PDBMotifHalf => {
             let ca_dist = structure.get_ca_distance(i, j);
             let cb_dist = structure.get_cb_distance(i, j);
             let ca_cb_angle = structure.get_ca_cb_angle(i, j);
@@ -167,7 +167,7 @@ pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type
 impl HashType {
     pub fn amino_acid_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos |
+            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf |
             HashType::FoldDiscoDefault | HashType::Default32bit | 
             HashType::PointPairFeature => Some(vec![0, 1]),
             _ => None
@@ -176,7 +176,7 @@ impl HashType {
 
     pub fn dist_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos => Some(vec![2, 3]),
+            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf => Some(vec![2, 3]),
             HashType::FoldDiscoDefault | HashType::Default32bit |
             HashType::PointPairFeature => Some(vec![2]),
             HashType::TrRosetta => Some(vec![0]),
@@ -186,7 +186,7 @@ impl HashType {
     
     pub fn angle_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos => Some(vec![4]),
+            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf => Some(vec![4]),
             HashType::TrRosetta => Some(vec![1, 2, 3, 4, 5]),
             HashType::FoldDiscoDefault | HashType::Default32bit => Some(vec![3, 4, 5, 6, 7]),
             HashType::PointPairFeature => Some(vec![3, 4, 5]),

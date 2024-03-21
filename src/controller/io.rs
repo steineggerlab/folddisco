@@ -4,6 +4,8 @@
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
 use dashmap::DashMap;
+use rustc_hash::FxHashMap;
+use core::hash;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write, Error};
 use memmap2::Mmap;
@@ -81,10 +83,11 @@ pub fn save_offset_vec(
 pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<GeometricHash, (usize, usize)>, Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
-    let mut offset_map = DashMap::default();
+    let hash_encoding_type = hash_type.encoding_type();
+    let mut offset_map = DashMap::with_capacity(mmap.len() / (16 + (hash_encoding_type / 8)) as usize);
     let mut offset = 0;
     while offset < mmap.len() {
-        let (key, w): (GeometricHash, usize) = match hash_type.encoding_type() {
+        let (key, w): (GeometricHash, usize) = match hash_encoding_type {
             32 => {
                 (GeometricHash::from_u32(
                     u32::from_le_bytes(mmap[offset..offset + 4].try_into().unwrap()),
@@ -108,7 +111,6 @@ pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<Geomet
     }
     Ok(offset_map)
 }
-
 
 pub fn write_usize_vector(path: &str, vec: &Vec<usize>) -> Result<(), Error> {
     let mut file = OpenOptions::new()
@@ -235,6 +237,8 @@ pub fn read_u32_vector(path: &str)-> Result<(Mmap, &'static [u32]), Error> {
 
 #[cfg(test)]
 mod tests {
+    use crate::measure_time;
+
     use super::*;
     #[test]
     fn test_offset_map_io() {
@@ -259,5 +263,10 @@ mod tests {
         let (mmap, vec) = read_usize_vector("test_usize_vector_io.value").unwrap();
         assert_eq!(vec, &[1, 2, 3, 4, 5]);
     }
+    
+    // #[test]
+    // fn test_load_offset_map() {
+    //     let offset_map = measure_time!(read_offset_map("analysis/h_sapiens_db/d16a3/index.offset", HashType::PDBMotifSinCos).unwrap());
+    // }
     
 }

@@ -9,6 +9,7 @@ use crate::HashableSync;
 pub enum HashType {
     PDBMotif,
     PDBMotifSinCos,
+    PDBMotifHalf,
     TrRosetta,
     FoldDiscoDefault,
     Default32bit,
@@ -22,10 +23,11 @@ impl HashType {
         match index {
             0 => HashType::PDBMotif,
             1 => HashType::PDBMotifSinCos,
-            2 => HashType::TrRosetta,
-            3 => HashType::FoldDiscoDefault,
-            4 => HashType::Default32bit,
-            5 => HashType::PointPairFeature,
+            2 => HashType::PDBMotifHalf,
+            3 => HashType::TrRosetta,
+            4 => HashType::FoldDiscoDefault,
+            5 => HashType::Default32bit,
+            6 => HashType::PointPairFeature,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -34,10 +36,11 @@ impl HashType {
         match hash_type {
             "0" | "PDBMotif" | "pyscomotif" => HashType::PDBMotif,
             "1" | "PDBMotifSinCos" | "pdb" => HashType::PDBMotifSinCos,
-            "2" | "TrRosetta" | "trrosetta" => HashType::TrRosetta,
-            "3" | "FoldDiscoDefault" | "default" => HashType::FoldDiscoDefault,
-            "4" | "Default32bit" | "default32" => HashType::Default32bit,
-            "5" | "PointPairFeature" | "ppf" => HashType::PointPairFeature,
+            "2" | "PDBMotifHalf" | "pdbhalf" => HashType::PDBMotifHalf,
+            "3" | "TrRosetta" | "trrosetta" => HashType::TrRosetta,
+            "4" | "FoldDiscoDefault" | "default" => HashType::FoldDiscoDefault,
+            "5" | "Default32bit" | "default32" => HashType::Default32bit,
+            "6" | "PointPairFeature" | "ppf" => HashType::PointPairFeature,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -46,6 +49,7 @@ impl HashType {
         match self {
             HashType::PDBMotif => 32usize,
             HashType::PDBMotifSinCos => 32usize,
+            HashType::PDBMotifHalf => 32usize,
             HashType::TrRosetta => 64usize,
             HashType::FoldDiscoDefault => 64usize,
             HashType::Default32bit => 32usize,
@@ -69,6 +73,7 @@ impl HashType {
             hash_type = match line.as_str() {
                 "PDBMotif" => HashType::PDBMotif,
                 "PDBMotifSinCos" => HashType::PDBMotifSinCos,
+                "PDBMotifHalf" => HashType::PDBMotifHalf,
                 "TrRosetta" => HashType::TrRosetta,
                 "FoldDiscoDefault" => HashType::FoldDiscoDefault,
                 "Default32bit" => HashType::Default32bit,
@@ -90,6 +95,7 @@ mod tests {
         let hash_type_vec = vec![
             HashType::PDBMotif,
             HashType::PDBMotifSinCos,
+            HashType::PDBMotifHalf,
             HashType::TrRosetta,
             HashType::FoldDiscoDefault,
             HashType::Default32bit,
@@ -108,6 +114,7 @@ mod tests {
 pub enum GeometricHash {
     PDBMotif(super::pdb_motif::HashValue),
     PDBMotifSinCos(super::pdb_motif_sincos::HashValue),
+    PDBMotifHalf(super::pdb_halfmatch::HashValue),
     TrRosetta(super::trrosetta::HashValue),
     FoldDiscoDefault(super::default::HashValue),
     Default32bit(super::default_32bit::HashValue),
@@ -125,6 +132,9 @@ impl GeometricHash {
             ),
             HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
                 super::pdb_motif_sincos::HashValue::perfect_hash_default(feature)
+            ),
+            HashType::PDBMotifHalf => GeometricHash::PDBMotifHalf(
+                super::pdb_halfmatch::HashValue::perfect_hash_default(feature)
             ),
             HashType::TrRosetta => GeometricHash::TrRosetta(
                 super::trrosetta::HashValue::perfect_hash_default(feature)
@@ -154,6 +164,11 @@ impl GeometricHash {
                 ),
                 HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
                     super::pdb_motif_sincos::HashValue::perfect_hash(
+                        feature, nbin_dist, nbin_angle
+                    )
+                ),
+                HashType::PDBMotifHalf => GeometricHash::PDBMotifHalf(
+                    super::pdb_halfmatch::HashValue::perfect_hash(
                         feature, nbin_dist, nbin_angle
                     )
                 ),
@@ -187,6 +202,7 @@ impl GeometricHash {
         match self {
             GeometricHash::PDBMotif(hash) => hash.reverse_hash_default(),
             GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash_default(),
+            GeometricHash::PDBMotifHalf(hash) => hash.reverse_hash_default(),
             GeometricHash::TrRosetta(hash) => hash.reverse_hash_default(),
             GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash_default(),
             GeometricHash::Default32bit(hash) => hash.reverse_hash_default(),
@@ -200,6 +216,7 @@ impl GeometricHash {
         match self {
             GeometricHash::PDBMotif(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            GeometricHash::PDBMotifHalf(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::TrRosetta(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::Default32bit(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
@@ -213,6 +230,7 @@ impl GeometricHash {
         match self {
             GeometricHash::PDBMotif(hash) => hash.hash_type(),
             GeometricHash::PDBMotifSinCos(hash) => hash.hash_type(),
+            GeometricHash::PDBMotifHalf(hash) => hash.hash_type(),
             GeometricHash::TrRosetta(hash) => hash.hash_type(),
             GeometricHash::FoldDiscoDefault(hash) => hash.hash_type(),
             GeometricHash::Default32bit(hash) => hash.hash_type(),
@@ -229,6 +247,9 @@ impl GeometricHash {
             ),
             HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
                 super::pdb_motif_sincos::HashValue::from_u32(hashvalue)
+            ),
+            HashType::PDBMotifHalf => GeometricHash::PDBMotifHalf(
+                super::pdb_halfmatch::HashValue::from_u32(hashvalue)
             ),
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
                 super::ppf::HashValue::from_u32(hashvalue)
@@ -248,6 +269,9 @@ impl GeometricHash {
             ),
             HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
                 super::pdb_motif_sincos::HashValue::from_u64(hashvalue)
+            ),
+            HashType::PDBMotifHalf => GeometricHash::PDBMotifHalf(
+                super::pdb_halfmatch::HashValue::from_u64(hashvalue)
             ),
             HashType::TrRosetta => GeometricHash::TrRosetta(
                 super::trrosetta::HashValue::from_u64(hashvalue)
@@ -270,6 +294,7 @@ impl GeometricHash {
         match self {
             GeometricHash::PDBMotif(hash) => hash.as_u32(),
             GeometricHash::PDBMotifSinCos(hash) => hash.as_u32(),
+            GeometricHash::PDBMotifHalf(hash) => hash.as_u32(),
             GeometricHash::PointPairFeature(hash) => hash.as_u32(),
             GeometricHash::Default32bit(hash) => hash.as_u32(),
             // append new hash type here
@@ -280,6 +305,7 @@ impl GeometricHash {
         match self {
             GeometricHash::PDBMotif(hash) => hash.as_u64(),
             GeometricHash::PDBMotifSinCos(hash) => hash.as_u64(),
+            GeometricHash::PDBMotifHalf(hash) => hash.as_u64(),
             GeometricHash::TrRosetta(hash) => hash.as_u64(),
             GeometricHash::FoldDiscoDefault(hash) => hash.as_u64(),
             GeometricHash::Default32bit(hash) => hash.as_u64(),
@@ -298,6 +324,12 @@ impl GeometricHash {
     pub fn downcast_pdb_motif_sincos(&self) -> super::pdb_motif_sincos::HashValue {
         match self {
             GeometricHash::PDBMotifSinCos(hash) => hash.clone(),
+            _ => panic!("Invalid hash type"),
+        }
+    }
+    pub fn downcast_pdb_motif_half(&self) -> super::pdb_halfmatch::HashValue {
+        match self {
+            GeometricHash::PDBMotifHalf(hash) => hash.clone(),
             _ => panic!("Invalid hash type"),
         }
     }
@@ -338,6 +370,9 @@ impl fmt::Debug for GeometricHash {
             GeometricHash::PDBMotifSinCos(hash) => {
                 write!(f, "PDBMotifSinCos({:?})", hash)
             },
+            GeometricHash::PDBMotifHalf(hash) => {
+                write!(f, "PDBMotifHalf({:?})", hash)
+            },
             GeometricHash::TrRosetta(hash) => {
                 write!(f, "TrRosetta({:?})", hash)
             },
@@ -364,6 +399,9 @@ impl fmt::Display for GeometricHash {
             },
             GeometricHash::PDBMotifSinCos(hash) => {
                 write!(f, "PDBMotifSinCos\t{:?}", hash)
+            },
+            GeometricHash::PDBMotifHalf(hash) => {
+                write!(f, "PDBMotifHalf\t{:?}", hash)
             },
             GeometricHash::TrRosetta(hash) => {
                 write!(f, "TrRosetta\t{:?}", hash)

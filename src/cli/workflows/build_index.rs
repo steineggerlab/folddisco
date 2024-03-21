@@ -81,6 +81,7 @@ pub fn build_index(env: AppArgs) {
                     );
                 }
                 let hash_type = HashType::get_with_str(hash_type.as_str());
+                if verbose { print_log_msg(INFO, &format!("Hash type: {:?}", hash_type)); }
                 let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);
 
                 pdb_path_chunks.into_iter().enumerate().for_each(|(i, pdb_path_vec)| {
@@ -141,11 +142,11 @@ mod tests {
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
-        let hash_type = "pdb";
+        let hash_type = "pdbhalf";
         let index_path = "data/serine_peptidases_pdb";
         let num_threads = 1;
-        let num_bin_dist = 16;
-        let num_bin_angle = 6;
+        let num_bin_dist = 8;
+        let num_bin_angle = 3;
         let chunk_size = 30;
         let max_residue = 3000;
         let recursive = true;

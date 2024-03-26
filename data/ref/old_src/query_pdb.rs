@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use crate::cli::workflows::config::read_config_from_file;
 use crate::cli::*;
 use crate::controller::io::{get_values_with_offset, get_values_with_offset_u16, read_offset_map, read_u16_vector, read_usize_vector};
-use crate::controller::query::{make_query_map, parse_threshold_string};
+use crate::controller::query::parse_threshold_string;
 use crate::controller::retrieve::{connected, hash_vec_to_aa_pairs, res_vec_as_string, retrieve_residue_with_hash};
 use crate::index::lookup::{load_lookup_from_file};
 use crate::prelude::*;
@@ -116,15 +116,10 @@ pub fn query_pdb(env: AppArgs) {
                     let angle_thresholds = parse_threshold_string(angle_threshold.clone());
                     // Make query with pdb
                     let query_residues = parse_query_string(&query_string, structure.chains[0]);
-                    // let pdb_query =  measure_time!(make_query(
-                    //     &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, exact_match, dist_thresholds, angle_thresholds
-                    // ));
-                    // NOTE: testing with new querying scheme that checks the node coverage
-                    let pdb_query_map =  measure_time!(make_query_map(
-                        &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, dist_thresholds, angle_thresholds
+                    let pdb_query =  measure_time!(make_query(
+                        &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, exact_match, dist_thresholds, angle_thresholds
                     ));
-                    let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();
-
+                    
                     // Load index table
                     // let (mmap, value_vec) = measure_time!(read_usize_vector(&value_path).expect("[ERROR] Failed to load value vector"));
                     let (mmap, value_vec) = measure_time!(read_u16_vector(&value_path).expect("[ERROR] Failed to load value vector"));
@@ -135,66 +130,46 @@ pub fn query_pdb(env: AppArgs) {
                     // let (path_vec, numeric_id_vec, optional_vec) = measure_time!(load_lookup_from_file(&lookup_path));
                     let lookup = measure_time!(load_lookup_from_file(&lookup_path));
                     
-                    // Make union of values queried
-                    // Query count map: nid -> (count, idf, nres, plddt, node_set, edge_set, exact_match_count, overflow_count)
-                    let mut query_count_map: HashMap<usize, (usize, f32, usize, f32, HashSet<usize>, HashSet<(usize, usize)>, usize, usize)> = HashMap::new();
+                    
+                    // Get offset from offset_table with query
+                    let mut offset_to_query = Vec::new();
                     for i in 0..pdb_query.len() {
                         let offset = offset_table.get(&pdb_query[i]);
+                        // Get offset map values
                         if offset.is_none() {
                             continue;
+                        } else {
+                            offset_to_query.push(*offset.unwrap());
                         }
-                        let offset = *offset.unwrap();
-                        let edge_info = pdb_query_map.get(&pdb_query[i]).unwrap();
-                        let is_exact = edge_info.1;
-                        let edge = edge_info.0;
+                    }
+                    
+                    // Make union of values queried
+                    let mut query_count_map: HashMap<usize, (usize, f32, usize, f32)> = HashMap::new();
+                    for i in 0..offset_to_query.len() {
                         // let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
-                        let single_queried_values = get_values_with_offset_u16(&value_vec, offset.0, offset.1);
-                        let hash_count = offset.1;
+                        let single_queried_values = get_values_with_offset_u16(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
+                        let hash_count = offset_to_query[i].1;
                         for j in 0..single_queried_values.len() {
                             let nid = lookup.1[single_queried_values[j] as usize];
                             let nres = lookup.2[single_queried_values[j] as usize];
                             let plddt = lookup.3[single_queried_values[j] as usize];
-                            
                             if nres > num_res_cutoff || plddt < plddt_cutoff {
                                 continue;
                             }
                             let count = query_count_map.get(&nid);
                             // Added calculation of idf
                             let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
-                            // TODO: Check if normalization is done per match or per query
-                            let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
-                            let nres_penalty = (nres as f32).log2() * -0.5;
+                            let nres_norm = (nres as f32).log2() * -4.0 + 50.0;
                             if count.is_none() {
-                                let mut node_set = HashSet::new();
-                                node_set.insert(edge.0);
-                                node_set.insert(edge.1);
-                                let mut edge_set = HashSet::new();
-                                edge_set.insert(edge);
-                                let exact_match_count = if is_exact { 1usize } else { 0usize };
-                                let overflow_count = 0usize;
-                                query_count_map.insert(nid, (1, idf + nres_norm, nres, plddt, node_set, edge_set, exact_match_count, overflow_count));
+                                query_count_map.insert(nid, (1, idf + nres_norm, nres, plddt));
                             } else {
-                                // Update node set and edge set
-                                let mut node_set = count.unwrap().4.clone();
-                                node_set.insert(edge.0);
-                                node_set.insert(edge.1);
-                                let mut edge_set = count.unwrap().5.clone();
-                                // If edge is already in the set, it is an overflow. Check edge set contains the edge
-                                let is_overflow: bool = edge_set.contains(&edge);
-                                edge_set.insert(edge);
-                                let exact_match_count = if is_exact { count.unwrap().6 + 1 } else { count.unwrap().6 };
-                                let overflow_count = if is_overflow { count.unwrap().7 + 1 } else { count.unwrap().7 };
-                                let idf_norm = if is_overflow { idf + nres_penalty } else { idf + nres_norm };
-                                // query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1 + nres_norm, nres, plddt));
-                                query_count_map.insert(nid, (count.unwrap().0 + 1, idf_norm + count.unwrap().1, nres, plddt, node_set, edge_set, exact_match_count, overflow_count));
+                                query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1, nres, plddt));
                             }
                         }
                     }
                     // Sort by count and print
                     let mut query_count_vec: Vec<_> = query_count_map.iter().collect();
-                    // Nested sorting by idf & exact match count
                     query_count_vec.sort_by(|a, b| b.1.1.partial_cmp(&a.1.1).unwrap());
-
                     let count_cut = match_cutoff.round() as usize;
                     // let count_cut = 0;
                     let hash_set: HashSet<GeometricHash> = pdb_query.iter().cloned().collect();
@@ -219,11 +194,7 @@ pub fn query_pdb(env: AppArgs) {
                                 if count.1 < score_cutoff {
                                     continue;
                                 }
-                                println!(
-                                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
-                                    lookup.0[*nid], count.0, count.1, count.2, count.3,
-                                    count.4.len(), count.5.len(), count.6, count.7
-                                );
+                                println!("{}\t{}\t{}\t{}\t{}", lookup.0[*nid], count.0, count.1, count.2, count.3);
                             }
                         }
                     }
@@ -251,7 +222,7 @@ mod tests {
         let index_path = Some(String::from("data/serine_peptidases_pdb"));
         let exact_match = false;
         let retrieve = false;
-        let dist_threshold = Some(String::from("0.5,1.0"));
+        let dist_threshold = Some(String::from("0.5"));
         let angle_threshold = Some(String::from("5.0,10.0,15.0"));
         let help = false;
         let match_cutoff = 0.0;

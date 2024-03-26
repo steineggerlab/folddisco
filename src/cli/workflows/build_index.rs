@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
-        let hash_type = "pdbhalf";
+        let hash_type = "pdb";
         let index_path = "data/serine_peptidases_pdb";
         let num_threads = 1;
         let num_bin_dist = 8;

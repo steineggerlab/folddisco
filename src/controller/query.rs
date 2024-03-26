@@ -144,7 +144,7 @@ pub fn make_query_map(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
     nbin_dist: usize, nbin_angle: usize, dist_thresholds: Vec<f32>, angle_thresholds: Vec<f32>
 ) -> HashMap<GeometricHash, ((usize, usize), bool)> {
-    let check_neighboring_index: bool = true;
+
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
     let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
     let compact = compact.to_compact();
@@ -171,16 +171,6 @@ pub fn make_query_map(
             print_log_msg(INFO, &format!("Found residue: {}:{:?}({})", chain as char, ri, residue));
             indices.push(index);
         }
-        if check_neighboring_index {
-            let index = compact.get_index(&chain, &(ri + 1));
-            if let Some(index) = index {
-                indices.push(index);
-            }
-            let index = compact.get_index(&chain, &(ri - 1));
-            if let Some(index) = index {
-                indices.push(index);
-            }
-        }
     }
     let dist_indices = hash_type.dist_index();
     let angle_indices = hash_type.angle_index();
@@ -193,7 +183,7 @@ pub fn make_query_map(
         let feature = get_single_feature(
             indices[i], indices[j], &compact, hash_type
         );
-
+        
         if feature.is_some() {
             let feature = feature.unwrap();
             let feature_clone = feature.clone();

@@ -162,8 +162,7 @@ pub fn query_pdb(env: AppArgs) {
                             // Added calculation of idf
                             let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
                             // TODO: Check if normalization is done per match or per query
-                            let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
-                            let nres_penalty = (nres as f32).log2() * -0.5;
+                            let nres_norm = (nres as f32).log2() * -0.5 + 6.0;
                             if count.is_none() {
                                 let mut node_set = HashSet::new();
                                 node_set.insert(edge.0);
@@ -184,9 +183,9 @@ pub fn query_pdb(env: AppArgs) {
                                 edge_set.insert(edge);
                                 let exact_match_count = if is_exact { count.unwrap().6 + 1 } else { count.unwrap().6 };
                                 let overflow_count = if is_overflow { count.unwrap().7 + 1 } else { count.unwrap().7 };
-                                let idf_norm = if is_overflow { idf + nres_penalty } else { idf + nres_norm };
+                                let idf = if is_exact { idf + nres_norm } else { (idf + nres_norm) / (1.5 + (overflow_count * overflow_count) as f32) };
                                 // query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1 + nres_norm, nres, plddt));
-                                query_count_map.insert(nid, (count.unwrap().0 + 1, idf_norm + count.unwrap().1, nres, plddt, node_set, edge_set, exact_match_count, overflow_count));
+                                query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1, nres, plddt, node_set, edge_set, exact_match_count, overflow_count));
                             }
                         }
                     }

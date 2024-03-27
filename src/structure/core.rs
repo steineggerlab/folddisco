@@ -431,6 +431,29 @@ impl CompactStructure {
         }
     }
     
+    pub fn get_pdb_tr_feature(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
+        let ca1 = self.get_ca(idx1);
+        let ca2 = self.get_ca(idx2);
+        let cb1 = self.get_cb(idx1);
+        let cb2 = self.get_cb(idx2);
+        let n1 = self.get_n(idx1);
+        let n2 = self.get_n(idx2);
+        if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2)) =
+            (ca1, ca2, cb1, cb2, n1, n2)
+        {
+
+            let ca_dist =self.get_ca_distance(idx1, idx2).unwrap();
+            let cb_dist = self.get_cb_distance(idx1, idx2).unwrap();
+            let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2).unwrap().to_radians();
+            let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
+            let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
+            let feature = vec![ca_dist, cb_dist, ca_cb_angle, theta1, theta2];
+            Some(feature)
+        } else {
+            None
+        }
+    }
+    
     pub fn get_bfactor(&self, idx: usize) -> f32 {
         self.b_factors[idx]
     }

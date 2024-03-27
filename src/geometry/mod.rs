@@ -7,3 +7,4 @@ pub mod pdb_halfmatch;
 pub mod ppf;
 pub mod trrosetta;
 pub mod util;
+pub mod pdb_tr;

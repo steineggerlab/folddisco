@@ -145,7 +145,7 @@ mod tests {
         let hash_type = "pdb";
         let index_path = "data/serine_peptidases_pdb";
         let num_threads = 1;
-        let num_bin_dist = 8;
+        let num_bin_dist = 16;
         let num_bin_angle = 3;
         let chunk_size = 30;
         let max_residue = 3000;

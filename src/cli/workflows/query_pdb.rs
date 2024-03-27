@@ -247,10 +247,10 @@ mod tests {
         let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let query_string = String::from("B57,B102,C195");
         let threads = 1;
-        let index_path = Some(String::from("data/serine_peptidases_pdb"));
+        let index_path = Some(String::from("data/serine_peptidases_pdbtr"));
         let exact_match = false;
         let retrieve = false;
-        let dist_threshold = Some(String::from("0.5"));
+        let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;
         let match_cutoff = 0.0;

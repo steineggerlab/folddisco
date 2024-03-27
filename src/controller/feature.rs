@@ -94,6 +94,21 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
                 None
             }
         }
+        HashType::PDBTrRosetta => {
+            let feature = structure.get_pdb_tr_feature(i, j);
+            if feature.is_some() {
+                let mut feature = feature.unwrap();
+                if feature[0] > 20.0 {
+                    None
+                } else {
+                    feature.insert(0, res1);
+                    feature.insert(1, res2);
+                    Some(feature)
+                }
+            } else {
+                None
+            }
+        }
         // append new hash type here
         _ => {
             None
@@ -169,14 +184,15 @@ impl HashType {
         match self {
             HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf |
             HashType::FoldDiscoDefault | HashType::Default32bit | 
-            HashType::PointPairFeature => Some(vec![0, 1]),
+            HashType::PointPairFeature | HashType::PDBTrRosetta => Some(vec![0, 1]), 
             _ => None
         }
     }
 
     pub fn dist_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf => Some(vec![2, 3]),
+            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf |
+            HashType::PDBTrRosetta  => Some(vec![2, 3]),
             HashType::FoldDiscoDefault | HashType::Default32bit |
             HashType::PointPairFeature => Some(vec![2]),
             HashType::TrRosetta => Some(vec![0]),
@@ -190,6 +206,7 @@ impl HashType {
             HashType::TrRosetta => Some(vec![1, 2, 3, 4, 5]),
             HashType::FoldDiscoDefault | HashType::Default32bit => Some(vec![3, 4, 5, 6, 7]),
             HashType::PointPairFeature => Some(vec![3, 4, 5]),
+            HashType::PDBTrRosetta => Some(vec![4, 5, 6]), 
             _ => None
         }
     }

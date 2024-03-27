@@ -14,6 +14,7 @@ pub enum HashType {
     FoldDiscoDefault,
     Default32bit,
     PointPairFeature,
+    PDBTrRosetta,
     // append new hash type here
     Other,
 }
@@ -28,6 +29,7 @@ impl HashType {
             4 => HashType::FoldDiscoDefault,
             5 => HashType::Default32bit,
             6 => HashType::PointPairFeature,
+            7 => HashType::PDBTrRosetta,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -41,6 +43,7 @@ impl HashType {
             "4" | "FoldDiscoDefault" | "default" => HashType::FoldDiscoDefault,
             "5" | "Default32bit" | "default32" => HashType::Default32bit,
             "6" | "PointPairFeature" | "ppf" => HashType::PointPairFeature,
+            "7" | "PDBTrRosetta" | "pdbtr" => HashType::PDBTrRosetta,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -54,6 +57,7 @@ impl HashType {
             HashType::FoldDiscoDefault => 64usize,
             HashType::Default32bit => 32usize,
             HashType::PointPairFeature => 32usize,
+            HashType::PDBTrRosetta => 32usize,
             // append new hash type here
             HashType::Other => 0usize,
         }
@@ -78,6 +82,7 @@ impl HashType {
                 "FoldDiscoDefault" => HashType::FoldDiscoDefault,
                 "Default32bit" => HashType::Default32bit,
                 "PointPairFeature" => HashType::PointPairFeature,
+                "PDBTrRosetta" => HashType::PDBTrRosetta,
                 // append new hash type here
                 _ => HashType::Other,
             };
@@ -100,6 +105,7 @@ mod tests {
             HashType::FoldDiscoDefault,
             HashType::Default32bit,
             HashType::PointPairFeature,
+            HashType::PDBTrRosetta,
             // append new hash type here
         ];
         for hash_type in hash_type_vec {
@@ -119,6 +125,7 @@ pub enum GeometricHash {
     FoldDiscoDefault(super::default::HashValue),
     Default32bit(super::default_32bit::HashValue),
     PointPairFeature(super::ppf::HashValue),
+    PDBTrRosetta(super::pdb_tr::HashValue),
     // append new hash type here
 }
 
@@ -147,6 +154,9 @@ impl GeometricHash {
             ),
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
                 super::ppf::HashValue::perfect_hash_default(feature)
+            ),
+            HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
+                super::pdb_tr::HashValue::perfect_hash_default(feature)
             ),
             // append new hash type here
             _ => panic!("Invalid hash type"),
@@ -192,6 +202,11 @@ impl GeometricHash {
                         feature, nbin_dist, nbin_angle
                     )
                 ),
+                HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
+                    super::pdb_tr::HashValue::perfect_hash(
+                        feature, nbin_dist, nbin_angle
+                    )
+                ),
                 // append new hash type here
                 _ => panic!("Invalid hash type"),
             }
@@ -207,6 +222,7 @@ impl GeometricHash {
             GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash_default(),
             GeometricHash::Default32bit(hash) => hash.reverse_hash_default(),
             GeometricHash::PointPairFeature(hash) => hash.reverse_hash_default(),
+            GeometricHash::PDBTrRosetta(hash) => hash.reverse_hash_default(),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -221,6 +237,7 @@ impl GeometricHash {
             GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::Default32bit(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::PointPairFeature(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            GeometricHash::PDBTrRosetta(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -235,6 +252,7 @@ impl GeometricHash {
             GeometricHash::FoldDiscoDefault(hash) => hash.hash_type(),
             GeometricHash::Default32bit(hash) => hash.hash_type(),
             GeometricHash::PointPairFeature(hash) => hash.hash_type(),
+            GeometricHash::PDBTrRosetta(hash) => hash.hash_type(),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -256,6 +274,9 @@ impl GeometricHash {
             ),
             HashType::Default32bit => GeometricHash::Default32bit(
                 super::default_32bit::HashValue::from_u32(hashvalue)
+            ),
+            HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
+                super::pdb_tr::HashValue::from_u32(hashvalue)
             ),
             // append new hash type here if it is encoded as u32
             _ => panic!("Invalid hash type"),
@@ -285,6 +306,9 @@ impl GeometricHash {
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
                 super::ppf::HashValue::from_u64(hashvalue)
             ),
+            HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
+                super::pdb_tr::HashValue::from_u64(hashvalue)
+            ),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -297,6 +321,7 @@ impl GeometricHash {
             GeometricHash::PDBMotifHalf(hash) => hash.as_u32(),
             GeometricHash::PointPairFeature(hash) => hash.as_u32(),
             GeometricHash::Default32bit(hash) => hash.as_u32(),
+            GeometricHash::PDBTrRosetta(hash) => hash.as_u32(),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -310,6 +335,7 @@ impl GeometricHash {
             GeometricHash::FoldDiscoDefault(hash) => hash.as_u64(),
             GeometricHash::Default32bit(hash) => hash.as_u64(),
             GeometricHash::PointPairFeature(hash) => hash.as_u64(),
+            GeometricHash::PDBTrRosetta(hash) => hash.as_u64(),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -357,6 +383,12 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
+    pub fn downcast_pdb_tr(&self) -> super::pdb_tr::HashValue {
+        match self {
+            GeometricHash::PDBTrRosetta(hash) => hash.clone(),
+            _ => panic!("Invalid hash type"),
+        }
+    }
     // append the downcast method for new hash type here
 
 }
@@ -384,6 +416,9 @@ impl fmt::Debug for GeometricHash {
             },
             GeometricHash::PointPairFeature(hash) => {
                 write!(f, "PointPairFeature({:?})", hash)
+            },
+            GeometricHash::PDBTrRosetta(hash) => {
+                write!(f, "PDBTrRosetta({:?})", hash)
             },
             // append new hash type here
             _ => panic!("Invalid hash type"),
@@ -414,6 +449,9 @@ impl fmt::Display for GeometricHash {
             },
             GeometricHash::PointPairFeature(hash) => {
                 write!(f, "PointPairFeature\t{:?}", hash)
+            },
+            GeometricHash::PDBTrRosetta(hash) => {
+                write!(f, "PDBTrRosetta\t{:?}", hash)
             },
             // append new hash type here
             _ => panic!("Invalid hash type"),

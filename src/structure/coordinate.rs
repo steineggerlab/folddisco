@@ -242,13 +242,49 @@ impl CoordinateVector {
         }
         torsion_angles
     }
+    
+    pub fn min_coord(&self) -> (f32, f32, f32) {
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut min_z = f32::MAX;
+        for i in 0..self.size {
+            if self.x[i] < min_x {
+                min_x = self.x[i];
+            }
+            if self.y[i] < min_y {
+                min_y = self.y[i];
+            }
+            if self.z[i] < min_z {
+                min_z = self.z[i];
+            }
+        }
+        (min_x, min_y, min_z)
+    }
+    pub fn max_coord(&self) -> (f32, f32, f32) {
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+        let mut max_z = f32::MIN;
+        for i in 0..self.size {
+            if self.x[i] > max_x {
+                max_x = self.x[i];
+            }
+            if self.y[i] > max_y {
+                max_y = self.y[i];
+            }
+            if self.z[i] > max_z {
+                max_z = self.z[i];
+            }
+        }
+        (max_x, max_y, max_z)
+    }
+
 }
 
 #[derive(Debug, Clone)]
 pub struct CarbonCoordinateVector {
-    x: Vec<Option<f32>>,
-    y: Vec<Option<f32>>,
-    z: Vec<Option<f32>>,
+    pub x: Vec<Option<f32>>,
+    pub y: Vec<Option<f32>>,
+    pub z: Vec<Option<f32>>,
 }
 
 impl CarbonCoordinateVector {
@@ -336,7 +372,58 @@ impl CarbonCoordinateVector {
         }
         torsion_angles
     }
-
+    pub fn min_coord(&self) -> (f32, f32, f32) {
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut min_z = f32::MAX;
+        for i in 0..self.x.len() {
+            if self.x[i].is_none() {
+                continue;
+            }
+            if self.x[i].unwrap() < min_x {
+                min_x = self.x[i].unwrap();
+            }
+            if self.y[i].is_none() {
+                continue;
+            }
+            if self.y[i].unwrap() < min_y {
+                min_y = self.y[i].unwrap();
+            }
+            if self.z[i].is_none() {
+                continue;
+            }
+            if self.z[i].unwrap() < min_z {
+                min_z = self.z[i].unwrap();
+            }
+        }
+        (min_x, min_y, min_z)
+    }
+    pub fn max_coord(&self) -> (f32, f32, f32) {
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+        let mut max_z = f32::MIN;
+        for i in 0..self.x.len() {
+            if self.x[i].is_none() {
+                continue;
+            }
+            if self.x[i].unwrap() > max_x {
+                max_x = self.x[i].unwrap();
+            }
+            if self.y[i].is_none() {
+                continue;
+            }
+            if self.y[i].unwrap() > max_y {
+                max_y = self.y[i].unwrap();
+            }
+            if self.z[i].is_none() {
+                continue;
+            }
+            if self.z[i].unwrap() > max_z {
+                max_z = self.z[i].unwrap();
+            }
+        }
+        (max_x, max_y, max_z)
+    }
 }
 
 impl Iterator for CarbonCoordinateVector {

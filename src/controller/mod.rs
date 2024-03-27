@@ -25,7 +25,7 @@ use crate::controller::feature::get_geometric_hash_from_structure;
 
 const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
-const DEFAULT_HASH_TYPE: HashType = HashType::PDBMotifSinCos;
+const DEFAULT_HASH_TYPE: HashType = HashType::PDBTrRosetta;
 const DEFAULT_MAX_RESIDUE: usize = 5000;
 
 

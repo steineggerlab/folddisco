@@ -1,13 +1,9 @@
 # Development note
 
-## TODOs 240315
-INDEX
-- [x] DONE:saving residue count & average plddt (for AFDB) to lookup
-    - [ ] Filter
+## TODOs 240327
 
 IMPORTANT: BENCHMARK 
-- [x] To reduce FPs, filtering out & weighting long structures matter
-  - [ ] TODO: scoring metric that takes into account the length of the structure & IDFs
+- [ ] TODO: scoring metric that takes into account the length of the structure & IDFs
 
 DEV
 - [ ] TODO: Split and extract ranking module

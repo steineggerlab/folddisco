@@ -137,6 +137,27 @@ mod tests {
         let compact = structure.to_compact();
         assert_eq!(compact.num_residues, 49);
     }
+    #[test]
+    fn test_get_min_max_coords() {
+        let path = Path::new("data/homeobox/1akha-.pdb");
+        // let path = Path::new("analysis/3jb9.pdb");
+        let file = File::open(&path).unwrap();
+        let reader = Reader::new(file);
+        let structure = reader.read_structure().unwrap();
+        let compact = structure.to_compact();
+        let min = compact.ca_vector.min_coord();
+        let max = compact.ca_vector.max_coord();
+        let len = compact.ca_vector.x.len();
+        // Distance between min and max
+        let dist = (max.0 - min.0, max.1 - min.1, max.2 - min.2);
+        // let dist = (dist.0.powi(2) + dist.1.powi(2) + dist.2.powi(2)).sqrt();
+        let x_bin = (max.0 - min.0) / 1.0;
+        let y_bin = (max.1 - min.1) / 1.0;
+        let z_bin = (max.2 - min.2) / 1.0;
+        println!("Min: {:?}, Max: {:?}, len: {}, dist: {:?}, x_bin: {}, y_bin: {}, z_bin: {}", min, max, len, dist, x_bin, y_bin, z_bin);
+    }
+    
+    
     
     #[test]
     fn test_read_pdb_gz() {

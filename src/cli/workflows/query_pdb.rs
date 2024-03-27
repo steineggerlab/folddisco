@@ -162,7 +162,7 @@ pub fn query_pdb(env: AppArgs) {
                             // Added calculation of idf
                             let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
                             // TODO: Check if normalization is done per match or per query
-                            let nres_norm = (nres as f32).log2() * -0.5 + 6.0;
+                            let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
                             if count.is_none() {
                                 let mut node_set = HashSet::new();
                                 node_set.insert(edge.0);

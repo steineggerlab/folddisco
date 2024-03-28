@@ -126,7 +126,7 @@ mod tests {
         let grid_index_vector = get_grid_index_vector_from_compact(&compact, 20.0);
         // let grid_index_tuple_vector: Vec<(u8, u8, u8)> = grid_index_vector.iter().map(|&index| grid_index_to_tuple(index)).collect();
         println!("{:?}", grid_index_vector);
-        let grid_distance_vector: Vec<u8> = grid_index_vector.iter().map(|&index| grid_distance_square(index, grid_index_vector[150])).collect();
+        let grid_distance_vector: Vec<u8> = grid_index_vector.iter().map(|&index| grid_distance_square(index, grid_index_vector[0])).collect();
         println!("{:?}", grid_distance_vector);
         // Count the elements in grid_distance_vector less or equal than root3
         let count = grid_distance_vector.iter().filter(|&&dist| dist <= 3).count();

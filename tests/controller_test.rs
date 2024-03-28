@@ -57,7 +57,7 @@ fn test_folddisco_pdbmotifsincos() {
     let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
     measure_time!(fold_disco.collect_hash_pairs());
     fold_disco.fill_numeric_id_vec();
-    let mut hashes = fold_disco.hash_id_pairs.clone();
+    let mut hashes = fold_disco.hash_id_grids.clone();
     // Get the memory usage of hashes
     let size = std::mem::size_of_val(&hashes);
     let total_size = std::mem::size_of_val(&hashes[0]) * hashes.len();

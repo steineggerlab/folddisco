@@ -80,7 +80,7 @@ pub fn build_index(env: AppArgs) {
                         )
                     );
                 }
-                let grid_width = 40.0;
+                let grid_width = 30.0;
                 let hash_type = HashType::get_with_str(hash_type.as_str());
                 if verbose { print_log_msg(INFO, &format!("Hash type: {:?}", hash_type)); }
                 let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);

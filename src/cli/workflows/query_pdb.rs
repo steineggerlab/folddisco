@@ -13,11 +13,12 @@ use rayon::prelude::*;
 
 use crate::cli::workflows::config::read_config_from_file;
 use crate::cli::*;
-use crate::controller::io::{get_values_with_offset, get_values_with_offset_u16, read_offset_map, read_u16_vector, read_usize_vector};
+use crate::controller::io::{get_values_with_offset, get_values_with_offset_u16, get_values_with_offset_u24, get_values_with_offset_u8, read_offset_map, read_u16_vector, read_u8_vector, read_usize_vector};
 use crate::controller::query::{make_query_map, parse_threshold_string};
 use crate::controller::retrieve::{connected, hash_vec_to_aa_pairs, res_vec_as_string, retrieve_residue_with_hash};
 use crate::index::lookup::{load_lookup_from_file};
 use crate::prelude::*;
+use crate::structure::grid::{convert_to_id_grid_vector, grid_index_to_tuple, nearby, tuple_to_grid_index};
 
 
 pub const HELP_QUERY: &str = "\
@@ -127,8 +128,8 @@ pub fn query_pdb(env: AppArgs) {
 
                     // Load index table
                     // let (mmap, value_vec) = measure_time!(read_usize_vector(&value_path).expect("[ERROR] Failed to load value vector"));
-                    let (mmap, value_vec) = measure_time!(read_u16_vector(&value_path).expect("[ERROR] Failed to load value vector"));
-                    
+                    let (mmap, value_vec) = measure_time!(read_u8_vector(&value_path).expect("[ERROR] Failed to load value vector"));
+
                     let offset_table = measure_time!(
                         read_offset_map(&offset_path, hash_type).expect("[ERROR] Failed to load offset table")
                     );
@@ -137,7 +138,7 @@ pub fn query_pdb(env: AppArgs) {
                     
                     // Make union of values queried
                     // Query count map: nid -> (count, idf, nres, plddt, node_set, edge_set, exact_match_count, overflow_count)
-                    let mut query_count_map: HashMap<usize, (usize, f32, usize, f32, HashSet<usize>, HashSet<(usize, usize)>, usize, usize)> = HashMap::new();
+                    let mut query_count_map: HashMap<usize, (usize, f32, usize, f32, HashSet<usize>, HashSet<(usize, usize)>, usize, usize, HashSet<(u8, u8, u8)>)> = HashMap::new();
                     for i in 0..pdb_query.len() {
                         let offset = offset_table.get(&pdb_query[i]);
                         if offset.is_none() {
@@ -148,13 +149,19 @@ pub fn query_pdb(env: AppArgs) {
                         let is_exact = edge_info.1;
                         let edge = edge_info.0;
                         // let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
-                        let single_queried_values = get_values_with_offset_u16(&value_vec, offset.0, offset.1);
+                        // let single_queried_values = get_values_with_offset_u16(&value_vec, offset.0, offset.1);
+                        let single_queried_values = get_values_with_offset_u24(value_vec, offset.0, offset.1);
+                        let single_queried_values = convert_to_id_grid_vector(single_queried_values);
                         let hash_count = offset.1;
                         for j in 0..single_queried_values.len() {
-                            let nid = lookup.1[single_queried_values[j] as usize];
-                            let nres = lookup.2[single_queried_values[j] as usize];
-                            let plddt = lookup.3[single_queried_values[j] as usize];
-                            
+                            // let nid = lookup.1[single_queried_values[j] as usize];
+                            // let nres = lookup.2[single_queried_values[j] as usize];
+                            // let plddt = lookup.3[single_queried_values[j] as usize];
+                            let nid = lookup.1[single_queried_values[j].0 as usize];
+                            let nres = lookup.2[single_queried_values[j].0 as usize];
+                            let plddt = lookup.3[single_queried_values[j].0 as usize];
+                            let grid_index = single_queried_values[j].1;
+
                             if nres > num_res_cutoff || plddt < plddt_cutoff {
                                 continue;
                             }
@@ -171,7 +178,9 @@ pub fn query_pdb(env: AppArgs) {
                                 edge_set.insert(edge);
                                 let exact_match_count = if is_exact { 1usize } else { 0usize };
                                 let overflow_count = 0usize;
-                                query_count_map.insert(nid, (1, idf + nres_norm, nres, plddt, node_set, edge_set, exact_match_count, overflow_count));
+                                let mut grid_index_vec = HashSet::new();
+                                grid_index_vec.insert(grid_index_to_tuple(grid_index));
+                                query_count_map.insert(nid, (1, idf + nres_norm, nres, plddt, node_set, edge_set, exact_match_count, overflow_count, grid_index_vec));
                             } else {
                                 // Update node set and edge set
                                 let mut node_set = count.unwrap().4.clone();
@@ -184,8 +193,10 @@ pub fn query_pdb(env: AppArgs) {
                                 let exact_match_count = if is_exact { count.unwrap().6 + 1 } else { count.unwrap().6 };
                                 let overflow_count = if is_overflow { count.unwrap().7 + 1 } else { count.unwrap().7 };
                                 let idf = if is_exact { idf + nres_norm } else { (idf + nres_norm) / (1.5 + (overflow_count * overflow_count) as f32) };
+                                let mut grid_index_vec = count.unwrap().8.clone();
+                                grid_index_vec.insert(grid_index_to_tuple(grid_index));
                                 // query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1 + nres_norm, nres, plddt));
-                                query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1, nres, plddt, node_set, edge_set, exact_match_count, overflow_count));
+                                query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1, nres, plddt, node_set, edge_set, exact_match_count, overflow_count, grid_index_vec));
                             }
                         }
                     }
@@ -219,9 +230,9 @@ pub fn query_pdb(env: AppArgs) {
                                     continue;
                                 }
                                 println!(
-                                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
+                                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
                                     lookup.0[*nid], count.0, count.1, count.2, count.3,
-                                    count.4.len(), count.5.len(), count.6, count.7
+                                    count.4.len(), count.5.len(), count.6, count.7, count.8.len(), count.8.iter().map(|&x| format!("{}{}{}", x.0, x.1, x.2)).collect::<Vec<String>>().join(";")
                                 );
                             }
                         }

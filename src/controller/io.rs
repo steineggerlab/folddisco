@@ -147,6 +147,11 @@ pub fn get_values_with_offset(vec: &[u64], offset: usize, length: usize) -> &[u6
 pub fn get_values_with_offset_u16(vec: &[u16], offset: usize, length: usize) -> &[u16] {
     &vec[offset..offset + length]
 }
+pub fn get_values_with_offset_u24(vec: &[u8], offset: usize, length: usize) -> &[u8] {
+    let offset = offset * 3;
+    let length = length * 3;
+    &vec[offset..offset + length]
+}
 pub fn get_values_with_offset_u32(vec: &[u32], offset: usize, length: usize) -> &[u32] {
     &vec[offset..offset + length]
 }
@@ -164,6 +169,7 @@ pub fn write_usize_vector_in_bits(path: &str, vec: &Vec<usize>, num_bits: usize)
     let total_size: u64 = match num_bits {
         8 => (size_of::<u8>() * vec.len()) as u64,
         16 => (size_of::<u16>() * vec.len()) as u64,
+        24 => (3 * vec.len()) as u64, // 3 bytes
         32 => (size_of::<u32>() * vec.len()) as u64,
         _ => { panic!("Invalid number of bits"); }
     };
@@ -183,6 +189,22 @@ pub fn write_usize_vector_in_bits(path: &str, vec: &Vec<usize>, num_bits: usize)
             let vec_u16 = vec.iter().map(|&x| x as u16).collect::<Vec<u16>>();
             let vec_bytes = unsafe { 
                 std::slice::from_raw_parts(vec_u16.as_ptr() as *const u8, 
+                total_size as usize) 
+            };
+            writer.write_all(vec_bytes)?;
+        },
+        24 => {
+            // Extract 3 bytes from usize as Vec<u8>
+            let vec_u8 = vec.iter().flat_map(|&x| {
+                // endianess is not considered. first 2bytes: id, last byte: grid index
+                let mut bytes = Vec::new();
+                bytes.push(((x >> 16) & 0xFF) as u8);
+                bytes.push(((x >> 8) & 0xFF) as u8);
+                bytes.push((x & 0xFF) as u8);
+                bytes
+            }).collect::<Vec<u8>>();
+            let vec_bytes = unsafe { 
+                std::slice::from_raw_parts(vec_u8.as_ptr() as *const u8, 
                 total_size as usize) 
             };
             writer.write_all(vec_bytes)?;
@@ -225,6 +247,7 @@ pub fn read_u16_vector(path: &str)-> Result<(Mmap, &'static [u16]), Error> {
     };
     Ok((mmap, vec))
 }
+
 pub fn read_u32_vector(path: &str)-> Result<(Mmap, &'static [u32]), Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };

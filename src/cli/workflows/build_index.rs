@@ -104,7 +104,8 @@ pub fn build_index(env: AppArgs) {
                             &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_grids.len(), PEAK_ALLOC.current_usage_as_mb())
                         );
                     }
-                    measure_time!(fold_disco.sort_hash_pairs());
+                    measure_time!(fold_disco.sort_hash_grids());
+                    // measure_time!(fold_disco.sort_hash_pairs());
                     if verbose { print_log_msg(INFO, &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
                     fold_disco.fill_numeric_id_vec();
                     let (offset_table, value_vec) =

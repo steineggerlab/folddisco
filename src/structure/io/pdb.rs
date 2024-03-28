@@ -139,8 +139,8 @@ mod tests {
     }
     #[test]
     fn test_get_min_max_coords() {
-        // let path = Path::new("data/homeobox/1akha-.pdb");
-        let path = Path::new("analysis/h_sapiens_pdb/AF-Q02817-F3-model_v4.pdb");
+        let path = Path::new("data/homeobox/1akha-.pdb");
+        // let path = Path::new("analysis/h_sapiens_pdb/AF-Q02817-F3-model_v4.pdb");
         let file = File::open(&path).unwrap();
         let reader = Reader::new(file);
         let structure = reader.read_structure().unwrap();

@@ -4,6 +4,7 @@
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
 use dashmap::DashMap;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rustc_hash::FxHashMap;
 use core::hash;
 use std::fs::{File, OpenOptions};
@@ -80,7 +81,7 @@ pub fn save_offset_vec(
     Ok(())
 }
 
-pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<GeometricHash, (usize, usize)>, Error> {
+pub fn read_offset_map_single(path: &str, hash_type: HashType) -> Result<DashMap<GeometricHash, (usize, usize)>, Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
     let hash_encoding_type = hash_type.encoding_type();
@@ -111,6 +112,43 @@ pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<Geomet
     }
     Ok(offset_map)
 }
+
+pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<GeometricHash, (usize, usize)>, Error> {
+    let file = File::open(path)?;
+    let mmap = unsafe { Mmap::map(&file)? };
+    let hash_encoding_type = hash_type.encoding_type();
+    let chunk_size = 16 + (hash_encoding_type / 8) as usize;
+    let chunks: Vec<_> = mmap.chunks(chunk_size).collect();
+
+    // Set number of threads
+    // rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
+    let offset_map: DashMap<_, _> = chunks.into_par_iter().filter_map(|chunk| {
+        let (key, w): (GeometricHash, usize) = match hash_encoding_type {
+            32 => {
+                (GeometricHash::from_u32(
+                    u32::from_le_bytes(chunk[0..4].try_into().unwrap()),
+                    hash_type
+                ), 4_usize)
+            },
+            64 => {
+                (GeometricHash::from_u64(
+                    u64::from_le_bytes(chunk[0..8].try_into().unwrap()),
+                    hash_type
+                ), 8_usize)
+            },
+            _ => { return None; }
+        };
+        let value = (
+            usize::from_le_bytes(chunk[w..w + 8].try_into().unwrap()),
+            usize::from_le_bytes(chunk[w + 8..w + 16].try_into().unwrap())
+        );
+        Some((key, value))
+    }).collect();
+
+    Ok(offset_map)
+}
+
+
 
 pub fn write_usize_vector(path: &str, vec: &Vec<usize>) -> Result<(), Error> {
     let mut file = OpenOptions::new()
@@ -289,7 +327,10 @@ mod tests {
     
     // #[test]
     // fn test_load_offset_map() {
-    //     let offset_map = measure_time!(read_offset_map("analysis/h_sapiens_db/d16a3/index.offset", HashType::PDBMotifSinCos).unwrap());
+    //     let offset_map = measure_time!(read_offset_map("index2.offset", HashType::Default32bit).unwrap());
+    //     println!("{:?}", *offset_map.get(&GeometricHash::from_u32(1581533403, HashType::Default32bit)).unwrap());
+    //     let offset_map = measure_time!(read_offset_map_single("index2.offset", HashType::Default32bit).unwrap());
+    //     println!("{:?}", *offset_map.get(&GeometricHash::from_u32(1581533403, HashType::Default32bit)).unwrap());
     // }
     
 }

@@ -353,21 +353,33 @@ impl CarbonCoordinateVector {
         }
         torsion_angles
     }
-    pub fn min_coord(&self) -> Coordinate {
-        let out = Coordinate {
-            x: self.x.iter().filter(|&x| x.is_some()).map(|x| x.unwrap()).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
-            y: self.y.iter().filter(|&y| y.is_some()).map(|y| y.unwrap()).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
-            z: self.z.iter().filter(|&z| z.is_some()).map(|z| z.unwrap()).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
-        };
-        out
+    pub fn min_coord(&self) -> Option<Coordinate> {
+        let x = self.x.iter().filter_map(|x| *x).min_by(|a, b| a.partial_cmp(b).unwrap());
+        let y = self.y.iter().filter_map(|y| *y).min_by(|a, b| a.partial_cmp(b).unwrap());
+        let z = self.z.iter().filter_map(|z| *z).min_by(|a, b| a.partial_cmp(b).unwrap());
+        if x.is_none() || y.is_none() || z.is_none() {
+            return None;
+        } else {
+            return Some(Coordinate {
+                x: x.unwrap(),
+                y: y.unwrap(),
+                z: z.unwrap(),
+            });
+        }
     }
-    pub fn max_coord(&self) -> Coordinate {
-        let out = Coordinate {
-            x: self.x.iter().filter(|&x| x.is_some()).map(|x| x.unwrap()).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
-            y: self.y.iter().filter(|&y| y.is_some()).map(|y| y.unwrap()).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
-            z: self.z.iter().filter(|&z| z.is_some()).map(|z| z.unwrap()).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
-        };
-        out
+    pub fn max_coord(&self) -> Option<Coordinate> {
+        let x = self.x.iter().filter_map(|x| *x).max_by(|a, b| a.partial_cmp(b).unwrap());
+        let y = self.y.iter().filter_map(|y| *y).max_by(|a, b| a.partial_cmp(b).unwrap());
+        let z = self.z.iter().filter_map(|z| *z).max_by(|a, b| a.partial_cmp(b).unwrap());
+        if x.is_none() || y.is_none() || z.is_none() {
+            return None;
+        } else {
+            return Some(Coordinate {
+                x: x.unwrap(),
+                y: y.unwrap(),
+                z: z.unwrap(),
+            });
+        }
     }
 }
 

@@ -147,6 +147,8 @@ mod tests {
         let compact = structure.to_compact();
         let min = compact.ca_vector.min_coord();
         let max = compact.ca_vector.max_coord();
+        let min = min.unwrap();
+        let max = max.unwrap();
         let len = compact.ca_vector.x.len();
         // Distance between min and max
         let dist = max.distance(&min);

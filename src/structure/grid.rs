@@ -7,17 +7,23 @@ use crate::structure::core::{Structure, CompactStructure};
 pub const MAX_GRID_SIZE: u8 = 6;
 pub const DEFAULT_GRID_WIDTH: f32 = 50.0;
 
-pub fn get_grid_count(compact: &CompactStructure, grid_width: f32) -> (Coordinate, Coordinate, Coordinate, Coordinate) {
+pub fn get_grid_count(compact: &CompactStructure, grid_width: f32) -> Option<(Coordinate, Coordinate, Coordinate, Coordinate)> {
     // Return min, max, bins
     let min = compact.ca_vector.min_coord();
     let max = compact.ca_vector.max_coord();
-    let diff = max.sub(&min);
-    let mut bins = diff.clone();
-    bins.x = (bins.x / grid_width).ceil().min(MAX_GRID_SIZE as f32);
-    bins.y = (bins.y / grid_width).ceil().min(MAX_GRID_SIZE as f32);
-    bins.z = (bins.z / grid_width).ceil().min(MAX_GRID_SIZE as f32);
-    let widths = Coordinate::new(diff.x / bins.x, diff.y / bins.y, diff.z / bins.z);
-    (min, max, bins, widths)
+    if min.is_none() || max.is_none() {
+        return None;
+    } else {
+        let min = min.unwrap();
+        let max = max.unwrap();
+        let diff = max.sub(&min);
+        let mut bins = diff.clone();
+        bins.x = (bins.x / grid_width).ceil().min(MAX_GRID_SIZE as f32);
+        bins.y = (bins.y / grid_width).ceil().min(MAX_GRID_SIZE as f32);
+        bins.z = (bins.z / grid_width).ceil().min(MAX_GRID_SIZE as f32);
+        let widths = Coordinate::new(diff.x / bins.x, diff.y / bins.y, diff.z / bins.z);
+        Some((min, max, bins, widths))
+    }
 }
 
 pub fn get_grid_index_as_tuple(coord: &Coordinate, min: &Coordinate, widths: &Coordinate, bins: &Coordinate) -> (u8, u8, u8) {
@@ -45,7 +51,11 @@ pub fn tuple_to_grid_index(tuple: (u8, u8, u8)) -> u8 {
 }
 
 pub fn get_grid_index_vector_from_compact(compact: &CompactStructure, grid_width: f32) -> Vec<u8> {
-    let (min, _, bins, widths) = get_grid_count(&compact, grid_width);
+    let grid_output = get_grid_count(&compact, grid_width);
+    if grid_output.is_none() {
+        return vec![0; compact.num_residues as usize];
+    }
+    let (min, _, bins, widths) = get_grid_count(&compact, grid_width).unwrap();
     let mut grid_index_vector: Vec<u8> = vec![0; compact.num_residues as usize];
     for i in 0..compact.num_residues {
         let ca = compact.get_ca(i);
@@ -121,7 +131,7 @@ mod tests {
         let structure = reader.read_structure().unwrap();
         let compact = structure.to_compact();
         println!("{:?}", compact.num_residues);
-        let (min, max, bins, widths) = get_grid_count(&compact, 20.0);
+        let (min, max, bins, widths) = get_grid_count(&compact, 20.0).unwrap();
         println!("Min: {:?}, Max: {:?}, Bins: {:?}, Widths: {:?}", min, max, bins, widths);
         let grid_index_vector = get_grid_index_vector_from_compact(&compact, 20.0);
         // let grid_index_tuple_vector: Vec<(u8, u8, u8)> = grid_index_vector.iter().map(|&index| grid_index_to_tuple(index)).collect();

@@ -80,6 +80,7 @@ pub fn build_index(env: AppArgs) {
                         )
                     );
                 }
+                let grid_width = 30.0;
                 let hash_type = HashType::get_with_str(hash_type.as_str());
                 if verbose { print_log_msg(INFO, &format!("Hash type: {:?}", hash_type)); }
                 let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);
@@ -94,26 +95,28 @@ pub fn build_index(env: AppArgs) {
                     };
                     let mut fold_disco = FoldDisco::new_with_params(
                         pdb_path_vec.to_vec(), hash_type, true, num_threads, 
-                        num_bin_dist, num_bin_angle, index_path.clone()
+                        num_bin_dist, num_bin_angle, index_path.clone(), grid_width,
                     );
                     measure_time!(fold_disco.collect_hash_pairs());
                     if verbose {
                         print_log_msg(INFO, 
-                            &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pairs.len(), PEAK_ALLOC.current_usage_as_mb())
+                            // &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pairs.len(), PEAK_ALLOC.current_usage_as_mb())
+                            &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_grids.len(), PEAK_ALLOC.current_usage_as_mb())
                         );
                     }
-                    measure_time!(fold_disco.sort_hash_pairs());
+                    measure_time!(fold_disco.sort_hash_grids());
+                    // measure_time!(fold_disco.sort_hash_pairs());
                     if verbose { print_log_msg(INFO, &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
                     fold_disco.fill_numeric_id_vec();
                     let (offset_table, value_vec) =
-                        measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_pairs));
+                        measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_grids));
                     if verbose { print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
                     let offset_path = format!("{}.offset", index_path);
                     measure_time!(save_offset_vec(&offset_path, &offset_table).expect(
                         &log_msg(FAIL, "Failed to save offset table")
                     ));
                     let value_path = format!("{}.value", index_path);
-                    measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 16).expect(
+                    measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 24).expect(
                         &log_msg(FAIL, "Failed to save values")
                     ));
                     let lookup_path = format!("{}.lookup", index_path);
@@ -142,11 +145,11 @@ mod tests {
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
-        let hash_type = "pdb";
-        let index_path = "data/serine_peptidases_pdb";
-        let num_threads = 1;
+        let hash_type = "pdbtr";
+        let index_path = "data/serine_peptidases_pdbtr";
+        let num_threads = 4;
         let num_bin_dist = 16;
-        let num_bin_angle = 3;
+        let num_bin_angle = 4;
         let chunk_size = 30;
         let max_residue = 3000;
         let recursive = true;

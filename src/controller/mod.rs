@@ -17,16 +17,19 @@ use rayon::prelude::*;
 
 // Internal imports
 use crate::prelude::print_log_msg;
+use crate::structure::grid::{get_grid_index_vector_from_compact, DEFAULT_GRID_WIDTH};
 use crate::{measure_time, PDBReader};
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::index::alloc::{IndexBuilder};
 use crate::utils::log::{ log_msg, INFO, FAIL, WARN, DONE };
 use crate::controller::feature::get_geometric_hash_from_structure;
 
+use self::feature::get_geometric_hash_with_grid;
+
 const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
 const DEFAULT_HASH_TYPE: HashType = HashType::PDBTrRosetta;
-const DEFAULT_MAX_RESIDUE: usize = 5000;
+const DEFAULT_MAX_RESIDUE: usize = 50000;
 
 
 pub struct FoldDisco {
@@ -36,6 +39,7 @@ pub struct FoldDisco {
     pub plddt_vec: Vec<f32>,
     pub hash_collection: Vec<Vec<GeometricHash>>,
     pub hash_id_pairs: Vec<(GeometricHash, usize)>,
+    pub hash_id_grids: Vec<(GeometricHash, usize)>,
     pub index_builder: IndexBuilder<usize, GeometricHash>,
     pub hash_type: HashType,
     pub remove_redundancy: bool,
@@ -44,6 +48,7 @@ pub struct FoldDisco {
     pub num_bin_angle: usize,
     pub output_path: String,
     pub max_residue: usize,
+    pub grid_width: f32,
 }
 
 impl FoldDisco {
@@ -56,6 +61,7 @@ impl FoldDisco {
             plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
+            hash_id_grids: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: DEFAULT_HASH_TYPE,
             remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
@@ -64,6 +70,7 @@ impl FoldDisco {
             num_bin_angle: 0,
             output_path: String::new(),
             max_residue: DEFAULT_MAX_RESIDUE,
+            grid_width: DEFAULT_GRID_WIDTH,
         }
     }
     pub fn new_with_hash_type(path_vec: Vec<String>, hash_type: HashType) -> FoldDisco {
@@ -75,6 +82,7 @@ impl FoldDisco {
             plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
+            hash_id_grids: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: hash_type,
             remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
@@ -83,12 +91,14 @@ impl FoldDisco {
             num_bin_angle: 0,
             output_path: String::new(),
             max_residue: DEFAULT_MAX_RESIDUE,
+            grid_width: DEFAULT_GRID_WIDTH,
         }
     }
 
     pub fn new_with_params(
         path_vec: Vec<String>, hash_type: HashType, remove_redundancy: bool,
-        num_threads: usize, num_bin_dist: usize, num_bin_angle: usize, output_path: String
+        num_threads: usize, num_bin_dist: usize, num_bin_angle: usize, output_path: String,
+        grid_width: f32
     ) -> FoldDisco {
         let length = path_vec.len();
         FoldDisco {
@@ -98,6 +108,7 @@ impl FoldDisco {
             plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
+            hash_id_grids: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: hash_type,
             remove_redundancy: remove_redundancy,
@@ -106,6 +117,7 @@ impl FoldDisco {
             num_bin_angle: num_bin_angle,
             output_path: output_path,
             max_residue: DEFAULT_MAX_RESIDUE,
+            grid_width: grid_width,
         }
     }
     // Setters
@@ -249,23 +261,28 @@ impl FoldDisco {
                         nres_vec[pdb_pos] = nres;
                         plddt_vec[pdb_pos] = plddt;
                     }
-                    let mut hash_vec = get_geometric_hash_from_structure(
-                        &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
+                    // let mut hash_vec = get_geometric_hash_from_structure(
+                    //     &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
+                    // );
+                    let mut hash_with_grid = get_geometric_hash_with_grid(
+                        &compact, pdb_pos, self.hash_type, self.num_bin_dist, self.num_bin_angle, self.grid_width
                     );
+
                     // Drop intermediate variables
                     drop(compact);
                     drop(pdb_reader);
                     // If remove_redundancy is true, remove duplicates
                     if self.remove_redundancy {
-                        hash_vec.sort_unstable();
-                        hash_vec.dedup();
-                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect::<Vec<(GeometricHash, usize)>>()
+                        hash_with_grid.sort_unstable();
+                        hash_with_grid.dedup();
+                        hash_with_grid.iter().map(|x| *x).collect()
                     } else {
-                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect::<Vec<(GeometricHash, usize)>>()
+                        hash_with_grid.iter().map(|x| *x).collect()
                     }
                 }).flatten().collect()
             });
-        self.hash_id_pairs = collected;
+        // self.hash_id_pairs = collected;
+        self.hash_id_grids = collected;
         self.nres_vec = Arc::try_unwrap(nres_vec).unwrap().into_inner().unwrap();
         self.plddt_vec = Arc::try_unwrap(plddt_vec).unwrap().into_inner().unwrap();
         drop(pool);
@@ -279,6 +296,17 @@ impl FoldDisco {
             .expect(&log_msg(FAIL, "Failed to build thread pool for sorting"));
         pool.install(|| {
             self.hash_id_pairs.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        });
+        drop(pool);
+    }
+    
+    pub fn sort_hash_grids(&mut self) {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            .build()
+            .expect(&log_msg(FAIL, "Failed to build thread pool for sorting"));
+        pool.install(|| {
+            self.hash_id_grids.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
         });
         drop(pool);
     }

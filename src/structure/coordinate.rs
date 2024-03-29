@@ -243,41 +243,22 @@ impl CoordinateVector {
         torsion_angles
     }
     
-    pub fn min_coord(&self) -> (f32, f32, f32) {
-        let mut min_x = f32::MAX;
-        let mut min_y = f32::MAX;
-        let mut min_z = f32::MAX;
-        for i in 0..self.size {
-            if self.x[i] < min_x {
-                min_x = self.x[i];
-            }
-            if self.y[i] < min_y {
-                min_y = self.y[i];
-            }
-            if self.z[i] < min_z {
-                min_z = self.z[i];
-            }
-        }
-        (min_x, min_y, min_z)
+    pub fn min_coord(&self) -> Coordinate {
+        let out = Coordinate {
+            x: self.x.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap().clone(),
+            y: self.y.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap().clone(),
+            z: self.z.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap().clone(),
+        };
+        out
     }
-    pub fn max_coord(&self) -> (f32, f32, f32) {
-        let mut max_x = f32::MIN;
-        let mut max_y = f32::MIN;
-        let mut max_z = f32::MIN;
-        for i in 0..self.size {
-            if self.x[i] > max_x {
-                max_x = self.x[i];
-            }
-            if self.y[i] > max_y {
-                max_y = self.y[i];
-            }
-            if self.z[i] > max_z {
-                max_z = self.z[i];
-            }
-        }
-        (max_x, max_y, max_z)
+    pub fn max_coord(&self) -> Coordinate {
+        let out = Coordinate {
+            x: self.x.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap().clone(),
+            y: self.y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap().clone(),
+            z: self.z.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap().clone(),
+        };
+        out
     }
-
 }
 
 #[derive(Debug, Clone)]
@@ -372,57 +353,21 @@ impl CarbonCoordinateVector {
         }
         torsion_angles
     }
-    pub fn min_coord(&self) -> (f32, f32, f32) {
-        let mut min_x = f32::MAX;
-        let mut min_y = f32::MAX;
-        let mut min_z = f32::MAX;
-        for i in 0..self.x.len() {
-            if self.x[i].is_none() {
-                continue;
-            }
-            if self.x[i].unwrap() < min_x {
-                min_x = self.x[i].unwrap();
-            }
-            if self.y[i].is_none() {
-                continue;
-            }
-            if self.y[i].unwrap() < min_y {
-                min_y = self.y[i].unwrap();
-            }
-            if self.z[i].is_none() {
-                continue;
-            }
-            if self.z[i].unwrap() < min_z {
-                min_z = self.z[i].unwrap();
-            }
-        }
-        (min_x, min_y, min_z)
+    pub fn min_coord(&self) -> Coordinate {
+        let out = Coordinate {
+            x: self.x.iter().filter(|&x| x.is_some()).map(|x| x.unwrap()).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
+            y: self.y.iter().filter(|&y| y.is_some()).map(|y| y.unwrap()).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
+            z: self.z.iter().filter(|&z| z.is_some()).map(|z| z.unwrap()).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
+        };
+        out
     }
-    pub fn max_coord(&self) -> (f32, f32, f32) {
-        let mut max_x = f32::MIN;
-        let mut max_y = f32::MIN;
-        let mut max_z = f32::MIN;
-        for i in 0..self.x.len() {
-            if self.x[i].is_none() {
-                continue;
-            }
-            if self.x[i].unwrap() > max_x {
-                max_x = self.x[i].unwrap();
-            }
-            if self.y[i].is_none() {
-                continue;
-            }
-            if self.y[i].unwrap() > max_y {
-                max_y = self.y[i].unwrap();
-            }
-            if self.z[i].is_none() {
-                continue;
-            }
-            if self.z[i].unwrap() > max_z {
-                max_z = self.z[i].unwrap();
-            }
-        }
-        (max_x, max_y, max_z)
+    pub fn max_coord(&self) -> Coordinate {
+        let out = Coordinate {
+            x: self.x.iter().filter(|&x| x.is_some()).map(|x| x.unwrap()).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
+            y: self.y.iter().filter(|&y| y.is_some()).map(|y| y.unwrap()).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
+            z: self.z.iter().filter(|&z| z.is_some()).map(|z| z.unwrap()).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
+        };
+        out
     }
 }
 

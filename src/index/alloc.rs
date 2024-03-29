@@ -321,7 +321,6 @@ pub fn convert_sorted_pairs_to_offset_and_values<V: HashableSync, K:HashableSync
     (offset_map, vec)
 }
 
-
 pub fn estimate_hash_size<V: HashableSync, K:HashableSync> (
     sorted_pairs: &Vec<(V, K)>
 ) -> (usize, usize) {

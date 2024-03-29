@@ -92,7 +92,7 @@ pub fn query_pdb(env: AppArgs) {
                 index_paths.push(index_path.clone());
             }
             // Limit threads to the number of index paths
-            let threads = std::cmp::min(threads, index_paths.len());
+            // let threads = std::cmp::min(threads, index_paths.len());
             print_log_msg(INFO, &format!("Found {} index file(s). Querying with {} threads", index_paths.len(), threads));
             let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
             pool.install(|| {

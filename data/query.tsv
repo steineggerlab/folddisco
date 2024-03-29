@@ -1,0 +1,4 @@
+data/query/4CHA.pdb	B57,B102,C195	data/result/serine_protease.tsv
+data/query/1G2F.pdb	F207,F212,F225,F229	data/result/zinc_finger.tsv
+data/query/1LAP.pdb	250,255,273,332,334	data/result/aminopeptidase.tsv
+data/query/1ED8.pdb	51,102,153,155,166,322,327,328,331,369,370,412	data/result/alkaline_phosphatase.tsv

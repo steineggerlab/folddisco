@@ -34,7 +34,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             num_bin_dist: args.value_from_str(["-d", "--distance"]).unwrap_or(0),
             num_bin_angle: args.value_from_str(["-a", "--angle"]).unwrap_or(0),
             chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(65535),
-            max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(3000),
+            max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(100000),
             recursive: args.contains(["-r", "--recursive"]),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
@@ -50,7 +50,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             angle_threshold: args.opt_value_from_str(["-a", "--angle"])?,
             match_cutoff: args.value_from_str(["-m", "--match"]).unwrap_or(0.0), // 0,0: no cutoff; 0.0 < cutoff < 1.0: relative cutoff; 1.0 < cutoff: count cutoff
             score_cutoff: args.value_from_str(["-s", "--score"]).unwrap_or(0.0),
-            num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(1400), // Return result with less than this number of residues
+            num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(100000), // Return result with less than this number of residues
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
             help: args.contains(["-h", "--help"]),
         }),

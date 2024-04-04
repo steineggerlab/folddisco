@@ -6,11 +6,13 @@
 // Arguments of CLI app are defined here
 
 pub mod workflows;
+pub mod config;
 
 #[derive(Debug)]
 enum Subcommand {
     Index,
     Query,
+    Benchmark,
     // Add subcommands here
 }
 
@@ -22,12 +24,15 @@ pub enum AppArgs {
         pdb_dir: Option<String>,
         hash_type: String,
         index_path: String,
+        mode: String,
         num_threads: usize,
         num_bin_dist: usize,
         num_bin_angle: usize,
+        grid_width: f32,
         chunk_size: usize,
         max_residue: usize,
         recursive: bool,
+        id_type: String,
         verbose: bool,
         help: bool,
     },
@@ -36,17 +41,22 @@ pub enum AppArgs {
         query_string: String,
         threads: usize,
         index_path: Option<String>,
-        exact_match: bool,
         retrieve: bool,
         // Match thresholds
+        amino_acid: u8,
         dist_threshold: Option<String>,
         angle_threshold: Option<String>,
         // Cutoffs
-        match_cutoff: f32,
+        match_cutoff: Option<String>,
         score_cutoff: f32,
         num_res_cutoff: usize,
         plddt_cutoff: f32,
+        verbose: bool,
         help: bool,
+    },
+    Benchmark {
+        result: String,
+        answer: String,
     },
     Test {
         index_path: String,

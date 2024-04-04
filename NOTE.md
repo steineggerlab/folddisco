@@ -1,26 +1,33 @@
 # Development note
 
-## TODOs 240329
-- [ ] Collect test query info / commands in QUERY.md
-
-GEOMETRY
-- [x] DONE: PDB + two theta angles work nice
-- [ ] TODO: Add 3Di hash 
-
+## TODOs 240404
 QUERYING
-- [ ] Comprehensive filtering parameters: node coverage, edge coverage, exact match, total match, grid count, check all grid is nearby
+- [x] DONE: Comprehensive filtering parameters: node coverage, edge coverage, exact match, total match, grid count, check all grid is nearby
 - [ ] Allow different amino acid pairs
   - [ ] TODO: Policies: Any, Exact, Same property
+- [ ] Collect test query info / commands in QUERY.md
 
 DEV
 - [ ] CLI: polish grid related parameters
+- [ ] CLI::index: Delete unncessary parameters
+- [x] DONE: CLI::query_pdb: filter how??
 - [ ] CLI: polish logging
-- [ ] CLI::query_pdb: Extract functions and measure time
+- [x] DONE: CLI::query_pdb: Extract functions and measure time
 - [ ] CLI::query_pdb: Log the original query
 - [ ] CLI::query_pdb: Output option
-- [ ] TODO: CLI::query_pdb: Print only the base name of the pdb file
-- [ ] TODO: CLI::index: Save only the base name of the pdb file (optional)
+- [x] DONE: CLI::query_pdb: Print only the base name of the pdb file
+- [x] DONE: CLI::index: Save only the base name of the pdb file (optional)
 - [ ] CLI::query_pdb: Multiple queries by input file
+
+INDEXING
+- [x] DONE: Add an option to save indices with different schemes
+  - [x] 1. ID only
+  - [x] 2. ID + grid
+  - [ ] 3. ID + position
+
+GEOMETRY
+- [ ] TODO: Add 3Di hash 
+
 
 ## TODOs 
 

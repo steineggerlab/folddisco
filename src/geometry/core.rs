@@ -48,6 +48,20 @@ impl HashType {
             _ => HashType::Other,
         }
     }
+    pub fn to_string(&self) -> String {
+        match self {
+            HashType::PDBMotif => "PDBMotif".to_string(),
+            HashType::PDBMotifSinCos => "PDBMotifSinCos".to_string(),
+            HashType::PDBMotifHalf => "PDBMotifHalf".to_string(),
+            HashType::TrRosetta => "TrRosetta".to_string(),
+            HashType::FoldDiscoDefault => "FoldDiscoDefault".to_string(),
+            HashType::Default32bit => "Default32bit".to_string(),
+            HashType::PointPairFeature => "PointPairFeature".to_string(),
+            HashType::PDBTrRosetta => "PDBTrRosetta".to_string(),
+            // append new hash type here
+            HashType::Other => "Other".to_string(),
+        }
+    }
     pub fn encoding_type(&self) -> usize {
         match self {
             HashType::PDBMotif => 32usize,

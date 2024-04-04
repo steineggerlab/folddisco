@@ -11,10 +11,16 @@ use std::collections::{HashMap, HashSet};
 
 use rayon::prelude::*;
 
-use crate::cli::workflows::config::read_config_from_file;
+use crate::cli::config::{read_index_config_from_file, IndexConfig, QueryConfig};
+use crate::controller::mode::IndexMode;
 use crate::cli::*;
-use crate::controller::io::{get_values_with_offset, get_values_with_offset_u16, get_values_with_offset_u24, get_values_with_offset_u8, read_offset_map, read_u16_vector, read_u8_vector, read_usize_vector};
-use crate::controller::query::{make_query_map, parse_threshold_string};
+use crate::controller::io::{
+    get_values_with_offset, get_values_with_offset_u16, get_values_with_offset_u24, 
+    get_values_with_offset_u8, read_offset_map, read_u16_vector, read_u32_vector, 
+    read_u8_vector, read_usize_vector
+};
+use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
+use crate::controller::rank::{count_query_gridmode, count_query_idmode, QueryResult};
 use crate::controller::retrieve::{connected, hash_vec_to_aa_pairs, res_vec_as_string, retrieve_residue_with_hash};
 use crate::index::lookup::{load_lookup_from_file};
 use crate::prelude::*;
@@ -25,22 +31,21 @@ pub const HELP_QUERY: &str = "\
 USAGE: motifsearch query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
 Example: motifsearch query -i index_table.index -t 6 1aq2.pdb A250,A232,A269
 Options:
-    -d, --pdb <PDB_PATH>             Path of PDB file to query
+    -p, --pdb <PDB_PATH>             Path of PDB file to query
     -q, --query <QUERY_STRING>       Query string
     -i, --index <INDEX_PATH>         Path of index table to load
     -t, --threads <THREADS>          Number of threads to use
     -v, --verbose                    Print verbose messages
-    -e, --exact                      Return only exact matches
-    -v, --retrieve                   Retrieve matched residues (Need PDB files)
-    -d, --distance <DIST_CUTOFF>     Distance cutoff (default 0.0)
-    -a, --angle <ANGLE_CUTOFF>       Angle cutoff (default 0.0)
+    -r, --retrieve                   Retrieve matched residues (Need PDB files)
+    -d, --distance <DIST_THRESHOLD>  Distance threshold (default 0.0)
+    -a, --angle <ANGLE_THRESHOLD>    Angle threshold (default 0.0)
     -m, --match <MATCH_CUTOFF>       Match cutoff (default 0.0)
     -s, --score <SCORE_CUTOFF>       Score cutoff (default 0.0)
     -n, --num-res <NUM_RES_CUTOFF>   Number of residues cutoff (default 3000)
     -l, --plddt <PLDDT_CUTOFF>       PLDDT cutoff (default 0.0)
     -h, --help                       Print this help menu
+    --amino-acid <MODE>              Amino acid mode (default 0=matching, 1=all, 2=similar)
 ";
-
 
 pub fn query_pdb(env: AppArgs) {
     match env {
@@ -49,14 +54,15 @@ pub fn query_pdb(env: AppArgs) {
             query_string,
             threads,
             index_path,
-            exact_match,
             retrieve,
+            amino_acid, // TODO:" Implement amino acid mode"
             dist_threshold,
             angle_threshold,
             match_cutoff,
             score_cutoff,
             num_res_cutoff,
             plddt_cutoff,
+            verbose,
             help,
         } => {
             if help {
@@ -68,44 +74,22 @@ pub fn query_pdb(env: AppArgs) {
                 eprintln!("{}", HELP_QUERY);
                 std::process::exit(1);
             }
-
-            // Get path. formatting without quotation marks
-            let index_path = index_path.unwrap();
-            // Check if index_path_0 is a file.
-            let index_chunk_prefix = format!("{}_0", index_path.clone());
-            let index_chunk_path = format!("{}_0.offset", index_path.clone());
-            let mut index_paths = Vec::new();
-            if std::path::Path::new(&index_chunk_path).is_file() {
-                print_log_msg(INFO, &format!("Index table is chunked"));
-                let mut i = 0;
-                loop {
-                    let index_chunk_prefix = format!("{}_{}", index_path.clone(), i);
-                    let index_chunk_path = format!("{}.offset", index_chunk_prefix);
-                    if std::path::Path::new(&index_chunk_path).is_file() {
-                        index_paths.push(index_chunk_prefix);
-                        i += 1;
-                    } else {
-                        break;
-                    }
-                }
-            } else {
-                index_paths.push(index_path.clone());
+            // Get index paths
+            let index_paths = check_and_get_indices(index_path, verbose);
+            if verbose {
+                print_log_msg(INFO, &format!("Found {} index file(s). Querying with {} threads", index_paths.len(), threads));
             }
-            // Limit threads to the number of index paths
-            // let threads = std::cmp::min(threads, index_paths.len());
-            print_log_msg(INFO, &format!("Found {} index file(s). Querying with {} threads", index_paths.len(), threads));
+            // Set thread pool
             let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
-            pool.install(|| {
-                index_paths.into_par_iter().for_each(|index_path| {
-                    let offset_path = format!("{}.offset", index_path.clone()); 
-                    let value_path = format!("{}.value", index_path.clone());
-                    let lookup_path = format!("{}.lookup", index_path.clone());
-                    let hash_type_path = format!("{}.type", index_path.clone());
-                    assert!(std::path::Path::new(&offset_path).is_file());
-                    assert!(std::path::Path::new(&value_path).is_file());
-                    assert!(std::path::Path::new(&lookup_path).is_file());
-                    assert!(std::path::Path::new(&hash_type_path).is_file());
-                    let (hash_type, num_bin_dist, num_bin_angle) = read_config_from_file(&hash_type_path);
+
+            let query_map_vec: HashMap<usize, QueryResult> = pool.install(|| {
+                index_paths.into_par_iter().map(|index_path| {
+                    let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
+                    let config = read_index_config_from_file(&hash_type_path);
+                    let hash_type = config.hash_type;
+                    let num_bin_dist = config.num_bin_dist;
+                    let num_bin_angle = config.num_bin_angle;
+                    let mode = config.mode;
                     
                     let pdb_loaded = PDBReader::from_file(&pdb_path).expect(
                         &log_msg(FAIL, &format!("Failed to read PDB file: {}", &pdb_path))
@@ -115,130 +99,100 @@ pub fn query_pdb(env: AppArgs) {
                     );
                     let dist_thresholds = parse_threshold_string(dist_threshold.clone());
                     let angle_thresholds = parse_threshold_string(angle_threshold.clone());
+
                     // Make query with pdb
                     let query_residues = parse_query_string(&query_string, structure.chains[0]);
-                    // let pdb_query =  measure_time!(make_query(
-                    //     &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, exact_match, dist_thresholds, angle_thresholds
-                    // ));
-                    // NOTE: testing with new querying scheme that checks the node coverage
+
                     let pdb_query_map =  measure_time!(make_query_map(
                         &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, dist_thresholds, angle_thresholds
                     ));
                     let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();
 
+                    let match_cutoffs = parse_threshold_string(match_cutoff.clone());
+                    let mut match_count_filter: Vec<usize> = Vec::with_capacity(match_cutoffs.len());
+                    for (i, &m) in match_cutoffs.iter().enumerate() {
+                        if m > 1.0 {
+                            match_count_filter.push(m as usize);
+                        } else if m > 0.0 {
+                            if i == 0 || i == 3 {// i=0: Total match count, i=3: exact match count
+                                match_count_filter.push((m * pdb_query.len() as f32).ceil() as usize);
+                            } else if i == 1 {// i=1: node match count
+                                match_count_filter.push((m * query_residues.len() as f32).ceil() as usize);
+                            } else if i == 2 {// i=2: edge match count
+                                let num_edges = query_residues.len() * (query_residues.len() - 1);
+                                match_count_filter.push((m * num_edges as f32).ceil() as usize);
+                            }
+                        } else {
+                            match_count_filter.push(0);
+                        }
+                    }
+                    // If length is less than 4, fill with 0
+                    while match_count_filter.len() < 4 {
+                        match_count_filter.push(0);
+                    }
+
                     // Load index table
-                    // let (mmap, value_vec) = measure_time!(read_usize_vector(&value_path).expect("[ERROR] Failed to load value vector"));
-                    let (mmap, value_vec) = measure_time!(read_u8_vector(&value_path).expect("[ERROR] Failed to load value vector"));
-
-                    let offset_table = measure_time!(
-                        read_offset_map(&offset_path, hash_type).expect("[ERROR] Failed to load offset table")
-                    );
-                    // let (path_vec, numeric_id_vec, optional_vec) = measure_time!(load_lookup_from_file(&lookup_path));
-                    let lookup = measure_time!(load_lookup_from_file(&lookup_path));
-                    
-                    // Make union of values queried
-                    // Query count map: nid -> (count, idf, nres, plddt, node_set, edge_set, exact_match_count, overflow_count)
-                    let mut query_count_map: HashMap<usize, (usize, f32, usize, f32, HashSet<usize>, HashSet<(usize, usize)>, usize, usize, HashSet<(u8, u8, u8)>)> = HashMap::new();
-                    for i in 0..pdb_query.len() {
-                        let offset = offset_table.get(&pdb_query[i]);
-                        if offset.is_none() {
-                            continue;
+                    let query_count_map: HashMap<usize, QueryResult> = match mode {
+                        IndexMode::Id => {
+                            let (mmap, value_vec) = measure_time!(
+                                read_u16_vector(&value_path).expect(
+                                    &log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path))
+                                )
+                            );
+                            let offset_table = measure_time!(
+                                read_offset_map(&offset_path, hash_type).expect(
+                                    &log_msg(FAIL, &format!("Failed to load offset table: {}", &offset_path))
+                                )
+                            );
+                            let lookup = measure_time!(load_lookup_from_file(&lookup_path));
+                            count_query_idmode(
+                                pdb_query, pdb_query_map, offset_table, value_vec, &lookup
+                            )
+                        },
+                        IndexMode::Grid => {
+                            let (mmap, value_vec) = measure_time!(
+                                read_u8_vector(&value_path).expect(
+                                    &log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path))
+                                )
+                            );
+                            let offset_table = measure_time!(
+                                read_offset_map(&offset_path, hash_type).expect(
+                                    &log_msg(FAIL, &format!("Failed to load offset table: {}", &offset_path))
+                                )
+                            );
+                            let lookup = measure_time!(load_lookup_from_file(&lookup_path));
+                            count_query_gridmode(
+                                pdb_query, pdb_query_map, offset_table, value_vec, &lookup
+                            )
                         }
-                        let offset = *offset.unwrap();
-                        let edge_info = pdb_query_map.get(&pdb_query[i]).unwrap();
-                        let is_exact = edge_info.1;
-                        let edge = edge_info.0;
-                        // let single_queried_values = get_values_with_offset(&value_vec, offset_to_query[i].0, offset_to_query[i].1);
-                        // let single_queried_values = get_values_with_offset_u16(&value_vec, offset.0, offset.1);
-                        let single_queried_values = get_values_with_offset_u24(value_vec, offset.0, offset.1);
-                        let single_queried_values = convert_to_id_grid_vector(single_queried_values);
-                        let hash_count = offset.1;
-                        for j in 0..single_queried_values.len() {
-                            // let nid = lookup.1[single_queried_values[j] as usize];
-                            // let nres = lookup.2[single_queried_values[j] as usize];
-                            // let plddt = lookup.3[single_queried_values[j] as usize];
-                            let nid = lookup.1[single_queried_values[j].0 as usize];
-                            let nres = lookup.2[single_queried_values[j].0 as usize];
-                            let plddt = lookup.3[single_queried_values[j].0 as usize];
-                            let grid_index = single_queried_values[j].1;
-
-                            if nres > num_res_cutoff || plddt < plddt_cutoff {
-                                continue;
-                            }
-                            let count = query_count_map.get(&nid);
-                            // Added calculation of idf
-                            let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
-                            // TODO: Check if normalization is done per match or per query
-                            let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
-                            if count.is_none() {
-                                let mut node_set = HashSet::new();
-                                node_set.insert(edge.0);
-                                node_set.insert(edge.1);
-                                let mut edge_set = HashSet::new();
-                                edge_set.insert(edge);
-                                let exact_match_count = if is_exact { 1usize } else { 0usize };
-                                let overflow_count = 0usize;
-                                let mut grid_index_vec = HashSet::new();
-                                grid_index_vec.insert(grid_index_to_tuple(grid_index));
-                                query_count_map.insert(nid, (1, idf + nres_norm, nres, plddt, node_set, edge_set, exact_match_count, overflow_count, grid_index_vec));
-                            } else {
-                                // Update node set and edge set
-                                let mut node_set = count.unwrap().4.clone();
-                                node_set.insert(edge.0);
-                                node_set.insert(edge.1);
-                                let mut edge_set = count.unwrap().5.clone();
-                                // If edge is already in the set, it is an overflow. Check edge set contains the edge
-                                let is_overflow: bool = edge_set.contains(&edge);
-                                edge_set.insert(edge);
-                                let exact_match_count = if is_exact { count.unwrap().6 + 1 } else { count.unwrap().6 };
-                                let overflow_count = if is_overflow { count.unwrap().7 + 1 } else { count.unwrap().7 };
-                                let idf = if is_exact { idf + nres_norm } else { (idf + nres_norm) / (1.5 + (overflow_count * overflow_count) as f32) };
-                                let mut grid_index_vec = count.unwrap().8.clone();
-                                grid_index_vec.insert(grid_index_to_tuple(grid_index));
-                                // query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1 + nres_norm, nres, plddt));
-                                query_count_map.insert(nid, (count.unwrap().0 + 1, idf + count.unwrap().1, nres, plddt, node_set, edge_set, exact_match_count, overflow_count, grid_index_vec));
-                            }
-                        }
-                    }
-                    // Sort by count and print
-                    let mut query_count_vec: Vec<_> = query_count_map.iter().collect();
-                    // Nested sorting by idf & exact match count
-                    query_count_vec.sort_by(|a, b| b.1.1.partial_cmp(&a.1.1).unwrap());
-
-                    let count_cut = match_cutoff.round() as usize;
-                    // let count_cut = 0;
-                    let hash_set: HashSet<GeometricHash> = pdb_query.iter().cloned().collect();
-                    let aa_filter = hash_vec_to_aa_pairs(&pdb_query);
-                    for (nid, count) in query_count_vec {
-                        if count.0 >= count_cut {
-                            if retrieve {
-                                let retrieved = retrieve_residue_with_hash(
-                                    &hash_set, &aa_filter, &lookup.0[*nid], hash_type, num_bin_dist, num_bin_angle
-                                );
-                                if retrieved.is_some() {
-                                    let retrieved = retrieved.unwrap();
-                                    let connected = connected(&retrieved, query_residues.len());
-                                    let total_matches = retrieved.len();
-                                    println!(
-                                        "{};uniq_matches={};idf={};total_matches={};connected={};{}",
-                                        lookup.0[*nid], count.0, count.1, total_matches,
-                                        connected, res_vec_as_string(&retrieved)
-                                    );
-                                }
-                            } else {
-                                if count.1 < score_cutoff {
-                                    continue;
-                                }
-                                println!(
-                                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
-                                    lookup.0[*nid], count.0, count.1, count.2, count.3,
-                                    count.4.len(), count.5.len(), count.6, count.7, count.8.len(), count.8.iter().map(|&x| format!("{}{}{}", x.0, x.1, x.2)).collect::<Vec<String>>().join(";")
-                                );
-                            }
-                        }
-                    }
-                });
+                        IndexMode::Pos => {
+                            let (mmap, value_vec) = measure_time!(read_u32_vector(&value_path).expect("[ERROR] Failed to load value vector"));
+                            let offset_table = measure_time!(
+                                read_offset_map(&offset_path, hash_type).expect("[ERROR] Failed to load offset table")
+                            );
+                            let lookup = measure_time!(load_lookup_from_file(&lookup_path));
+                            let mut query_count_map: HashMap<usize, QueryResult> = HashMap::new();
+                            // todo!("IMPLEMENT NEEDED!");
+                            query_count_map
+                        },
+                    };
+                    // Filter query count map
+                    query_count_map.into_iter().filter(|(k, v)| {
+                        v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
+                        v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
+                        v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
+                    }).collect()
+                }).reduce(|| HashMap::new(), |mut acc, x| {
+                    acc.extend(x);
+                    acc
+                })
             });
+            
+            let mut query_count_vec: Vec<(usize, QueryResult)> = query_map_vec.into_iter().collect();
+            query_count_vec.sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap());
+            for (k, v) in query_count_vec.iter() {
+                println!("{:?}", v);
+            }
         },
         _ => {
             eprintln!("{}", HELP_QUERY);
@@ -246,6 +200,7 @@ pub fn query_pdb(env: AppArgs) {
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -257,30 +212,32 @@ mod tests {
         // let query_string = String::from("A110,A294,A266");
         let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let query_string = String::from("B57,B102,C195");
-        let threads = 1;
+        let threads = 4;
         let index_path = Some(String::from("data/serine_peptidases_pdbtr"));
         let exact_match = false;
         let retrieve = false;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;
-        let match_cutoff = 0.0;
+        let match_cutoff = Some(String::from("0.0,0.0,0.0,0.0"));
         let score_cutoff = 0.0;
         let num_res_cutoff = 3000;
         let plddt_cutoff = 0.0;
+        let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
             query_string,
             threads,
             index_path,
-            exact_match: exact_match,
             retrieve,
+            amino_acid: 0,
             dist_threshold,
             angle_threshold,
             match_cutoff,
             score_cutoff,
             num_res_cutoff,
             plddt_cutoff,
+            verbose,
             help,
         };
         query_pdb(env);

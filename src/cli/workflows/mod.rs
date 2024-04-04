@@ -9,4 +9,3 @@
 pub mod build_index;
 pub mod query_pdb;
 pub mod benchmark;
-pub mod config;

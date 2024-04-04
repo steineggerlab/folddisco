@@ -27,3 +27,5 @@ dashmap = { version = "5.5.3", features = ["rayon"] }
 rustc-hash = "1.1.0"
 peak_alloc = "0.2.1"
 flate2 = { version = "1.0.28" }
+toml = "0.8.12"
+regex = "1.10.4"

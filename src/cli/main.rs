@@ -26,16 +26,18 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
         .as_deref()
     {
         Some("index") => Ok(AppArgs::Index {
-            // TODO: NOTE: Change to parse positional arguments for input PDBs
             pdb_dir: args.opt_value_from_str(["-p", "--pdbs"])?,
             hash_type: args.value_from_str(["-y", "--type"]).unwrap_or("default".into()),
             index_path: args.value_from_str(["-i", "--index"]).unwrap_or("folddisco_index".into()),
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            mode: args.value_from_str(["-m", "--mode"]).unwrap_or("grid".into()),
             num_bin_dist: args.value_from_str(["-d", "--distance"]).unwrap_or(0),
             num_bin_angle: args.value_from_str(["-a", "--angle"]).unwrap_or(0),
+            grid_width: args.value_from_str(["-g", "--grid"]).unwrap_or(40.0),
             chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(65535),
-            max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(100000),
+            max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             recursive: args.contains(["-r", "--recursive"]),
+            id_type: args.value_from_str("--idtype").unwrap_or("relpath".into()),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),
@@ -44,16 +46,21 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             query_string: args.value_from_str(["-q", "--query"]).unwrap_or("".into()),
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             index_path: args.opt_value_from_str(["-i", "--index"])?,
-            exact_match: args.contains(["-e", "--exact"]),
-            retrieve: args.contains(["-v", "--retrieve"]),
+            retrieve: args.contains(["-r", "--retrieve"]),
+            amino_acid: args.value_from_str("--amino-acid").unwrap_or(0),
             dist_threshold: args.opt_value_from_str(["-d", "--distance"])?,
             angle_threshold: args.opt_value_from_str(["-a", "--angle"])?,
-            match_cutoff: args.value_from_str(["-m", "--match"]).unwrap_or(0.0), // 0,0: no cutoff; 0.0 < cutoff < 1.0: relative cutoff; 1.0 < cutoff: count cutoff
+            match_cutoff: args.opt_value_from_str(["-m", "--match"])?, 
             score_cutoff: args.value_from_str(["-s", "--score"]).unwrap_or(0.0),
-            num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(100000), // Return result with less than this number of residues
+            num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
+            verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),
+        // Some("benchmark") => Ok(AppArgs::Benchmark {
+        //     result: args.free_from_str(),
+        //     answer: args.free_from_str(),
+        // }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,
             verbose: args.contains(["-v", "--verbose"]),
@@ -90,6 +97,9 @@ fn main() {
             } else {
                 query_pdb::query_pdb(parsed_args);
             }
+        }
+        AppArgs::Benchmark { .. } => {
+            benchmark::benchmark(parsed_args);
         }
         AppArgs::Test { .. } => {
             println!("Testing");

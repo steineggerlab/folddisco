@@ -1,0 +1,18 @@
+[index]
+chunk_size = 65535
+grid_width = 30.0
+hash_type = "PDBTrRosetta"
+max_residue = 4000
+mode = "id"
+num_bin_angle = 10
+num_bin_dist = 10
+
+[query]
+amino_acid = 0
+angle_threshold = [0.0]
+dist_threshold = [0.0]
+match_cutoff = [0.0]
+num_res_cutoff = 50000
+plddt_cutoff = 0.0
+retrieve = true
+score_cutoff = 0.0

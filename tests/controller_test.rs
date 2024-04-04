@@ -55,7 +55,7 @@ fn test_folddisco_pdbmotifsincos() {
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
     let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
-    measure_time!(fold_disco.collect_hash_pairs());
+    measure_time!(fold_disco.collect_hash_grids());
     fold_disco.fill_numeric_id_vec();
     let mut hashes = fold_disco.hash_id_grids.clone();
     // Get the memory usage of hashes

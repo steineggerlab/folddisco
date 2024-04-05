@@ -121,13 +121,19 @@ pub fn query_pdb(env: AppArgs) {
                             } else if i == 2 {// i=2: edge match count
                                 let num_edges = query_residues.len() * (query_residues.len() - 1);
                                 match_count_filter.push((m * num_edges as f32).ceil() as usize);
+                            } else  {
+                                match_count_filter.push(u32::MAX as usize);
                             }
                         } else {
-                            match_count_filter.push(0);
+                            if i < 4 {
+                                match_count_filter.push(0);
+                            } else {
+                                match_count_filter.push(u32::MAX as usize);
+                            }
                         }
                     }
                     // If length is less than 4, fill with 0
-                    while match_count_filter.len() < 4 {
+                    while match_count_filter.len() < 6 {
                         match_count_filter.push(0);
                     }
 
@@ -180,6 +186,7 @@ pub fn query_pdb(env: AppArgs) {
                     query_count_map.into_iter().filter(|(k, v)| {
                         v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                         v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
+                        v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                         v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                     }).collect()
                 }).reduce(|| HashMap::new(), |mut acc, x| {

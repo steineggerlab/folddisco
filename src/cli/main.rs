@@ -37,7 +37,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(65535),
             max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             recursive: args.contains(["-r", "--recursive"]),
-            id_type: args.value_from_str("--idtype").unwrap_or("relpath".into()),
+            id_type: args.value_from_str("--id").unwrap_or("relpath".into()),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),

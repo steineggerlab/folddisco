@@ -131,4 +131,7 @@ testing commands
 # H. sapiens, serine peptidases
 ./target/release/motifsearch index -p analysis/h_sapiens_pdb -i analysis/h_sapiens_db/d8a3/index -t 8 -v -d 8 -a 3 -H pdb -c 65535
 ./target/release/motifsearch query -i analysis/h_sapiens_db/d8a3/index  -p data/serine_peptidases_filtered/4cha.pdb -q B57,B102,C195
+
+\time -v ~/Projects/06_Motifsearch/motifsearch/target/release/motifsearch query -p query/4CHA.pdb -q B57,B102,C195 -i h_sapiens_db/3di/index -t 32 > ~/serine.3di.tsv
+
 ```

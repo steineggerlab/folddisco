@@ -58,13 +58,14 @@ impl HashValue {
         let ca_dist = discretize_value(
             feature[7], MIN_DIST, MAX_DIST, nbin_dist
         );
-        let seq_dist = if feature[8] < -4.0 {
-            0_u32
-        } else if feature[8] > 4.0 {
-            8_u32
-        } else {
-            feature[8] as u32 + 4
-        };
+        // let seq_dist = if feature[8] < -4.0 {
+        //     0_u32
+        // } else if feature[8] > 4.0 {
+        //     8_u32
+        // } else {
+        //     feature[8] as u32 + 4
+        // };
+        let seq_dist = 0u32;
 
         let hashvalue = (cos_phi_12 << 26) | (cos_phi_34 << 23) | (cos_phi_15 << 20) |
                         (cos_phi_35 << 17) | (cos_phi_14 << 14) | (cos_phi_23 << 11) |

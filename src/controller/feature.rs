@@ -1,5 +1,8 @@
 
+use std::hash::Hash;
+
 use crate::geometry::util::map_aa_to_u8;
+use crate::structure::coordinate::calc_angle_point;
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::structure::grid::{get_grid_index_vector_from_compact, merge_id_with_grid, nearby};
@@ -108,6 +111,46 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
                 }
             } else {
                 None
+            }
+        }
+        HashType::TertiaryInteraction => {
+            if i == 0 || j == 0 || i == structure.num_residues - 1 || j == structure.num_residues - 1 {
+                return None;
+            }
+            let ca_1i = structure.get_ca(i-1);
+            let ca_i = structure.get_ca(i);
+            let ca_i1 = structure.get_ca(i+1);
+            let ca_1j = structure.get_ca(j-1);
+            let ca_j = structure.get_ca(j);
+            let ca_j1 = structure.get_ca(j+1);
+            
+            if ca_1i.is_none() || ca_i.is_none() || ca_i1.is_none() || ca_1j.is_none() || ca_j.is_none() || ca_j1.is_none() {
+                return None;
+            } else {
+                let ca_1i = ca_1i.unwrap();
+                let ca_i = ca_i.unwrap();
+                let ca_i1 = ca_i1.unwrap();
+                let ca_1j = ca_1j.unwrap();
+                let ca_j = ca_j.unwrap();
+                let ca_j1 = ca_j1.unwrap();
+                let u1 = ca_i.sub(&ca_1i).normalize();
+                let u2 = ca_i1.sub(&ca_i).normalize();
+                let u3 = ca_j.sub(&ca_1j).normalize();
+                let u4 = ca_j1.sub(&ca_j).normalize();
+                let u5 = ca_j.sub(&ca_i).normalize();
+                let phi_12 = u1.dot(&u2).acos();
+                let phi_34 = u3.dot(&u4).acos();
+                let phi_15 = u1.dot(&u5).acos();
+                let phi_35 = u3.dot(&u5).acos();
+                let phi_14 = u1.dot(&u4).acos();
+                let phi_23 = u2.dot(&u3).acos();
+                let phi_13 = u1.dot(&u3).acos();
+                let ca_dist = ca_i.distance(&ca_j);
+                let seq_dist = j as f32 - i as f32;
+                let feature = vec![
+                    phi_12, phi_34, phi_15, phi_35, phi_14, phi_23, phi_13, ca_dist, seq_dist
+                ];
+                Some(feature)
             }
         }
         // append new hash type here
@@ -222,6 +265,7 @@ impl HashType {
             HashType::FoldDiscoDefault | HashType::Default32bit |
             HashType::PointPairFeature => Some(vec![2]),
             HashType::TrRosetta => Some(vec![0]),
+            HashType::TertiaryInteraction => Some(vec![7]),
             _ => None
         }
     }
@@ -233,6 +277,7 @@ impl HashType {
             HashType::FoldDiscoDefault | HashType::Default32bit => Some(vec![3, 4, 5, 6, 7]),
             HashType::PointPairFeature => Some(vec![3, 4, 5]),
             HashType::PDBTrRosetta => Some(vec![4, 5, 6]), 
+            HashType::TertiaryInteraction => Some(vec![0, 1, 2, 3, 4, 5, 6]),
             _ => None
         }
     }

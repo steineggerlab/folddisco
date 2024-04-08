@@ -1,35 +1,6 @@
 # Development note
 
 ## TODOs 240404
-QUERYING
-- [x] DONE: Comprehensive filtering parameters: node coverage, edge coverage, exact match, total match, grid count, check all grid is nearby
-- [ ] Allow different amino acid pairs
-  - [ ] TODO: Policies: Any, Exact, Same property
-- [ ] Collect test query info / commands in QUERY.md
-
-DEV
-- [ ] CLI: polish grid related parameters
-- [ ] CLI::index: Delete unncessary parameters
-- [x] DONE: CLI::query_pdb: filter how??
-- [ ] CLI: polish logging
-- [x] DONE: CLI::query_pdb: Extract functions and measure time
-- [ ] CLI::query_pdb: Log the original query
-- [ ] CLI::query_pdb: Output option
-- [x] DONE: CLI::query_pdb: Print only the base name of the pdb file
-- [x] DONE: CLI::index: Save only the base name of the pdb file (optional)
-- [ ] CLI::query_pdb: Multiple queries by input file
-
-INDEXING
-- [x] DONE: Add an option to save indices with different schemes
-  - [x] 1. ID only
-  - [x] 2. ID + grid
-  - [ ] 3. ID + position
-
-GEOMETRY
-- [ ] TODO: Add 3Di hash 
-
-
-## TODOs 
 
 IMPORTANT: BENCHMARK 
 - [ ] Setup module & script
@@ -41,6 +12,31 @@ IMPORTANT: BENCHMARK
 - [ ] TODO: check SCOP database
 - [ ] Compare with pyscomotif
   - [ ] TODO: IMPORTANT: Download and rerun pyscomotif
+
+QUERYING
+- [ ] Allow different amino acid pairs
+  - [ ] TODO: Policies: Any, Exact, Same property
+- [ ] Collect test query info / commands in QUERY.md
+
+DEV
+- [ ] Print node residue, 
+- [ ] CLI: polish grid related parameters
+- [ ] CLI::index: Delete unncessary parameters
+- [ ] CLI: polish logging
+- [ ] CLI::query_pdb: Log the original query
+- [ ] CLI::query_pdb: Output option
+- [ ] CLI::query_pdb: Multiple queries by input file
+
+INDEXING
+- [x] DONE: Add an option to save indices with different schemes
+  - [ ] 3. ID + position
+
+GEOMETRY
+- [ ] TODO: Add 3Di hash 
+
+
+## TODOs 
+
 
 DEV
 - [ ] TODO: Split and extract ranking module

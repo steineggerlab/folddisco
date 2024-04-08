@@ -25,7 +25,7 @@ Options:
     -p, --pdbs <PDB_DIR>         Directory containing PDB files
     -y, --type <HASH_TYPE>       Hash type to use (pdb, trrosetta, default)
     -i, --index <INDEX_PATH>     Path to save the index table
-    -m, --mode <MODE>            Mode to index (default=0, 0: index only id, 1: index id and grid, 2: index id and position)
+    -m, --mode <MODE>            Mode to index (default=id, id: index only id, grid: index id and grid, pos: index id and position)
     -t, --threads <THREADS>      Number of threads to use
     -d, --distance <NBIN_DIST>   Number of distance bins (default 0, zero means default)
     -a, --angle <NBIN_ANGLE>     Number of angle bins (default 0, zero means default)
@@ -33,11 +33,10 @@ Options:
     -c, --chunk <CHUNK_SIZE>     Number of PDB files to index at once (default, max=65535)
     -r, --recursive              Index PDB files in subdirectories
     -n, --max-residue <MAX_RES>  Maximum number of residues in a PDB file (default=3000)
+    --idtype <ID_TYPE>           ID type to use (pdb, uniprot, afdb, relpath, abspath, default=relpath)
     -v, --verbose                Print verbose messages
     -h, --help                   Print this help menu
 ";
-// TODO: ADD MONITOR_MEMORY AS A PARAMETER
-// TODO: ADD NBIN_ANGLE, NBIN_DIST AS PARAMETERS
 
 pub fn build_index(env: AppArgs) {
     match env {
@@ -204,12 +203,12 @@ mod tests {
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
-        let hash_type = "pdbtr";
-        let index_path = "data/serine_peptidases_pdbtr";
-        let index_mode = "grid";
-        let num_threads = 4;
+        let hash_type = "3di";
+        let index_path = "data/serine_peptidases_3di";
+        let index_mode = "id";
+        let num_threads = 1;
         let num_bin_dist = 16;
-        let num_bin_angle = 4;
+        let num_bin_angle = 8;
         let chunk_size = 30;
         let max_residue = 3000;
         let grid_width = 40.0;

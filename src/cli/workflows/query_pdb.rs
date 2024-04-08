@@ -134,7 +134,11 @@ pub fn query_pdb(env: AppArgs) {
                     }
                     // If length is less than 4, fill with 0
                     while match_count_filter.len() < 6 {
-                        match_count_filter.push(0);
+                        if match_count_filter.len() < 4 {
+                            match_count_filter.push(0);
+                        } else {
+                            match_count_filter.push(u32::MAX as usize);
+                        }
                     }
 
                     // Load index table
@@ -220,7 +224,7 @@ mod tests {
         let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let query_string = String::from("B57,B102,C195");
         let threads = 4;
-        let index_path = Some(String::from("data/serine_peptidases_pdbtr"));
+        let index_path = Some(String::from("data/serine_peptidases_3di"));
         let exact_match = false;
         let retrieve = false;
         let dist_threshold = Some(String::from("0.5,1.0"));

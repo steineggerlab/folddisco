@@ -8,3 +8,4 @@ pub mod ppf;
 pub mod trrosetta;
 pub mod util;
 pub mod pdb_tr;
+pub mod tertiary_interaction;

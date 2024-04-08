@@ -208,7 +208,7 @@ mod tests {
         let index_mode = "id";
         let num_threads = 1;
         let num_bin_dist = 16;
-        let num_bin_angle = 8;
+        let num_bin_angle = 6;
         let chunk_size = 30;
         let max_residue = 3000;
         let grid_width = 40.0;

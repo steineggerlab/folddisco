@@ -127,11 +127,15 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
             if ca_1i.is_none() || ca_i.is_none() || ca_i1.is_none() || ca_1j.is_none() || ca_j.is_none() || ca_j1.is_none() {
                 return None;
             } else {
-                let ca_1i = ca_1i.unwrap();
                 let ca_i = ca_i.unwrap();
+                let ca_j = ca_j.unwrap();
+                let ca_dist = ca_i.distance(&ca_j);
+                if ca_dist > 20.0 {
+                    return None;
+                }
+                let ca_1i = ca_1i.unwrap();
                 let ca_i1 = ca_i1.unwrap();
                 let ca_1j = ca_1j.unwrap();
-                let ca_j = ca_j.unwrap();
                 let ca_j1 = ca_j1.unwrap();
                 let u1 = ca_i.sub(&ca_1i).normalize();
                 let u2 = ca_i1.sub(&ca_i).normalize();
@@ -145,7 +149,6 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
                 let phi_14 = u1.dot(&u4).acos();
                 let phi_23 = u2.dot(&u3).acos();
                 let phi_13 = u1.dot(&u3).acos();
-                let ca_dist = ca_i.distance(&ca_j);
                 let seq_dist = j as f32 - i as f32;
                 let feature = vec![
                     phi_12, phi_34, phi_15, phi_35, phi_14, phi_23, phi_13, ca_dist, seq_dist

@@ -57,10 +57,12 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),
-        // Some("benchmark") => Ok(AppArgs::Benchmark {
-        //     result: args.free_from_str(),
-        //     answer: args.free_from_str(),
-        // }),
+        Some("benchmark") => Ok(AppArgs::Benchmark {
+            result: args.opt_value_from_str(["-r", "--result"])?,
+            answer: args.opt_value_from_str(["-a", "--answer"])?,
+            index: args.opt_value_from_str(["-i", "--index"])?,
+            format: args.value_from_str(["-f", "--format"]).unwrap_or("tsv".into()),
+        }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,
             verbose: args.contains(["-v", "--verbose"]),

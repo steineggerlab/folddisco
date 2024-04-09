@@ -1,55 +1,53 @@
 # Development note
 
-## TODOs 240404
+## TODOs 240409
+
+DEV
+- [x] DONE:Print original query
+- [ ] Print node residue, 
+- [ ] CLI::query_pdb: Output option
+- [ ] CLI::query_pdb: Multiple queries by input file
+- [ ] TODO: IMPORTANT: Restore retrieving functionality
 
 IMPORTANT: BENCHMARK 
 - [ ] Setup module & script
-- [ ] Build an index of PDB database
-  - [ ] TODO: Rebuild one with nbin_dist = 16, nbin_angle = 4
-- [ ] Build an index of Swissprot
-- [ ] Check if the query from other lab works or not
-- [ ] Read MASTER, PDB realtime motif, pyscomotif on how they benchmarked
+    - [x] DONE: benchmark module
+    - [ ] benchmark script
+- [x] DONE: Use hashset not to count duplicates
 - [ ] TODO: check SCOP database
 - [ ] Compare with pyscomotif
   - [ ] TODO: IMPORTANT: Download and rerun pyscomotif
+  - [ ] TODO: Pyscomotif in two options
 
 QUERYING
 - [ ] Allow different amino acid pairs
   - [ ] TODO: Policies: Any, Exact, Same property
 - [ ] Collect test query info / commands in QUERY.md
 
-DEV
-- [ ] Print node residue, 
-- [ ] CLI: polish grid related parameters
-- [ ] CLI::index: Delete unncessary parameters
-- [ ] CLI: polish logging
-- [ ] CLI::query_pdb: Log the original query
-- [ ] CLI::query_pdb: Output option
-- [ ] CLI::query_pdb: Multiple queries by input file
-
 INDEXING
 - [x] DONE: Add an option to save indices with different schemes
   - [ ] 3. ID + position
 
-GEOMETRY
-- [ ] TODO: Add 3Di hash 
+- [ ] Apply graph based algorithms (MASTER, ...) after running folddisco
 
 
 ## TODOs 
 
+BENCHMARK
+- [ ] Build an index of Swissprot & PDB
+- [ ] Check if the query from other lab works or not
+- [ ] Read MASTER, PDB realtime motif, pyscomotif on how they benchmarked
 
 DEV
-- [ ] TODO: Split and extract ranking module
-  - [ ] TODO: Fill in and integrate with the rest of the code
-- [ ] TODO: Polish logging
-- [ ] TODO: Print original query
 - [ ] TODO: expose necessary functions with prelude
 - [ ] TODO: Setup output format --> easy to parse (tsv or other)
+- [ ] CLI: polish grid related parameters
+- [ ] CLI::index: Delete unncessary parameters
+- [ ] CLI: polish logging
 
 QUERYING
 - [ ] TODO: IDEA: interactive mode that saves all the offsets in RAM
 - [ ] TODO: FEATURE: multiple queries
-
 
 BIG THINGS
 - [ ] IMPORTANT: confirm if sin & cos representation is working 
@@ -134,4 +132,38 @@ testing commands
 
 \time -v ~/Projects/06_Motifsearch/motifsearch/target/release/motifsearch query -p query/4CHA.pdb -q B57,B102,C195 -i h_sapiens_db/3di/index -t 32 > ~/serine.3di.tsv
 
+```
+
+
+```sh
+(base) hyunbin@hulk:/fast/hyunbin/motif$ ~/Projects/06_Motifsearch/motifsearch/target/release/motifsearch index -p model_benchmark/h_sapiens/pdb/ -i h_sapiens_db/default32/d8a4/index -t 128 -y default32 -d 8 -a 4 -v --id uniprot -m id
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing model_benchmark/h_sapiens/pdb/ with 128 threads and 1 chunks
+[INFO] Hash type: Default32bit
+[INFO] Indexing all PDB files in one chunk
+[INFO] Collecting ids of the structures
+[INFO] fold_disco.collect_hash_pairs: 835.665160066s
+[INFO] Total 921636864 hashes collected (Allocated 21099.59MB)
+[INFO] fold_disco.sort_hash_pairs: 9.796442734s
+[INFO] Hash sorted (Allocated 21099.703MB)
+[INFO] convert_sorted_pairs_to_offset_and_values_vec: 11.134125762s
+[INFO] Offset & values acquired (Allocated 9358.994MB)
+[INFO] save_offset_vec: 20.450865102s
+[INFO] write_usize_vector_in_bits: 11.350247254s
+[INFO] save_lookup_to_file: 39.04581ms
+[DONE] Indexing done for chunk 0 - h_sapiens_db/default32/d8a4/index
+[DONE] Done.
+
+```
+
+> 2024-04-09 21:24:11
+```sh
+analysis/h_sapiens/d16a4/index_id       data/serine_pyscomotif.tsv      data/serine_answer.tsv  20504   198     124     PDBTrRosetta    16      4       108     20290   90      16      0.5455  0.8710  0.9948  0.6708
+analysis/h_sapiens/d16a4/index_id       data/serine_folddisco.tsv       data/serine_answer.tsv  20504   105     124     PDBTrRosetta    16      4       101     20376   4       23      0.9619  0.8145  0.9987  0.8821
+analysis/h_sapiens/d16a4/index_id       data/zinc_pyscomotif.tsv        data/zinc_answer.tsv    20504   304     1817    PDBTrRosetta    16      4       277     18669   27      1540    0.9112  0.1524  0.9236  0.2612
+analysis/h_sapiens/d16a4/index_id       data/zinc_folddisco.tsv data/zinc_answer.tsv    20504   766     1817    PDBTrRosetta    16      4       753     18683   13      1064    0.9830  0.4144  0.9475  0.5830
 ```

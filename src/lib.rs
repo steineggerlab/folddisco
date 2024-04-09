@@ -54,6 +54,6 @@ pub mod prelude {
     pub use crate::index::alloc::convert_sorted_pairs_to_offset_and_values_vec;
     
     pub use crate::utils::loader::load_path;
-    pub use crate::utils::benchmark::{Metrics, calculate_metrics, compare_target_answer};
+    pub use crate::utils::benchmark::{Metrics, compare_target_answer_set};
     pub use crate::utils::log::{INFO, FAIL, WARN, DONE, log_msg, print_log_msg};
 }

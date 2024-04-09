@@ -55,8 +55,10 @@ pub enum AppArgs {
         help: bool,
     },
     Benchmark {
-        result: String,
-        answer: String,
+        result: Option<String>,
+        answer: Option<String>,
+        index: Option<String>,
+        format: String,
     },
     Test {
         index_path: String,

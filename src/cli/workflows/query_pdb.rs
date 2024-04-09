@@ -26,7 +26,6 @@ use crate::index::lookup::{load_lookup_from_file};
 use crate::prelude::*;
 use crate::structure::grid::{convert_to_id_grid_vector, grid_index_to_tuple, nearby, tuple_to_grid_index};
 
-
 pub const HELP_QUERY: &str = "\
 USAGE: motifsearch query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
 Example: motifsearch query -i index_table.index -t 6 1aq2.pdb A250,A232,A269
@@ -73,6 +72,11 @@ pub fn query_pdb(env: AppArgs) {
             if index_path.is_none() {
                 eprintln!("{}", HELP_QUERY);
                 std::process::exit(1);
+            }
+            // Print query information
+            if verbose {
+                print_log_msg(INFO, &format!("Querying {}:{} to {}", &pdb_path, &query_string, &index_path.clone().unwrap()));
+                // NOTE: If needed, print filter information
             }
             // Get index paths
             let index_paths = check_and_get_indices(index_path, verbose);

@@ -11,6 +11,7 @@ use crate::controller::mode::IndexMode;
 
 use super::io::{get_values_with_offset_u16, get_values_with_offset_u24, get_values_with_offset_u32};
 
+#[derive(Clone)]
 pub struct QueryResult {
     pub id: String,
     pub nid: usize,
@@ -78,11 +79,23 @@ impl fmt::Debug for QueryResult {
         )
     }
 }
+// write_fmt
+impl QueryResult {
+    pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:?}\t{:?}\t{:?}\t{:?}", 
+            self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
+            self.exact_match_count, self.overflow_count, self.grid_count,
+            self.nres, self.plddt, self.pos_set.len(),
+            self.node_set, self.edge_set, self.grid_set, self.pos_set
+        )
+    }
+}
 
 
 pub fn count_query_idmode(
-    queries: Vec<GeometricHash>, query_map: HashMap<GeometricHash, ((usize, usize), bool)>,
-    offset_table: DashMap<GeometricHash, (usize, usize)>, value_vec: &[u16],
+    queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    offset_table: &DashMap<GeometricHash, (usize, usize)>, value_vec: &[u16],
     lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
 ) -> HashMap<usize, QueryResult> {
     let mut query_count_map = HashMap::new();
@@ -158,8 +171,8 @@ pub fn count_query_idmode(
 }
 
 pub fn count_query_gridmode(
-    queries: Vec<GeometricHash>, query_map: HashMap<GeometricHash, ((usize, usize), bool)>,
-    offset_table: DashMap<GeometricHash, (usize, usize)>, value_vec: &[u8],
+    queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    offset_table: &DashMap<GeometricHash, (usize, usize)>, value_vec: &[u8],
     lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
 ) -> HashMap<usize, QueryResult> {
     let mut query_count_map = HashMap::new();

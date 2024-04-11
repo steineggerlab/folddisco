@@ -3,18 +3,16 @@
 ## TODOs 240409
 
 DEV
-- [x] DONE:Print original query
-- [ ] Print node residue, 
-- [ ] CLI::query_pdb: Output option
-- [ ] CLI::query_pdb: Multiple queries by input file
+- [x] DONE: CLI::query_pdb: Multiple queries by input file
+BENCHMARK
+- [ ] Setup module & script
+  - [ ] benchmark script
+- [ ] TODO: check SCOP database
+- [x] DONE: Print node residue, 
+- [x] DONE: CLI::query_pdb: Output option
 - [ ] TODO: IMPORTANT: Restore retrieving functionality
 
 IMPORTANT: BENCHMARK 
-- [ ] Setup module & script
-    - [x] DONE: benchmark module
-    - [ ] benchmark script
-- [x] DONE: Use hashset not to count duplicates
-- [ ] TODO: check SCOP database
 - [ ] Compare with pyscomotif
   - [ ] TODO: IMPORTANT: Download and rerun pyscomotif
   - [ ] TODO: Pyscomotif in two options
@@ -23,16 +21,13 @@ QUERYING
 - [ ] Allow different amino acid pairs
   - [ ] TODO: Policies: Any, Exact, Same property
 - [ ] Collect test query info / commands in QUERY.md
+- [ ] Apply graph based algorithms (MASTER, ...) after running folddisco
 
 INDEXING
 - [x] DONE: Add an option to save indices with different schemes
   - [ ] 3. ID + position
 
-- [ ] Apply graph based algorithms (MASTER, ...) after running folddisco
-
-
 ## TODOs 
-
 BENCHMARK
 - [ ] Build an index of Swissprot & PDB
 - [ ] Check if the query from other lab works or not
@@ -163,7 +158,9 @@ testing commands
 > 2024-04-09 21:24:11
 ```sh
 analysis/h_sapiens/d16a4/index_id       data/serine_pyscomotif.tsv      data/serine_answer.tsv  20504   198     124     PDBTrRosetta    16      4       108     20290   90      16      0.5455  0.8710  0.9948  0.6708
+analysis/h_sapiens/d16a4/index_id       temp.ser.tsv                    data/serine_answer.tsv  20504   643     124     PDBTrRosetta    16      4       114     19851   529     10      0.1773  0.9194  0.9737  0.2973
 analysis/h_sapiens/d16a4/index_id       data/serine_folddisco.tsv       data/serine_answer.tsv  20504   105     124     PDBTrRosetta    16      4       101     20376   4       23      0.9619  0.8145  0.9987  0.8821
 analysis/h_sapiens/d16a4/index_id       data/zinc_pyscomotif.tsv        data/zinc_answer.tsv    20504   304     1817    PDBTrRosetta    16      4       277     18669   27      1540    0.9112  0.1524  0.9236  0.2612
-analysis/h_sapiens/d16a4/index_id       data/zinc_folddisco.tsv data/zinc_answer.tsv    20504   766     1817    PDBTrRosetta    16      4       753     18683   13      1064    0.9830  0.4144  0.9475  0.5830
+analysis/h_sapiens/d16a4/index_id       temp.zinc.tsv                   data/zinc_answer.tsv    20504   1409    1817    PDBTrRosetta    16      4       895     18182   514     922     0.6352  0.4926  0.9300  0.5549
+analysis/h_sapiens/d16a4/index_id       data/zinc_folddisco.tsv         data/zinc_answer.tsv    20504   766     1817    PDBTrRosetta    16      4       753     18683   13      1064    0.9830  0.4144  0.9475  0.5830
 ```

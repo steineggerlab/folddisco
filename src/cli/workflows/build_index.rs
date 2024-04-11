@@ -203,13 +203,13 @@ mod tests {
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
-        let hash_type = "3di";
-        let index_path = "data/serine_peptidases_3di";
+        let hash_type = "pdbtr";
+        let index_path = "data/serine_peptidases_pdbtr";
         let index_mode = "id";
         let num_threads = 1;
         let num_bin_dist = 16;
         let num_bin_angle = 6;
-        let chunk_size = 30;
+        let chunk_size = 5;
         let max_residue = 3000;
         let grid_width = 40.0;
         let recursive = true;

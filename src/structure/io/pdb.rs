@@ -46,6 +46,10 @@ impl Reader<File> {
                     // Current version does not support multiple models in one PDB file
                     break;
                 }
+                // If line is less than 6 characters, skip the line
+                if atomline.len() < 6 {
+                    continue;
+                }
                 match &atomline[..6] {
                     "MODEL " => {
                         model += 1;

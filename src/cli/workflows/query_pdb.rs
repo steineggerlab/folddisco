@@ -10,6 +10,7 @@ use core::{hash, num};
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Write};
 
+use dashmap::DashMap;
 use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig, QueryConfig};
@@ -201,17 +202,20 @@ pub fn query_pdb(env: AppArgs) {
             // BEFORE
 
             // Merge query_map_vec based on same query_info_string
-            let mut query_count_map: HashMap<(String, String), Vec<(usize, QueryResult)>> = HashMap::new();
-            for (query_count_vec, query_info_string, output_path) in query_map_vec.iter() {
+            let mut query_count_map: DashMap<(String, String), Vec<(usize, QueryResult)>> = DashMap::new();
+            // for (query_count_vec, query_info_string, output_path) in query_map_vec.iter() {
+            query_map_vec.into_par_iter().for_each(|(query_count_vec, query_info_string, output_path)| {
                 let key = (query_info_string.clone(), output_path.clone());
                 if query_count_map.contains_key(&key) {
                     query_count_map.get_mut(&key).unwrap().extend(query_count_vec.clone());
                 } else {
                     query_count_map.insert(key, query_count_vec.clone());
                 }
-            }
-            let mut query_map_vec = query_count_map.into_iter().collect::<Vec<((String, String), Vec<(usize, QueryResult)>)>>();
-            for ((query_residues, output_path),query_count_vec) in query_map_vec.iter_mut() {
+            });
+            let mut query_map_vec = query_count_map.into_par_iter().collect::<Vec<((String, String), Vec<(usize, QueryResult)>)>>();
+            
+            // for ((query_residues, output_path),query_count_vec) in query_map_vec.iter_mut() {
+            query_map_vec.par_iter_mut().for_each(|((query_residues, output_path), query_count_vec)| {
                 measure_time!(query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
                 // If output path is not empty, write to file
                 if !output_path.is_empty() {
@@ -231,7 +235,7 @@ pub fn query_pdb(env: AppArgs) {
                         println!("{:?}\t{}\t{}", v, query_residues, index_path.clone().unwrap());
                     }
                 }
-            }
+            });
         },
         _ => {
             eprintln!("{}", HELP_QUERY);

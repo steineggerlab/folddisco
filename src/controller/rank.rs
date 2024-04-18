@@ -59,11 +59,12 @@ impl QueryResult {
 impl fmt::Display for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:?}\t{:?}\t{:?}\t{:?}", 
+            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, self.pos_set.len(),
-            self.node_set, self.edge_set, self.grid_set, self.pos_set
+            self.nres, self.plddt, 
+            // self.pos_set.len(),
+            // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
     }
 }
@@ -71,11 +72,12 @@ impl fmt::Display for QueryResult {
 impl fmt::Debug for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:?}\t{:?}\t{:?}\t{:?}", 
+            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, self.pos_set.len(),
-            self.node_set, self.edge_set, self.grid_set, self.pos_set
+            self.nres, self.plddt, 
+            // self.pos_set.len(),
+            // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
     }
 }
@@ -83,11 +85,12 @@ impl fmt::Debug for QueryResult {
 impl QueryResult {
     pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:?}\t{:?}\t{:?}\t{:?}", 
+            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, self.pos_set.len(),
-            self.node_set, self.edge_set, self.grid_set, self.pos_set
+            self.nres, self.plddt, 
+            // self.pos_set.len(),
+            // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
     }
 }

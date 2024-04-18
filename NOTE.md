@@ -4,13 +4,22 @@
 
 DEV
 - [x] DONE: CLI::query_pdb: Multiple queries by input file
+  - [ ] Split by query not to use excessive memory
+  - [ ] Per query: iterate this
+    - [ ] Count Query as hashmap -> Filter -> Sort -> Write
+  - [ ] The indices should be loaded only once
+
 BENCHMARK
 - [ ] Setup module & script
   - [ ] benchmark script
 - [ ] TODO: check SCOP database
 - [x] DONE: Print node residue, 
 - [x] DONE: CLI::query_pdb: Output option
-- [ ] TODO: IMPORTANT: Restore retrieving functionality
+  - [ ] TODO: IMPORTANT: Restore retrieving functionality
+- [ ] TODO: Index should not be a mandatory parameter --> Fix this
+
+SCORING
+- [ ] MASTER
 
 IMPORTANT: BENCHMARK 
 - [ ] Compare with pyscomotif

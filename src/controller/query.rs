@@ -142,7 +142,7 @@ pub fn parse_threshold_string(threshold_string: Option<String>) -> Vec<f32> {
 
 pub fn make_query_map(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
-    nbin_dist: usize, nbin_angle: usize, dist_thresholds: Vec<f32>, angle_thresholds: Vec<f32>
+    nbin_dist: usize, nbin_angle: usize, dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>
 ) -> HashMap<GeometricHash, ((usize, usize), bool)> {
 
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
@@ -391,7 +391,7 @@ mod tests {
         let dist_thresholds: Vec<f32> = vec![0.5];
         let angle_thresholds: Vec<f32> = vec![5.0,10.0,15.0];
         let hash_type = HashType::PDBMotifSinCos;
-        let hash_collection = make_query_map(&path, &query_residues, hash_type, 8, 3, dist_thresholds, angle_thresholds);
+        let hash_collection = make_query_map(&path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds);
         println!("{:?}", hash_collection);
         println!("{}", hash_collection.len());
         // Print the count where value.1 is true

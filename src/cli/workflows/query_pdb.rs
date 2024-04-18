@@ -128,6 +128,8 @@ pub fn query_pdb(env: AppArgs) {
                     &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &pdb_path))
                 ).to_compact();
                 let query_residues = parse_query_string(&query_string, query_structure.chains[0]);
+                drop(query_structure);
+                drop(pdb_file);
                 // Get query map for each query in all indices
                 let mut queried_from_indices: Vec<(usize, QueryResult)> = loaded_index_vec.par_iter().map(
                     |(offset_table, lookup, config, value_path)| {
@@ -156,6 +158,9 @@ pub fn query_pdb(env: AppArgs) {
                                     v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
+                                drop(mmap);
+                                drop(value_vec);
+                                drop(match_count_filter);
                                 query_count_vec
                             },
                             IndexMode::Grid => {
@@ -174,6 +179,9 @@ pub fn query_pdb(env: AppArgs) {
                                     v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
+                                drop(mmap);
+                                drop(value_vec);
+                                drop(match_count_filter);
                                 query_count_vec
                             },
                             IndexMode::Pos => {
@@ -185,7 +193,7 @@ pub fn query_pdb(env: AppArgs) {
                     acc.extend(x);
                     acc
                 });
-
+                drop(query_residues);
                 // Sort query_count_vec by idf
                 measure_time!(queried_from_indices.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
                 // If output path is not empty, write to file

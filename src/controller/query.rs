@@ -41,7 +41,6 @@ pub fn make_query(
         if let Some(index) = index {
             // convert u8 array to string
             let residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
-            print_log_msg(INFO, &format!("Found residue: {}:{:?}({})", chain as char, ri, residue));
             indices.push(index);
         }
     }
@@ -168,7 +167,6 @@ pub fn make_query_map(
         if let Some(index) = index {
             // convert u8 array to string
             let residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
-            print_log_msg(INFO, &format!("Found residue: {}:{:?}({})", chain as char, ri, residue));
             indices.push(index);
         }
     }

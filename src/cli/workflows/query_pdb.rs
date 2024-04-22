@@ -6,27 +6,21 @@
 // This file contains the workflow for querying PDB files
 // When querying PDB files, we need index table and query file.
 
-use core::{hash, num};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::{BufRead, Write};
 
 use dashmap::DashMap;
 use rayon::prelude::*;
 
-use crate::cli::config::{read_index_config_from_file, IndexConfig, QueryConfig};
+use crate::cli::config::{read_index_config_from_file, IndexConfig};
 use crate::controller::mode::IndexMode;
 use crate::cli::*;
-use crate::controller::io::{
-    get_values_with_offset, get_values_with_offset_u16, get_values_with_offset_u24, 
-    get_values_with_offset_u8, read_offset_map, read_u16_vector, read_u32_vector, 
-    read_u8_vector, read_usize_vector
-};
-use crate::controller::query::{self, check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
+use crate::controller::io::{read_offset_map, read_u16_vector, read_u8_vector};
+use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
 use crate::controller::rank::{count_query_gridmode, count_query_idmode, QueryResult};
-use crate::controller::retrieve::{connected, hash_vec_to_aa_pairs, res_vec_as_string, retrieve_residue_with_hash};
-use crate::index::lookup::{load_lookup_from_file};
+// use crate::controller::retrieve::{connected, hash_vec_to_aa_pairs, res_vec_as_string, retrieve_residue_with_hash};
+use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
-use crate::structure::grid::{convert_to_id_grid_vector, grid_index_to_tuple, nearby, tuple_to_grid_index};
 
 pub const HELP_QUERY: &str = "\
 USAGE: motifsearch query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
@@ -55,7 +49,7 @@ pub fn query_pdb(env: AppArgs) {
             query_string,
             threads,
             index_path,
-            retrieve,
+            retrieve, // TODO: Restore retrieve function
             amino_acid, // TODO:" Implement amino acid mode"
             dist_threshold,
             angle_threshold,
@@ -86,7 +80,7 @@ pub fn query_pdb(env: AppArgs) {
                 print_log_msg(INFO, &format!("Found {} index file(s). Querying with {} threads", index_paths.len(), threads));
             }
             // Set thread pool
-            let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+            let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
 
             let queries = if query_string.ends_with(".txt") || query_string.ends_with(".tsv") {
                 // Read file and get path, query, output by line
@@ -152,14 +146,13 @@ pub fn query_pdb(env: AppArgs) {
                                 let match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()
                                 );
-                                let query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(k, v)| {
+                                let query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
                                     v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
                                 drop(mmap);
-                                drop(value_vec);
                                 drop(match_count_filter);
                                 query_count_vec
                             },
@@ -173,14 +166,13 @@ pub fn query_pdb(env: AppArgs) {
                                 let match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()
                                 );
-                                let query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(k, v)| {
+                                let query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
                                     v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
                                 drop(mmap);
-                                drop(value_vec);
                                 drop(match_count_filter);
                                 query_count_vec
                             },
@@ -203,14 +195,14 @@ pub fn query_pdb(env: AppArgs) {
                         &log_msg(FAIL, &format!("Failed to create file: {}", &output_path))
                     );
                     let mut writer = std::io::BufWriter::new(file);
-                    for (k, v) in queried_from_indices.iter() {
+                    for (_k, v) in queried_from_indices.iter() {
                         writer.write_all(format!("{:?}\t{}\t{}\n", v, query_string, index_path.clone().unwrap()
                     ).as_bytes()).expect(
                             &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
                         );
                     }
                 } else {
-                    for (k, v) in queried_from_indices.iter() {
+                    for (_k, v) in queried_from_indices.iter() {
                         println!("{:?}\t{}\t{}", v, query_string, index_path.clone().unwrap());
                     }
                 }
@@ -304,7 +296,6 @@ mod tests {
         let query_string = String::from("B57,B102,C195");
         let threads = 4;
         let index_path = Some(String::from("data/serine_peptidases_pdbtr"));
-        let exact_match = false;
         let retrieve = false;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));

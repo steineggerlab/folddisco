@@ -4,7 +4,7 @@ use std::io::BufRead;
 use crate::cli::*;
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
-use crate::utils::benchmark::{compare_target_answer_set, measure_up_to_k_fp};
+use crate::utils::benchmark::measure_up_to_k_fp;
 
 use crate::cli::config::read_index_config_from_file;
 

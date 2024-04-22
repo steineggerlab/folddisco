@@ -8,14 +8,6 @@
 pub mod workflows;
 pub mod config;
 
-#[derive(Debug)]
-enum Subcommand {
-    Index,
-    Query,
-    Benchmark,
-    // Add subcommands here
-}
-
 pub enum AppArgs {
     Global {
         help: bool,

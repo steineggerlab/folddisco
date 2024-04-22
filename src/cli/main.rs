@@ -5,7 +5,6 @@
 
 // use crate::*;
 use motifsearch::cli::{workflows::{build_index, benchmark, query_pdb}, *};
-use motifsearch::prelude::*;
 const HELP: &str = "\
 USAGE: motifsearch index [OPTIONS] <PDBS...>
        motifsearch query [OPTIONS] <PDB> <INDEX>
@@ -83,7 +82,7 @@ fn main() {
         std::process::exit(1);
     });
     match parsed_args {
-        AppArgs::Global { help } => {
+        AppArgs::Global { help: _ } => {
             eprintln!("{}", HELP);
         }
         AppArgs::Index { help, .. } => {
@@ -93,7 +92,7 @@ fn main() {
                 build_index::build_index(parsed_args);
             }
         }
-        AppArgs::Query { help, threads, .. } => {
+        AppArgs::Query { help, .. } => {
             if help {
                 eprintln!("{}", workflows::query_pdb::HELP_QUERY);
             } else {

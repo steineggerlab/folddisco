@@ -1,5 +1,5 @@
 
-use std::{fs, io::{BufRead, Read, Write}};
+use std::{fs, io::{BufRead, Write}};
 use crate::prelude::{HashType, log_msg, FAIL};
 use toml::map::Map;
 use crate::controller::mode::IndexMode;
@@ -174,9 +174,6 @@ pub fn read_query_config_from_file(path: &str) -> QueryConfig {
 }
 
 pub fn write_configs_to_file(path: &str, index_config: Option<IndexConfig>, query_config: Option<QueryConfig>) {
-    let mut file = std::fs::File::create(path).expect(
-        &log_msg(FAIL, &format!("Unable to create config file: {}", path))
-    );
     let mut toml = Map::new();
     if let Some(index_config) = index_config {
         toml.insert("index".to_string(), index_config.to_toml());
@@ -209,7 +206,6 @@ pub fn read_configs_from_file(path: &str) -> (Option<IndexConfig>, Option<QueryC
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     #[test]
     fn test_write_configs_to_file() {
         let path = "data/configs.toml";

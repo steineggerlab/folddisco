@@ -5,8 +5,6 @@
 
 use dashmap::DashMap;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rustc_hash::FxHashMap;
-use core::hash;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write, Error};
 use memmap2::Mmap;
@@ -17,7 +15,7 @@ use std::mem::size_of;
 pub fn save_offset_map(
     path: &str, offset_map: &DashMap<GeometricHash, (usize, usize)>
 ) -> Result<(), Error> {
-    let mut file = OpenOptions::new()
+    let file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -51,7 +49,7 @@ pub fn save_offset_map(
 pub fn save_offset_vec(
     path: &str, offset_map: &Vec<(GeometricHash, usize, usize)>
 ) -> Result<(), Error> {
-    let mut file = OpenOptions::new()
+    let file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -85,7 +83,7 @@ pub fn read_offset_map_single(path: &str, hash_type: HashType) -> Result<DashMap
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
     let hash_encoding_type = hash_type.encoding_type();
-    let mut offset_map = DashMap::with_capacity(mmap.len() / (16 + (hash_encoding_type / 8)) as usize);
+    let offset_map = DashMap::with_capacity(mmap.len() / (16 + (hash_encoding_type / 8)) as usize);
     let mut offset = 0;
     while offset < mmap.len() {
         let (key, w): (GeometricHash, usize) = match hash_encoding_type {
@@ -151,7 +149,7 @@ pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<Geomet
 
 
 pub fn write_usize_vector(path: &str, vec: &Vec<usize>) -> Result<(), Error> {
-    let mut file = OpenOptions::new()
+    let file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -298,12 +296,10 @@ pub fn read_u32_vector(path: &str)-> Result<(Mmap, &'static [u32]), Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::measure_time;
-
     use super::*;
     #[test]
     fn test_offset_map_io() {
-        let mut offset_map = DashMap::new();
+        let offset_map = DashMap::new();
         offset_map.insert(GeometricHash::from_u64(0, HashType::PDBMotif), (0, 10));
         offset_map.insert(GeometricHash::from_u64(1, HashType::PDBMotif), (10, 10));
         offset_map.insert(GeometricHash::from_u64(2, HashType::PDBMotif), (20, 10));
@@ -321,7 +317,7 @@ mod tests {
     fn test_usize_vector_io() {
         let vec = vec![1, 2, 3, 4, 5];
         write_usize_vector("test_usize_vector_io.value", &vec).unwrap();
-        let (mmap, vec) = read_usize_vector("test_usize_vector_io.value").unwrap();
+        let (_mmap, vec) = read_usize_vector("test_usize_vector_io.value").unwrap();
         assert_eq!(vec, &[1, 2, 3, 4, 5]);
     }
     

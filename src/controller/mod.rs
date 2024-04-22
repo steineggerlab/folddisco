@@ -19,11 +19,11 @@ use rayon::prelude::*;
 
 // Internal imports
 use crate::prelude::print_log_msg;
-use crate::structure::grid::{get_grid_index_vector_from_compact, DEFAULT_GRID_WIDTH};
+use crate::structure::grid::DEFAULT_GRID_WIDTH;
 use crate::{measure_time, PDBReader};
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::index::alloc::{IndexBuilder};
-use crate::utils::log::{ log_msg, INFO, FAIL, WARN, DONE };
+use crate::index::alloc::IndexBuilder;
+use crate::utils::log::{ log_msg, FAIL, WARN };
 use crate::controller::feature::get_geometric_hash_from_structure;
 
 use self::feature::get_geometric_hash_with_grid;

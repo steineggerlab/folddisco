@@ -255,7 +255,7 @@ impl GeometricHash {
             GeometricHash::PDBTrRosetta(hash) => hash.reverse_hash_default(),
             GeometricHash::TertiaryInteraction(hash) => hash.reverse_hash_default(),
             // append new hash type here
-            _ => panic!("Invalid hash type"),
+            // _ => panic!("Invalid hash type"),
         }
     }
 
@@ -271,7 +271,7 @@ impl GeometricHash {
             GeometricHash::PDBTrRosetta(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::TertiaryInteraction(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             // append new hash type here
-            _ => panic!("Invalid hash type"),
+            // _ => panic!("Invalid hash type"),
         }
     }
     
@@ -287,7 +287,7 @@ impl GeometricHash {
             GeometricHash::PDBTrRosetta(hash) => hash.hash_type(),
             GeometricHash::TertiaryInteraction(hash) => hash.hash_type(),
             // append new hash type here
-            _ => panic!("Invalid hash type"),
+            // _ => panic!("Invalid hash type"),
         }
     }
     
@@ -378,7 +378,7 @@ impl GeometricHash {
             GeometricHash::PDBTrRosetta(hash) => hash.as_u64(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u64(),
             // append new hash type here
-            _ => panic!("Invalid hash type"),
+            // _ => panic!("Invalid hash type"),
         }
     }
     
@@ -471,7 +471,7 @@ impl fmt::Debug for GeometricHash {
                 write!(f, "TertiaryInteraction({:?})", hash)
             },
             // append new hash type here
-            _ => panic!("Invalid hash type"),
+            // _ => panic!("Invalid hash type"),
         }
     }
 }
@@ -507,7 +507,7 @@ impl fmt::Display for GeometricHash {
                 write!(f, "TertiaryInteraction\t{:?}", hash)
             },
             // append new hash type here
-            _ => panic!("Invalid hash type"),
+            // _ => panic!("Invalid hash type"),
         }
     }
 }

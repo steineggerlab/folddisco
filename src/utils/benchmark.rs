@@ -74,9 +74,7 @@ pub fn compare_target_answer_set<T: Eq + PartialEq + Hash>(target: &HashSet<T>, 
 pub fn measure_up_to_k_fp<T: Eq + PartialEq + Hash>(target: &Vec<T>, answer: &HashSet<T>, all: &HashSet<T>, k: f64) -> Metrics {
     // Iter until k false positives are found
     let mut true_pos = 0.0;
-    let mut true_neg = 0.0;
     let mut false_pos = 0.0;
-    let mut false_neg = 0.0;
     // Iterate over target
     for t in target {
         if answer.contains(t) {
@@ -89,8 +87,8 @@ pub fn measure_up_to_k_fp<T: Eq + PartialEq + Hash>(target: &Vec<T>, answer: &Ha
         }
     }
     // False negatives
-    false_neg = answer.len() as f64 - true_pos;
+    let false_neg = answer.len() as f64 - true_pos;
     // True negatives
-    true_neg = all.len() as f64 - (true_pos + false_pos + false_neg);
+    let true_neg = all.len() as f64 - (true_pos + false_pos + false_neg);
     Metrics::new(true_pos, true_neg, false_pos, false_neg)
 }

@@ -5,7 +5,7 @@ pub mod pdb;
 #[derive(Debug)]
 pub enum StructureFileFormat {
     PDB,
-    PDB_GZ,
+    PDBGZ,
     CIF,
     FCZ,
     MMTF,

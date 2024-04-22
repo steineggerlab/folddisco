@@ -3,21 +3,16 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
-use rayon::iter::ParallelIterator;
-use rayon::prelude::*;
 // external crates
-use rustc_hash::{FxHashMap};
+use rustc_hash::FxHashMap;
 use dashmap::DashMap;
 
 
 // 
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
-
-// Measure time
-
 
 use crate::HashableSync;
 
@@ -368,121 +363,3 @@ pub fn convert_sorted_pairs_to_offset_and_values_vec<V: HashableSync, K:Hashable
     vec.shrink_to_fit();
     (offset_list, vec)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    fn create_test_data(num_key: usize, num_value: usize) -> Vec<Vec<usize>> {
-        let mut data = Vec::new();
-        for i in 0..num_key {
-            let mut inner = Vec::new();
-            for j in 0..num_value {
-                inner.push(i * num_value + j);
-            }
-            data.push(inner);
-        }
-        println!("Created test data with {} keys and {} values", num_key, num_value);
-        println!("data.len(): {}", data.len());
-        data
-    }
-}
-
-// pub struct HugeAllocation {
-//     pub allocation: UnsafeCell<Vec<usize>>,
-// }
-
-// unsafe impl Sync for HugeAllocation {}
-
-// pub fn run(num_threads: usize, ext_data: Arc<Vec<Vec<usize>>>) -> Arc<HugeAllocation> {
-//     println!("Creating {} threads", num_threads);
-//     // Iterate through ext_data and get the total size
-//     let total_size = Arc::new(AtomicUsize::new(0));
-//     let ext_data_index = Arc::new(AtomicUsize::new(0));
-//     // Spawn threads to find out the size to allocate
-//     let start = Instant::now();
-//     let mut handles = vec![];
-//     for i in 0..num_threads {
-//         let ext_data = ext_data.clone();
-//         let total_size = total_size.clone();
-//         let ext_data_index = ext_data_index.clone();
-//         let handle = thread::spawn(move || {
-//             // While there is data to check the size, keep checking
-//             while ext_data_index.load(Ordering::Relaxed) < ext_data.len() {
-//                 let ext_data_index = ext_data_index.fetch_add(1, Ordering::Relaxed);
-//                 if ext_data_index >= ext_data.len() {
-//                     break;
-//                 }
-//                 let ext_data_inner = &ext_data[ext_data_index];
-//                 total_size.fetch_add(ext_data_inner.len(), Ordering::Relaxed);
-//             }
-//         });
-//         handles.push(handle);
-//     }
-//     for handle in handles {
-//         handle.join().unwrap();
-//     }
-//     let estimation_time = start.elapsed();
-//     println!("Estimation time: {:?}", estimation_time);
-//     println!(
-//         "Allocating {} gigabytes", 
-//         total_size.clone().load(Ordering::Relaxed) as f32 * 8.0 / 1024.0 / 1024.0 / 1024.0
-//     );
-
-//     // Allocate the memory
-//     let start = Instant::now();
-//     let data = Arc::new(HugeAllocation {
-//         allocation: UnsafeCell::new(vec![0; total_size.load(Ordering::Relaxed)]),
-//     });
-//     let allocation_time = start.elapsed();
-//     println!("Allocation time: {:?}", allocation_time);
-//     // Spawn threads to copy the data
-//     let start = Instant::now();
-//     let mut handles = vec![];
-//     let mut ext_data_index = Arc::new(AtomicUsize::new(0));
-
-//     let expected_num_value = ext_data[0].len();
-//     let size_per_value = total_size.load(Ordering::Relaxed) / expected_num_value;
-//     let offset_vec = (0..expected_num_value).map(
-//         |x| AtomicUsize::new(x * size_per_value)
-//     ).collect::<Vec<AtomicUsize>>();
-//     let offset_vec = Arc::new(offset_vec);
-    
-//     for i in 0..num_threads {
-//         let data_clone = Arc::clone(&data);
-//         let ext_data = ext_data.clone();
-//         let ext_data_index = ext_data_index.clone();
-//         let offset_vec = offset_vec.clone();
-//         let handle = thread::spawn(move || {
-//             while ext_data_index.load(Ordering::Relaxed) < ext_data.len() {
-//                 let ext_data_index = ext_data_index.fetch_add(1, Ordering::Relaxed);
-//                 if ext_data_index >= ext_data.len() {
-//                     break;
-//                 }
-//                 let ext_data_inner = &ext_data[ext_data_index];
-//                 // let offset_in_allocation = offset_in_allocation.fetch_add(ext_data_inner.len(), Ordering::Relaxed);
-//                 let data = data_clone.allocation.get();
-//                 for j in 0..ext_data_inner.len() {
-//                     // Get offset from offsets map for value of j
-//                     let val = ext_data_inner[j];
-//                     let offset_in_allocation = offset_vec[val].fetch_add(1, Ordering::Relaxed);
-//                     unsafe {
-//                         (*data)[offset_in_allocation] = ext_data_index;
-//                     }
-//                 }
-//             }
-//         });
-//         handles.push(handle);
-//     }
-//     for handle in handles {
-//         handle.join().unwrap();
-//     }
-//     let computation_time = start.elapsed();
-//     println!("Filling time: {:?}", computation_time);
-    
-//     for i in 0..10 {
-//         println!("{:?}", offset_vec[i].load(Ordering::Relaxed));
-//     }
-    
-//     return data;
-// }

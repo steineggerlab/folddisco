@@ -75,7 +75,7 @@ impl Torsion {
     }
 
     pub fn calc_psi_angle(structure: &Structure, nth: usize) -> f32 {
-        let psi_vec: Vec<f32> = Vec::new();
+        let _psi_vec: Vec<f32> = Vec::new();
 
         let n = structure.atom_vector.get_nth_n(nth).get_coordinate();
         let ca = structure.atom_vector.get_nth_ca(nth).get_coordinate();

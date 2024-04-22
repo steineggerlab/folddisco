@@ -131,7 +131,7 @@ mod tests {
         ];
 
         let hash = HashValue::perfect_hash_default(raw_feature.clone());
-        let reversed = hash.reverse_hash_default();
+        let _reversed = hash.reverse_hash_default();
         println!("{:?}", hash);
     }
     #[test]
@@ -144,7 +144,7 @@ mod tests {
             raw_feature.2, raw_feature.3, raw_feature.4
         ];
         let hash = HashValue::perfect_hash(raw_feature.clone(), 16, 8);
-        let reversed = hash.reverse_hash(16, 8);
+        let _reversed = hash.reverse_hash(16, 8);
         println!("{:?}", hash);
     }
 }

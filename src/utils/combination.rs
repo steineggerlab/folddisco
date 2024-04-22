@@ -57,7 +57,7 @@ mod tests {
     }
     #[test]
     fn test_long_combination_iterator() {
-        let mut comb_iter = CombinationIterator::new(10);
+        let comb_iter = CombinationIterator::new(10);
         comb_iter.for_each(|(i, j)| {
             println!("{} {}", i, j);
         });

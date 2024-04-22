@@ -1,8 +1,8 @@
 // 
-use std::{collections::{HashMap, HashSet}, fs::File, hash::Hash};
-use crate::{geometry::util::map_aa_to_u8, prelude::*, utils::combination::CombinationIterator};
+use std::{collections::{HashMap, HashSet}, fs::File};
+use crate::{prelude::*, utils::combination::CombinationIterator};
 
-use super::feature::{self, get_single_feature};
+use super::feature::{get_single_feature};
 
 pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
     let mut output: HashSet<(u32, u32)> = HashSet::new();
@@ -14,7 +14,7 @@ pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)
 }
 
 pub fn retrieve_residue_with_hash(
-    hash_set: &HashSet<GeometricHash>, aa_filter: &HashSet<(u32, u32)>, path: &str, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
+    hash_set: &HashSet<GeometricHash>, _aa_filter: &HashSet<(u32, u32)>, path: &str, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
 ) -> Option<Vec<((u8, u8), (u64, u64))>> {
 
     let file = File::open(path).expect("File not found");
@@ -52,7 +52,7 @@ pub fn retrieve_residue_with_hash(
     }
 }
 
-pub fn connected(res_ind_vec: &Vec<((u8, u8), (u64, u64))>, len: usize) -> usize {
+pub fn connected(res_ind_vec: &Vec<((u8, u8), (u64, u64))>, _len: usize) -> usize {
     let mut res_set: HashMap<String, usize> = HashMap::new();
     for (i, j) in res_ind_vec {
         let key1 = format!("{}{}", i.0 as char, j.0);
@@ -75,7 +75,7 @@ pub fn connected(res_ind_vec: &Vec<((u8, u8), (u64, u64))>, len: usize) -> usize
     max
 }
 
-pub fn cycle(res_ind_vec: &Vec<((u8, u8), (u64, u64))>) -> usize {
+pub fn cycle(_res_ind_vec: &Vec<((u8, u8), (u64, u64))>) -> usize {
     // Use res_ind_vec as a directed graph and count cycles
     todo!();
 }

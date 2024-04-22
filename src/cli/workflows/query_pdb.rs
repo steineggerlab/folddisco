@@ -49,8 +49,8 @@ pub fn query_pdb(env: AppArgs) {
             query_string,
             threads,
             index_path,
-            retrieve, // TODO: Restore retrieve function
-            amino_acid, // TODO:" Implement amino acid mode"
+            retrieve: _, // TODO: Restore retrieve function
+            amino_acid: _, // TODO:" Implement amino acid mode"
             dist_threshold,
             angle_threshold,
             match_cutoff,

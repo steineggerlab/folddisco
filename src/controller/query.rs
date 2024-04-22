@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use dashmap::DashMap;
+
 
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::prelude::{print_log_msg, PDBReader, INFO};
@@ -40,7 +40,7 @@ pub fn make_query(
         let index = compact.get_index(&chain, &ri);
         if let Some(index) = index {
             // convert u8 array to string
-            let residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
+            let _residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
             indices.push(index);
         }
     }
@@ -166,7 +166,7 @@ pub fn make_query_map(
         let index = compact.get_index(&chain, &ri);
         if let Some(index) = index {
             // convert u8 array to string
-            let residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
+            let _residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
             indices.push(index);
         }
     }
@@ -333,7 +333,7 @@ pub fn check_and_get_indices(index_path: Option<String>, verbose: bool) -> Vec<S
     // Get path. formatting without quotation marks
     let index_path = index_path.unwrap();
     // Check if index_path_0 is a file.
-    let index_chunk_prefix = format!("{}_0", index_path.clone());
+    let _index_chunk_prefix = format!("{}_0", index_path.clone());
     let index_chunk_path = format!("{}_0.offset", index_path.clone());
     let mut index_paths = Vec::new();
     if std::path::Path::new(&index_chunk_path).is_file() {

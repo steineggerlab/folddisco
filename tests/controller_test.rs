@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+
 // Import unique
-use std::collections::HashSet;
+
 
 
 use motifsearch::prelude::*;
@@ -59,11 +59,11 @@ fn test_folddisco_pdbmotifsincos() {
     fold_disco.fill_numeric_id_vec();
     let mut hashes = fold_disco.hash_id_grids.clone();
     // Get the memory usage of hashes
-    let size = std::mem::size_of_val(&hashes);
-    let total_size = std::mem::size_of_val(&hashes[0]) * hashes.len();
+    let _size = std::mem::size_of_val(&hashes);
+    let _total_size = std::mem::size_of_val(&hashes[0]) * hashes.len();
     // sort hashes
     measure_time!(hashes.par_sort_by(|a, b| a.0.cmp(&b.0)));
-    let (offset, values) = measure_time!(convert_sorted_pairs_to_offset_and_values_vec(hashes));
+    let (_offset, _values) = measure_time!(convert_sorted_pairs_to_offset_and_values_vec(hashes));
 }
 
 

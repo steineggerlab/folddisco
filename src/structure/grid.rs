@@ -2,7 +2,7 @@
 // Max grid is 6x6x6
 
 use crate::structure::coordinate::Coordinate;
-use crate::structure::core::{Structure, CompactStructure};
+use crate::structure::core::{CompactStructure};
 
 pub const MAX_GRID_SIZE: u8 = 6;
 pub const DEFAULT_GRID_WIDTH: f32 = 50.0;

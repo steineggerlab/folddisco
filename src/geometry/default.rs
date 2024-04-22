@@ -81,7 +81,7 @@ impl HashValue {
         HashValue(hashvalue)
     }
 
-    fn _reverse_hash(&self, nbin_dist: f32, nbin_angle: f32) -> [f32; 8] {
+    fn _reverse_hash(&self, _nbin_dist: f32, nbin_angle: f32) -> [f32; 8] {
         let res1 = (self.0 >> 49) as f32;
         // Mask bits
         let res2 = ((self.0 >> 44) & BITMASK64_5BIT) as f32;

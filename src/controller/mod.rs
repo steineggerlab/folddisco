@@ -154,9 +154,9 @@ impl FoldDisco {
     }
 
     pub fn collect_hash(&mut self) {
-        let mut path_order: Arc<Vec<usize>> = Arc::new(Vec::with_capacity(self.path_vec.len()));
-        let mut nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
-        let mut plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
+        let path_order: Arc<Vec<usize>> = Arc::new(Vec::with_capacity(self.path_vec.len()));
+        let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
+        let plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
@@ -167,7 +167,7 @@ impl FoldDisco {
             self.path_vec
                 .par_iter()
                 .map(|pdb_path| {
-                    let mut path_order = path_order.clone();
+                    let _path_order = path_order.clone();
                     // let mut path_order = Arc::make_mut(&mut path_order);
                     let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
                     let pdb_reader = PDBReader::from_file(pdb_path).expect(
@@ -220,15 +220,15 @@ impl FoldDisco {
     }
     
     pub fn collect_hash_pairs(&mut self) {
-        let mut nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
-        let mut plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
+        let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
+        let plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating files");
         // For iterating files, apply multi-threading with num_threads_for_file
-        let mut collected: Vec<(GeometricHash, usize)> = pool.install(|| {
+        let collected: Vec<(GeometricHash, usize)> = pool.install(|| {
             self.path_vec
                 .par_iter()
                 .map(|pdb_path| {
@@ -287,15 +287,15 @@ impl FoldDisco {
     }
     
     pub fn collect_hash_grids(&mut self) {
-        let mut nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
-        let mut plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
+        let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
+        let plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating files");
         // For iterating files, apply multi-threading with num_threads_for_file
-        let mut collected: Vec<(GeometricHash, usize)> = pool.install(|| {
+        let collected: Vec<(GeometricHash, usize)> = pool.install(|| {
             self.path_vec
                 .par_iter()
                 .map(|pdb_path| {
@@ -394,7 +394,7 @@ impl FoldDisco {
         allocation_size
     }
 
-    pub fn save_raw_feature(&mut self, path: &str, discretize: bool) {
+    pub fn save_raw_feature(&mut self, _path: &str, _discretize: bool) {
         todo!("Implement save_raw_feature method!!!");
     }
 
@@ -429,7 +429,7 @@ impl FoldDisco {
         // self.index_builder.fill_with_dashmap();
         let index_map = measure_time!(self.index_builder.fill_and_return_dashmap());
         // TODO: IMPORTANT: Move this.
-        let (offset_map, value_vec) = measure_time!(self.index_builder.convert_hashmap_to_offset_and_values(index_map));
+        let (_offset_map, _value_vec) = measure_time!(self.index_builder.convert_hashmap_to_offset_and_values(index_map));
     }
     
     pub fn save_offset_map(&self) {

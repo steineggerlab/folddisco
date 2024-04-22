@@ -6,19 +6,19 @@
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 // external crates
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap};
 use dashmap::DashMap;
 
-use std::collections::BTreeMap;
+
 // 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
-use std::hash::Hash;
+
 // Measure time
-use crate::measure_time;
-use crate::structure::atom::Atom;
+
+
 use crate::HashableSync;
 
 const DEFAULT_NUM_THREADS: usize = 4;
@@ -137,7 +137,7 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         let total_size = Arc::new(AtomicUsize::new(0));
         let ext_data_index = Arc::new(AtomicUsize::new(0));
         let mut handles = vec![];
-        for i in 0..self.num_threads {
+        for _i in 0..self.num_threads {
             let ext_data = self.data.clone();
             let total_size = total_size.clone();
             let ext_data_index = ext_data_index.clone();
@@ -210,9 +210,9 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         // 
         for _ in 0..self.num_threads {
             let data = self.data.clone();   
-            let ids = self.ids.clone();
+            let _ids = self.ids.clone();
             let data_index = data_index.clone();
-            let allocation = self.allocation.clone();
+            let _allocation = self.allocation.clone();
             let handle = thread::spawn(move || {
                 while data_index.load(Ordering::Relaxed) < data.len() {
                     let data_index = data_index.fetch_add(1, Ordering::Relaxed);
@@ -222,7 +222,7 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
                     let data_inner = &data[data_index];
                     for j in 0..data_inner.len() {
                         // Get offset from offsets map for value of j
-                        let val = data_inner[j];
+                        let _val = data_inner[j];
                     }
                     // Update offset map
                     // self.offset.insert(data_inner[j].clone(), offset);
@@ -243,9 +243,9 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
         // OffsetMap - key: hash, value: (offset, length)
         // Vec - all values concatenated
         println!("Orig map length: {}", orig_map.len());
-        let mut offset_map = DashMap::new();
+        let offset_map = DashMap::new();
         let mut vec: Vec<K> = Vec::new();
-        let mut offset = AtomicUsize::new(0);
+        let offset = AtomicUsize::new(0);
         
         orig_map.iter().for_each(|entry| {
             let hash = entry.key().to_owned();
@@ -265,9 +265,9 @@ impl<K: HashableSync, V: HashableSync> IndexBuilder<K, V> {
     ) -> (DashMap<V, (usize, usize)>, Vec<K>) {
         // OffsetMap - key: hash, value: (offset, length)
         // Vec - all values concatenated
-        let mut offset_map = DashMap::new();
+        let offset_map = DashMap::new();
         let mut vec: Vec<K> = Vec::new();
-        let mut offset = AtomicUsize::new(0);
+        let offset = AtomicUsize::new(0);
         
         sorted_pairs.iter().for_each(|pair| {
             // If offset_map does not contain the key, insert it
@@ -301,9 +301,9 @@ pub fn convert_sorted_pairs_to_offset_and_values<V: HashableSync, K:HashableSync
 ) -> (DashMap<V, (usize, usize)>, Vec<K>) {
     // OffsetMap - key: hash, value: (offset, length)
     // Vec - all values concatenated
-    let mut offset_map = DashMap::new();
+    let offset_map = DashMap::new();
     let mut vec: Vec<K> = Vec::new();
-    let mut offset = AtomicUsize::new(0);
+    let offset = AtomicUsize::new(0);
     
     sorted_pairs.iter().for_each(|pair| {
         // If offset_map does not contain the key, insert it

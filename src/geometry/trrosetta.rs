@@ -226,7 +226,7 @@ impl fmt::Display for HashValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::util::map_aa_to_u8;
+    
     use crate::geometry::core::GeometricHash;
     #[test]
     fn test_geometrichash_works() {

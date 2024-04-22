@@ -3,7 +3,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 
 use flate2::read::GzDecoder;
-use rayon::collections::binary_heap;
+
 
 use super::super::core::*;
 use super::parser::*;
@@ -40,7 +40,7 @@ impl Reader<File> {
         let mut record = (b' ', 0);
         let mut model = 0;
         // Reading each line of PDB, parse and build atomvector.
-        for (idx, line) in reader.lines().enumerate() {
+        for (_idx, line) in reader.lines().enumerate() {
             if let Ok(atomline) = line {
                 if model > 1 {
                     // Current version does not support multiple models in one PDB file
@@ -60,7 +60,7 @@ impl Reader<File> {
                             Ok(atom) => {
                                 structure.update(atom, &mut record);
                             }
-                            Err(e) => {
+                            Err(_e) => {
                                 continue;
                             }
                         }
@@ -92,7 +92,7 @@ impl Reader<File> {
         // Read binary as a string. Conver
         let reader = BufReader::new(&binary[..]);
         // Convert to string
-        for (idx, line) in reader.lines().enumerate() {
+        for (_idx, line) in reader.lines().enumerate() {
             if let Ok(atomline) = line {
                 match &atomline[..6] {
                     "ATOM  " => {
@@ -101,7 +101,7 @@ impl Reader<File> {
                             Ok(atom) => {
                                 structure.update(atom, &mut record);
                             }
-                            Err(e) => {
+                            Err(_e) => {
                                 // Conversion error. Jusk skip the line.
                                 // If verbose, print message (NOT IMPLEMENTED)
                                 // println!("Skipping line{}: {}", idx, e);
@@ -128,7 +128,7 @@ mod tests {
 
     use super::*;
     use std::fs::File;
-    use std::io::Read;
+    
     use std::path::Path;
     
     

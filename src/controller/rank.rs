@@ -1,15 +1,15 @@
 // Functions for ranking queried results
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use std::fmt;
 
 use dashmap::DashMap;
 
 use crate::structure::grid::grid_index_to_tuple;
 use crate::{prelude::GeometricHash, structure::grid::convert_to_id_grid_vector};
-use crate::controller::mode::IndexMode;
 
-use super::io::{get_values_with_offset_u16, get_values_with_offset_u24, get_values_with_offset_u32};
+
+use super::io::{get_values_with_offset_u16, get_values_with_offset_u24};
 
 #[derive(Clone)]
 pub struct QueryResult {
@@ -102,7 +102,7 @@ pub fn count_query_idmode(
     lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
 ) -> HashMap<usize, QueryResult> {
     let mut query_count_map = HashMap::new();
-    for (i, query) in queries.iter().enumerate() {
+    for (_i, query) in queries.iter().enumerate() {
         let offset = offset_table.get(query);
         if offset.is_none() {
             continue;
@@ -119,7 +119,7 @@ pub fn count_query_idmode(
             let nres = lookup.2[single_queried_values[j] as usize];
             let plddt = lookup.3[single_queried_values[j] as usize];
             
-            let mut result = query_count_map.get_mut(&nid);
+            let result = query_count_map.get_mut(&nid);
             let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
             let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
             
@@ -140,7 +140,7 @@ pub fn count_query_idmode(
                 query_result.edge_set = edge_set;
                 query_count_map.insert(nid, query_result);
             } else {
-                let mut result = result.unwrap();
+                let result = result.unwrap();
                 if result.node_set.contains_key(&edge.0) {
                     let count = result.node_set.get_mut(&edge.0).unwrap();
                     *count += 1;
@@ -179,7 +179,7 @@ pub fn count_query_gridmode(
     lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
 ) -> HashMap<usize, QueryResult> {
     let mut query_count_map = HashMap::new();
-    for (i, query) in queries.iter().enumerate() {
+    for (_i, query) in queries.iter().enumerate() {
         let offset = offset_table.get(query);
         if offset.is_none() {
             continue;
@@ -198,7 +198,7 @@ pub fn count_query_gridmode(
             let plddt = lookup.3[single_queried_values[j].0 as usize];
             let grid_index = single_queried_values[j].1;
             
-            let mut result = query_count_map.get_mut(&nid);
+            let result = query_count_map.get_mut(&nid);
             let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
             let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
             
@@ -222,7 +222,7 @@ pub fn count_query_gridmode(
                 query_result.grid_set = grid_set;
                 query_count_map.insert(nid, query_result);
             } else {
-                let mut result = result.unwrap();
+                let result = result.unwrap();
                 if result.node_set.contains_key(&edge.0) {
                     let count = result.node_set.get_mut(&edge.0).unwrap();
                     *count += 1;

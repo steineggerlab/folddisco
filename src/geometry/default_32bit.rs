@@ -11,7 +11,7 @@ use crate::geometry::util::discretize_f32_value_into_u32 as discretize_value;
 use crate::geometry::util::continuize_u32_value_into_f32 as continuize_value;
 use crate::geometry::util::*;
 
-use super::util::map_u32_to_aa_pair;
+
 use super::util::map_u32_to_aa_u32_pair;
 
 // TODO: IMPORTANT: Implement this to reduce execution time
@@ -94,7 +94,7 @@ impl HashValue {
         HashValue(hashvalue)
     }
 
-    fn _reverse_hash(&self, nbin_dist: f32, nbin_angle: f32) -> [f32; 8] {
+    fn _reverse_hash(&self, _nbin_dist: f32, nbin_angle: f32) -> [f32; 8] {
         let res_pair = ((self.0 >> 23) & BITMASK32_9BIT) as u32;
         let (res1, res2) = map_u32_to_aa_u32_pair(res_pair);
         // Mask bits

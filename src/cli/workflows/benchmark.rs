@@ -4,7 +4,7 @@ use std::io::BufRead;
 use crate::cli::*;
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
-use crate::utils::benchmark::compare_target_answer_set;
+use crate::utils::benchmark::{compare_target_answer_set, measure_up_to_k_fp};
 
 use crate::cli::config::read_index_config_from_file;
 
@@ -29,14 +29,16 @@ pub fn benchmark(env: AppArgs) {
             let config_path = format!("{}.type", index_path);
 
             let format = format.as_str();
-            let result = read_one_column_of_tsv(&result_path, 0);
+            // let result = read_one_column_of_tsv(&result_path, 0);
+            let result = read_one_column_of_tsv_as_vec(&result_path, 0);
             let answer = read_one_column_of_tsv(&answer_path, 0);
             let lookup = load_lookup_from_file(&lookup_path).0;
             let lookup = lookup.into_iter().collect::<HashSet<_>>();
             let config = read_index_config_from_file(&config_path);
 
-            let metric = compare_target_answer_set(&result, &answer, &lookup);
-
+            // let metric = compare_target_answer_set(&result, &answer, &lookup);
+            let metric = measure_up_to_k_fp(&result, &answer, &lookup, 5.0);
+            
             match format {
                 "tsv" => {
                     // lookup, result, answer, lookup_len, result_len, answer_len,
@@ -111,6 +113,21 @@ fn read_one_column_of_tsv(file: &str, col_index: usize) -> HashSet<String> {
     set
 }
 
+fn read_one_column_of_tsv_as_vec(file: &str, col_index: usize) -> Vec<String> {
+    let mut vec = Vec::new();
+    // Open file and get specific column
+    let file = std::fs::File::open(file).expect(
+        &log_msg(FAIL, &format!("Failed to open tsv file: {}", file))
+    );
+    let reader = std::io::BufReader::new(file);
+    reader.lines().for_each(|line| {
+        let line = line.expect(&log_msg(FAIL, "Failed to read line"));
+        let row = line.split('\t').collect::<Vec<_>>();
+        vec.push(row[col_index].to_string());
+    });
+    vec
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -119,8 +136,8 @@ mod tests {
     #[test]
     #[ignore]
     fn test_benchmark() {
-        let result = Some("data/serine_folddisco.tsv".to_string());
-        let answer = Some("data/serine_answer.tsv".to_string());
+        let result = Some("data/zinc_folddisco.tsv".to_string());
+        let answer = Some("data/zinc_answer.tsv".to_string());
         let index = Some("analysis/h_sapiens/d16a4/index_id".to_string());
         let format = "tsv";
         let env = AppArgs::Benchmark {

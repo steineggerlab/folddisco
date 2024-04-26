@@ -1,14 +1,7 @@
-//! # About project
+//! # Folddisco
 //!
-//! Motifsearch is a tool for finding discontinuous motifs in protein structures.
-//! # Things to keep in mind when developing
-//! * No dependencies between huge modules
-//!   * geometry ←→ structure ←→ index
-//! * Make errors visible
-//!   * No unwrap, use Option/Result/expect/match
-//! * Write tests
-//!   * Unit tests at source files
-//!   * Integration tests at `tests/`
+//! Folddisco is a tool for finding discontinuous motifs in protein structures.
+
 
 use std::hash::Hash;
 use std::fmt::Debug;

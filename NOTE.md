@@ -3,19 +3,13 @@
 ## TODOs 240409
 
 DEV
-- [x] DONE: CLI::query_pdb: Multiple queries by input file
-  - [ ] Split by query not to use excessive memory
-  - [ ] Per query: iterate this
-    - [ ] Count Query as hashmap -> Filter -> Sort -> Write
-  - [ ] The indices should be loaded only once
+- [ ] Write rustdoc
 
 BENCHMARK
-- [ ] Setup module & script
+- [x] Setup module & script
   - [ ] benchmark script
 - [ ] TODO: check SCOP database
-- [x] DONE: Print node residue, 
-- [x] DONE: CLI::query_pdb: Output option
-  - [ ] TODO: IMPORTANT: Restore retrieving functionality
+- [ ] TODO: IMPORTANT: Restore retrieving functionality
 - [ ] TODO: Index should not be a mandatory parameter --> Fix this
 
 SCORING
@@ -23,7 +17,6 @@ SCORING
 
 IMPORTANT: BENCHMARK 
 - [ ] Compare with pyscomotif
-  - [ ] TODO: IMPORTANT: Download and rerun pyscomotif
   - [ ] TODO: Pyscomotif in two options
 
 QUERYING
@@ -173,3 +166,12 @@ analysis/h_sapiens/d16a4/index_id       data/zinc_pyscomotif.tsv        data/zin
 analysis/h_sapiens/d16a4/index_id       temp.zinc.tsv                   data/zinc_answer.tsv    20504   1409    1817    PDBTrRosetta    16      4       895     18182   514     922     0.6352  0.4926  0.9300  0.5549
 analysis/h_sapiens/d16a4/index_id       data/zinc_folddisco.tsv         data/zinc_answer.tsv    20504   766     1817    PDBTrRosetta    16      4       753     18683   13      1064    0.9830  0.4144  0.9475  0.5830
 ```
+
+# Things to keep in mind when developing
+* No dependencies between huge modules
+  * geometry ←→ structure ←→ index
+* Make errors visible
+  * Avoid unwrap, use Option/Result/expect/match
+* Write tests
+  * Unit tests at source files
+  * Integration tests at `tests/`

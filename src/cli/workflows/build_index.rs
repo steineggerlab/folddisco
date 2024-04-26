@@ -2,10 +2,10 @@
 // Created: 2023-09-05 16:36:23
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2023 Hyunbin Kim, All rights reserved
-// Description
-// This file contains the workflow for building index table
-// For building index table, we need a directory containing PDB files, 
-// and the path to save the index table.
+
+//! This file contains the workflow for building index table
+//! For building index table, we need a directory containing PDB files, 
+//! and the path to save the index table.
 
 
 use crate::cli::config::{write_index_config_to_file, IndexConfig};
@@ -20,7 +20,7 @@ use peak_alloc::PeakAlloc;
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 pub const HELP_INDEX: &str = "\
-USAGE: motifsearch index [OPTIONS]
+USAGE: folddisco index [OPTIONS]
 Options:
     -p, --pdbs <PDB_DIR>         Directory containing PDB files
     -y, --type <HASH_TYPE>       Hash type to use (pdb, trrosetta, default)

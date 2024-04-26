@@ -3,15 +3,19 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
+//! Main entry point for FoldDisco CLI
+
 // use crate::*;
-use motifsearch::cli::{workflows::{build_index, benchmark, query_pdb}, *};
+use folddisco::cli::{workflows::{build_index, benchmark, query_pdb}, *};
 const HELP: &str = "\
-USAGE: motifsearch index [OPTIONS] <PDBS...>
-       motifsearch query [OPTIONS] <PDB> <INDEX>
+USAGE: folddisco index [OPTIONS] -p <PDBS...> -i <INDEX> -y <TYPE>
+       folddisco query [OPTIONS] -p <PDB> -i <INDEX> -q <QUERY>
+       folddisco benchmark [OPTIONS] -r <RESULT> -a <ANSWER> -i <INDEX>
 
 SUBCOMMANDS:
   index     Create a new index table from multiple protein structures
   query     Query a motif from an index table
+  benchmark Benchmark the performance of FoldDisco
 OPTIONS:
   -t, --threads <THREADS>    Number of threads to use
   -h, --help                 Print this help menu

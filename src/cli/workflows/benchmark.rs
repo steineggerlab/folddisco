@@ -8,8 +8,8 @@ use crate::utils::benchmark::measure_up_to_k_fp;
 
 use crate::cli::config::read_index_config_from_file;
 
-// usage: motifsearch benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f tsv
-// usage: motifsearch benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f default
+// usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f tsv
+// usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f default
 pub fn benchmark(env: AppArgs) {
     match env {
         AppArgs::Benchmark {

@@ -1,11 +1,10 @@
 [package]
-# TODO: THIS SHOULD BE RENAMED!
-name = "motifsearch"
-version = "0.1.0"
+name = "folddisco"
+version = "1.0.0"
 edition = "2021"
 authors = ["Hyunbin Kim <khb7840@gmail.com>", "Rachel Kim <seamustard52@gmail.com>"]
 description = "A bioinformatics tool for finding discontinuous motifs in protein structures"
-repository = "https://github.com/steineggerlab/motifsearch"
+repository = "https://github.com/steineggerlab/folddisco"
 
 
 # test optimization
@@ -15,8 +14,7 @@ opt-level = 3
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-# TODO: THIS SHOULD BE RENAMED!
-name = "motifsearch"
+name = "folddisco"
 path = "src/cli/main.rs"
 
 [dependencies]

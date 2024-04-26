@@ -1,3 +1,5 @@
+//! Command line interface for FoldDisco
+
 // File: mod.rs
 // Created: 2023-09-05 16:36:23
 // Author: Hyunbin Kim (khb7840@gmail.com)

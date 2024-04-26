@@ -3,7 +3,7 @@
 
 
 
-use motifsearch::prelude::*;
+use folddisco::prelude::*;
 use rayon::prelude::*;
 
 mod common;

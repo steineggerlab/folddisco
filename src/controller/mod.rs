@@ -6,6 +6,7 @@
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
 pub mod feature;
+pub mod graph;
 pub mod io;
 pub mod query;
 pub mod retrieve;

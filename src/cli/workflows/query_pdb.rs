@@ -18,6 +18,7 @@ use crate::cli::*;
 use crate::controller::io::{read_offset_map, read_u16_vector, read_u8_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
 use crate::controller::rank::{count_query_gridmode, count_query_idmode, QueryResult};
+use crate::controller::retrieve::retrieval_wrapper;
 // use crate::controller::retrieve::{connected, hash_vec_to_aa_pairs, res_vec_as_string, retrieve_residue_with_hash};
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
@@ -49,7 +50,7 @@ pub fn query_pdb(env: AppArgs) {
             query_string,
             threads,
             index_path,
-            retrieve: _, // TODO: Restore retrieve function
+            retrieve,
             amino_acid: _, // TODO:" Implement amino acid mode"
             dist_threshold,
             angle_threshold,
@@ -127,6 +128,7 @@ pub fn query_pdb(env: AppArgs) {
                 // Get query map for each query in all indices
                 let mut queried_from_indices: Vec<(usize, QueryResult)> = loaded_index_vec.par_iter().map(
                     |(offset_table, lookup, config, value_path)| {
+                        let residue_count = query_residues.len();
                         let hash_type = config.hash_type;
                         let num_bin_dist = config.num_bin_dist;
                         let num_bin_angle = config.num_bin_angle;
@@ -143,15 +145,30 @@ pub fn query_pdb(env: AppArgs) {
                                 let query_count_map = measure_time!(count_query_idmode(
                                     &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
                                 ));
-                                let match_count_filter = get_match_count_filter(
+                                let mut match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()
                                 );
-                                let query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
+                                if retrieve {
+                                    match_count_filter[1] = residue_count;
+                                }
+                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
                                     v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
+                                // IF retrieve is true, retrieve matching residues
+                                if retrieve {
+                                    query_count_vec.iter_mut().for_each(|(_, v)| {
+                                        let retrieval_result = retrieval_wrapper(
+                                            &v.id, residue_count, &pdb_query, hash_type, num_bin_dist, num_bin_angle
+                                        );
+                                        v.matching_residues = retrieval_result;
+                                    });
+                                    drop(mmap);
+                                    drop(match_count_filter);
+                                    return query_count_vec;
+                                }
                                 drop(mmap);
                                 drop(match_count_filter);
                                 query_count_vec
@@ -163,15 +180,30 @@ pub fn query_pdb(env: AppArgs) {
                                 let query_count_map = measure_time!(count_query_gridmode(
                                     &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
                                 ));
-                                let match_count_filter = get_match_count_filter(
+                                let mut match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()
                                 );
-                                let query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
+                                if retrieve {
+                                    match_count_filter[1] = residue_count;
+                                }
+                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
                                     v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
+                                // IF retrieve is true, retrieve matching residues
+                                if retrieve {
+                                    query_count_vec.iter_mut().for_each(|(_, v)| {
+                                        let retrieval_result = retrieval_wrapper(
+                                            &v.id, residue_count, &pdb_query, hash_type, num_bin_dist, num_bin_angle
+                                        );
+                                        v.matching_residues = retrieval_result;
+                                    });
+                                    drop(mmap);
+                                    drop(match_count_filter);
+                                    return query_count_vec;
+                                }
                                 drop(mmap);
                                 drop(match_count_filter);
                                 query_count_vec
@@ -296,11 +328,11 @@ mod tests {
         let query_string = String::from("B57,B102,C195");
         let threads = 4;
         let index_path = Some(String::from("data/serine_peptidases_pdbtr"));
-        let retrieve = false;
+        let retrieve = true;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;
-        let match_cutoff = Some(String::from("0.0,0.8,0.0,0.0"));
+        let match_cutoff = Some(String::from("0.0"));
         let score_cutoff = 0.0;
         let num_res_cutoff = 3000;
         let plddt_cutoff = 0.0;

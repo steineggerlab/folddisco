@@ -1,7 +1,12 @@
 # Development note
 
-## TODOs 240409
-
+## TODOs 240509
+QUERYING
+- [x] DONE: IMPORTANT: Restore retrieving functionality
+- [x] Graph based matching? just checking connectivity
+  - IDEA is getting the connected components of the graph with same number of nodes (both strong and weak connected components)
+- [ ] TODO: IMPORTANT: RMSD calculation for matched positions
+  - [ ] TODO: NEED superposition for the matched positions
 DEV
 - [ ] Write rustdoc
 
@@ -9,7 +14,6 @@ BENCHMARK
 - [x] Setup module & script
   - [ ] benchmark script
 - [ ] TODO: check SCOP database
-- [ ] TODO: IMPORTANT: Restore retrieving functionality
 - [ ] TODO: Index should not be a mandatory parameter --> Fix this
 
 SCORING

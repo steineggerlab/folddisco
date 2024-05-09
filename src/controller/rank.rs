@@ -28,6 +28,7 @@ pub struct QueryResult {
     pub edge_set: HashMap<(usize, usize), usize>,
     pub grid_set: HashMap<(u8, u8, u8), usize>,
     pub pos_set: HashMap<(u16, u16), usize>,
+    pub matching_residues: Vec<String>,
 }
 
 impl QueryResult {
@@ -52,6 +53,7 @@ impl QueryResult {
             edge_set: HashMap::new(),
             grid_set: HashMap::new(),
             pos_set: HashMap::new(),
+            matching_residues: Vec::new(),
         }
     }
 }
@@ -59,10 +61,10 @@ impl QueryResult {
 impl fmt::Display for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
+            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, 
+            self.nres, self.plddt, self.matching_residues.join(";")
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
@@ -72,10 +74,10 @@ impl fmt::Display for QueryResult {
 impl fmt::Debug for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
+            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, 
+            self.nres, self.plddt, self.matching_residues.join(";") 
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
@@ -85,10 +87,10 @@ impl fmt::Debug for QueryResult {
 impl QueryResult {
     pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
+            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, 
+            self.nres, self.plddt, self.matching_residues.join(";")
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )

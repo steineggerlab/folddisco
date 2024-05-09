@@ -33,7 +33,7 @@ Options:
     -c, --chunk <CHUNK_SIZE>     Number of PDB files to index at once (default, max=65535)
     -r, --recursive              Index PDB files in subdirectories
     -n, --max-residue <MAX_RES>  Maximum number of residues in a PDB file (default=3000)
-    --idtype <ID_TYPE>           ID type to use (pdb, uniprot, afdb, relpath, abspath, default=relpath)
+    --id <ID_TYPE>               ID type to use (pdb, uniprot, afdb, relpath, abspath, default=relpath)
     -v, --verbose                Print verbose messages
     -h, --help                   Print this help menu
 ";
@@ -215,7 +215,7 @@ mod tests {
         let recursive = true;
         let verbose = true;
         let help = false;
-        let id_type = "pdb";
+        let id_type = "relpath";
         let env = AppArgs::Index {
             pdb_dir: Some(pdb_dir.to_string()),
             hash_type: hash_type.to_string(),

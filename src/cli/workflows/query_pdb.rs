@@ -123,12 +123,16 @@ pub fn query_pdb(env: AppArgs) {
                     &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &pdb_path))
                 ).to_compact();
                 let query_residues = parse_query_string(&query_string, query_structure.chains[0]);
+                let residue_count = if query_residues.is_empty() {
+                    query_structure.num_residues
+                } else {
+                    query_residues.len()
+                };
                 drop(query_structure);
                 drop(pdb_file);
                 // Get query map for each query in all indices
                 let mut queried_from_indices: Vec<(usize, QueryResult)> = loaded_index_vec.par_iter().map(
                     |(offset_table, lookup, config, value_path)| {
-                        let residue_count = query_residues.len();
                         let hash_type = config.hash_type;
                         let num_bin_dist = config.num_bin_dist;
                         let num_bin_angle = config.num_bin_angle;
@@ -228,8 +232,7 @@ pub fn query_pdb(env: AppArgs) {
                     );
                     let mut writer = std::io::BufWriter::new(file);
                     for (_k, v) in queried_from_indices.iter() {
-                        writer.write_all(format!("{:?}\t{}\t{}\n", v, query_string, index_path.clone().unwrap()
-                    ).as_bytes()).expect(
+                        writer.write_all(format!("{:?}\t{}\t{}\n", v, query_string, index_path.clone().unwrap()).as_bytes()).expect(
                             &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
                         );
                     }

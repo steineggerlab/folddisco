@@ -1,26 +1,26 @@
 # Development note
 
-## TODOs 240509
+## TODOs 240514
 QUERYING
-- [x] DONE: IMPORTANT: Restore retrieving functionality
-- [x] Graph based matching? just checking connectivity
-  - IDEA is getting the connected components of the graph with same number of nodes (both strong and weak connected components)
 - [ ] TODO: IMPORTANT: RMSD calculation for matched positions
   - [ ] TODO: NEED superposition for the matched positions
 DEV
 - [ ] Write rustdoc
 
 BENCHMARK
-- [x] Setup module & script
-  - [ ] benchmark script
-- [ ] TODO: check SCOP database
 - [ ] TODO: Index should not be a mandatory parameter --> Fix this
+- Benchmark plan
+  - 1. Known motifs
+    - Compare with pyscomotif, PDB
+    - Serine peptidase, Zinc finger, Aminopeptidase, 
+  - 2. Random motifs (SCOP)
+    - SCOP or SCOP 40
+
 
 SCORING
 - [ ] MASTER
 
 IMPORTANT: BENCHMARK 
-- [ ] Compare with pyscomotif
   - [ ] TODO: Pyscomotif in two options
 
 QUERYING
@@ -179,3 +179,14 @@ analysis/h_sapiens/d16a4/index_id       data/zinc_folddisco.tsv         data/zin
 * Write tests
   * Unit tests at source files
   * Integration tests at `tests/`
+
+
+analysis/e_coli/pdb/AF-P76176-F1-model_v4.pdb   76.3243 6       3       6       2       0       1       273     89.81777        A145,A223,A84   B57,B102,C195   analysis/e_coli/pdbtr/d16a4/index
+
+ATOM    391  CA  HIS B  57       6.994   8.354  42.405  1.00  7.59           C  
+ATOM    733  CA  ASP B 102       9.429   7.479  48.266  1.00  8.81           C  
+ATOM   1392  CA  SER C 195       5.547   0.158  42.050  1.00  7.92           C  
+
+ATOM   1084  CA  ASP A 145     -12.833   3.134  -7.780  1.00 97.66           C  
+ATOM   1669  CA  SER A 223      -5.720  -2.218  -3.368  1.00 98.13           C  
+ATOM    608  CA  HIS A  84     -13.958  -1.741  -4.223  1.00 98.13           C  

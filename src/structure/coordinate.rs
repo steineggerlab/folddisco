@@ -45,6 +45,19 @@ impl Coordinate {
             z: self.x * other.y - self.y * other.x,
         }
     }
+    pub fn outer(&self, other: &Coordinate) -> Vec<f32> {
+        vec![
+            self.x * other.x,
+            self.x * other.y,
+            self.x * other.z,
+            self.y * other.x,
+            self.y * other.y,
+            self.y * other.z,
+            self.z * other.x,
+            self.z * other.y,
+            self.z * other.z,
+        ]
+    }
     pub fn norm(&self) -> f32 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }

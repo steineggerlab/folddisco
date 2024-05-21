@@ -2,8 +2,11 @@
 
 ## TODOs 240514
 QUERYING
-- [ ] TODO: IMPORTANT: RMSD calculation for matched positions
-  - [ ] TODO: NEED superposition for the matched positions
+- [x] DONE: IMPORTANT: RMSD calculation for matched positions
+  - [x] DONE: NEED superposition for the matched positions
+  - [x] Implemented QCP superposition
+  - [ ] TODO: Matching query and reference positions
+
 DEV
 - [ ] Write rustdoc
 
@@ -15,7 +18,6 @@ BENCHMARK
     - Serine peptidase, Zinc finger, Aminopeptidase, 
   - 2. Random motifs (SCOP)
     - SCOP or SCOP 40
-
 
 SCORING
 - [ ] MASTER
@@ -190,3 +192,9 @@ ATOM   1392  CA  SER C 195       5.547   0.158  42.050  1.00  7.92           C
 ATOM   1084  CA  ASP A 145     -12.833   3.134  -7.780  1.00 97.66           C  
 ATOM   1669  CA  SER A 223      -5.720  -2.218  -3.368  1.00 98.13           C  
 ATOM    608  CA  HIS A  84     -13.958  -1.741  -4.223  1.00 98.13           C  
+
+analysis/h_sapiens/pdb/AF-Q9BZJ3-F1-model_v4.pdb        68.08451        6       3       6       4       0       1       242     85.22195        A128,A231,A81   B57,B102,C195   analysis/h_sapiens/index
+
+ATOM    612  CA  HIS A  81      -4.924   5.813  -9.485  1.00 96.40           C  
+ATOM   1002  CA  ASP A 128      -0.499  10.073  -8.059  1.00 97.81           C  
+ATOM   1796  CA  SER A 231      -0.792   0.658  -4.430  1.00 96.12           C  

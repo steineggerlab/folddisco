@@ -4,4 +4,4 @@ pub mod core;
 pub mod feature;
 pub mod io;
 pub mod grid;
-pub mod icp;
+pub mod qcp;

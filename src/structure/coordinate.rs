@@ -93,6 +93,10 @@ impl Coordinate {
         let n1_n2 = n1.dot(&n2).acos();
         [d.norm(), n1_nd, n2_nd, n1_n2]
     }
+
+    pub fn to_array(&self) -> [f32; 3] {
+        [self.x, self.y, self.z]
+    }
 }
 
 impl Calculate for Coordinate {

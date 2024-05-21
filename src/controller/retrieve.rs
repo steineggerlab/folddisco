@@ -146,6 +146,9 @@ pub fn res_index_to_char(chain: u8, res_ind: u64) -> String {
     format!("{}{}", chain as char, res_ind)
 }
 
+
+
+
 pub fn retrieval_wrapper(
     path: &str, node_count: usize, query_vector: &Vec<GeometricHash>, _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize
 ) -> Vec<String> {
@@ -161,6 +164,7 @@ pub fn retrieval_wrapper(
     });
     let graph = create_index_graph(&indices_found, &query_vector);
     let connected = connected_components_with_given_node_count(&graph, node_count);
+    
     connected.iter().for_each(|component| {
         let mut res_vec: Vec<String> = Vec::new();
         component.iter().for_each(|&node| {
@@ -226,13 +230,7 @@ mod tests {
             }).collect();
             println!("{:?}", res_vec);
         });
-
-
-
     } 
-    
-
-    
     
     #[test]
     fn test_retrieve_residue_with_hash() {

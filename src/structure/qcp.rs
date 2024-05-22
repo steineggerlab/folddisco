@@ -241,7 +241,8 @@ fn qcp(coords1: &[[f32; 3]], coords2: &[[f32; 3]], natoms: usize) -> (f32, [[f32
     let mut mx_eigenv = e0; // starting guess (x in eqs above)
     let eval_prec = 1e-11; // convergence criterion
     let mut converged = false;
-    for _ in 0..50 {
+    let iteration = 10;
+    for _ in 0..iteration {
         let oldg = mx_eigenv;
 
         let x2 = mx_eigenv * mx_eigenv;
@@ -258,10 +259,9 @@ fn qcp(coords1: &[[f32; 3]], coords2: &[[f32; 3]], natoms: usize) -> (f32, [[f32
             break; // convergence
         }
     }
-
-    if !converged {
-        println!("Newton-Rhapson did not converge after 50 iterations");
-    }
+    // if !converged {
+    //     println!("Newton-Rhapson did not converge after 50 iterations");
+    // }
 
     let rmsd = (2.0 * (e0 - mx_eigenv).abs() / natoms as f32).sqrt();
 

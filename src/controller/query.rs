@@ -187,10 +187,10 @@ pub fn make_query_map(
             let feature_clone = feature.clone();
             if nbin_dist == 0 || nbin_angle == 0 {
                 let hash_value = GeometricHash::perfect_hash_default(feature_clone, hash_type);
-                hash_collection.insert(hash_value, ((i, j), true));
+                hash_collection.insert(hash_value, ((indices[i], indices[j]), true));
             } else {
                 let hash_value = GeometricHash::perfect_hash(feature_clone, hash_type, nbin_dist, nbin_angle);
-                hash_collection.insert(hash_value, ((i, j), true));
+                hash_collection.insert(hash_value, ((indices[i], indices[j]), true));
             }
             if let Some(dist_indices) = &dist_indices {
                 for dist_threshold in dist_thresholds.iter() {
@@ -205,12 +205,12 @@ pub fn make_query_map(
                             if hash_collection.contains_key(&hash_near) {
                                 continue;
                             } else {
-                                hash_collection.insert(hash_near, ((i, j), false));
+                                hash_collection.insert(hash_near, ((indices[i], indices[j]), false));
                             }
                             if hash_collection.contains_key(&hash_far) {
                                 continue;
                             } else {
-                                hash_collection.insert(hash_far, ((i, j), false));
+                                hash_collection.insert(hash_far, ((indices[i], indices[j]), false));
                             }
                         } else {
                             let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
@@ -218,12 +218,12 @@ pub fn make_query_map(
                             if hash_collection.contains_key(&hash_near) {
                                 continue;
                             } else {
-                                hash_collection.insert(hash_near, ((i, j), false));
+                                hash_collection.insert(hash_near, ((indices[i], indices[j]), false));
                             }
                             if hash_collection.contains_key(&hash_far) {
                                 continue;
                             } else {
-                                hash_collection.insert(hash_far, ((i, j), false));
+                                hash_collection.insert(hash_far, ((indices[i], indices[j]), false));
                             }
                         }
                     }
@@ -243,12 +243,12 @@ pub fn make_query_map(
                             if hash_collection.contains_key(&hash_near) {
                                 continue;
                             } else {
-                                hash_collection.insert(hash_near, ((i, j), false));
+                                hash_collection.insert(hash_near, ((indices[i], indices[j]), false));
                             }
                             if hash_collection.contains_key(&hash_far) {
                                 continue;
                             } else {
-                                hash_collection.insert(hash_far, ((i, j), false));
+                                hash_collection.insert(hash_far, ((indices[i], indices[j]), false));
                             }
                         } else {
                             let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
@@ -256,12 +256,12 @@ pub fn make_query_map(
                             if hash_collection.contains_key(&hash_near) {
                                 continue;
                             } else {
-                                hash_collection.insert(hash_near, ((i, j), false));
+                                hash_collection.insert(hash_near, ((indices[i], indices[j]), false));
                             }
                             if hash_collection.contains_key(&hash_far) {
                                 continue;
                             } else {
-                                hash_collection.insert(hash_far, ((i, j), false));
+                                hash_collection.insert(hash_far, ((indices[i], indices[j]), false));
                             }
                         }
                     }

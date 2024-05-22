@@ -301,6 +301,14 @@ impl CarbonCoordinateVector {
         (self.x[idx], self.y[idx], self.z[idx])
     }
 
+    pub fn get_coord(&self, idx: usize) -> Option<Coordinate> {
+        let (x, y, z) = self.get(idx);
+        match (x, y, z) {
+            (Some(x), Some(y), Some(z)) => Some(Coordinate { x, y, z }),
+            _ => None,
+        }
+    }
+    
     pub fn push(&mut self, coordinate: &Coordinate) {
         self.x.push(Some(coordinate.x));
         self.y.push(Some(coordinate.y));

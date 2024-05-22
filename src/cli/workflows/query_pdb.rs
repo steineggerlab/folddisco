@@ -123,12 +123,19 @@ pub fn query_pdb(env: AppArgs) {
                     &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &pdb_path))
                 ).to_compact();
                 let query_residues = parse_query_string(&query_string, query_structure.chains[0]);
+                
                 let residue_count = if query_residues.is_empty() {
                     query_structure.num_residues
                 } else {
                     query_residues.len()
                 };
-                drop(query_structure);
+                let query_string = if query_residues.is_empty() {
+                    query_string
+                } else {
+                    let mut query_residues = query_residues.clone();
+                    query_residues.sort();
+                    res_chain_to_string(&query_residues)
+                };
                 drop(pdb_file);
                 // Get query map for each query in all indices
                 let mut queried_from_indices: Vec<(usize, QueryResult)> = loaded_index_vec.par_iter().map(
@@ -165,7 +172,9 @@ pub fn query_pdb(env: AppArgs) {
                                 if retrieve {
                                     query_count_vec.iter_mut().for_each(|(_, v)| {
                                         let retrieval_result = retrieval_wrapper(
-                                            &v.id, residue_count, &pdb_query, hash_type, num_bin_dist, num_bin_angle
+                                            &v.id, residue_count, &pdb_query,
+                                            hash_type, num_bin_dist, num_bin_angle,
+                                            &pdb_query_map, &query_structure,
                                         );
                                         v.matching_residues = retrieval_result;
                                     });
@@ -200,7 +209,9 @@ pub fn query_pdb(env: AppArgs) {
                                 if retrieve {
                                     query_count_vec.iter_mut().for_each(|(_, v)| {
                                         let retrieval_result = retrieval_wrapper(
-                                            &v.id, residue_count, &pdb_query, hash_type, num_bin_dist, num_bin_angle
+                                            &v.id, residue_count, &pdb_query,
+                                            hash_type, num_bin_dist, num_bin_angle,
+                                            &pdb_query_map, &query_structure,
                                         );
                                         v.matching_residues = retrieval_result;
                                     });
@@ -313,7 +324,7 @@ pub fn get_match_count_filter(match_cutoff: Option<String>, query_length: usize,
 pub fn res_chain_to_string(res_chain: &Vec<(u8, u64)>) -> String {
     let mut output = String::new();
     for (i, (chain, res)) in res_chain.iter().enumerate() {
-        output.push_str(&format!("{}:{}", *chain as char, res));
+        output.push_str(&format!("{}{}", *chain as char, res));
         if i < res_chain.len() - 1 {
             output.push(',');
         }

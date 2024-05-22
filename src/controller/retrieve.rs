@@ -1,8 +1,9 @@
 // 
 use std::{collections::{HashMap, HashSet}, fs::File};
+use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::{geometry::util::map_u8_to_aa, prelude::*, structure::core::CompactStructure, utils::combination::CombinationIterator};
+use crate::{geometry::util::map_u8_to_aa, prelude::*, structure::{coordinate::Coordinate, core::CompactStructure, qcp::QCPSuperimposer}, utils::combination::CombinationIterator};
 use crate::controller::{graph::{connected_components_with_given_node_count, create_index_graph}, query::{make_query, parse_query_string}};
 
 use super::feature::{get_single_feature};
@@ -146,45 +147,111 @@ pub fn res_index_to_char(chain: u8, res_ind: u64) -> String {
     format!("{}{}", chain as char, res_ind)
 }
 
-
-
-
+// Returns a vector of 1) chain+residue index as String and 2) RMSD value as f32
 pub fn retrieval_wrapper(
-    path: &str, node_count: usize, query_vector: &Vec<GeometricHash>, _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize
-) -> Vec<String> {
+    path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
+    _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_structure: &CompactStructure
+) -> Vec<(String, f32)> {
+    // Load structure to retrieve motif
     let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
     let compact = pdb_loaded.read_structure().expect("Error reading structure");
     let compact = compact.to_compact();
     let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();
-    let mut output: Vec<String> = Vec::new();
+    let mut output: Vec<(String, f32)> = Vec::new();
+    // Iterate over query vector and retrieve indices
     query_vector.iter().for_each(|hash| {
         let prefiltered = prefilter_aa_pair(&compact, hash);
         let retrieved = retrieve_with_prefilter(&compact, hash, &prefiltered, _nbin_dist, _nbin_angle);
         indices_found.push(retrieved);
     });
+    // Make a graph and find connected components with the same node count
+    // NOTE: Naive implementation to find matching components. Need to be improved to handle partial matches
     let graph = create_index_graph(&indices_found, &query_vector);
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     connected.iter().for_each(|component| {
+        // Filter graph to get subgraph with component
+        let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
+            |node, _| {
+                if component.contains(&graph[node]) {
+                    Some(graph[node])
+                } else {
+                    None
+                }
+            },
+            |_, edge| Some(*edge)
+        );
+        // Find mapping between query residues and retrieved residues
+        let (query_indices, retrieved_indices) = map_query_and_retrieved_residues(
+            &subgraph, query_map, node_count
+        );
+        // Sort component to match retrieved indices
         let mut res_vec: Vec<String> = Vec::new();
-        component.iter().for_each(|&node| {
+        retrieved_indices.iter().for_each(|&node| {
             let (chain, res_ind) = get_chain_and_res_ind(&compact, node);
             res_vec.push(res_index_to_char(chain, res_ind));
         });
-        output.push(res_vec.join(","));
+
+        let res_string = res_vec.join(",");
+        let rmsd = rmsd_for_matched(
+            query_structure, &compact, &query_indices, &retrieved_indices
+        );
+        output.push((res_string, rmsd));
     });
     output
+}
+
+pub fn map_query_and_retrieved_residues(
+    retrieved: &Graph<usize, GeometricHash>, 
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    node_count: usize
+) -> (Vec<usize>, Vec<usize>) {
+    let mut query_indices: Vec<usize> = Vec::new();
+    let mut retrieved_indices: Vec<usize> = Vec::new();
+    // Iterate over edges in the graph
+    retrieved.edge_indices().for_each(|edge| {
+        let (i, j) = retrieved.edge_endpoints(edge).unwrap();
+        let hash = retrieved[edge];
+        let query = query_map.get(&hash);
+        if query.is_some() {
+            let (query_i, query_j) = query.unwrap().0;
+            // 
+            if !query_indices.contains(&query_i) && !retrieved_indices.contains(&retrieved[i]) {
+                query_indices.push(query_i);
+                retrieved_indices.push(retrieved[i]);
+            }
+            if !query_indices.contains(&query_j) && !retrieved_indices.contains(&retrieved[j]){
+                query_indices.push(query_j);
+                retrieved_indices.push(retrieved[j]);
+            }
+        }
+        if retrieved_indices.len() == node_count {
+            return;
+        }
+    });
+    (query_indices, retrieved_indices)
 }
 
 pub fn rmsd_for_matched(
     compact1: &CompactStructure, compact2: &CompactStructure, 
     index1: &Vec<usize>, index2: &Vec<usize>
 ) -> f32 {
-    todo!()
+    let mut qcp = QCPSuperimposer::new();
+
+    let coord_vec1: Vec<Coordinate> = index1.iter().map(
+        |&i| compact1.ca_vector.get_coord(i).unwrap()
+    ).collect();
+    
+    let coord_vec2: Vec<Coordinate> = index2.iter().map(
+        |&i| compact2.ca_vector.get_coord(i).unwrap()
+    ).collect();
+    
+    qcp.set_atoms(&coord_vec1, &coord_vec2);
+    qcp.run();
+    qcp.get_rms()
 }
-
-
-
 
 #[cfg(test)]
 mod tests {

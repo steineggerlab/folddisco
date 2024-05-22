@@ -28,7 +28,7 @@ pub struct QueryResult {
     pub edge_set: HashMap<(usize, usize), usize>,
     pub grid_set: HashMap<(u8, u8, u8), usize>,
     pub pos_set: HashMap<(u16, u16), usize>,
-    pub matching_residues: Vec<String>,
+    pub matching_residues: Vec<(String, f32)>,
 }
 
 impl QueryResult {
@@ -60,11 +60,15 @@ impl QueryResult {
 
 impl fmt::Display for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let matching_residues_with_score = self.matching_residues.iter().map(
+            // Only print score with 4 decimal places
+            |(x, y)| format!("{}:{:.4}", x, y)
+        ).collect::<Vec<String>>().join(";");
         write!(
             f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, self.matching_residues.join(";")
+            self.nres, self.plddt, matching_residues_with_score
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
@@ -73,11 +77,14 @@ impl fmt::Display for QueryResult {
 
 impl fmt::Debug for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let matching_residues_with_score = self.matching_residues.iter().map(
+            |(x, y)| format!("{}:{:.4}", x, y)
+        ).collect::<Vec<String>>().join(";");
         write!(
             f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, self.matching_residues.join(";") 
+            self.nres, self.plddt, matching_residues_with_score
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
@@ -86,11 +93,14 @@ impl fmt::Debug for QueryResult {
 // write_fmt
 impl QueryResult {
     pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let matching_residues_with_score = self.matching_residues.iter().map(
+            |(x, y)| format!("{}:{:.4}", x, y)
+        ).collect::<Vec<String>>().join(";");
         write!(
             f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, self.matching_residues.join(";")
+            self.nres, self.plddt, matching_residues_with_score
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )

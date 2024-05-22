@@ -158,20 +158,22 @@ pub fn retrieval_wrapper(
     let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
     let compact = pdb_loaded.read_structure().expect("Error reading structure");
     let compact = compact.to_compact();
-    let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();
+    // let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();
     let mut output: Vec<(String, f32)> = Vec::new();
     // Iterate over query vector and retrieve indices
-    query_vector.iter().for_each(|hash| {
+    // Parallel
+    let indices_found = query_vector.par_iter().map(|hash| {
         let prefiltered = prefilter_aa_pair(&compact, hash);
-        let retrieved = retrieve_with_prefilter(&compact, hash, &prefiltered, _nbin_dist, _nbin_angle);
-        indices_found.push(retrieved);
-    });
+        retrieve_with_prefilter(&compact, hash, &prefiltered, _nbin_dist, _nbin_angle)
+    }).collect::<Vec<Vec<(usize, usize)>>>();
+    
     // Make a graph and find connected components with the same node count
     // NOTE: Naive implementation to find matching components. Need to be improved to handle partial matches
     let graph = create_index_graph(&indices_found, &query_vector);
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
-    connected.iter().for_each(|component| {
+    // Parallel
+    let output: Vec<(String, f32)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -183,6 +185,7 @@ pub fn retrieval_wrapper(
             },
             |_, edge| Some(*edge)
         );
+        let node_count = subgraph.node_count();
         // Find mapping between query residues and retrieved residues
         let (query_indices, retrieved_indices) = map_query_and_retrieved_residues(
             &subgraph, query_map, node_count
@@ -198,8 +201,8 @@ pub fn retrieval_wrapper(
         let rmsd = rmsd_for_matched(
             query_structure, &compact, &query_indices, &retrieved_indices
         );
-        output.push((res_string, rmsd));
-    });
+        (res_string, rmsd)
+    }).collect();
     output
 }
 

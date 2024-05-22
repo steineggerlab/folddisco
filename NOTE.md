@@ -1,11 +1,13 @@
 # Development note
 
-## TODOs 240514
+## TODOs 240522
 QUERYING
 - [x] DONE: IMPORTANT: RMSD calculation for matched positions
   - [x] DONE: NEED superposition for the matched positions
   - [x] Implemented QCP superposition
-  - [ ] TODO: Matching query and reference positions
+  - [x] DONE: Matching query and reference positions
+  - [x] DONE: rayon based parallelization
+- [ ] TODO: For partial match, fill in with "_" in the output where the query does not match
 
 DEV
 - [ ] Write rustdoc

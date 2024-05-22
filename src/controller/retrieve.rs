@@ -245,15 +245,15 @@ pub fn rmsd_for_matched(
     index1: &Vec<usize>, index2: &Vec<usize>
 ) -> f32 {
     let mut qcp = QCPSuperimposer::new();
-
+    
     let coord_vec1: Vec<Coordinate> = index1.iter().map(
-        |&i| compact1.ca_vector.get_coord(i).unwrap()
-    ).collect();
+        |&i| (compact1.ca_vector.get_coord(i).unwrap(), compact1.cb_vector.get_coord(i).unwrap())
+    ).flat_map(|(a, b)| vec![a, b]).collect();
     
     let coord_vec2: Vec<Coordinate> = index2.iter().map(
-        |&i| compact2.ca_vector.get_coord(i).unwrap()
-    ).collect();
-    
+        |&i| (compact2.ca_vector.get_coord(i).unwrap(), compact2.cb_vector.get_coord(i).unwrap())
+    ).flat_map(|(a, b)| vec![a, b]).collect();
+
     qcp.set_atoms(&coord_vec1, &coord_vec2);
     qcp.run();
     qcp.get_rms()

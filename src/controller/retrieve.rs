@@ -231,6 +231,12 @@ pub fn map_query_and_retrieved_residues(
             return;
         }
     });
+    // Sort both indices 
+    let mut zipped: Vec<(usize, usize)> = query_indices.iter().zip(retrieved_indices.iter()).map(|(&a, &b)| (a, b)).collect();
+    // Sort by query indices and next by retrieved indices
+    zipped.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    query_indices = zipped.iter().map(|(a, _)| *a).collect(); 
+    retrieved_indices = zipped.iter().map(|(_, b)| *b).collect();   
     (query_indices, retrieved_indices)
 }
 

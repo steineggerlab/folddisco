@@ -152,7 +152,7 @@ pub fn retrieval_wrapper(
     path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
     _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize,
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    query_structure: &CompactStructure
+    query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
 ) -> Vec<(String, f32)> {
     // Load structure to retrieve motif
     let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
@@ -188,14 +188,24 @@ pub fn retrieval_wrapper(
         let node_count = subgraph.node_count();
         // Find mapping between query residues and retrieved residues
         let (query_indices, retrieved_indices) = map_query_and_retrieved_residues(
-            &subgraph, query_map, node_count
+            &subgraph, query_map, node_count,
         );
         // Sort component to match retrieved indices
         let mut res_vec: Vec<String> = Vec::new();
-        retrieved_indices.iter().for_each(|&node| {
-            let (chain, res_ind) = get_chain_and_res_ind(&compact, node);
-            res_vec.push(res_index_to_char(chain, res_ind));
+        all_query_indices.iter().for_each(|&i| {
+            // If i is in query_indices, get the corresponding retrieved index
+            if query_indices.contains(&i) {
+                let index = query_indices.iter().position(|&x| x == i).unwrap();
+                let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_indices[index]);
+                res_vec.push(res_index_to_char(chain, res_ind));
+            } else {
+                res_vec.push("_".to_string());
+            }
         });
+        // retrieved_indices.iter().enumerate().for_each(|(i, &node)| {
+        //     let (chain, res_ind) = get_chain_and_res_ind(&compact, node);
+        //     res_vec.push(res_index_to_char(chain, res_ind));
+        // });
 
         let res_string = res_vec.join(",");
         let rmsd = rmsd_for_matched(
@@ -235,11 +245,11 @@ pub fn map_query_and_retrieved_residues(
         }
     });
     // Sort both indices 
-    let mut zipped: Vec<(usize, usize)> = query_indices.iter().zip(retrieved_indices.iter()).map(|(&a, &b)| (a, b)).collect();
-    // Sort by query indices and next by retrieved indices
-    zipped.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
-    query_indices = zipped.iter().map(|(a, _)| *a).collect(); 
-    retrieved_indices = zipped.iter().map(|(_, b)| *b).collect();   
+    // let mut zipped: Vec<(usize, usize)> = query_indices.iter().zip(retrieved_indices.iter()).map(|(&a, &b)| (a, b)).collect();
+    // // Sort by query indices and next by retrieved indices
+    // zipped.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    // query_indices = zipped.iter().map(|(a, _)| *a).collect(); ㄴ
+    // retrieved_indices = zipped.iter().map(|(_, b)| *b).collect();   
     (query_indices, retrieved_indices)
 }
 

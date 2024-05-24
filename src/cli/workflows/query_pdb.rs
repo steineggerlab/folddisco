@@ -144,7 +144,7 @@ pub fn query_pdb(env: AppArgs) {
                         let num_bin_dist = config.num_bin_dist;
                         let num_bin_angle = config.num_bin_angle;
                         let mode = config.mode;
-                        let pdb_query_map = measure_time!(make_query_map(
+                        let (pdb_query_map, query_indices) = measure_time!(make_query_map(
                             &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds
                         ));
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
@@ -175,7 +175,7 @@ pub fn query_pdb(env: AppArgs) {
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, residue_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
-                                            &pdb_query_map, &query_structure,
+                                            &pdb_query_map, &query_structure, &query_indices,
                                         );
                                         v.matching_residues = retrieval_result;
                                     });
@@ -215,7 +215,7 @@ pub fn query_pdb(env: AppArgs) {
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, residue_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
-                                            &pdb_query_map, &query_structure,
+                                            &pdb_query_map, &query_structure, &query_indices,
                                         );
                                         v.matching_residues = retrieval_result;
                                     });
@@ -281,7 +281,7 @@ pub fn parse_multiple_queries(
         );
         // Make query with pdb
         let query_residues = parse_query_string(&query_string, structure.chains[0]);
-        let pdb_query_map =  measure_time!(make_query_map(
+        let (pdb_query_map, query_indices) =  measure_time!(make_query_map(
             &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds
         ));
         let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();

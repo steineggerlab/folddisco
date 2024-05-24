@@ -3,7 +3,7 @@
 //! Folddisco is a tool for finding discontinuous motifs in protein structures.
 
 
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::fmt::Debug;
 pub mod cli;
 pub mod controller;
@@ -16,7 +16,18 @@ pub mod utils;
 pub use structure::io::pdb::Reader as PDBReader;
 
 // Declare a new trait that supports required traits
-pub trait HashableSync: Clone + Copy + Hash + Sync + Send + Eq + PartialEq + Ord + Debug + 'static {}
+pub trait HashableSync: Clone + Copy + Hash + Sync + Send + Eq + PartialEq + Ord + Debug + 'static {
+    fn hash_u32(&self) -> u32 {
+        use rustc_hash::FxHasher;
+        let mut hasher = FxHasher::default();
+        self.hash(&mut hasher);
+        let hash = hasher.finish() as u32;
+        println!("Hash: {:?}", hash);
+        // hasher.finish() as u32
+        hash
+    }
+
+}
 
 impl HashableSync for usize {}
 impl HashableSync for u64 {}

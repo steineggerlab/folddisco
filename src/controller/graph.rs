@@ -41,7 +41,8 @@ pub fn connected_components_with_given_node_count(
     scc.append(&mut wcc);
     // Filter components with the same node count
     // scc.retain(|component| component.len() == node_count);
-    scc.retain(|component| component.len() >= 3);
+    // Filter components with the node count greater than or equal to the given node count
+    // scc.retain(|component| component.len() >= 3);
 
     // Uniqueness cheking. Sort all inner vectors and dedup
     scc.iter_mut().for_each(|component| component.sort());

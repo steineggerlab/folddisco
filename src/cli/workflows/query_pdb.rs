@@ -161,7 +161,7 @@ pub fn query_pdb(env: AppArgs) {
                                 );
                                 if retrieve {
                                     // match_count_filter[1] = residue_count;
-                                    match_count_filter[1] = if match_count_filter[1] < 3 { 3 } else { match_count_filter[1] };
+                                    // match_count_filter[1] = if match_count_filter[1] < 3 { 3 } else { match_count_filter[1] };
                                 }
                                 let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
@@ -201,7 +201,7 @@ pub fn query_pdb(env: AppArgs) {
                                 );
                                 if retrieve {
                                     // match_count_filter[1] = residue_count;
-                                    match_count_filter[1] = if match_count_filter[1] < 3 { 3 } else { match_count_filter[1] };
+                                    // match_count_filter[1] = if match_count_filter[1] < 3 { 3 } else { match_count_filter[1] };
                                 }
                                 let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
@@ -220,6 +220,7 @@ pub fn query_pdb(env: AppArgs) {
                                         v.matching_residues = retrieval_result;
                                     });
                                     query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
+                                    println!("{:?}", query_count_vec.len());
                                     drop(mmap);
                                     drop(match_count_filter);
                                     return query_count_vec;

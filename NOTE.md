@@ -8,6 +8,7 @@ QUERYING
   - [x] DONE: Matching query and reference positions
   - [x] DONE: rayon based parallelization
 - [ ] TODO: For partial match, fill in with "_" in the output where the query does not match
+- [ ] TODO: Rename features --> default goes to PDBTrRosetta
 
 DEV
 - [ ] Write rustdoc

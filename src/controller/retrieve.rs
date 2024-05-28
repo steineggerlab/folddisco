@@ -123,17 +123,35 @@ pub fn retrieve_with_prefilter(
     compact: &CompactStructure, hash: &GeometricHash, prefilter: &Vec<(usize, usize)>, nbin_dist: usize, nbin_angle: usize
 ) -> Vec<(usize, usize)> {
     let mut output: Vec<(usize, usize)> = Vec::new();
-    for (i, j) in prefilter {
-        let feature = get_single_feature(*i, *j, compact, hash.hash_type());
-        if feature.is_some() {
-            let feature = feature.unwrap();
-            let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
-                GeometricHash::perfect_hash_default(feature, hash.hash_type())
-            } else {
-                GeometricHash::perfect_hash(feature, hash.hash_type(), nbin_dist, nbin_angle)
-            };
-            if curr_hash == *hash {
-                output.push((*i, *j));
+    if prefilter.is_empty() {
+        let comb = CombinationIterator::new(compact.num_residues);
+        comb.for_each(|(i, j)| {
+            let feature = get_single_feature(i, j, compact, hash.hash_type());
+            if feature.is_some() {
+                let feature = feature.unwrap();
+                let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
+                    GeometricHash::perfect_hash_default(feature, hash.hash_type())
+                } else {
+                    GeometricHash::perfect_hash(feature, hash.hash_type(), nbin_dist, nbin_angle)
+                };
+                if curr_hash == *hash {
+                    output.push((i, j));
+                }
+            }
+        });
+    } else {
+        for (i, j) in prefilter {
+            let feature = get_single_feature(*i, *j, compact, hash.hash_type());
+            if feature.is_some() {
+                let feature = feature.unwrap();
+                let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
+                    GeometricHash::perfect_hash_default(feature, hash.hash_type())
+                } else {
+                    GeometricHash::perfect_hash(feature, hash.hash_type(), nbin_dist, nbin_angle)
+                };
+                if curr_hash == *hash {
+                    output.push((*i, *j));
+                }
             }
         }
     }

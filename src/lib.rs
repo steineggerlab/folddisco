@@ -21,12 +21,8 @@ pub trait HashableSync: Clone + Copy + Hash + Sync + Send + Eq + PartialEq + Ord
         use rustc_hash::FxHasher;
         let mut hasher = FxHasher::default();
         self.hash(&mut hasher);
-        let hash = hasher.finish() as u32;
-        println!("Hash: {:?}", hash);
-        // hasher.finish() as u32
-        hash
+        hasher.finish() as u32
     }
-
 }
 
 impl HashableSync for usize {}

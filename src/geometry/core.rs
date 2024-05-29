@@ -144,7 +144,7 @@ pub enum GeometricHash {
     PDBMotifHalf(super::pdb_halfmatch::HashValue),
     TrRosetta(super::trrosetta::HashValue),
     FoldDiscoDefault(super::default::HashValue),
-    Default32bit(super::default_32bit::HashValue),
+    Default32bit(super::trrosetta_32bit::HashValue),
     PointPairFeature(super::ppf::HashValue),
     PDBTrRosetta(super::pdb_tr::HashValue),
     TertiaryInteraction(super::tertiary_interaction::HashValue),
@@ -172,7 +172,7 @@ impl GeometricHash {
                 super::default::HashValue::perfect_hash_default(feature)
             ),
             HashType::Default32bit => GeometricHash::Default32bit(
-                super::default_32bit::HashValue::perfect_hash_default(feature)
+                super::trrosetta_32bit::HashValue::perfect_hash_default(feature)
             ),
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
                 super::ppf::HashValue::perfect_hash_default(feature)
@@ -218,7 +218,7 @@ impl GeometricHash {
                     )
                 ),
                 HashType::Default32bit => GeometricHash::Default32bit(
-                    super::default_32bit::HashValue::perfect_hash(
+                    super::trrosetta_32bit::HashValue::perfect_hash(
                         feature, nbin_dist, nbin_angle
                     )
                 ),
@@ -306,7 +306,7 @@ impl GeometricHash {
                 super::ppf::HashValue::from_u32(hashvalue)
             ),
             HashType::Default32bit => GeometricHash::Default32bit(
-                super::default_32bit::HashValue::from_u32(hashvalue)
+                super::trrosetta_32bit::HashValue::from_u32(hashvalue)
             ),
             HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
                 super::pdb_tr::HashValue::from_u32(hashvalue)
@@ -337,7 +337,7 @@ impl GeometricHash {
                 super::default::HashValue::from_u64(hashvalue)
             ),
             HashType::Default32bit => GeometricHash::Default32bit(
-                super::default_32bit::HashValue::from_u64(hashvalue)
+                super::trrosetta_32bit::HashValue::from_u64(hashvalue)
             ),
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
                 super::ppf::HashValue::from_u64(hashvalue)
@@ -412,7 +412,7 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
-    pub fn downcast_default_32bit(&self) -> super::default_32bit::HashValue {
+    pub fn downcast_default_32bit(&self) -> super::trrosetta_32bit::HashValue {
         match self {
             GeometricHash::Default32bit(hash) => hash.clone(),
             _ => panic!("Invalid hash type"),

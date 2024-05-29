@@ -11,6 +11,7 @@ pub mod io;
 pub mod query;
 pub mod retrieve;
 pub mod rank;
+pub mod map;
 pub mod mode;
 
 use std::io::Write;

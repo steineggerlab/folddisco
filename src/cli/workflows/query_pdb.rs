@@ -8,11 +8,13 @@
 
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
+use std::path::PathBuf;
 
 use dashmap::DashMap;
 use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig};
+use crate::controller::map::SimpleHashMap;
 use crate::controller::mode::IndexMode;
 use crate::cli::*;
 use crate::controller::io::{read_offset_map, read_u16_vector, read_u8_vector};
@@ -109,15 +111,27 @@ pub fn query_pdb(env: AppArgs) {
             let dist_thresholds = parse_threshold_string(dist_threshold.clone());
             let angle_thresholds = parse_threshold_string(angle_threshold.clone());
             
+            // let loaded_index_vec = index_paths.into_par_iter().map(|index_path| {
+            //     let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
+            //     let config = read_index_config_from_file(&hash_type_path);
+            //     let offset_table = measure_time!(read_offset_map(&offset_path, config.hash_type).expect(
+            //         &log_msg(FAIL, &format!("Failed to load offset table: {}", &offset_path))
+            //     ));
+            //     let lookup = measure_time!(load_lookup_from_file(&lookup_path));
+            //     (offset_table, lookup, config, value_path)
+            // }).collect::<Vec<(DashMap<GeometricHash, (usize, usize)>, (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>), IndexConfig, String)>>();
             let loaded_index_vec = index_paths.into_par_iter().map(|index_path| {
                 let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
                 let config = read_index_config_from_file(&hash_type_path);
-                let offset_table = measure_time!(read_offset_map(&offset_path, config.hash_type).expect(
-                    &log_msg(FAIL, &format!("Failed to load offset table: {}", &offset_path))
-                ));
+                let offset_table = measure_time!(
+                    SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path)).expect(
+                        &log_msg(FAIL, &format!("Failed to load offset table: {}", &offset_path))
+                    )
+                );
                 let lookup = measure_time!(load_lookup_from_file(&lookup_path));
                 (offset_table, lookup, config, value_path)
-            }).collect::<Vec<(DashMap<GeometricHash, (usize, usize)>, (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>), IndexConfig, String)>>();
+            }).collect::<Vec<(SimpleHashMap, (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>), IndexConfig, String)>>();
+
             // Iterate over queries
             queries.into_par_iter().for_each(|(pdb_path, query_string, output_path)| {
                 let pdb_file = PDBReader::from_file(&pdb_path).expect(
@@ -358,9 +372,10 @@ mod tests {
     fn test_query_pdb_workflow() {
         let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let query_string = String::from("B57,B102,C195");
-        let threads = 4;
-        let index_path = Some(String::from("data/serine_peptidases_pdbtr"));
-        let retrieve = true;
+        let threads = 1;
+        // let index_path = Some(String::from("data/serine_peptidases_pdbtr_test"));
+        let index_path = Some(String::from("analysis/e_coli/test_index"));
+        let retrieve = false;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;

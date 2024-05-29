@@ -8,7 +8,10 @@
 //! and the path to save the index table.
 
 
+use std::path::PathBuf;
+
 use crate::cli::config::{write_index_config_to_file, IndexConfig};
+use crate::controller::map::{convert_sorted_hash_pairs_to_simplemap, SimpleHashMap};
 use crate::controller::mode::{parse_path_vec_by_id_type, IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::{save_offset_vec, write_usize_vector_in_bits};
@@ -138,20 +141,35 @@ pub fn build_index(env: AppArgs) {
                 }
                 if verbose { print_log_msg(INFO, &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
                 fold_disco.fill_numeric_id_vec();
-                let (offset_table, value_vec) = match index_mode {
+                // let (offset_table, value_vec) = match index_mode {
+                //     IndexMode::Id => {
+                //         measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_pairs))
+                //     }
+                //     IndexMode::Grid => {
+                //         measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_grids))
+                //     }
+                //     IndexMode::Pos => {
+                //         todo!("Implement this part");
+                //     }
+                // };
+                let (offset_map, value_vec) = measure_time!( match index_mode {
                     IndexMode::Id => {
-                        measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_pairs))
+                        convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_pairs)
                     }
                     IndexMode::Grid => {
-                        measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_grids))
+                        convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_grids)
                     }
                     IndexMode::Pos => {
                         todo!("Implement this part");
                     }
-                };
+                });
+
                 if verbose { print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
                 let offset_path = format!("{}.offset", index_path);
-                measure_time!(save_offset_vec(&offset_path, &offset_table).expect(
+                // measure_time!(save_offset_vec(&offset_path, &offset_table).expect(
+                //     &log_msg(FAIL, "Failed to save offset table")
+                // ));
+                measure_time!(offset_map.dump_to_disk(&PathBuf::from(&offset_path)).expect(
                     &log_msg(FAIL, "Failed to save offset table")
                 ));
                 let value_path = format!("{}.value", index_path);
@@ -203,13 +221,15 @@ mod tests {
     #[test]
     fn test_build_index() {
         let pdb_dir = "data/serine_peptidases_filtered";
+        // let pdb_dir = "analysis/e_coli/sample";
         let hash_type = "pdbtr";
-        let index_path = "data/serine_peptidases_pdbtr";
+        // let index_path = "analysis/e_coli/test_index";
+        let index_path = "data/serine_peptidases_pdbtr_test";
         let index_mode = "id";
-        let num_threads = 1;
+        let num_threads = 8;
         let num_bin_dist = 16;
-        let num_bin_angle = 6;
-        let chunk_size = 5;
+        let num_bin_angle = 4;
+        let chunk_size = 65535;
         let max_residue = 3000;
         let grid_width = 40.0;
         let recursive = true;

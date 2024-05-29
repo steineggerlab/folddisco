@@ -10,6 +10,7 @@ use crate::{prelude::GeometricHash, structure::grid::convert_to_id_grid_vector};
 
 
 use super::io::{get_values_with_offset_u16, get_values_with_offset_u24};
+use super::map::SimpleHashMap;
 
 #[derive(Clone)]
 pub struct QueryResult {
@@ -124,7 +125,9 @@ impl QueryResult {
 
 pub fn count_query_idmode(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    offset_table: &DashMap<GeometricHash, (usize, usize)>, value_vec: &[u16],
+    // offset_table: &DashMap<GeometricHash, (usize, usize)>,
+    offset_table: &SimpleHashMap,
+    value_vec: &[u16],
     lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
 ) -> HashMap<usize, QueryResult> {
     let mut query_count_map = HashMap::new();
@@ -201,7 +204,9 @@ pub fn count_query_idmode(
 
 pub fn count_query_gridmode(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    offset_table: &DashMap<GeometricHash, (usize, usize)>, value_vec: &[u8],
+    // offset_table: &DashMap<GeometricHash, (usize, usize)>,
+    offset_table: &SimpleHashMap,
+    value_vec: &[u8],
     lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
 ) -> HashMap<usize, QueryResult> {
     let mut query_count_map = HashMap::new();

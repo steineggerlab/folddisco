@@ -241,7 +241,7 @@ fn qcp(coords1: &[[f32; 3]], coords2: &[[f32; 3]], natoms: usize) -> (f32, [[f32
     let mut mx_eigenv = e0; // starting guess (x in eqs above)
     let eval_prec = 1e-11; // convergence criterion
     let mut converged = false;
-    let iteration = 10;
+    let iteration = 20;
     for _ in 0..iteration {
         let oldg = mx_eigenv;
 

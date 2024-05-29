@@ -1,5 +1,4 @@
-// Default hasher using trrosetta features
-// 32 bit implementation default hashing scheme
+// 32 bit implementation of TrRosetta features
 
 // Implementation
 // 5bit aa1, 5bit aa2, cbeta distance - 16 bins; 4 bits

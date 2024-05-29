@@ -239,14 +239,25 @@ impl SimpleHashMap {
         let keys_count = size;
         let keys_size = keys_count * mem::size_of::<u32>();
         let keys = unsafe {
-            slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u32, keys_count).to_vec()
+            // slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u32, keys_count).to_vec()
+            mmap[offset..offset + keys_size].chunks_exact(mem::size_of::<u32>()).map(|chunk| {
+                let mut bytes = [0u8; mem::size_of::<u32>()];
+                bytes.copy_from_slice(chunk);
+                u32::from_le_bytes(bytes)
+            }).collect::<Vec<u32>>()
         };
         offset += keys_size;
         println!("[DEBUG] Current offset: {}", offset);
         println!("[DEBUG] Keys read");
         let values_size = keys_count * mem::size_of::<(usize, usize)>();
         let values = unsafe {
-            slice::from_raw_parts(mmap.as_ptr().add(offset) as *const (usize, usize), keys_count).to_vec()
+            // slice::from_raw_parts(mmap.as_ptr().add(offset) as *const (usize, usize), keys_count).to_vec()
+            mmap[offset..offset + values_size].chunks_exact(mem::size_of::<(usize, usize)>()).map(|chunk| {
+                let mut bytes = [0u8; mem::size_of::<(usize, usize)>()];
+                bytes.copy_from_slice(chunk);
+                let (a, b) = (usize::from_le_bytes(bytes[0..mem::size_of::<usize>()].try_into().unwrap()), usize::from_le_bytes(bytes[mem::size_of::<usize>()..].try_into().unwrap()));
+                (a, b)
+            }).collect::<Vec<(usize, usize)>>()
         };
         println!("[DEBUG] Current offset: {}", offset);
         println!("[DEBUG] Values read");

@@ -4,9 +4,8 @@ use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{geometry::util::map_u8_to_aa, prelude::*, structure::{coordinate::Coordinate, core::CompactStructure, qcp::QCPSuperimposer}, utils::combination::CombinationIterator};
-use crate::controller::{graph::{connected_components_with_given_node_count, create_index_graph}, query::{make_query, parse_query_string}};
-
-use super::feature::{get_single_feature};
+use crate::controller::graph::{connected_components_with_given_node_count, create_index_graph};
+use crate::controller::feature::get_single_feature;
 
 pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
     let mut output: HashSet<(u32, u32)> = HashSet::new();
@@ -177,7 +176,6 @@ pub fn retrieval_wrapper(
     let compact = pdb_loaded.read_structure().expect("Error reading structure");
     let compact = compact.to_compact();
     // let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();
-    let mut output: Vec<(String, f32)> = Vec::new();
     // Iterate over query vector and retrieve indices
     // Parallel
     let indices_found = query_vector.par_iter().map(|hash| {

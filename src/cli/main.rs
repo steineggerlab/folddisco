@@ -57,6 +57,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             score_cutoff: args.value_from_str(["-s", "--score"]).unwrap_or(0.0),
             num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
+            header: args.contains("--header"),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),

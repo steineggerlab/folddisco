@@ -60,12 +60,16 @@ impl QueryResult {
 
 impl fmt::Display for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let matching_residues_with_score = self.matching_residues.iter().map(
-            // Only print score with 4 decimal places
-            |(x, y)| format!("{}:{:.4}", x, y)
-        ).collect::<Vec<String>>().join(";");
+        let matching_residues_with_score = if self.matching_residues.len() == 0 {
+            "NA".to_string()
+        } else {
+            self.matching_residues.iter().map(
+                // Only print score with 4 decimal places
+                |(x, y)| format!("{}:{:.4}", x, y)
+            ).collect::<Vec<String>>().join(";")
+        };
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
             self.nres, self.plddt, matching_residues_with_score
@@ -77,11 +81,16 @@ impl fmt::Display for QueryResult {
 
 impl fmt::Debug for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let matching_residues_with_score = self.matching_residues.iter().map(
-            |(x, y)| format!("{}:{:.4}", x, y)
-        ).collect::<Vec<String>>().join(";");
+        let matching_residues_with_score = if self.matching_residues.len() == 0 {
+            "NA".to_string()
+        } else {
+            self.matching_residues.iter().map(
+                // Only print score with 4 decimal places
+                |(x, y)| format!("{}:{:.4}", x, y)
+            ).collect::<Vec<String>>().join(";")
+        };
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
             self.nres, self.plddt, matching_residues_with_score
@@ -93,11 +102,16 @@ impl fmt::Debug for QueryResult {
 // write_fmt
 impl QueryResult {
     pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let matching_residues_with_score = self.matching_residues.iter().map(
-            |(x, y)| format!("{}:{:.4}", x, y)
-        ).collect::<Vec<String>>().join(";");
+        let matching_residues_with_score = if self.matching_residues.len() == 0 {
+            "NA".to_string()
+        } else {
+            self.matching_residues.iter().map(
+                // Only print score with 4 decimal places
+                |(x, y)| format!("{}:{:.4}", x, y)
+            ).collect::<Vec<String>>().join(";")
+        };
         write!(
-            f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
             self.nres, self.plddt, matching_residues_with_score

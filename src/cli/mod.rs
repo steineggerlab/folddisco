@@ -45,6 +45,7 @@ pub enum AppArgs {
         score_cutoff: f32,
         num_res_cutoff: usize,
         plddt_cutoff: f32,
+        header: bool,
         verbose: bool,
         help: bool,
     },

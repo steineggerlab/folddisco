@@ -43,6 +43,8 @@ Options:
     --amino-acid <MODE>              Amino acid mode (default 0=matching, 1=all, 2=similar)
 ";
 
+pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tgrid_count\tnres\tplddt\tmatching_residues\tquery_residues\tquery_file\tindex_path";
+
 pub fn query_pdb(env: AppArgs) {
     match env {
         AppArgs::Query {
@@ -58,6 +60,7 @@ pub fn query_pdb(env: AppArgs) {
             score_cutoff,
             num_res_cutoff,
             plddt_cutoff,
+            header,
             verbose,
             help,
         } => {
@@ -248,14 +251,22 @@ pub fn query_pdb(env: AppArgs) {
                         &log_msg(FAIL, &format!("Failed to create file: {}", &output_path))
                     );
                     let mut writer = std::io::BufWriter::new(file);
+                    if header {
+                        writer.write_all(format!("{}\n", QUERY_RESULT_HEADER).as_bytes()).expect(
+                            &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+                        );
+                    }
                     for (_k, v) in queried_from_indices.iter() {
-                        writer.write_all(format!("{:?}\t{}\t{}\n", v, query_string, index_path.clone().unwrap()).as_bytes()).expect(
+                        writer.write_all(format!("{:?}\t{}\t{}\t{}\n", v, query_string, pdb_path, index_path.clone().unwrap()).as_bytes()).expect(
                             &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
                         );
                     }
                 } else {
+                    if header {
+                        println!("{}", QUERY_RESULT_HEADER);
+                    }
                     for (_k, v) in queried_from_indices.iter() {
-                        println!("{:?}\t{}\t{}", v, query_string, index_path.clone().unwrap());
+                        println!("{:?}\t{}\t{}\t{}", v, query_string, pdb_path, index_path.clone().unwrap());
                     }
                 }
             }); // queries
@@ -356,6 +367,7 @@ mod tests {
         let score_cutoff = 0.0;
         let num_res_cutoff = 3000;
         let plddt_cutoff = 0.0;
+        let header = false;
         let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
@@ -370,6 +382,7 @@ mod tests {
             score_cutoff,
             num_res_cutoff,
             plddt_cutoff,
+            header,
             verbose,
             help,
         };
@@ -390,6 +403,7 @@ mod tests {
         let score_cutoff = 0.0;
         let num_res_cutoff = 3000;
         let plddt_cutoff = 0.0;
+        let header = true;
         let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
@@ -404,6 +418,7 @@ mod tests {
             score_cutoff,
             num_res_cutoff,
             plddt_cutoff,
+            header,
             verbose,
             help,
         };

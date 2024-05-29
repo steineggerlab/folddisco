@@ -41,6 +41,7 @@ Options:
     -l, --plddt <PLDDT_CUTOFF>       PLDDT cutoff (default 0.0)
     -h, --help                       Print this help menu
     --amino-acid <MODE>              Amino acid mode (default 0=matching, 1=all, 2=similar)
+    --header                         Print header in output
 ";
 
 pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tgrid_count\tnres\tplddt\tmatching_residues\tquery_residues\tquery_file\tindex_path";

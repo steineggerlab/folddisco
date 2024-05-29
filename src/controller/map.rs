@@ -1,5 +1,5 @@
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{BufWriter, Read, Write};
 use std::mem;
 use std::path::Path;
 use std::slice;
@@ -144,27 +144,39 @@ impl SimpleHashMap {
         }
     }
     
+    fn estimate_file_size(&self) -> usize {
+        let mut size = 0;
+        size += mem::size_of::<usize>() * 2; // size and capacity
+        size += self.buckets.len() * mem::size_of::<u32>();
+        size += (self.capacity + 7) / 8; // occupancy
+        size += self.keys.len() * mem::size_of::<u32>();
+        size += self.values.len() * mem::size_of::<(usize, usize)>();
+        size
+    }
+    
+    
     pub fn dump_to_disk(&self, path: &Path) -> std::io::Result<()> {
         // If file exists, make a new file
-        let mut file = OpenOptions::new().write(true).create(true).truncate(true).open(path)?;
-
+        let file = OpenOptions::new().read(true).write(true).create(true).open(path)?;
+        file.set_len(self.estimate_file_size() as u64)?;
+        let mut writer = BufWriter::new(file);
         // Serialize and write metadata
-        file.write_all(&self.size.to_le_bytes())?;
-        file.write_all(&self.capacity.to_le_bytes())?;
+        writer.write_all(&self.size.to_le_bytes())?;
+        writer.write_all(&self.capacity.to_le_bytes())?;
 
         // Serialize and write buckets
         let buckets_size = self.buckets.len() * mem::size_of::<u32>();
         let buckets_bytes = unsafe {
             slice::from_raw_parts(self.buckets.as_ptr() as *const u8, buckets_size)
         };
-        file.write_all(buckets_bytes)?;
-
+        writer.write_all(buckets_bytes)?;
+        
         // Serialize and write occupancy
         let occupancy_size = self.occupancy.bits.len();
         let occupancy_bytes = unsafe {
             slice::from_raw_parts(self.occupancy.bits.as_ptr() as *const u8, occupancy_size)
         };
-        file.write_all(occupancy_bytes)?;
+        writer.write_all(occupancy_bytes)?;
         
         // Serialize and write keys
         let keys_size = self.keys.len() * mem::size_of::<u32>();
@@ -172,15 +184,14 @@ impl SimpleHashMap {
             slice::from_raw_parts(self.keys.as_ptr() as *const u8, keys_size)
         };
         // Append keys to the file
-        file.write_all(keys_bytes)?;
+        writer.write_all(keys_bytes)?;
         
         // Serialize and write values
         let values_size = self.values.len() * mem::size_of::<(usize, usize)>();
         let values_bytes = unsafe {
             slice::from_raw_parts(self.values.as_ptr() as *const u8, values_size)
         };
-        file.write_all(values_bytes)?;
-
+        writer.write_all(values_bytes)?;
         Ok(())
     }
 

@@ -165,8 +165,12 @@ impl SimpleHashMap {
         writer.write_all(&self.capacity.to_le_bytes())?;
 
         println!("[DEBUG] Size and capacity written");
-        // Serialize and write buckets
+        // Serialize and write buckets. 
         let buckets_size = self.buckets.len() * mem::size_of::<u32>();
+        // Byte ordering should be preserved. little endian
+        let buckets_bytes = unsafe {
+            slice::from_raw_parts(self.buckets.as_ptr() as *const u8, buckets_size)
+        };
         let buckets_bytes = unsafe {
             slice::from_raw_parts(self.buckets.as_ptr() as *const u8, buckets_size)
         };
@@ -202,6 +206,7 @@ impl SimpleHashMap {
         let file = OpenOptions::new().read(true).open(path)?;
         println!("[DEBUG] File opened");
         let mmap = unsafe { Mmap::map(&file)? };
+        println!("[DEBUG] Mmap length: {}", mmap.len());
         println!("[DEBUG] Mapped file");
         let mut offset = 0usize;
         // Deserialize and read metadata
@@ -220,6 +225,7 @@ impl SimpleHashMap {
             slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u32, capacity).to_vec()
         };
         offset += buckets_size;
+        println!("[DEBUG] Current offset: {}", offset);
         println!("[DEBUG] Buckets read");
         // Deserialize and read occupancy
         let occupancy_size = (capacity + 7) / 8;
@@ -228,6 +234,7 @@ impl SimpleHashMap {
         };
         let occupancy = BitVec { bits, len: capacity };
         offset += occupancy_size;
+        println!("[DEBUG] Current offset: {}", offset);
         println!("[DEBUG] Occupancy read");
         let keys_count = size;
         let keys_size = keys_count * mem::size_of::<u32>();
@@ -235,11 +242,13 @@ impl SimpleHashMap {
             slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u32, keys_count).to_vec()
         };
         offset += keys_size;
+        println!("[DEBUG] Current offset: {}", offset);
         println!("[DEBUG] Keys read");
         let values_size = keys_count * mem::size_of::<(usize, usize)>();
         let values = unsafe {
             slice::from_raw_parts(mmap.as_ptr().add(offset) as *const (usize, usize), keys_count).to_vec()
         };
+        println!("[DEBUG] Current offset: {}", offset);
         println!("[DEBUG] Values read");
         Ok(SimpleHashMap {
             buckets,
@@ -318,8 +327,9 @@ mod tests {
     #[test]
     fn test_dump_and_load() {
         let mut std_map = StdHashMap::new();
-        std_map.insert(GeometricHash::from_u32(1u32, crate::prelude::HashType::PDBTrRosetta), (100usize, 100usize));
         std_map.insert(GeometricHash::from_u32(2u32, crate::prelude::HashType::PDBTrRosetta), (200usize, 200usize));
+        std_map.insert(GeometricHash::from_u32(1u32, crate::prelude::HashType::PDBTrRosetta), (100usize, 100usize));
+
 
         let map = SimpleHashMap::new_from_std_hashmap(std_map, 16usize);
         println!("MAP: {:?}", map);

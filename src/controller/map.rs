@@ -359,9 +359,9 @@ mod tests {
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(2u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(200usize, 200usize)));
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(13u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(1000usize, 100usize)));
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(3u32, crate::prelude::HashType::PDBTrRosetta)), None);
-        std::fs::remove_file(path).expect("Failed to remove test file");
         drop(loaded_map);
         drop(mmap);
+        std::fs::remove_file(path).expect("Failed to remove test file");
     }
     
     #[test]
@@ -391,6 +391,7 @@ mod tests {
         measure_time!({
             let offset_map = read_offset_map("hashmap.offset", crate::prelude::HashType::PDBTrRosetta).unwrap();
         });
+        drop(mmap);
         // Delete the file
         std::fs::remove_file(path).expect("Failed to remove test file");
         std::fs::remove_file("hashmap.offset").expect("Failed to remove test file");

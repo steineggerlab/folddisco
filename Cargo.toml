@@ -9,6 +9,7 @@ repository = "https://github.com/steineggerlab/folddisco"
 
 # test optimization
 [profile.test]
+# opt-level = 1 # When debugging, use this.
 opt-level = 3
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

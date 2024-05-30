@@ -1,6 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Read, Write};
-use std::mem;
+use std::mem::{self, ManuallyDrop};
 use std::path::Path;
 use std::slice;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -14,7 +14,7 @@ use crate::prelude::GeometricHash;
 
 #[derive(Debug)]
 struct BitVec {
-    bits: Vec<u8>,
+    bits: ManuallyDrop<Vec<u8>>,
     len: usize,
 }
 
@@ -22,7 +22,7 @@ impl BitVec {
     fn new(size: usize) -> Self {
         let byte_size = (size + 7) / 8; // Round up to the nearest byte
         BitVec {
-            bits: vec![0; byte_size],
+            bits: ManuallyDrop::new(vec![0; byte_size]),
             len: size,
         }
     }
@@ -46,10 +46,10 @@ impl BitVec {
 
 #[derive(Debug)]
 pub struct SimpleHashMap {
-    buckets: Vec<u32>,             // Stores the hash indices with occupancy information
+    buckets: ManuallyDrop<Vec<u32>>,             // Stores the hash indices with occupancy information
     occupancy: BitVec,               // Stores the occupancy information
-    keys: Vec<u32>,        // Stores keys separately
-    values: Vec<(usize, usize)>,     // Stores values separately
+    keys: ManuallyDrop<Vec<u32>>,        // Stores keys separately
+    values: ManuallyDrop<Vec<(usize, usize)>>,     // Stores values separately
     size: usize,
     capacity: usize,
 }
@@ -57,10 +57,10 @@ pub struct SimpleHashMap {
 impl SimpleHashMap {
     fn new(capacity: usize) -> Self {
         SimpleHashMap {
-            buckets: vec![0; capacity],
+            buckets: ManuallyDrop::new(vec![0; capacity]),
             occupancy: BitVec::new(capacity),
-            keys: Vec::with_capacity(capacity),
-            values: Vec::with_capacity(capacity),
+            keys: ManuallyDrop::new(Vec::with_capacity(capacity)),
+            values: ManuallyDrop::new(Vec::with_capacity(capacity)),
             size: 0,
             capacity,
         }
@@ -200,10 +200,10 @@ impl SimpleHashMap {
         Ok(())
     }
 
-    pub fn load_from_disk(path: &Path) -> std::io::Result<Self> {
+    pub fn load_from_disk(path: &Path) -> (std::io::Result<Self>, Mmap) {
         // Open as read-only
-        let file = OpenOptions::new().read(true).open(path)?;
-        let mmap = unsafe { Mmap::map(&file)? };
+        let file = OpenOptions::new().read(true).write(true).open(path).expect("Failed to open file");
+        let mmap = unsafe { Mmap::map(&file).expect("Failed to map file") };
         let mut offset = 0usize;
         // Deserialize and read metadata
         let mut size_bytes = [0u8; mem::size_of::<usize>()];
@@ -218,49 +218,54 @@ impl SimpleHashMap {
 
         let buckets_size = capacity * mem::size_of::<u32>();
         let buckets = unsafe {
-            slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u32, capacity).to_vec()
+            let bucket_ptr = mmap.as_ptr().add(offset) as *mut u32;
+            // Direct conversion from raw slice to Vec
+            ManuallyDrop::new(Vec::from_raw_parts(bucket_ptr, capacity, capacity))
         };
         offset += buckets_size;
 
         // Deserialize and read occupancy
         let occupancy_size = (capacity + 7) / 8;
         let bits = unsafe {
-            slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u8, occupancy_size).to_vec()
+            ManuallyDrop::new(Vec::from_raw_parts(mmap.as_ptr().add(offset) as *mut u8, occupancy_size, occupancy_size))
         };
-        let occupancy = BitVec { bits, len: capacity };
+        let occupancy = BitVec { bits: bits, len: capacity };
         offset += occupancy_size;
 
         let keys_count = size;
         let keys_size = keys_count * mem::size_of::<u32>();
         let keys = unsafe {
             // slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u32, keys_count).to_vec()
-            mmap[offset..offset + keys_size].chunks_exact(mem::size_of::<u32>()).map(|chunk| {
-                let mut bytes = [0u8; mem::size_of::<u32>()];
-                bytes.copy_from_slice(chunk);
-                u32::from_le_bytes(bytes)
-            }).collect::<Vec<u32>>()
+            ManuallyDrop::new(Vec::from_raw_parts(mmap.as_ptr().add(offset) as *mut u32, keys_count, keys_count))
         };
         offset += keys_size;
 
         let values_size = keys_count * mem::size_of::<(usize, usize)>();
         let values = unsafe {
             // slice::from_raw_parts(mmap.as_ptr().add(offset) as *const (usize, usize), keys_count).to_vec()
-            mmap[offset..offset + values_size].chunks_exact(mem::size_of::<(usize, usize)>()).map(|chunk| {
-                let mut bytes = [0u8; mem::size_of::<(usize, usize)>()];
-                bytes.copy_from_slice(chunk);
-                let (a, b) = (usize::from_le_bytes(bytes[0..mem::size_of::<usize>()].try_into().unwrap()), usize::from_le_bytes(bytes[mem::size_of::<usize>()..].try_into().unwrap()));
-                (a, b)
-            }).collect::<Vec<(usize, usize)>>()
+            ManuallyDrop::new(Vec::from_raw_parts(mmap.as_ptr().add(offset) as *mut (usize, usize), keys_count, keys_count))
         };
 
-        Ok(SimpleHashMap {
-            buckets,
+        (Ok(SimpleHashMap {
+            buckets: buckets,
             occupancy,
-            keys,
-            values,
+            keys: keys,
+            values: values,
             size,
             capacity,
-        })
+        }), mmap)
+    }
+}
+
+impl Drop for SimpleHashMap {
+    fn drop(&mut self) {
+        unsafe {
+            // The vector should not be dropped before mmap dropped. Don't drop. leak here
+            std::mem::forget(ManuallyDrop::take(&mut self.buckets));
+            std::mem::forget(ManuallyDrop::take(&mut self.keys));
+            std::mem::forget(ManuallyDrop::take(&mut self.values));
+            std::mem::forget(ManuallyDrop::take(&mut self.occupancy.bits));
+        }
     }
 }
 
@@ -340,12 +345,15 @@ mod tests {
         map.dump_to_disk(&path).expect("Failed to dump to disk");
         // Change the permissions of the file to allow read and write access
 
-        let loaded_map = SimpleHashMap::load_from_disk(&path).expect("Failed to load from disk");
+        let (loaded_map, mmap) = SimpleHashMap::load_from_disk(&path);
+        let loaded_map = loaded_map.expect("Failed to load from disk");
         println!("LOADED: {:?}", loaded_map);
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(1u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(100usize, 100usize)));
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(2u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(200usize, 200usize)));
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(3u32, crate::prelude::HashType::PDBTrRosetta)), None);
         std::fs::remove_file(path).expect("Failed to remove test file");
+        drop(loaded_map);
+        drop(mmap);
     }
     
     #[test]
@@ -362,12 +370,15 @@ mod tests {
         map.dump_to_disk(&path).expect("Failed to dump to disk");
         // Change the permissions of the file to allow read and write access
         measure_time!({
-            let loaded_map = SimpleHashMap::load_from_disk(&path).expect("Failed to load from disk");
+            let (loaded_map, mmap) = SimpleHashMap::load_from_disk(&path);
         });
-        let loaded_map = SimpleHashMap::load_from_disk(&path).expect("Failed to load from disk");
-        for i in 0..20 {
-            assert_eq!(loaded_map.get(&GeometricHash::from_u32(i as u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(i, i)));
+        let (loaded_map, mmap) = SimpleHashMap::load_from_disk(&path);
+        if let Ok(loaded_map) = loaded_map {
+            for i in 0..test_size {
+                assert_eq!(loaded_map.get(&GeometricHash::from_u32(i as u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(i, i)));
+            }
         }
+
         save_offset_map("hashmap.offset", &dash_map).unwrap();
         measure_time!({
             let offset_map = read_offset_map("hashmap.offset", crate::prelude::HashType::PDBTrRosetta).unwrap();

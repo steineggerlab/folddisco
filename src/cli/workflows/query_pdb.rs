@@ -11,6 +11,7 @@ use std::io::{BufRead, Write};
 use std::path::PathBuf;
 
 use dashmap::DashMap;
+use memmap2::Mmap;
 use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig};
@@ -123,14 +124,13 @@ pub fn query_pdb(env: AppArgs) {
             let loaded_index_vec = index_paths.into_par_iter().map(|index_path| {
                 let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
                 let config = read_index_config_from_file(&hash_type_path);
-                let offset_table = measure_time!(
-                    SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path)).expect(
-                        &log_msg(FAIL, &format!("Failed to load offset table: {}", &offset_path))
-                    )
+                let (offset_table, mmap) = measure_time!(
+                    SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
                 );
+                let offset_table = offset_table.unwrap();
                 let lookup = measure_time!(load_lookup_from_file(&lookup_path));
-                (offset_table, lookup, config, value_path)
-            }).collect::<Vec<(SimpleHashMap, (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>), IndexConfig, String)>>();
+                (offset_table, mmap, lookup, config, value_path)
+            }).collect::<Vec<(SimpleHashMap, Mmap, (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>), IndexConfig, String)>>();
 
             // Iterate over queries
             queries.into_par_iter().for_each(|(pdb_path, query_string, output_path)| {
@@ -157,7 +157,7 @@ pub fn query_pdb(env: AppArgs) {
                 drop(pdb_file);
                 // Get query map for each query in all indices
                 let mut queried_from_indices: Vec<(usize, QueryResult)> = loaded_index_vec.par_iter().map(
-                    |(offset_table, lookup, config, value_path)| {
+                    |(offset_table, mmap, lookup, config, value_path)| {
                         let hash_type = config.hash_type;
                         let num_bin_dist = config.num_bin_dist;
                         let num_bin_angle = config.num_bin_angle;
@@ -373,9 +373,9 @@ mod tests {
         let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let query_string = String::from("B57,B102,C195");
         let threads = 1;
-        // let index_path = Some(String::from("data/serine_peptidases_pdbtr_test"));
-        let index_path = Some(String::from("analysis/e_coli/test_index"));
-        let retrieve = false;
+        let index_path = Some(String::from("data/serine_peptidases_pdbtr_test"));
+        // let index_path = Some(String::from("analysis/e_coli/test_index"));
+        let retrieve = true;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;

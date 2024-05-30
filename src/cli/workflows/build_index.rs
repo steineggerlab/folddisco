@@ -114,6 +114,7 @@ pub fn build_index(env: AppArgs) {
                         if verbose {
                             print_log_msg(INFO, 
                                 &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pairs.len(), PEAK_ALLOC.current_usage_as_mb())
+                                // &format!("Total {} hashes collected", fold_disco.hash_id_pairs.len())
                             );
                         }
                         measure_time!(fold_disco.sort_hash_pairs());
@@ -124,6 +125,7 @@ pub fn build_index(env: AppArgs) {
                         if verbose {
                             print_log_msg(INFO, 
                                 &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_grids.len(), PEAK_ALLOC.current_usage_as_mb())
+                                // &format!("Total {} hashes collected", fold_disco.hash_id_grids.len())
                             );
                         }
                         measure_time!(fold_disco.sort_hash_grids());
@@ -139,7 +141,10 @@ pub fn build_index(env: AppArgs) {
                         todo!("Implement this part");
                     }
                 }
-                if verbose { print_log_msg(INFO, &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
+                if verbose { print_log_msg(INFO,
+                    &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
+                    // "Hash sorted"
+                ); }
                 fold_disco.fill_numeric_id_vec();
                 // let (offset_table, value_vec) = match index_mode {
                 //     IndexMode::Id => {
@@ -164,7 +169,10 @@ pub fn build_index(env: AppArgs) {
                     }
                 });
 
-                if verbose { print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
+                if verbose { print_log_msg(INFO, 
+                    &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
+                    // &format!("Offset & values acquired")
+                ); }
                 let offset_path = format!("{}.offset", index_path);
                 // measure_time!(save_offset_vec(&offset_path, &offset_table).expect(
                 //     &log_msg(FAIL, "Failed to save offset table")

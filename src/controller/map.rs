@@ -154,7 +154,6 @@ impl SimpleHashMap {
         size
     }
     
-    
     pub fn dump_to_disk(&self, path: &Path) -> std::io::Result<()> {
         // If file exists, make a new file
         let file = OpenOptions::new().read(true).write(true).create(true).open(path)?;
@@ -164,12 +163,23 @@ impl SimpleHashMap {
         writer.write_all(&self.size.to_le_bytes())?;
         writer.write_all(&self.capacity.to_le_bytes())?;
 
+        // Serialize and write values
+        let values_size = self.values.len() * mem::size_of::<(usize, usize)>();
+        let values_bytes = unsafe {
+            slice::from_raw_parts(self.values.as_ptr() as *const u8, values_size)
+        };
+        writer.write_all(values_bytes)?;
+        // Serialize and write keys
+        let keys_size = self.keys.len() * mem::size_of::<u32>();
+        let keys_bytes = unsafe {
+            slice::from_raw_parts(self.keys.as_ptr() as *const u8, keys_size)
+        };
+        // Append keys to the file
+        writer.write_all(keys_bytes)?;
+
         // Serialize and write buckets. 
         let buckets_size = self.buckets.len() * mem::size_of::<u32>();
         // Byte ordering should be preserved. little endian
-        let buckets_bytes = unsafe {
-            slice::from_raw_parts(self.buckets.as_ptr() as *const u8, buckets_size)
-        };
         let buckets_bytes = unsafe {
             slice::from_raw_parts(self.buckets.as_ptr() as *const u8, buckets_size)
         };
@@ -181,22 +191,7 @@ impl SimpleHashMap {
             slice::from_raw_parts(self.occupancy.bits.as_ptr() as *const u8, occupancy_size)
         };
         writer.write_all(occupancy_bytes)?;
-
-        // Serialize and write keys
-        let keys_size = self.keys.len() * mem::size_of::<u32>();
-        let keys_bytes = unsafe {
-            slice::from_raw_parts(self.keys.as_ptr() as *const u8, keys_size)
-        };
-        // Append keys to the file
-        writer.write_all(keys_bytes)?;
-
-        // Serialize and write values
-        let values_size = self.values.len() * mem::size_of::<(usize, usize)>();
-        let values_bytes = unsafe {
-            slice::from_raw_parts(self.values.as_ptr() as *const u8, values_size)
-        };
-        writer.write_all(values_bytes)?;
-
+        
         Ok(())
     }
 
@@ -216,9 +211,29 @@ impl SimpleHashMap {
         let capacity = usize::from_le_bytes(capacity_bytes);
         offset += mem::size_of::<usize>();
 
+        let keys_count = size;
+        let values_size = keys_count * mem::size_of::<(usize, usize)>();
+        let values = unsafe {
+            let values_ptr = mmap.as_ptr().add(offset) as *mut (usize, usize);
+            assert_ptr_for_raw_parts(values_ptr, keys_count);
+            // slice::from_raw_parts(mmap.as_ptr().add(offset) as *const (usize, usize), keys_count).to_vec()
+            ManuallyDrop::new(Vec::from_raw_parts(values_ptr, keys_count, keys_count))
+        };
+        offset += values_size;
+        
+        let keys_size = keys_count * mem::size_of::<u32>();
+        let keys = unsafe {
+            let keys_ptr = mmap.as_ptr().add(offset) as *mut u32;
+            assert_ptr_for_raw_parts(keys_ptr, keys_count);
+            // slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u32, keys_count).to_vec()
+            ManuallyDrop::new(Vec::from_raw_parts(keys_ptr, keys_count, keys_count))
+        };
+        offset += keys_size;
+        
         let buckets_size = capacity * mem::size_of::<u32>();
         let buckets = unsafe {
             let bucket_ptr = mmap.as_ptr().add(offset) as *mut u32;
+            assert_ptr_for_raw_parts(bucket_ptr, capacity);
             // Direct conversion from raw slice to Vec
             ManuallyDrop::new(Vec::from_raw_parts(bucket_ptr, capacity, capacity))
         };
@@ -227,25 +242,12 @@ impl SimpleHashMap {
         // Deserialize and read occupancy
         let occupancy_size = (capacity + 7) / 8;
         let bits = unsafe {
-            ManuallyDrop::new(Vec::from_raw_parts(mmap.as_ptr().add(offset) as *mut u8, occupancy_size, occupancy_size))
+            let bits_ptr = mmap.as_ptr().add(offset) as *mut u8;
+            assert_ptr_for_raw_parts(bits_ptr, occupancy_size);
+            ManuallyDrop::new(Vec::from_raw_parts(bits_ptr, occupancy_size, occupancy_size))
         };
         let occupancy = BitVec { bits: bits, len: capacity };
-        offset += occupancy_size;
-
-        let keys_count = size;
-        let keys_size = keys_count * mem::size_of::<u32>();
-        let keys = unsafe {
-            // slice::from_raw_parts(mmap.as_ptr().add(offset) as *const u32, keys_count).to_vec()
-            ManuallyDrop::new(Vec::from_raw_parts(mmap.as_ptr().add(offset) as *mut u32, keys_count, keys_count))
-        };
-        offset += keys_size;
-
-        let values_size = keys_count * mem::size_of::<(usize, usize)>();
-        let values = unsafe {
-            // slice::from_raw_parts(mmap.as_ptr().add(offset) as *const (usize, usize), keys_count).to_vec()
-            ManuallyDrop::new(Vec::from_raw_parts(mmap.as_ptr().add(offset) as *mut (usize, usize), keys_count, keys_count))
-        };
-
+        
         (Ok(SimpleHashMap {
             buckets: buckets,
             occupancy,
@@ -255,6 +257,13 @@ impl SimpleHashMap {
             capacity,
         }), mmap)
     }
+}
+
+fn assert_ptr_for_raw_parts<T>(ptr: *const T, len: usize) {
+    assert!(!ptr.is_null());
+    assert_eq!(ptr as usize % mem::align_of::<T>(), 0);
+    assert!(len > 0);
+    assert!(len <= isize::MAX as usize / mem::size_of::<T>());
 }
 
 impl Drop for SimpleHashMap {
@@ -268,7 +277,6 @@ impl Drop for SimpleHashMap {
         }
     }
 }
-
 
 pub fn convert_sorted_hash_pairs_to_simplemap(
     sorted_pairs: Vec<(GeometricHash, usize)>
@@ -336,8 +344,7 @@ mod tests {
         let mut std_map = StdHashMap::new();
         std_map.insert(GeometricHash::from_u32(2u32, crate::prelude::HashType::PDBTrRosetta), (200usize, 200usize));
         std_map.insert(GeometricHash::from_u32(1u32, crate::prelude::HashType::PDBTrRosetta), (100usize, 100usize));
-
-
+        std_map.insert(GeometricHash::from_u32(13u32, crate::prelude::HashType::PDBTrRosetta), (1000usize, 100usize));
         let map = SimpleHashMap::new_from_std_hashmap(std_map, 16usize);
         println!("MAP: {:?}", map);
         let path = PathBuf::from("hashmap.dat");
@@ -350,6 +357,7 @@ mod tests {
         println!("LOADED: {:?}", loaded_map);
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(1u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(100usize, 100usize)));
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(2u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(200usize, 200usize)));
+        assert_eq!(loaded_map.get(&GeometricHash::from_u32(13u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(1000usize, 100usize)));
         assert_eq!(loaded_map.get(&GeometricHash::from_u32(3u32, crate::prelude::HashType::PDBTrRosetta)), None);
         std::fs::remove_file(path).expect("Failed to remove test file");
         drop(loaded_map);

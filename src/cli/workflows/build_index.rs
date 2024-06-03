@@ -11,11 +11,10 @@
 use std::path::PathBuf;
 
 use crate::cli::config::{write_index_config_to_file, IndexConfig};
-use crate::controller::map::{convert_sorted_hash_pairs_to_simplemap, SimpleHashMap};
+use crate::controller::map::convert_sorted_hash_pairs_to_simplemap;
 use crate::controller::mode::{parse_path_vec_by_id_type, IdType, IndexMode};
 use crate::cli::*;
-use crate::controller::io::{save_offset_vec, write_usize_vector_in_bits};
-use crate::index::alloc::convert_sorted_pairs_to_offset_and_values_vec;
+use crate::controller::io::write_usize_vector_in_bits;
 use crate::prelude::*;
 use peak_alloc::PeakAlloc;
 
@@ -146,28 +145,18 @@ pub fn build_index(env: AppArgs) {
                     // "Hash sorted"
                 ); }
                 fold_disco.fill_numeric_id_vec();
-                // let (offset_table, value_vec) = match index_mode {
-                //     IndexMode::Id => {
-                //         measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_pairs))
-                //     }
-                //     IndexMode::Grid => {
-                //         measure_time!(convert_sorted_pairs_to_offset_and_values_vec(fold_disco.hash_id_grids))
-                //     }
-                //     IndexMode::Pos => {
-                //         todo!("Implement this part");
-                //     }
-                // };
-                let (offset_map, value_vec) = measure_time!( match index_mode {
+
+                let (offset_map, value_vec) = match index_mode {
                     IndexMode::Id => {
-                        convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_pairs)
+                        measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_pairs))
                     }
                     IndexMode::Grid => {
-                        convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_grids)
+                        measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_grids))
                     }
                     IndexMode::Pos => {
                         todo!("Implement this part");
                     }
-                });
+                };
 
                 if verbose { print_log_msg(INFO, 
                     &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())

@@ -94,7 +94,7 @@ impl QCPSuperimposer {
         self.rms = Some(rms);
         self.rot = Some(rot);
         // Check rotated centered_coords and centered_ref
-        let rotated_coords = centered_ref.iter()
+        let _rotated_coords = centered_ref.iter()
             .map(|&coord| {
                 let rotated = rotate(coord, rot);
                 [
@@ -240,7 +240,7 @@ fn qcp(coords1: &[[f32; 3]], coords2: &[[f32; 3]], natoms: usize) -> (f32, [[f32
 
     let mut mx_eigenv = e0; // starting guess (x in eqs above)
     let eval_prec = 1e-11; // convergence criterion
-    let mut converged = false;
+    let mut _converged = false;
     let iteration = 20;
     for _ in 0..iteration {
         let oldg = mx_eigenv;
@@ -255,7 +255,7 @@ fn qcp(coords1: &[[f32; 3]], coords2: &[[f32; 3]], natoms: usize) -> (f32, [[f32
         let delta = f / (f_prime + eval_prec); // avoid division by zero
         mx_eigenv = (mx_eigenv - delta).abs();
         if (mx_eigenv - oldg).abs() < (eval_prec * mx_eigenv) {
-            converged = true;
+            _converged = true;
             break; // convergence
         }
     }

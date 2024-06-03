@@ -33,7 +33,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             hash_type: args.value_from_str(["-y", "--type"]).unwrap_or("default".into()),
             index_path: args.value_from_str(["-i", "--index"]).unwrap_or("folddisco_index".into()),
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
-            mode: args.value_from_str(["-m", "--mode"]).unwrap_or("grid".into()),
+            mode: args.value_from_str(["-m", "--mode"]).unwrap_or("id".into()),
             num_bin_dist: args.value_from_str(["-d", "--distance"]).unwrap_or(0),
             num_bin_angle: args.value_from_str(["-a", "--angle"]).unwrap_or(0),
             grid_width: args.value_from_str(["-g", "--grid"]).unwrap_or(40.0),

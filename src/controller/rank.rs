@@ -1,10 +1,7 @@
 // Functions for ranking queried results
 
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::fmt;
-
-use dashmap::DashMap;
-
 use crate::structure::grid::grid_index_to_tuple;
 use crate::{prelude::GeometricHash, structure::grid::convert_to_id_grid_vector};
 

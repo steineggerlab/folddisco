@@ -2,19 +2,14 @@
 
 ## TODOs 240522
 QUERYING
-- [x] DONE: IMPORTANT: RMSD calculation for matched positions
-  - [x] DONE: NEED superposition for the matched positions
-  - [x] Implemented QCP superposition
-  - [x] DONE: Matching query and reference positions
-  - [x] DONE: rayon based parallelization
-- [x] DONE: For partial match, fill in with "_" in the output where the query does not match
-- [x] DONE: SimpleHashMap that can be accessed with memmap2
-- [x] DONE: Faster loading of offset using SimpleHashMap; 500ms - 2s --> 100-500 microseconds
 - [ ] IMPORTANT: TODO: Rename features --> default goes to PDBTrRosetta
 - [ ] IMPORTANT: TODO: Delete 64bit hashes; Only keep 32bit
-  
+- [ ] Check if combination of thresholds works better
+
 DEV
+- [ ] Set default options; PDBTrRosetta, 16, 4, ID, relpath
 - [ ] Write rustdoc
+- [ ] TODO: Foldcomp DB reader
 
 BENCHMARK
 - [ ] TODO: Index should not be a mandatory parameter --> Fix this

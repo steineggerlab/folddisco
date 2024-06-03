@@ -5,8 +5,6 @@
 
 use std::collections::HashMap;
 
-
-
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::prelude::{print_log_msg, PDBReader, INFO};
 use crate::utils::combination::CombinationIterator;
@@ -389,7 +387,7 @@ mod tests {
         let dist_thresholds: Vec<f32> = vec![0.5];
         let angle_thresholds: Vec<f32> = vec![5.0,10.0,15.0];
         let hash_type = HashType::PDBMotifSinCos;
-        let (hash_collection, index_found) = make_query_map(&path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds);
+        let (hash_collection, _index_found) = make_query_map(&path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds);
         println!("{:?}", hash_collection);
         println!("{}", hash_collection.len());
         // Print the count where value.1 is true

@@ -1,13 +1,11 @@
-use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Read, Write};
+use std::fs::OpenOptions;
+use std::io::{BufWriter, Write};
 use std::mem::{self, ManuallyDrop};
 use std::path::Path;
 use std::slice;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use memmap2::Mmap;
 
 use crate::index::alloc::estimate_hash_size;
-use crate::measure_time;
 use crate::prelude::GeometricHash;
 
 // const INITIAL_CAPACITY: usize = 16;
@@ -15,6 +13,7 @@ use crate::prelude::GeometricHash;
 #[derive(Debug)]
 struct BitVec {
     bits: ManuallyDrop<Vec<u8>>,
+    #[allow(dead_code)] // Suppress warning for now
     len: usize,
 }
 
@@ -46,10 +45,10 @@ impl BitVec {
 
 #[derive(Debug)]
 pub struct SimpleHashMap {
-    buckets: ManuallyDrop<Vec<u32>>,             // Stores the hash indices with occupancy information
-    occupancy: BitVec,               // Stores the occupancy information
-    keys: ManuallyDrop<Vec<u32>>,        // Stores keys separately
-    values: ManuallyDrop<Vec<(usize, usize)>>,     // Stores values separately
+    buckets: ManuallyDrop<Vec<u32>>,           // Stores the hash indices with occupancy information
+    occupancy: BitVec,                         // Stores the occupancy information
+    keys: ManuallyDrop<Vec<u32>>,              // Stores keys separately
+    values: ManuallyDrop<Vec<(usize, usize)>>, // Stores values separately
     size: usize,
     capacity: usize,
 }
@@ -66,7 +65,7 @@ impl SimpleHashMap {
         }
     }
 
-    fn new_from_std_hashmap(mut map: std::collections::HashMap<GeometricHash, (usize, usize)>, capacity: usize) -> Self {
+    fn _new_from_std_hashmap(mut map: std::collections::HashMap<GeometricHash, (usize, usize)>, capacity: usize) -> Self {
         let mut simple_hash_map = SimpleHashMap::new(capacity);
 
         for (key, value) in map.drain() {
@@ -85,7 +84,7 @@ impl SimpleHashMap {
         simple_hash_map
     }
     
-    fn new_from_dashmap(map: dashmap::DashMap<GeometricHash, (usize, usize)>, capacity: usize) -> Self {
+    fn _new_from_dashmap(map: dashmap::DashMap<GeometricHash, (usize, usize)>, capacity: usize) -> Self {
         let mut simple_hash_map = SimpleHashMap::new(capacity);
 
         map.iter().for_each(|entry| {
@@ -282,25 +281,10 @@ pub fn convert_sorted_hash_pairs_to_simplemap(
     sorted_pairs: Vec<(GeometricHash, usize)>
 ) -> (SimpleHashMap, Vec<usize>) {
     // OffsetMap - key: hash, value: (offset, length)
-    // Vec - all values concatenated
     let (total_hashes, total_values) = estimate_hash_size(&sorted_pairs);
     let mut offset_map = SimpleHashMap::new(total_hashes * 3);
     let mut vec: Vec<usize> = Vec::with_capacity(total_values);
-    let offset = AtomicUsize::new(0);
-    measure_time!(
-    // sorted_pairs.iter().for_each(|pair| {
-    //     // If offset_map does not contain the key, insert it
-    //     if !offset_map.contains_key(&pair.0) {
-    //         offset_map.insert(pair.0, (offset.load(Ordering::Relaxed), 1));
-    //     } else {
-    //         // If offset_map contains the key, increment the offset, size and push the value to vec
-    //         let mut entry = offset_map.get_mut(&pair.0).unwrap();
-    //         entry.1 += 1;
-    //     }
-    //     vec.push(pair.1);
-    //     offset.fetch_add(1, Ordering::Relaxed);
-    // })
-    
+
     if let Some((first_hash, _)) = sorted_pairs.first() {
         let mut current_hash = first_hash;
         let mut current_offset = 0;
@@ -310,7 +294,6 @@ pub fn convert_sorted_hash_pairs_to_simplemap(
             if pair.0 == *current_hash {
                 current_count += 1;
             } else {
-                // offset_list.push((*current_hash, current_offset, current_count));
                 offset_map.insert(*current_hash, (current_offset, current_count));
                 current_hash = &pair.0;
                 current_offset = index;
@@ -318,12 +301,8 @@ pub fn convert_sorted_hash_pairs_to_simplemap(
             }
             vec.push(pair.1);
         }
-        // offset_list.push((*current_hash, current_offset, current_count));
         offset_map.insert(*current_hash, (current_offset, current_count));
     }
-    );
-    // Convert the offset_map to SimpleHashMap
-    // let offset_map = measure_time!(SimpleHashMap::new_from_std_hashmap(offset_map, total_values));
     (offset_map, vec)
 }
 
@@ -345,7 +324,7 @@ mod tests {
         std_map.insert(GeometricHash::from_u32(2u32, crate::prelude::HashType::PDBTrRosetta), (200usize, 200usize));
         std_map.insert(GeometricHash::from_u32(1u32, crate::prelude::HashType::PDBTrRosetta), (100usize, 100usize));
         std_map.insert(GeometricHash::from_u32(13u32, crate::prelude::HashType::PDBTrRosetta), (1000usize, 100usize));
-        let map = SimpleHashMap::new_from_std_hashmap(std_map, 16usize);
+        let map = SimpleHashMap::_new_from_std_hashmap(std_map, 16usize);
         println!("MAP: {:?}", map);
         let path = PathBuf::from("hashmap.dat");
 
@@ -367,20 +346,16 @@ mod tests {
     #[test]
     fn test_bigger() {
         let test_size = 200000usize;
-        let mut std_map = DashMap::new();
+        let std_map = DashMap::new();
         for i in 0..test_size {
             std_map.insert(GeometricHash::from_u32(i as u32, crate::prelude::HashType::PDBTrRosetta), (i, i));
         }
         let dash_map = std_map.clone();
-        let map = SimpleHashMap::new_from_dashmap(std_map, test_size);
+        let map = SimpleHashMap::_new_from_dashmap(std_map, test_size);
         let path = PathBuf::from("hashmap.dat");
 
         map.dump_to_disk(&path).expect("Failed to dump to disk");
-        // Change the permissions of the file to allow read and write access
-        measure_time!({
-            let (loaded_map, mmap) = SimpleHashMap::load_from_disk(&path);
-        });
-        let (loaded_map, mmap) = SimpleHashMap::load_from_disk(&path);
+        let (loaded_map, mmap) = measure_time!(SimpleHashMap::load_from_disk(&path));
         if let Ok(loaded_map) = loaded_map {
             for i in 0..test_size {
                 assert_eq!(loaded_map.get(&GeometricHash::from_u32(i as u32, crate::prelude::HashType::PDBTrRosetta)), Some(&(i, i)));
@@ -389,7 +364,7 @@ mod tests {
 
         save_offset_map("hashmap.offset", &dash_map).unwrap();
         measure_time!({
-            let offset_map = read_offset_map("hashmap.offset", crate::prelude::HashType::PDBTrRosetta).unwrap();
+            let _ = read_offset_map("hashmap.offset", crate::prelude::HashType::PDBTrRosetta).unwrap();
         });
         drop(mmap);
         // Delete the file

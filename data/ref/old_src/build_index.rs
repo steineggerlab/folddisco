@@ -66,7 +66,6 @@ pub fn build_index(env: AppArgs) {
                 // 4. Fill index table
                 measure_time!(fold_disco.fill_index_table());
 
-                // index_table.remove(&0u64); // Remove invalid hash
                 // Convert to offset table
                 let mut index_table = measure_time!(fold_disco.index_builder.fill_and_return_dashmap());
                 index_table.remove(&GeometricHash::from_u64(0, hash_type));

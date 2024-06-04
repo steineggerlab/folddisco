@@ -3,7 +3,7 @@
 ## TODOs 240522
 QUERYING
 - [ ] IMPORTANT: TODO: Rename features --> default goes to PDBTrRosetta
-- [ ] IMPORTANT: TODO: Delete 64bit hashes; Only keep 32bit
+- [x] DONE: Delete 64bit hashes; Only keep 32bit
 - [ ] Check if combination of thresholds works better
 
 DEV

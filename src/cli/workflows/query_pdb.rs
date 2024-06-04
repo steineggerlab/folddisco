@@ -90,8 +90,8 @@ pub fn query_pdb(env: AppArgs) {
                 print_log_msg(INFO, &format!("Found {} index file(s). Querying with {} threads", index_paths.len(), threads));
             }
             // Set thread pool
-            let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
-
+            let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
+            
             let queries = if query_string.ends_with(".txt") || query_string.ends_with(".tsv") {
                 // Read file and get path, query, output by line
                 let mut queries: Vec<(String, String, String)> = Vec::new();
@@ -181,7 +181,7 @@ pub fn query_pdb(env: AppArgs) {
                                 }).collect();
                                 // IF retrieve is true, retrieve matching residues
                                 if retrieve {
-                                    query_count_vec.iter_mut().for_each(|(_, v)| {
+                                    query_count_vec.par_iter_mut().for_each(|(_, v)| {
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
@@ -220,7 +220,7 @@ pub fn query_pdb(env: AppArgs) {
                                 }).collect();
                                 // IF retrieve is true, retrieve matching residues
                                 if retrieve {
-                                    query_count_vec.iter_mut().for_each(|(_, v)| {
+                                    query_count_vec.par_iter_mut().for_each(|(_, v)| {
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
@@ -374,7 +374,7 @@ mod tests {
         let score_cutoff = 0.0;
         let num_res_cutoff = 3000;
         let plddt_cutoff = 0.0;
-        let node_count = 3;
+        let node_count = 2;
         let header = false;
         let verbose = true;
         let env = AppArgs::Query {
@@ -403,8 +403,8 @@ mod tests {
         let pdb_path = String::from("");
         let query_string = String::from("data/query.tsv");
         let threads = 4;
-        let index_path = Some(String::from("analysis/h_sapiens/d16a4/index_id"));
-        let retrieve = false;
+        let index_path = Some(String::from("analysis/e_coli/test_index"));
+        let retrieve = true;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;
@@ -418,7 +418,7 @@ mod tests {
         let env = AppArgs::Query {
             pdb_path,
             query_string,
-            threads,
+            threads, 
             index_path,
             retrieve,
             amino_acid: 0,

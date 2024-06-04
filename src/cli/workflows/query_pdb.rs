@@ -167,9 +167,12 @@ pub fn query_pdb(env: AppArgs) {
                                 let query_count_map = measure_time!(count_query_idmode(
                                     &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
                                 ));
-                                let match_count_filter = get_match_count_filter(
+                                let mut match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()
                                 );
+                                if retrieve {
+                                    match_count_filter[1] = if node_count > match_count_filter[1] {node_count} else {match_count_filter[1]};
+                                }
                                 let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
@@ -203,9 +206,12 @@ pub fn query_pdb(env: AppArgs) {
                                 let query_count_map = measure_time!(count_query_gridmode(
                                     &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
                                 ));
-                                let match_count_filter = get_match_count_filter(
+                                let mut match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()
                                 );
+                                if retrieve {
+                                    match_count_filter[1] = if node_count > match_count_filter[1] {node_count} else {match_count_filter[1]};
+                                }
                                 let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&

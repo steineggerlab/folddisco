@@ -43,6 +43,7 @@ Options:
     -h, --help                       Print this help menu
     --amino-acid <MODE>              Amino acid mode (default 0=matching, 1=all, 2=similar)
     --header                         Print header in output
+    --node <NODE_COUNT>              Number of nodes to retrieve (default 2)
 ";
 
 pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tgrid_count\tnres\tplddt\tmatching_residues\tquery_residues\tquery_file\tindex_path";
@@ -64,6 +65,7 @@ pub fn query_pdb(env: AppArgs) {
             score_cutoff,
             num_res_cutoff,
             plddt_cutoff,
+            node_count,
             header,
             verbose,
             help,
@@ -178,7 +180,7 @@ pub fn query_pdb(env: AppArgs) {
                                 if retrieve {
                                     query_count_vec.iter_mut().for_each(|(_, v)| {
                                         let retrieval_result = retrieval_wrapper(
-                                            &v.id, DEFAULT_NODE_COUNT, &pdb_query,
+                                            &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
                                         );
@@ -214,7 +216,7 @@ pub fn query_pdb(env: AppArgs) {
                                 if retrieve {
                                     query_count_vec.iter_mut().for_each(|(_, v)| {
                                         let retrieval_result = retrieval_wrapper(
-                                            &v.id, DEFAULT_NODE_COUNT, &pdb_query,
+                                            &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
                                         );
@@ -366,6 +368,7 @@ mod tests {
         let score_cutoff = 0.0;
         let num_res_cutoff = 3000;
         let plddt_cutoff = 0.0;
+        let node_count = 3;
         let header = false;
         let verbose = true;
         let env = AppArgs::Query {
@@ -381,6 +384,7 @@ mod tests {
             score_cutoff,
             num_res_cutoff,
             plddt_cutoff,
+            node_count,
             header,
             verbose,
             help,
@@ -402,6 +406,7 @@ mod tests {
         let score_cutoff = 0.0;
         let num_res_cutoff = 3000;
         let plddt_cutoff = 0.0;
+        let node_count = 2;
         let header = true;
         let verbose = true;
         let env = AppArgs::Query {
@@ -417,6 +422,7 @@ mod tests {
             score_cutoff,
             num_res_cutoff,
             plddt_cutoff,
+            node_count,
             header,
             verbose,
             help,

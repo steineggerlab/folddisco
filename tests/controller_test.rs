@@ -81,7 +81,7 @@ fn test_folddisco_pdbmotifhalf() {
 fn test_folddisco_pdbmotifsincos_dashmap() {
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
+    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBTrRosetta);
     measure_time!(fold_disco.collect_hash());
     // fold_disco.fill_numeric_id_vec();
     for i in 0..fold_disco.hash_collection.len() {

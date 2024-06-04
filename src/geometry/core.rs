@@ -11,8 +11,6 @@ pub enum HashType {
     PDBMotifSinCos,
     PDBMotifHalf,
     TrRosetta,
-    FoldDiscoDefault,
-    Default32bit,
     PointPairFeature,
     PDBTrRosetta,
     TertiaryInteraction,
@@ -27,11 +25,9 @@ impl HashType {
             1 => HashType::PDBMotifSinCos,
             2 => HashType::PDBMotifHalf,
             3 => HashType::TrRosetta,
-            4 => HashType::FoldDiscoDefault,
-            5 => HashType::Default32bit,
-            6 => HashType::PointPairFeature,
-            7 => HashType::PDBTrRosetta,
-            8 => HashType::TertiaryInteraction,
+            4 => HashType::PointPairFeature,
+            5 => HashType::PDBTrRosetta,
+            6 => HashType::TertiaryInteraction,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -42,11 +38,9 @@ impl HashType {
             "1" | "PDBMotifSinCos" | "pdb" => HashType::PDBMotifSinCos,
             "2" | "PDBMotifHalf" | "pdbhalf" => HashType::PDBMotifHalf,
             "3" | "TrRosetta" | "trrosetta" => HashType::TrRosetta,
-            "4" | "FoldDiscoDefault" | "default" => HashType::FoldDiscoDefault,
-            "5" | "Default32bit" | "default32" => HashType::Default32bit,
-            "6" | "PointPairFeature" | "ppf" => HashType::PointPairFeature,
-            "7" | "PDBTrRosetta" | "pdbtr" => HashType::PDBTrRosetta,
-            "8" | "TertiaryInteraction" | "tertiary" | "3di" => HashType::TertiaryInteraction,
+            "4" | "PointPairFeature" | "ppf" => HashType::PointPairFeature,
+            "5" | "PDBTrRosetta" | "pdbtr" | "default" => HashType::PDBTrRosetta,
+            "6" | "TertiaryInteraction" | "tertiary" | "3di" => HashType::TertiaryInteraction,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -57,8 +51,6 @@ impl HashType {
             HashType::PDBMotifSinCos => "PDBMotifSinCos".to_string(),
             HashType::PDBMotifHalf => "PDBMotifHalf".to_string(),
             HashType::TrRosetta => "TrRosetta".to_string(),
-            HashType::FoldDiscoDefault => "FoldDiscoDefault".to_string(),
-            HashType::Default32bit => "Default32bit".to_string(),
             HashType::PointPairFeature => "PointPairFeature".to_string(),
             HashType::PDBTrRosetta => "PDBTrRosetta".to_string(),
             HashType::TertiaryInteraction => "TertiaryInteraction".to_string(),
@@ -67,19 +59,8 @@ impl HashType {
         }
     }
     pub fn encoding_type(&self) -> usize {
-        match self {
-            HashType::PDBMotif => 32usize,
-            HashType::PDBMotifSinCos => 32usize,
-            HashType::PDBMotifHalf => 32usize,
-            HashType::TrRosetta => 64usize,
-            HashType::FoldDiscoDefault => 64usize,
-            HashType::Default32bit => 32usize,
-            HashType::PointPairFeature => 32usize,
-            HashType::PDBTrRosetta => 32usize,
-            HashType::TertiaryInteraction => 32usize,
-            // append new hash type here
-            HashType::Other => 0usize,
-        }
+        // Unified to u32 encoding
+        32usize
     }
     
     pub fn save_to_file(&self, path: &str) {
@@ -90,7 +71,7 @@ impl HashType {
     pub fn load_from_file(path: &str) -> Self {
         let file = std::fs::File::open(path).unwrap();
         let reader = std::io::BufReader::new(file);
-        let mut hash_type = HashType::FoldDiscoDefault;
+        let mut hash_type = HashType::PDBTrRosetta;
         for line in reader.lines() {
             let line = line.unwrap();
             hash_type = match line.as_str() {
@@ -98,8 +79,6 @@ impl HashType {
                 "PDBMotifSinCos" => HashType::PDBMotifSinCos,
                 "PDBMotifHalf" => HashType::PDBMotifHalf,
                 "TrRosetta" => HashType::TrRosetta,
-                "FoldDiscoDefault" => HashType::FoldDiscoDefault,
-                "Default32bit" => HashType::Default32bit,
                 "PointPairFeature" => HashType::PointPairFeature,
                 "PDBTrRosetta" => HashType::PDBTrRosetta,
                 "TertiaryInteraction" => HashType::TertiaryInteraction,
@@ -122,8 +101,6 @@ mod tests {
             HashType::PDBMotifSinCos,
             HashType::PDBMotifHalf,
             HashType::TrRosetta,
-            HashType::FoldDiscoDefault,
-            HashType::Default32bit,
             HashType::PointPairFeature,
             HashType::PDBTrRosetta,
             HashType::TertiaryInteraction,
@@ -142,9 +119,7 @@ pub enum GeometricHash {
     PDBMotif(super::pdb_motif::HashValue),
     PDBMotifSinCos(super::pdb_motif_sincos::HashValue),
     PDBMotifHalf(super::pdb_halfmatch::HashValue),
-    TrRosetta(super::trrosetta::HashValue),
-    FoldDiscoDefault(super::default::HashValue),
-    Default32bit(super::trrosetta_32bit::HashValue),
+    TrRosetta(super::trrosetta_32bit::HashValue),
     PointPairFeature(super::ppf::HashValue),
     PDBTrRosetta(super::pdb_tr::HashValue),
     TertiaryInteraction(super::tertiary_interaction::HashValue),
@@ -166,12 +141,6 @@ impl GeometricHash {
                 super::pdb_halfmatch::HashValue::perfect_hash_default(feature)
             ),
             HashType::TrRosetta => GeometricHash::TrRosetta(
-                super::trrosetta::HashValue::perfect_hash_default(feature)
-            ),
-            HashType::FoldDiscoDefault => GeometricHash::FoldDiscoDefault(
-                super::default::HashValue::perfect_hash_default(feature)
-            ),
-            HashType::Default32bit => GeometricHash::Default32bit(
                 super::trrosetta_32bit::HashValue::perfect_hash_default(feature)
             ),
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
@@ -208,16 +177,6 @@ impl GeometricHash {
                     )
                 ),
                 HashType::TrRosetta => GeometricHash::TrRosetta(
-                    super::trrosetta::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                HashType::FoldDiscoDefault => GeometricHash::FoldDiscoDefault(
-                    super::default::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                HashType::Default32bit => GeometricHash::Default32bit(
                     super::trrosetta_32bit::HashValue::perfect_hash(
                         feature, nbin_dist, nbin_angle
                     )
@@ -249,8 +208,6 @@ impl GeometricHash {
             GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash_default(),
             GeometricHash::PDBMotifHalf(hash) => hash.reverse_hash_default(),
             GeometricHash::TrRosetta(hash) => hash.reverse_hash_default(),
-            GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash_default(),
-            GeometricHash::Default32bit(hash) => hash.reverse_hash_default(),
             GeometricHash::PointPairFeature(hash) => hash.reverse_hash_default(),
             GeometricHash::PDBTrRosetta(hash) => hash.reverse_hash_default(),
             GeometricHash::TertiaryInteraction(hash) => hash.reverse_hash_default(),
@@ -265,8 +222,6 @@ impl GeometricHash {
             GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::PDBMotifHalf(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::TrRosetta(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
-            GeometricHash::FoldDiscoDefault(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
-            GeometricHash::Default32bit(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::PointPairFeature(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::PDBTrRosetta(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
             GeometricHash::TertiaryInteraction(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
@@ -281,8 +236,6 @@ impl GeometricHash {
             GeometricHash::PDBMotifSinCos(hash) => hash.hash_type(),
             GeometricHash::PDBMotifHalf(hash) => hash.hash_type(),
             GeometricHash::TrRosetta(hash) => hash.hash_type(),
-            GeometricHash::FoldDiscoDefault(hash) => hash.hash_type(),
-            GeometricHash::Default32bit(hash) => hash.hash_type(),
             GeometricHash::PointPairFeature(hash) => hash.hash_type(),
             GeometricHash::PDBTrRosetta(hash) => hash.hash_type(),
             GeometricHash::TertiaryInteraction(hash) => hash.hash_type(),
@@ -305,7 +258,7 @@ impl GeometricHash {
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
                 super::ppf::HashValue::from_u32(hashvalue)
             ),
-            HashType::Default32bit => GeometricHash::Default32bit(
+            HashType::TrRosetta => GeometricHash::TrRosetta(
                 super::trrosetta_32bit::HashValue::from_u32(hashvalue)
             ),
             HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
@@ -331,12 +284,6 @@ impl GeometricHash {
                 super::pdb_halfmatch::HashValue::from_u64(hashvalue)
             ),
             HashType::TrRosetta => GeometricHash::TrRosetta(
-                super::trrosetta::HashValue::from_u64(hashvalue)
-            ),
-            HashType::FoldDiscoDefault => GeometricHash::FoldDiscoDefault(
-                super::default::HashValue::from_u64(hashvalue)
-            ),
-            HashType::Default32bit => GeometricHash::Default32bit(
                 super::trrosetta_32bit::HashValue::from_u64(hashvalue)
             ),
             HashType::PointPairFeature => GeometricHash::PointPairFeature(
@@ -359,11 +306,10 @@ impl GeometricHash {
             GeometricHash::PDBMotifSinCos(hash) => hash.as_u32(),
             GeometricHash::PDBMotifHalf(hash) => hash.as_u32(),
             GeometricHash::PointPairFeature(hash) => hash.as_u32(),
-            GeometricHash::Default32bit(hash) => hash.as_u32(),
+            GeometricHash::TrRosetta(hash) => hash.as_u32(),
             GeometricHash::PDBTrRosetta(hash) => hash.as_u32(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u32(),
             // append new hash type here
-            _ => panic!("Invalid hash type"),
         }
     }
     pub fn as_u64(&self) -> u64 {
@@ -372,13 +318,10 @@ impl GeometricHash {
             GeometricHash::PDBMotifSinCos(hash) => hash.as_u64(),
             GeometricHash::PDBMotifHalf(hash) => hash.as_u64(),
             GeometricHash::TrRosetta(hash) => hash.as_u64(),
-            GeometricHash::FoldDiscoDefault(hash) => hash.as_u64(),
-            GeometricHash::Default32bit(hash) => hash.as_u64(),
             GeometricHash::PointPairFeature(hash) => hash.as_u64(),
             GeometricHash::PDBTrRosetta(hash) => hash.as_u64(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u64(),
             // append new hash type here
-            // _ => panic!("Invalid hash type"),
         }
     }
     
@@ -400,21 +343,9 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
-    pub fn downcast_trrosetta(&self) -> super::trrosetta::HashValue {
-        match self {
-            GeometricHash::TrRosetta(hash) => hash.clone(),
-            _ => panic!("Invalid hash type"),
-        }
-    }
-    pub fn downcast_fold_disco_default(&self) -> super::default::HashValue {
-        match self {
-            GeometricHash::FoldDiscoDefault(hash) => hash.clone(),
-            _ => panic!("Invalid hash type"),
-        }
-    }
     pub fn downcast_default_32bit(&self) -> super::trrosetta_32bit::HashValue {
         match self {
-            GeometricHash::Default32bit(hash) => hash.clone(),
+            GeometricHash::TrRosetta(hash) => hash.clone(),
             _ => panic!("Invalid hash type"),
         }
     }
@@ -455,12 +386,6 @@ impl fmt::Debug for GeometricHash {
             GeometricHash::TrRosetta(hash) => {
                 write!(f, "TrRosetta({:?})", hash)
             },
-            GeometricHash::FoldDiscoDefault(hash) => {
-                write!(f, "FoldDiscoDefault({:?})", hash)
-            },
-            GeometricHash::Default32bit(hash) => {
-                write!(f, "Default32bit({:?})", hash)
-            },
             GeometricHash::PointPairFeature(hash) => {
                 write!(f, "PointPairFeature({:?})", hash)
             },
@@ -490,12 +415,6 @@ impl fmt::Display for GeometricHash {
             },
             GeometricHash::TrRosetta(hash) => {
                 write!(f, "TrRosetta\t{:?}", hash)
-            },
-            GeometricHash::FoldDiscoDefault(hash) => {
-                write!(f, "FoldDiscoDefault\t{:?}", hash)
-            },
-            GeometricHash::Default32bit(hash) => {
-                write!(f, "Default32bit\t{:?}", hash)
             },
             GeometricHash::PointPairFeature(hash) => {
                 write!(f, "PointPairFeature\t{:?}", hash)

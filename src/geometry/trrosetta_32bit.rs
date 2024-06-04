@@ -46,7 +46,7 @@ impl HashValue {
         self._reverse_hash(NBIN_DIST, NBIN_SIN_COS).to_vec()
     }
     pub fn hash_type(&self) -> super::core::HashType {
-        HashType::Default32bit
+        HashType::TrRosetta
     }
 
     fn _perfect_hash(
@@ -189,7 +189,7 @@ mod tests {
             raw_feature.4.to_radians(), raw_feature.5.to_radians(),
             raw_feature.6.to_radians(), raw_feature.7.to_radians(),
         ];
-        let hash = GeometricHash::perfect_hash_default(feature_input, HashType::Default32bit);
+        let hash = GeometricHash::perfect_hash_default(feature_input, HashType::TrRosetta);
         //
         println!("{:?}", hash);
 
@@ -212,7 +212,7 @@ mod tests {
                 raw_feature.6.to_radians(), raw_feature.7.to_radians(),
             ];
             let hash = GeometricHash::perfect_hash(
-                feature_input, HashType::Default32bit, nbin_dist, nbin_angle
+                feature_input, HashType::TrRosetta, nbin_dist, nbin_angle
             );
             let rev = hash.reverse_hash(nbin_dist, nbin_angle);
             println!("{:?}", hash);

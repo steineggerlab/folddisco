@@ -56,19 +56,6 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
             }
         },
         HashType::TrRosetta => {
-            let feature = structure.get_trrosetta_feature(i, j);
-            if feature.is_some() {
-                let feature = feature.unwrap();
-                if feature[0] > 20.0 {
-                    None
-                } else {
-                    Some(feature)
-                }
-            } else {
-                None
-            }
-        },
-        HashType::FoldDiscoDefault | HashType::Default32bit => {
             let feature = structure.get_default_feature(i, j);
             if feature.is_some() {
                 // Concatenate res1 and res2 to the feature
@@ -256,8 +243,7 @@ impl HashType {
     pub fn amino_acid_index(&self) -> Option<Vec<usize>> {
         match self {
             HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf |
-            HashType::FoldDiscoDefault | HashType::Default32bit | 
-            HashType::PointPairFeature | HashType::PDBTrRosetta => Some(vec![0, 1]), 
+            HashType::TrRosetta | HashType::PointPairFeature | HashType::PDBTrRosetta => Some(vec![0, 1]), 
             _ => None
         }
     }
@@ -266,9 +252,7 @@ impl HashType {
         match self {
             HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf |
             HashType::PDBTrRosetta  => Some(vec![2, 3]),
-            HashType::FoldDiscoDefault | HashType::Default32bit |
-            HashType::PointPairFeature => Some(vec![2]),
-            HashType::TrRosetta => Some(vec![0]),
+            HashType::TrRosetta | HashType::PointPairFeature => Some(vec![2]),
             HashType::TertiaryInteraction => Some(vec![7]),
             _ => None
         }
@@ -277,8 +261,7 @@ impl HashType {
     pub fn angle_index(&self) -> Option<Vec<usize>> {
         match self {
             HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf => Some(vec![4]),
-            HashType::TrRosetta => Some(vec![1, 2, 3, 4, 5]),
-            HashType::FoldDiscoDefault | HashType::Default32bit => Some(vec![3, 4, 5, 6, 7]),
+            HashType::TrRosetta => Some(vec![3, 4, 5, 6, 7]),
             HashType::PointPairFeature => Some(vec![3, 4, 5]),
             HashType::PDBTrRosetta => Some(vec![4, 5, 6]), 
             HashType::TertiaryInteraction => Some(vec![0, 1, 2, 3, 4, 5, 6]),

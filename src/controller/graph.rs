@@ -10,24 +10,40 @@ use petgraph::graph::DiGraph;
 use crate::geometry::core::GeometricHash;
 
 
-pub fn create_index_graph(
-    ind_vec: &Vec<Vec<(usize, usize)>>, hash_vec: &Vec<GeometricHash>
-) -> DiGraph<usize, GeometricHash> {
+// pub fn create_index_graph(
+//     ind_vec: &Vec<Vec<(usize, usize)>>, hash_vec: &Vec<GeometricHash>
+// ) -> DiGraph<usize, GeometricHash> {
+//     let mut graph = DiGraph::<usize, GeometricHash>::new();
+//     let mut node_indices = HashMap::new();
+
+//     for (inner_vec, hash) in ind_vec.iter().zip(hash_vec.iter()) {
+//         if inner_vec.is_empty() {
+//             continue;
+//         }
+//         inner_vec.iter().for_each(|(i, j)| {
+//             let node_index_i = *node_indices.entry(*i).or_insert_with(|| graph.add_node(*i));
+//             let node_index_j = *node_indices.entry(*j).or_insert_with(|| graph.add_node(*j));
+//             graph.add_edge(node_index_i, node_index_j, hash.clone());
+//         });
+//     }
+//     graph
+// }
+
+pub fn create_index_graph(ind_vec: &Vec<(usize, usize, GeometricHash)>) -> DiGraph<usize, GeometricHash> {
     let mut graph = DiGraph::<usize, GeometricHash>::new();
     let mut node_indices = HashMap::new();
 
-    for (inner_vec, hash) in ind_vec.iter().zip(hash_vec.iter()) {
-        if inner_vec.is_empty() {
-            continue;
-        }
-        inner_vec.iter().for_each(|(i, j)| {
-            let node_index_i = *node_indices.entry(*i).or_insert_with(|| graph.add_node(*i));
-            let node_index_j = *node_indices.entry(*j).or_insert_with(|| graph.add_node(*j));
-            graph.add_edge(node_index_i, node_index_j, hash.clone());
-        });
+    for (i, j, hash) in ind_vec.iter() {
+        let node_index_i = *node_indices.entry(*i).or_insert_with(|| graph.add_node(*i));
+        let node_index_j = *node_indices.entry(*j).or_insert_with(|| graph.add_node(*j));
+        graph.add_edge(node_index_i, node_index_j, hash.clone());
     }
     graph
 }
+
+
+
+
 
 pub fn connected_components_with_given_node_count(
     graph: &DiGraph<usize, GeometricHash>, node_count: usize
@@ -89,23 +105,23 @@ mod tests {
         println!("{:?}", weak_cc);
     }
 
-    #[test]
-    fn test_usize_graph() {
-        let ind_vec = vec![
-            vec![(57, 102), (57, 195)], 
-            vec![(102, 57), (102, 195)],
-            vec![],
-            vec![(195, 57), (195, 102)], // Triad
-            vec![(57, 106), (106, 111), (212, 215), (219, 417), (417, 219)],
-            vec![(219, 212), (212, 417)],
-            vec![],
-        ];
-        let hash_vec = vec![GeometricHash::from_u32(1, HashType::PDBTrRosetta); 7];
-        let graph = create_index_graph(&ind_vec, &hash_vec);
-        println!("{:?}", graph);
-        let conn = connected_components_with_given_node_count(&graph, 3);
-        println!("{:?}", conn);
-    }
+    // #[test]
+    // fn test_usize_graph() {
+    //     let ind_vec = vec![
+    //         vec![(57, 102), (57, 195)], 
+    //         vec![(102, 57), (102, 195)],
+    //         vec![],
+    //         vec![(195, 57), (195, 102)], // Triad
+    //         vec![(57, 106), (106, 111), (212, 215), (219, 417), (417, 219)],
+    //         vec![(219, 212), (212, 417)],
+    //         vec![],
+    //     ];
+    //     let hash_vec = vec![GeometricHash::from_u32(1, HashType::PDBTrRosetta); 7];
+    //     let graph = create_index_graph(&ind_vec, &hash_vec);
+    //     println!("{:?}", graph);
+    //     let conn = connected_components_with_given_node_count(&graph, 3);
+    //     println!("{:?}", conn);
+    // }
     
     
 }

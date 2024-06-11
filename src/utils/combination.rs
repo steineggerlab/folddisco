@@ -63,3 +63,55 @@ mod tests {
         });
     }
 }
+
+#[derive(Hash, PartialEq, Eq)]
+pub struct CombinationVecIterator {
+    vec1: Vec<usize>,
+    vec2: Vec<usize>,
+    index1: usize,
+    index2: usize,
+}
+
+impl CombinationVecIterator {
+    pub fn new(vec1: Vec<usize>, vec2: Vec<usize>) -> Self {
+        Self {
+            vec1,
+            vec2,
+            index1: 0,
+            index2: 0,
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        if self.vec1.is_empty() || self.vec2.is_empty() {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Iterator for CombinationVecIterator {
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_empty() {
+            return None;
+        }
+        if self.index1 >= self.vec1.len() {
+            return None;
+        }
+        if self.index2 >= self.vec2.len() {
+            self.index1 += 1;
+            self.index2 = 0;
+        }
+        if self.index1 >= self.vec1.len() {
+            return None;
+        }
+
+        let result = Some((self.vec1[self.index1], self.vec2[self.index2]));
+        self.index2 += 1;
+        result
+    }
+}
+
+// TODO: Make tests

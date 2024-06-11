@@ -172,23 +172,30 @@ pub fn query_pdb(env: AppArgs) {
                                 );
                                 if retrieve {
                                     match_count_filter[1] = if node_count > match_count_filter[1] {node_count} else {match_count_filter[1]};
+                                    if verbose {
+                                        print_log_msg(INFO, &format!("Filtering result with residue >= {}", match_count_filter[1]));
+                                    }
                                 }
-                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
+                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
                                     v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
+                                if verbose {
+                                    print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
+                                }
+
                                 // IF retrieve is true, retrieve matching residues
                                 if retrieve {
-                                    query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                    measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
                                         );
                                         v.matching_residues = retrieval_result;
-                                    });
+                                    }));
                                     // Filter query_count_vec with reasonable retrieval results
                                     query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
                                     drop(value_mmap);
@@ -211,23 +218,29 @@ pub fn query_pdb(env: AppArgs) {
                                 );
                                 if retrieve {
                                     match_count_filter[1] = if node_count > match_count_filter[1] {node_count} else {match_count_filter[1]};
+                                    if verbose {
+                                        print_log_msg(INFO, &format!("Filtering result with residue >= {}", match_count_filter[1]));
+                                    }
                                 }
-                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_iter().filter(|(_k, v)| {
+                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
                                     v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
+                                if verbose {
+                                    print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
+                                }
                                 // IF retrieve is true, retrieve matching residues
                                 if retrieve {
-                                    query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                    measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
                                         );
                                         v.matching_residues = retrieval_result;
-                                    });
+                                    }));
                                     query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
                                     println!("{:?}", query_count_vec.len());
                                     drop(value_mmap);

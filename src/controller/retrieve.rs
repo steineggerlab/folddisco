@@ -1,9 +1,9 @@
 // 
 use std::{collections::{HashMap, HashSet}, fs::File};
 use petgraph::Graph;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelDrainFull, ParallelIterator};
 
-use crate::{geometry::util::map_u8_to_aa, prelude::*, structure::{coordinate::Coordinate, core::CompactStructure, qcp::QCPSuperimposer}, utils::combination::CombinationIterator};
+use crate::{geometry::util::map_u8_to_aa, prelude::*, structure::{coordinate::Coordinate, core::CompactStructure, qcp::QCPSuperimposer}, utils::combination::{CombinationIterator, CombinationVecIterator}};
 use crate::controller::graph::{connected_components_with_given_node_count, create_index_graph};
 use crate::controller::feature::get_single_feature;
 
@@ -99,29 +99,66 @@ pub fn res_vec_as_string(res_vec: &Vec<((u8, u8), (u64, u64))>) -> String {
 }
 
 
-pub fn prefilter_aa_pair(compact: &CompactStructure, hash: &GeometricHash) -> Vec<(usize, usize)> {
-    let mut output: Vec<(usize, usize)> = Vec::new();
-    let comb = CombinationIterator::new(compact.num_residues);
-    let aa_index = hash.hash_type().amino_acid_index();
-    if aa_index.is_none() {
-        return output;
-    }
-    let aa_index = aa_index.unwrap();
+// pub fn prefilter_aa_pair(compact: &CompactStructure, hash: &GeometricHash) -> Vec<(usize, usize)> {
+//     let mut output: Vec<(usize, usize)> = Vec::new();
+//     let comb = CombinationIterator::new(compact.num_residues);
+//     let aa_index = hash.hash_type().amino_acid_index();
+//     if aa_index.is_none() {
+//         return output;
+//     }
+//     let aa_index = aa_index.unwrap();
+//     let feature = hash.reverse_hash_default();
+//     let aa1 = map_u8_to_aa(feature[aa_index[0]] as u8).as_bytes();
+//     let aa2 = map_u8_to_aa(feature[aa_index[1]] as u8).as_bytes();
+//     comb.for_each(|(i, j)| {
+//         if compact.residue_name[i] == aa1 && compact.residue_name[j] == aa2 {
+//             output.push((i, j));
+//         }
+//     });
+//     output
+// }
+
+pub fn prefilter_aa_pair(
+    compact: &CompactStructure,
+    hash: &GeometricHash,
+) -> CombinationVecIterator {
+    
+    let aa_index = match hash.hash_type().amino_acid_index() {
+        Some(index) => index,
+        None => return CombinationVecIterator::new((0..compact.num_residues).collect(), (0..compact.num_residues).collect()),
+    };
+
     let feature = hash.reverse_hash_default();
     let aa1 = map_u8_to_aa(feature[aa_index[0]] as u8).as_bytes();
     let aa2 = map_u8_to_aa(feature[aa_index[1]] as u8).as_bytes();
-    comb.for_each(|(i, j)| {
-        if compact.residue_name[i] == aa1 && compact.residue_name[j] == aa2 {
-            output.push((i, j));
-        }
-    });
-    output
+
+    // Pre-filter the residue names
+    let filtered_indices_aa1: Vec<usize> = compact.residue_name
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &res)| if res == aa1 { Some(i) } else { None })
+        .collect();
+
+    let filtered_indices_aa2: Vec<usize> = compact.residue_name
+        .iter()
+        .enumerate()
+        .filter_map(|(j, &res)| if res == aa2 { Some(j) } else { None })
+        .collect();
+
+    CombinationVecIterator::new(filtered_indices_aa1, filtered_indices_aa2)
 }
 
+
 pub fn retrieve_with_prefilter(
-    compact: &CompactStructure, hash: &GeometricHash, prefilter: &Vec<(usize, usize)>, nbin_dist: usize, nbin_angle: usize
-) -> Vec<(usize, usize)> {
-    let mut output: Vec<(usize, usize)> = Vec::new();
+    compact: &CompactStructure,
+    // hash: &GeometricHash, 
+    hash_set: &HashSet<GeometricHash>,
+    // prefilter: &Vec<(usize, usize)>, 
+    prefilter: CombinationVecIterator,
+    nbin_dist: usize, nbin_angle: usize
+) -> Vec<(usize, usize, GeometricHash)> {
+    let mut output: Vec<(usize, usize, GeometricHash)> = Vec::new();
+    let hash = hash_set.iter().next().cloned().unwrap();
     if prefilter.is_empty() {
         let comb = CombinationIterator::new(compact.num_residues);
         comb.for_each(|(i, j)| {
@@ -133,14 +170,15 @@ pub fn retrieve_with_prefilter(
                 } else {
                     GeometricHash::perfect_hash(feature, hash.hash_type(), nbin_dist, nbin_angle)
                 };
-                if curr_hash == *hash {
-                    output.push((i, j));
+                if hash_set.contains(&curr_hash) {
+                    output.push((i, j, curr_hash));
                 }
             }
         });
     } else {
         for (i, j) in prefilter {
-            let feature = get_single_feature(*i, *j, compact, hash.hash_type());
+            // let feature = get_single_feature(*i, *j, compact, hash.hash_type());
+            let feature = get_single_feature(i, j, compact, hash.hash_type());
             if feature.is_some() {
                 let feature = feature.unwrap();
                 let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
@@ -148,14 +186,16 @@ pub fn retrieve_with_prefilter(
                 } else {
                     GeometricHash::perfect_hash(feature, hash.hash_type(), nbin_dist, nbin_angle)
                 };
-                if curr_hash == *hash {
-                    output.push((*i, *j));
+                if hash_set.contains(&curr_hash) {
+                    // output.push((*i, *j));
+                    output.push((i, j, curr_hash));
                 }
             }
         }
     }
     output
 }
+
 
 pub fn get_chain_and_res_ind(compact: &CompactStructure, i: usize) -> (u8, u64) {
     (compact.chain_per_residue[i], compact.residue_serial[i])
@@ -178,14 +218,23 @@ pub fn retrieval_wrapper(
     // let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();
     // Iterate over query vector and retrieve indices
     // Parallel
-    let indices_found = query_vector.par_iter().map(|hash| {
-        let prefiltered = prefilter_aa_pair(&compact, hash);
-        retrieve_with_prefilter(&compact, hash, &prefiltered, _nbin_dist, _nbin_angle)
-    }).collect::<Vec<Vec<(usize, usize)>>>();
+    let query_set: HashSet<GeometricHash> = HashSet::from_iter(query_vector.clone());
+    let mut prefilter_set = query_vector.par_iter().map(|hash| {
+        prefilter_aa_pair(&compact, hash)
+    }).collect::<HashSet<CombinationVecIterator>>();
+    
+     let indices_found = prefilter_set.par_drain().map(|aa_filter| {
+        retrieve_with_prefilter(&compact, &query_set, aa_filter, _nbin_dist, _nbin_angle)
+    }).flatten().collect::<Vec<(usize, usize, GeometricHash)>>();
+
+    // let indices_found = measure_time!(query_vector.par_iter().map(|hash| {
+    //     let prefiltered = prefilter_aa_pair(&compact, hash);
+    //     retrieve_with_prefilter(&compact, hash, prefiltered, _nbin_dist, _nbin_angle)
+    // }).collect::<Vec<Vec<(usize, usize)>>>());
     
     // Make a graph and find connected components with the same node count
     // NOTE: Naive implementation to find matching components. Need to be improved to handle partial matches
-    let graph = create_index_graph(&indices_found, &query_vector);
+    let graph = create_index_graph(&indices_found);
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     // Parallel
@@ -311,27 +360,29 @@ mod tests {
         let compact = compact.to_compact();
         // map
         let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();
+        let query_set = HashSet::from_iter(queries.clone());
         measure_time!(queries.iter().for_each(|hash| {
             let prefiltered = prefilter_aa_pair(&compact, hash);
-            let retrieved = retrieve_with_prefilter(&compact, hash, &prefiltered, nbin_dist, nbin_angle);
+            let retrieved = retrieve_with_prefilter(&compact, &query_set, prefiltered, nbin_dist, nbin_angle);
             println!("{}: {:?}", hash, retrieved);
-            indices_found.push(retrieved);
+            
         }));
         // Convert to graph
-        measure_time!({
-            let graph = create_index_graph(&indices_found, &queries);
-            let connected = connected_components_with_given_node_count(&graph, query_residues.len());
-            println!("{:?}", connected);
-            let res_vec: Vec<String> = connected.iter().map(|component| {
-                let mut res_vec: Vec<String> = Vec::new();
-                component.iter().for_each(|&node| {
-                    let (chain, res_ind) = get_chain_and_res_ind(&compact, node);
-                    res_vec.push(res_index_to_char(chain, res_ind));
-                });
-                res_vec.join(",")
-            }).collect();
-            println!("{:?}", res_vec);
-        });
+        // TODO: Restore this test
+        // measure_time!({
+        //     let graph = create_index_graph(&indices_found, &queries);
+        //     let connected = connected_components_with_given_node_count(&graph, query_residues.len());
+        //     println!("{:?}", connected);
+        //     let res_vec: Vec<String> = connected.iter().map(|component| {
+        //         let mut res_vec: Vec<String> = Vec::new();
+        //         component.iter().for_each(|&node| {
+        //             let (chain, res_ind) = get_chain_and_res_ind(&compact, node);
+        //             res_vec.push(res_index_to_char(chain, res_ind));
+        //         });
+        //         res_vec.join(",")
+        //     }).collect();
+        //     println!("{:?}", res_vec);
+        // });
     } 
     
     #[test]

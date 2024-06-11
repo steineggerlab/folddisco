@@ -3,15 +3,17 @@
 ## TODOs 240522
 QUERYING
 - [ ] IMPORTANT: TODO: Rename features --> default goes to PDBTrRosetta
-- [x] DONE: Delete 64bit hashes; Only keep 32bit
-- [ ] Check if combination of thresholds works better
+- [x] DONE: retrieving long motifs takes too much time even with node filtering option
+  - [x] DONE: Introduced new iterator for amino acid prefilter
+  - [ ] TODO: Restore tests for retrieve.rs & combination.rs
 
 DEV
 - [ ] Set default options; PDBTrRosetta, 16, 4, ID, relpath
 - [ ] Write rustdoc
 - [ ] TODO: Foldcomp DB reader
+- [ ] Check verbosity flag works
 
-BENCHMARK
+BENCHMARKa
 - [ ] TODO: Index should not be a mandatory parameter --> Fix this
 - Benchmark plan
   - 1. Known motifs
@@ -343,4 +345,74 @@ model_benchmark/e_coli/pdb/AF-P38394-F1-model_v4.pdb	16.2837	1	2	1	1	0	1	56	87.1
 model_benchmark/e_coli/pdb/AF-P45771-F1-model_v4.pdb	14.5993	1	2	1	1	0	1	180	82.3846	A173,A168,_,_:0.3801	F207,F212,F225,F229	query/1G2F.pdb	e_coli_db/pdbtr/d16a4/index
 model_benchmark/e_coli/pdb/AF-P06612-F1-model_v4.pdb	12.3345	1	2	1	1	0	1	865	90.2204	A689,A683,_,_:0.3782;A736,A731,_,_:0.3956	F207,F212,F225,F229	query/1G2F.pdb	e_coli_db/pdbtr/d16a4/index
 model_benchmark/e_coli/pdb/AF-P39393-F1-model_v4.pdb	12.2677	1	2	1	1	0	1	906	86.2010	A124,A119,_,_:0.2776	F207,F212,F225,F229	query/1G2F.pdb	e_coli_db/pdbtr/d16a4/index
+```
+```sh
+(base) hyunbin@ramda:/fast/hyunbin/motif$ \time -v ~/Projects/06_Motifsearch/motifsearch/target/release/folddisco index -p model_benchmark/h_sapiens/pdb/ -r -i h_sapiens_db/pdbtr/d16a4/240
+611_index -d 16 -a 4 -v -m id -v -t 12 -y pdbtr
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing model_benchmark/h_sapiens/pdb/ with 12 threads and 1 chunks
+[INFO] Hash type: PDBTrRosetta
+[INFO] Indexing all PDB files in one chunk
+[INFO] Collecting ids of the structures
+[INFO] fold_disco.collect_hash_pairs: 1339.433922503s
+[INFO] Total 927096148 hashes collected (Allocated 14150.642MB)
+[INFO] fold_disco.sort_hash_pairs: 11.551684272s
+[INFO] Hash sorted (Allocated 14150.684MB)
+[INFO] convert_sorted_hash_pairs_to_simplemap: 7.020740753s
+[INFO] Offset & values acquired (Allocated 8347.525MB)
+[INFO] offset_map.dump_to_disk: 1.257114737s
+[INFO] write_usize_vector_in_bits: 4.745809217s
+[INFO] save_lookup_to_file: 15.531911ms
+[DONE] Indexing done for chunk 0 - h_sapiens_db/pdbtr/d16a4/240611_index
+[DONE] Done.
+        Command being timed: "/home/hyunbin/Projects/06_Motifsearch/motifsearch/target/release/folddisco index -p model_benchmark/h_sapiens/pdb/ -r -i h_sapiens_db/pdbtr/d16a4/240611_index -d 16 -a 4 -v -m id -v -t 12 -y pdbtr"
+        User time (seconds): 16029.98
+        System time (seconds): 25.09
+        Percent of CPU this job got: 1174%
+        Elapsed (wall clock) time (h:mm:ss or m:ss): 22:46.56
+        Average shared text size (kbytes): 0
+        Average unshared data size (kbytes): 0
+        Average stack size (kbytes): 0
+        Average total size (kbytes): 0
+        Maximum resident set size (kbytes): 28975652
+        Average resident set size (kbytes): 0
+        Major (requiring I/O) page faults: 0
+        Minor (reclaiming a frame) page faults: 7501451
+        Voluntary context switches: 106314
+        Involuntary context switches: 38583
+        Swaps: 0
+        File system inputs: 32
+        File system outputs: 4788424
+        Socket messages sent: 0
+        Socket messages received: 0
+        Signals delivered: 0
+        Page size (bytes): 4096
+        Exit status: 0
+        
+(base) hbk@Hyunbinui-MacBookPro motifsearch % \time ./target/release/folddisco index -p analysis/s_cerevisiae/pdb -i analysis/s_cerevisiae/pdbtr_d16a4 -d 16 -a 4 -y pdbtr -v -m id -t 6
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing analysis/s_cerevisiae/pdb with 6 threads and 1 chunks
+[INFO] Hash type: PDBTrRosetta
+[INFO] Indexing all PDB files in one chunk
+[INFO] Collecting ids of the structures
+[INFO] fold_disco.collect_hash_pairs: 311.744003478s
+[INFO] Total 216608532 hashes collected (Allocated 3306.2327MB)
+[INFO] fold_disco.sort_hash_pairs: 5.963986874s
+[INFO] Hash sorted (Allocated 3306.267MB)
+[INFO] convert_sorted_hash_pairs_to_simplemap: 11.979051876s
+[INFO] Offset & values acquired (Allocated 2638.2983MB)
+[INFO] offset_map.dump_to_disk: 484.724063ms
+[INFO] write_usize_vector_in_bits: 1.252386884s
+[INFO] save_lookup_to_file: 10.259776ms
+[DONE] Indexing done for chunk 0 - analysis/s_cerevisiae/pdbtr_d16a4
+[DONE] Done.
+      332.71 real      1692.11 user        27.89 sys
 ```

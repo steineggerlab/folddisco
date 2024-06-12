@@ -121,6 +121,30 @@ impl SimpleHashMap {
             }
         }
     }
+    
+    fn insert_u32(&mut self, key: u32, value: (usize, usize)) {
+        let hash = self.hash(key);
+        let mut index = hash;
+
+        loop {
+            if !self.occupancy.get(index) {
+                let key_index = self.keys.len();
+                self.keys.push(key);
+                self.values.push(value);
+                self.buckets[index] = key_index as u32;
+                self.occupancy.set(index, true);
+                self.size += 1;
+                return;
+            } else if self.keys[self.buckets[index] as usize] == key {
+                let key_index = self.buckets[index] as usize;
+                self.values[key_index] = value;
+                return;
+            } else {
+                index = (index + 1) % self.capacity;
+            }
+        }
+    }
+    
 
     pub fn get(&self, key: &GeometricHash) -> Option<&(usize, usize)> {
         let key_u32 = key.as_u32();
@@ -305,6 +329,37 @@ pub fn convert_sorted_hash_pairs_to_simplemap(
     }
     (offset_map, vec)
 }
+
+
+pub fn convert_sorted_hash_vec_to_simplemap(
+    sorted_vec: Vec<(u32, usize)>
+) -> (SimpleHashMap, Vec<usize>) {
+    // OffsetMap - key: hash, value: (offset, length)
+    let (total_hashes, total_values) = estimate_hash_size(&sorted_vec);
+    let mut offset_map = SimpleHashMap::new(total_hashes * 3);
+    let mut vec: Vec<usize> = Vec::with_capacity(total_values);
+
+    if let Some((first_hash, _)) = sorted_vec.first() {
+        let mut current_hash = first_hash;
+        let mut current_offset = 0;
+        let mut current_count = 0;
+
+        for (index, pair) in sorted_vec.iter().enumerate() {
+            if pair.0 == *current_hash {
+                current_count += 1;
+            } else {
+                offset_map.insert_u32(*current_hash, (current_offset, current_count));
+                current_hash = &pair.0;
+                current_offset = index;
+                current_count = 1;
+            }
+            vec.push(pair.1);
+        }
+        offset_map.insert_u32(*current_hash, (current_offset, current_count));
+    }
+    (offset_map, vec)
+}
+
 
 
 #[cfg(test)]

@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 
 use crate::cli::config::{write_index_config_to_file, IndexConfig};
-use crate::controller::map::convert_sorted_hash_pairs_to_simplemap;
+use crate::controller::map::{convert_sorted_hash_pairs_to_simplemap, convert_sorted_hash_vec_to_simplemap};
 use crate::controller::mode::{parse_path_vec_by_id_type, IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::write_usize_vector_in_bits;
@@ -109,14 +109,17 @@ pub fn build_index(env: AppArgs) {
                 match index_mode {
                     IndexMode::Id => {
                         if verbose { print_log_msg(INFO, "Collecting ids of the structures"); }
-                        measure_time!(fold_disco.collect_hash_pairs());
+                        // measure_time!(fold_disco.collect_hash_pairs());
+                        measure_time!(fold_disco.collect_hash_vec());
                         if verbose {
                             print_log_msg(INFO, 
-                                &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pairs.len(), PEAK_ALLOC.current_usage_as_mb())
+                                // &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pairs.len(), PEAK_ALLOC.current_usage_as_mb())
+                                &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_vec.len(), PEAK_ALLOC.current_usage_as_mb())
                                 // &format!("Total {} hashes collected", fold_disco.hash_id_pairs.len())
                             );
                         }
-                        measure_time!(fold_disco.sort_hash_pairs());
+                        // measure_time!(fold_disco.sort_hash_pairs());
+                        measure_time!(fold_disco.sort_hash_vec());
                     }
                     IndexMode::Grid => {
                         if verbose { print_log_msg(INFO, "Collecting ids and grids with hashes observed"); }
@@ -148,7 +151,8 @@ pub fn build_index(env: AppArgs) {
 
                 let (offset_map, value_vec) = match index_mode {
                     IndexMode::Id => {
-                        measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_pairs))
+                        // measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_pairs))
+                        measure_time!(convert_sorted_hash_vec_to_simplemap(fold_disco.hash_id_vec))
                     }
                     IndexMode::Grid => {
                         measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_grids))

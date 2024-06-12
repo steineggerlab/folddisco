@@ -16,6 +16,7 @@ pub mod mode;
 
 use std::io::Write;
 use std::sync::{Arc, Mutex};
+use feature::get_geometric_hash_as_u32_from_structure;
 // External imports
 use rayon::prelude::*;
 
@@ -44,6 +45,7 @@ pub struct FoldDisco {
     pub hash_collection: Vec<Vec<GeometricHash>>,
     pub hash_id_pairs: Vec<(GeometricHash, usize)>,
     pub hash_id_grids: Vec<(GeometricHash, usize)>,
+    pub hash_id_vec: Vec<(u32, usize)>,
     pub index_builder: IndexBuilder<usize, GeometricHash>,
     pub hash_type: HashType,
     pub remove_redundancy: bool,
@@ -66,6 +68,7 @@ impl FoldDisco {
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
             hash_id_grids: Vec::new(),
+            hash_id_vec: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: DEFAULT_HASH_TYPE,
             remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
@@ -87,6 +90,7 @@ impl FoldDisco {
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
             hash_id_grids: Vec::new(),
+            hash_id_vec: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: hash_type,
             remove_redundancy: DEFAULT_REMOVE_REDUNDANCY,
@@ -113,6 +117,7 @@ impl FoldDisco {
             hash_collection: Vec::new(),
             hash_id_pairs: Vec::new(),
             hash_id_grids: Vec::new(),
+            hash_id_vec: Vec::new(),
             index_builder: IndexBuilder::empty(),
             hash_type: hash_type,
             remove_redundancy: remove_redundancy,
@@ -287,7 +292,7 @@ impl FoldDisco {
         self.plddt_vec = Arc::try_unwrap(plddt_vec).unwrap().into_inner().unwrap();
         drop(pool);
     }
-    
+
     pub fn collect_hash_grids(&mut self) {
         let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
         let plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
@@ -360,6 +365,74 @@ impl FoldDisco {
         drop(pool);
     }
 
+    pub fn collect_hash_vec(&mut self) {
+        let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
+        let plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
+        // Set file threads
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            .build()
+            .expect("Failed to build thread pool for iterating files");
+        // For iterating files, apply multi-threading with num_threads_for_file
+        let collected: Vec<(u32, usize)> = pool.install(|| {
+            self.path_vec
+                .par_iter()
+                .map(|pdb_path| {
+                    let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                    let pdb_reader = PDBReader::from_file(pdb_path).expect(
+                        log_msg(FAIL, "PDB file not found").as_str()
+                    );
+                    let compact = if pdb_path.ends_with(".gz") {
+                        pdb_reader.read_structure_from_gz().expect(
+                            log_msg(FAIL, "Failed to read structure").as_str()
+                        )
+                    } else {
+                        pdb_reader.read_structure().expect(
+                            log_msg(FAIL, "Failed to read structure").as_str()
+                        )
+                    };
+                    if compact.num_residues > self.max_residue {
+                        print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
+                        // skip this file
+                        // Drop intermediate variables
+                        drop(compact);
+                        drop(pdb_reader);
+                        return Vec::new();
+                    }
+                    let compact = compact.to_compact();
+                    // Directly write num_residues and avg_plddt to the vectors
+                    let nres = compact.num_residues;
+                    let plddt = compact.get_avg_plddt();
+                    {
+                        let mut nres_vec = nres_vec.lock().unwrap();
+                        let mut plddt_vec = plddt_vec.lock().unwrap();
+                        nres_vec[pdb_pos] = nres;
+                        plddt_vec[pdb_pos] = plddt;
+                    }
+                    let mut hash_vec = get_geometric_hash_as_u32_from_structure(
+                        &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
+                    );
+                    // Drop intermediate variables
+                    drop(compact);
+                    drop(pdb_reader);
+                    // If remove_redundancy is true, remove duplicates
+                    if self.remove_redundancy {
+                        hash_vec.sort_unstable();
+                        hash_vec.dedup();
+                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect()
+                    } else {
+                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect()
+                    }
+                }).flatten().collect()
+            });
+        self.hash_id_vec = collected;
+        // self.hash_id_grids = collected;
+        self.nres_vec = Arc::try_unwrap(nres_vec).unwrap().into_inner().unwrap();
+        self.plddt_vec = Arc::try_unwrap(plddt_vec).unwrap().into_inner().unwrap();
+        drop(pool);
+    }
+    
+    
     pub fn sort_hash_pairs(&mut self) {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
@@ -378,6 +451,17 @@ impl FoldDisco {
             .expect(&log_msg(FAIL, "Failed to build thread pool for sorting"));
         pool.install(|| {
             self.hash_id_grids.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        });
+        drop(pool);
+    }
+    
+    pub fn sort_hash_vec(&mut self) {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            .build()
+            .expect(&log_msg(FAIL, "Failed to build thread pool for sorting"));
+        pool.install(|| {
+            self.hash_id_vec.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
         });
         drop(pool);
     }

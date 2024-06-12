@@ -1,11 +1,25 @@
 # Development note
 
-## TODOs 240522
+## TODOs
+INDEXING
+- [ ] Scalability
+
+QUERYING
+- [ ] Allow different amino acid pairs
+- [ ] TODO: allowing different amino acid pairs.
+  - [ ] TODO: Policies: Any, Exact, Same property
+- [ ] Collect test query info / commands in QUERY.md
+
+- [x] DONE: FEATURE: multiple queries
+- [x] DONE: measure time for querying with retrieval of matched positions
+
 QUERYING
 - [ ] IMPORTANT: TODO: Rename features --> default goes to PDBTrRosetta
 - [x] DONE: retrieving long motifs takes too much time even with node filtering option
   - [x] DONE: Introduced new iterator for amino acid prefilter
   - [ ] TODO: Restore tests for retrieve.rs & combination.rs
+- [ ] TODO: Print only top N result (--top)
+- [ ] TODO: Add ID-handling to 
 
 DEV
 - [ ] Set default options; PDBTrRosetta, 16, 4, ID, relpath
@@ -14,6 +28,8 @@ DEV
 - [ ] Check verbosity flag works
 
 BENCHMARKa
+- [ ] TODO: Add an option to select metrics to calculate
+  - [ ] TODO: Metric at specific FPs (--fp, --k)
 - [ ] TODO: Index should not be a mandatory parameter --> Fix this
 - Benchmark plan
   - 1. Known motifs
@@ -28,11 +44,6 @@ SCORING
 IMPORTANT: BENCHMARK 
   - [ ] TODO: Pyscomotif in two options
 
-QUERYING
-- [ ] Allow different amino acid pairs
-  - [ ] TODO: Policies: Any, Exact, Same property
-- [ ] Collect test query info / commands in QUERY.md
-- [ ] Apply graph based algorithms (MASTER, ...) after running folddisco
 
 INDEXING
 - [x] DONE: Add an option to save indices with different schemes
@@ -58,10 +69,7 @@ QUERYING
 BIG THINGS
 - [ ] IMPORTANT: confirm if sin & cos representation is working 
 
-QUERYING
-- [ ] TODO: allowing different amino acid pairs.
-- [ ] TODO: FEATURE: multiple queries
-- [ ] TODO: measure time for querying with retrieval of matched positions
+
 
 INDEX
 - [ ] IMPORTANT: Reduce memory usage with delta encoding (Make this as an option). DELTA ENCODING!!!

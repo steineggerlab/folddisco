@@ -36,8 +36,9 @@ pub fn benchmark(env: AppArgs) {
             let lookup = lookup.into_iter().collect::<HashSet<_>>();
             let config = read_index_config_from_file(&config_path);
 
-            // let metric = compare_target_answer_set(&result, &answer, &lookup);
-            let metric = measure_up_to_k_fp(&result, &answer, &lookup, 5.0);
+            let result = HashSet::from_iter(result);
+            let metric = compare_target_answer_set(&result, &answer, &lookup);
+            // let metric = measure_up_to_k_fp(&result, &answer, &lookup, 5.0);
             
             match format {
                 "tsv" => {

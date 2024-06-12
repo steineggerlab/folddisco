@@ -26,3 +26,10 @@
 ```sh
 ~/Projects/06_Motifsearch/motifsearch/target/release/folddisco query -p query/20240426_WHY.pdb -i scop_benchmark/pdbtr/d16a4/index -t 32 -d 0.5 -a 5 > ~/temp.tsv
 ```
+
+
+
+
+---
+
+# Observations to report

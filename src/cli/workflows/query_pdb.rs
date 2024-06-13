@@ -117,11 +117,17 @@ pub fn query_pdb(env: AppArgs) {
             let loaded_index_vec = index_paths.into_par_iter().map(|index_path| {
                 let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
                 let config = read_index_config_from_file(&hash_type_path);
-                let (offset_table, offset_mmap) = measure_time!(
+                let (offset_table, offset_mmap) = if verbose { measure_time!(
                     SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
-                );
+                ) } else {
+                    SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
+                };
                 let offset_table = offset_table.unwrap();
-                let lookup = measure_time!(load_lookup_from_file(&lookup_path));
+                let lookup = if verbose {
+                    measure_time!(load_lookup_from_file(&lookup_path))
+                } else {
+                    load_lookup_from_file(&lookup_path)
+                };
                 (offset_table, offset_mmap, lookup, config, value_path)
             }).collect::<Vec<(SimpleHashMap, Mmap, (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>), IndexConfig, String)>>();
 
@@ -155,18 +161,24 @@ pub fn query_pdb(env: AppArgs) {
                         let num_bin_dist = config.num_bin_dist;
                         let num_bin_angle = config.num_bin_angle;
                         let mode = config.mode;
-                        let (pdb_query_map, query_indices) = measure_time!(make_query_map(
+                        let (pdb_query_map, query_indices) = if verbose { measure_time!(make_query_map(
                             &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds
-                        ));
+                        )) } else {
+                            make_query_map(&pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds)
+                        };
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
                         match mode {
                             IndexMode::Id => {
-                                let (value_mmap, value_vec) = measure_time!(read_u16_vector(&value_path).expect(
+                                let (value_mmap, value_vec) = if verbose { measure_time!(read_u16_vector(&value_path).expect(
                                     &log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path))
-                                ));
-                                let query_count_map = measure_time!(count_query_idmode(
+                                )) } else {
+                                    read_u16_vector(&value_path).expect(&log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path)))
+                                };
+                                let query_count_map = if verbose { measure_time!(count_query_idmode(
                                     &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
-                                ));
+                                ))} else {
+                                    count_query_idmode(&pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup)
+                                };
                                 let mut match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()
                                 );
@@ -262,8 +274,13 @@ pub fn query_pdb(env: AppArgs) {
                 });
                 drop(query_residues);
                 // Sort query_count_vec by idf
-                measure_time!(queried_from_indices.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
-                // If output path is not empty, write to file
+                // TODO: Change feature to sort
+                if verbose {
+                    measure_time!(queried_from_indices.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
+                } else {
+                    queried_from_indices.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap());
+                }
+                    // If output path is not empty, write to file
                 if !output_path.is_empty() {
                     // Create file
                     let file = std::fs::File::create(&output_path).expect(
@@ -389,7 +406,7 @@ mod tests {
         let plddt_cutoff = 0.0;
         let node_count = 2;
         let header = false;
-        let verbose = true;
+        let verbose = false;
         let env = AppArgs::Query {
             pdb_path,
             query_string,

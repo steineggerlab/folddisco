@@ -9,7 +9,7 @@ use dashmap::DashMap;
 
 
 // 
-use std::sync::Arc;
+use std::sync::{atomic, Arc};
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
@@ -30,7 +30,66 @@ impl<T: HashableSync> HugeAllocation<T> {
             allocation: UnsafeCell::new(vec![unsafe { std::mem::zeroed() }; size]),
         }
     }
+    pub fn fill(&self, index: usize, data: T) {
+        let allocation_ref = unsafe { &mut *self.allocation.get() };
+        allocation_ref[index] = data;
+    }
 }
+
+impl HugeAllocation<usize> {
+    pub fn add(&self, index: usize, data: usize) {
+        let allocation_ref = unsafe { &mut *self.allocation.get() };
+        allocation_ref[index] += data;
+    }
+}
+
+// Test for HugeAllocation
+#[cfg(test)]
+mod tests {
+    use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+
+    use crate::measure_time;
+
+    use super::*;
+    #[test]
+    fn test_huge_allocation() {
+        // Making an allocation for 2^30 elements
+        let size = 1 << 30;
+        let allocation = HugeAllocation::<usize>::new(size);
+        let allocation_ref = unsafe { &*allocation.allocation.get() };
+        assert_eq!(allocation_ref.len(), size);
+    }
+    
+    #[test]
+    fn test_parallel_filling() {
+        let size = 1 << 10;
+        let allocation = measure_time!(HugeAllocation::<usize>::new(size));
+        let allocation_ref = unsafe { &*allocation.allocation.get() };
+        // Use rayon
+        measure_time!({(0..size).into_par_iter().for_each(|i| {allocation.fill(i, i);});});
+        for i in 0..size {
+            assert_eq!(allocation_ref[i], i);
+        }
+    }
+    
+    #[test]
+    fn test_counting_and_filling() {
+        // one 1, two 2s, three 3s, four 4s, five 5s, until 32
+        let size = 1024;
+        let data: Vec<usize> = (1..size+1).flat_map(|i| vec![i; i]).collect();
+        // Count each element and fill the vector
+        let count_vector = HugeAllocation::<usize>::new(size);
+        data.par_iter().for_each(|&i| {
+            count_vector.add(i-1, 1);
+        });
+        // Print 
+        
+    }
+    
+    
+}
+
+
 
 pub struct IndexBuilder<K: HashableSync, V: HashableSync> {
     pub offset: DashMap<V, (AtomicUsize, AtomicUsize)>, // Value, (offset in allocation, size)

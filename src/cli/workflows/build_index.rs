@@ -16,6 +16,7 @@ use crate::controller::mode::{parse_path_vec_by_id_type, IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::write_usize_vector_in_bits;
 use crate::prelude::*;
+use memmap2::MmapMut;
 use peak_alloc::PeakAlloc;
 
 #[global_allocator]
@@ -87,6 +88,7 @@ pub fn build_index(env: AppArgs) {
                     )
                 );
             }
+            
             let hash_type = HashType::get_with_str(hash_type.as_str());
             if verbose { print_log_msg(INFO, &format!("Hash type: {:?}", hash_type)); }
             let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);
@@ -101,6 +103,7 @@ pub fn build_index(env: AppArgs) {
                     if verbose { print_log_msg(INFO, &format!("Indexing chunk {}", i)); }
                     format!("{}_{}", index_path, i)
                 };
+                print_log_msg(INFO, &format!("Before initializing (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb()));
                 let mut fold_disco = FoldDisco::new_with_params(
                     pdb_path_vec.to_vec(), hash_type, true, num_threads, 
                     num_bin_dist, num_bin_angle, index_path.clone(), grid_width,
@@ -109,16 +112,12 @@ pub fn build_index(env: AppArgs) {
                 match index_mode {
                     IndexMode::Id => {
                         if verbose { print_log_msg(INFO, "Collecting ids of the structures"); }
-                        // measure_time!(fold_disco.collect_hash_pairs());
                         measure_time!(fold_disco.collect_hash_vec());
                         if verbose {
                             print_log_msg(INFO, 
-                                // &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pairs.len(), PEAK_ALLOC.current_usage_as_mb())
                                 &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_vec.len(), PEAK_ALLOC.current_usage_as_mb())
-                                // &format!("Total {} hashes collected", fold_disco.hash_id_pairs.len())
                             );
                         }
-                        // measure_time!(fold_disco.sort_hash_pairs());
                         measure_time!(fold_disco.sort_hash_vec());
                     }
                     IndexMode::Grid => {
@@ -142,6 +141,19 @@ pub fn build_index(env: AppArgs) {
                         // }
                         todo!("Implement this part");
                     }
+                    IndexMode::Big => {
+                        if verbose { print_log_msg(INFO, "Collecting ids of the structures"); }
+                        measure_time!(fold_disco.collect_and_count());
+                        if verbose {
+                            print_log_msg(INFO, 
+                                &format!("Hashes collected (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
+                            );
+                        }
+                        measure_time!(fold_disco.fold_disco_index.allocate_entries());
+                        measure_time!(fold_disco.add_entries());
+                        measure_time!(fold_disco.fold_disco_index.finish_index());
+                        measure_time!(fold_disco.fold_disco_index.save_offset_to_file());
+                    }
                 }
                 if verbose { print_log_msg(INFO,
                     &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
@@ -159,6 +171,9 @@ pub fn build_index(env: AppArgs) {
                     }
                     IndexMode::Pos => {
                         todo!("Implement this part");
+                    }
+                    _ => {
+                        unimplemented!();
                     }
                 };
 
@@ -190,6 +205,9 @@ pub fn build_index(env: AppArgs) {
                         // measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 48).expect(
                         //     &log_msg(FAIL, "Failed to save values")
                         // ));
+                    }
+                    _ => {
+                        unimplemented!();
                     }
                 }
                 let lookup_path = format!("{}.lookup", index_path);
@@ -226,7 +244,7 @@ mod tests {
         let hash_type = "pdbtr";
         // let index_path = "analysis/e_coli/test_index";
         let index_path = "data/serine_peptidases_pdbtr_test";
-        let index_mode = "id";
+        let index_mode = "big";
         let num_threads = 8;
         let num_bin_dist = 16;
         let num_bin_angle = 4;

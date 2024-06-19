@@ -266,6 +266,9 @@ pub fn query_pdb(env: AppArgs) {
                             IndexMode::Pos => {
                                 todo!()
                             },
+                            IndexMode::Big => {
+                                todo!()
+                            },
                         } // match mode
                     }
                 ).reduce(|| Vec::new(), |mut acc, x| {

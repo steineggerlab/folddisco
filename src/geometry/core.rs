@@ -63,6 +63,20 @@ impl HashType {
         32usize
     }
     
+    pub fn encoding_bits(&self) -> usize {
+        match self {
+            HashType::PDBMotif => 25usize,
+            HashType::PDBMotifSinCos => 26usize,
+            HashType::PDBMotifHalf => 30usize,
+            HashType::TrRosetta => 32usize,
+            HashType::PointPairFeature => 32usize,
+            HashType::PDBTrRosetta => 30usize,
+            HashType::TertiaryInteraction => 29usize,
+            // append new hash type here
+            HashType::Other => 32usize,
+        }
+    }
+    
     pub fn save_to_file(&self, path: &str) {
         let mut file = std::fs::File::create(path).unwrap();
         file.write_all(format!("{:?}", self).as_bytes()).unwrap();

@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use crate::index::indextable::FolddiscoIndex;
 use crate::structure::grid::grid_index_to_tuple;
 use crate::{prelude::GeometricHash, structure::grid::convert_to_id_grid_vector};
 
@@ -122,7 +123,6 @@ impl QueryResult {
 
 pub fn count_query_idmode(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    // offset_table: &DashMap<GeometricHash, (usize, usize)>,
     offset_table: &SimpleHashMap,
     value_vec: &[u16],
     lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
@@ -144,6 +144,79 @@ pub fn count_query_idmode(
             let nid = lookup.1[single_queried_values[j] as usize];
             let nres = lookup.2[single_queried_values[j] as usize];
             let plddt = lookup.3[single_queried_values[j] as usize];
+            
+            let result = query_count_map.get_mut(&nid);
+            let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
+            let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
+            
+            if result.is_none() {
+                let mut node_set = HashMap::new();
+                node_set.insert(edge.0, 1);
+                node_set.insert(edge.1, 1);
+                let mut edge_set = HashMap::new();
+                edge_set.insert(edge, 1);
+                let exact_match_count = if is_exact { 1usize } else { 0usize };
+                let overflow_count = 0usize;
+                let total_match_count = 1usize;
+                let mut query_result = QueryResult::new(
+                    id, nid, total_match_count, 2, 1, exact_match_count,
+                    overflow_count, 1usize, idf + nres_norm, nres, plddt
+                );
+                query_result.node_set = node_set;
+                query_result.edge_set = edge_set;
+                query_count_map.insert(nid, query_result);
+            } else {
+                let result = result.unwrap();
+                if result.node_set.contains_key(&edge.0) {
+                    let count = result.node_set.get_mut(&edge.0).unwrap();
+                    *count += 1;
+                } else {
+                    result.node_set.insert(edge.0, 1);
+                    result.node_count += 1;
+                }
+                if result.node_set.contains_key(&edge.1) {
+                    let count = result.node_set.get_mut(&edge.1).unwrap();
+                    *count += 1;
+                } else {
+                    result.node_set.insert(edge.1, 1);
+                    result.node_count += 1;
+                }
+                let is_overflow = result.edge_set.contains_key(&edge);
+                if is_overflow {
+                    let count = result.edge_set.get_mut(&edge).unwrap();
+                    *count += 1;
+                    result.overflow_count += 1;
+                } else {
+                    result.edge_set.insert(edge, 1);
+                    result.edge_count += 1;
+                }
+                result.total_match_count += 1;
+                result.exact_match_count += if is_exact { 1usize } else { 0usize };
+                result.idf += idf + nres_norm;
+            }
+        }
+    }
+    query_count_map
+}
+
+pub fn count_query_bigmode(
+    queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    big_index: &FolddiscoIndex,
+    lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
+) -> HashMap<usize, QueryResult> {
+    let mut query_count_map = HashMap::new();
+    for (_i, query) in queries.iter().enumerate() {
+        
+        let single_queried_values = big_index.get_entries(query.as_u32());
+        let edge_info = query_map.get(query).unwrap();
+        let is_exact = edge_info.1;
+        let edge = edge_info.0;
+        let hash_count = single_queried_values.len();
+        for j in 0..single_queried_values.len() {
+            let id = lookup.0[single_queried_values[j]].clone();
+            let nid = lookup.1[single_queried_values[j]];
+            let nres = lookup.2[single_queried_values[j]];
+            let plddt = lookup.3[single_queried_values[j]];
             
             let result = query_count_map.get_mut(&nid);
             let idf = (lookup.0.len() as f32 / hash_count as f32).log2();

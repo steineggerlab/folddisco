@@ -56,7 +56,7 @@ pub struct FoldDisco {
     pub output_path: String,
     pub max_residue: usize,
     pub grid_width: f32,
-    pub fold_disco_index: FolddiscoIndex<'static>,
+    pub fold_disco_index: FolddiscoIndex,
 }
 
 impl FoldDisco {

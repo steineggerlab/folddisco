@@ -1,12 +1,17 @@
+
+
 use std::cell::UnsafeCell;
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+
 use memmap2::MmapMut;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
-pub struct FolddiscoIndex {
-    offsets: UnsafeCell<Vec<AtomicUsize>>,
+
+pub struct FolddiscoIndex<'a> {
+    offsets: UnsafeCell<Vec<usize>>,
+    atomic_offsets: UnsafeCell<Vec<&'a AtomicUsize>>,
     last_id: UnsafeCell<Vec<usize>>,
     total_hashes: usize,
     // entries: UnsafeCell<Vec<u8>>,
@@ -14,16 +19,23 @@ pub struct FolddiscoIndex {
     index_path: String,
 }
 
-unsafe impl Sync for FolddiscoIndex {}
+unsafe impl Sync for FolddiscoIndex<'static> {}
 
-impl FolddiscoIndex {
+impl FolddiscoIndex<'static> {
     pub fn new(total_hashes: usize, path: String) -> Self {
-        let offsets = (0..total_hashes + 1).map(|_| AtomicUsize::new(0)).collect();
+        let mut offsets = vec![0usize; total_hashes + 1];
+        let atomic_offsets = unsafe {
+            offsets.iter_mut().map(|x| {
+                let atomic = AtomicUsize::from_ptr(x);
+                atomic
+            }).collect()
+        };
         let last_id = vec![usize::MAX; total_hashes];
         let entries = MmapMut::map_anon(1024).unwrap();
         
         FolddiscoIndex {
             offsets: UnsafeCell::new(offsets),
+            atomic_offsets: UnsafeCell::new(atomic_offsets),
             last_id: UnsafeCell::new(last_id),
             total_hashes,
             entries: UnsafeCell::new(entries),
@@ -33,7 +45,7 @@ impl FolddiscoIndex {
 
     pub fn count_single_entry(&self, hash: u32, id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
-        let offsets = unsafe { &mut *self.offsets.get() };
+        let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
         let count = if last_id[hash as usize] == usize::MAX {
             if id == 0 {
                 1usize
@@ -44,13 +56,13 @@ impl FolddiscoIndex {
             (1 + (id - last_id[hash as usize]).ilog2() / 7) as usize
         };
 
-        offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
+        atomic_offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
         last_id[hash as usize] = id;
     }
     
     pub fn count_entries(&self, hashes: &Vec<u32>, id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
-        let offsets = unsafe { &mut *self.offsets.get() };
+        let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
 
         for &hash in hashes {
             let count = if last_id[hash as usize] == usize::MAX {
@@ -63,14 +75,14 @@ impl FolddiscoIndex {
                 (1 + (id - last_id[hash as usize]).ilog2() / 7) as usize
             };
 
-            offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
+            atomic_offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
             last_id[hash as usize] = id;
         }
     }
 
     pub fn add_entries(&self, hashes: &[u32], id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
-        let offsets = unsafe { &mut *self.offsets.get() };
+        let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
         let entries = unsafe { &mut *self.entries.get() };
 
         for &hash in hashes {
@@ -85,7 +97,7 @@ impl FolddiscoIndex {
                 (1 + (id - last_id[hash as usize]).ilog2() / 7) as usize
             };
 
-            let offset = offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
+            let offset = atomic_offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
             let prev = last_id[hash as usize];
             last_id[hash as usize] = id;
 
@@ -104,7 +116,7 @@ impl FolddiscoIndex {
 
     pub fn add_single_entry(&self, hash: u32, id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
-        let offsets = unsafe { &mut *self.offsets.get() };
+        let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
         let entries = unsafe { &mut *self.entries.get() };
 
         let count = if last_id[hash as usize] == usize::MAX {
@@ -117,7 +129,7 @@ impl FolddiscoIndex {
             (1 + (id - last_id[hash as usize]).ilog2() / 7) as usize
         };
 
-        let offset = offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
+        let offset = atomic_offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
         let prev = last_id[hash as usize];
         last_id[hash as usize] = id;
         let id_to_split: usize = match prev {
@@ -140,8 +152,8 @@ impl FolddiscoIndex {
 
         let mut total_entries = 0;
         for i in 0..self.total_hashes {
-            let current_entry_size = offsets[i].load(Ordering::SeqCst);
-            offsets[i] = AtomicUsize::new(total_entries);
+            let current_entry_size = offsets[i];
+            offsets[i] = total_entries;
             total_entries += current_entry_size;
         }
         let index_path = format!("{}.value", self.index_path);
@@ -154,7 +166,7 @@ impl FolddiscoIndex {
         index_file.set_len(total_entries as u64).unwrap();
         let mmap = unsafe { MmapMut::map_mut(&index_file).unwrap() };
         *entries = mmap;
-        offsets.push(AtomicUsize::new(total_entries));
+        offsets[self.total_hashes] = total_entries;
 
         for id in last_id.iter_mut() {
             *id = usize::MAX;
@@ -165,18 +177,17 @@ impl FolddiscoIndex {
         let offsets = unsafe { &mut *self.offsets.get() };
 
         for i in (1..=self.total_hashes).rev() {
-            offsets[i] = offsets[i - 1].load(Ordering::SeqCst).into();
+            offsets[i] = offsets[i - 1];
         }
-
-        offsets[0] = AtomicUsize::new(0);
+        offsets[0] = 0;
     }
 
     pub fn get_raw_entries(&self, hash: usize) -> &[u8] {
         let offsets = unsafe { &*self.offsets.get() };
         let entries = unsafe { &*self.entries.get() };
 
-        let start = offsets[hash].load(Ordering::SeqCst);
-        let end = offsets[hash + 1].load(Ordering::SeqCst);
+        let start = offsets[hash];
+        let end = offsets[hash + 1];
 
         &entries[start..end]
     }
@@ -189,13 +200,13 @@ impl FolddiscoIndex {
     pub fn save_offset_to_file(&self) {
         let offsets = unsafe { &*self.offsets.get() };
         let offset_path = format!("{}.offset", self.index_path);
-        let mut file = std::fs::File::create(&offset_path).expect("Unable to create offset file");
-        unsafe { let _ = offsets.iter().map(|x| {
-            let offset_to_write = *x.as_ptr();
-            file.write_all(
-                &offset_to_write.to_le_bytes()
-            ).expect("Unable to write offset to file")
-        }).collect::<Vec<_>>(); }
+        let file = std::fs::File::create(&offset_path).expect("Unable to create offset file");
+        let mut writer = std::io::BufWriter::new(file);
+        let offset_bytes = unsafe {
+            std::slice::from_raw_parts(offsets.as_ptr() as *const u8,
+            offsets.len() * std::mem::size_of::<usize>())
+        };
+        writer.write_all(offset_bytes).expect("Unable to write offset bytes");
     }
 }
 
@@ -232,7 +243,7 @@ mod tests {
         // Print offsets
         let offsets = unsafe { &*index.offsets.get() };
         for i in 0..total_hashes+1 {
-            println!("offsets[{}]: {}", i, offsets[i].load(Ordering::SeqCst));
+            println!("offsets[{}]: {}", i, offsets[i]);
         }
         let entries = unsafe { &*index.entries.get() };
         println!("{:?}", entries);

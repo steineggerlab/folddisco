@@ -2,7 +2,6 @@
 //!
 //! Folddisco is a tool for finding discontinuous motifs in protein structures.
 
-
 use std::hash::{Hash, Hasher};
 use std::fmt::Debug;
 pub mod cli;

@@ -358,9 +358,6 @@ mod tests {
             let entries = index.get_entries(i as u32);
             println!("Entries for hash {}: {:?}", i, entries);
         }
-        let entries = index.get_entries(70);
-        println!("Entries for hash {}: {:?}", 70, entries);
-        
     }
 }
 

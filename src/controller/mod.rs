@@ -17,6 +17,7 @@ pub mod mode;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 use feature::get_geometric_hash_as_u32_from_structure;
+use mode::IndexMode;
 // External imports
 use rayon::{current_thread_index, prelude::*};
 
@@ -56,6 +57,7 @@ pub struct FoldDisco {
     pub output_path: String,
     pub max_residue: usize,
     pub grid_width: f32,
+    pub index_mode: IndexMode,
     pub fold_disco_index: FolddiscoIndex,
 }
 
@@ -80,7 +82,8 @@ impl FoldDisco {
             output_path: String::new(),
             max_residue: DEFAULT_MAX_RESIDUE,
             grid_width: DEFAULT_GRID_WIDTH,
-            fold_disco_index: FolddiscoIndex::new(2usize.pow(DEFAULT_HASH_TYPE.encoding_bits() as u32), String::new()),
+            index_mode: IndexMode::Id,
+            fold_disco_index: FolddiscoIndex::new(0usize, String::new()),
         }
     }
     pub fn new_with_hash_type(path_vec: Vec<String>, hash_type: HashType) -> FoldDisco {
@@ -103,16 +106,22 @@ impl FoldDisco {
             output_path: String::new(),
             max_residue: DEFAULT_MAX_RESIDUE,
             grid_width: DEFAULT_GRID_WIDTH,
-            fold_disco_index: FolddiscoIndex::new(2usize.pow(hash_type.encoding_bits() as u32), String::new()),
+            index_mode: IndexMode::Id,
+            fold_disco_index: FolddiscoIndex::new(0usize, String::new()),
         }
     }
 
     pub fn new_with_params(
         path_vec: Vec<String>, hash_type: HashType, remove_redundancy: bool,
         num_threads: usize, num_bin_dist: usize, num_bin_angle: usize, output_path: String,
-        grid_width: f32
+        grid_width: f32, index_mode: IndexMode
     ) -> FoldDisco {
         let length = path_vec.len();
+        let total_hashes = match index_mode {
+            IndexMode::Id | IndexMode::Grid | IndexMode::Pos => 0,
+            IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
+            _ => 0,
+        };
         FoldDisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::with_capacity(length),
@@ -131,7 +140,8 @@ impl FoldDisco {
             output_path: output_path.clone(),
             max_residue: DEFAULT_MAX_RESIDUE,
             grid_width: grid_width,
-            fold_disco_index: FolddiscoIndex::new(2usize.pow(hash_type.encoding_bits() as u32), output_path.clone()),
+            index_mode: index_mode,
+            fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone()),
         }
     }
     // Setters

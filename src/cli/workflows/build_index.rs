@@ -107,7 +107,7 @@ pub fn build_index(env: AppArgs) {
                 print_log_msg(INFO, &format!("Before initializing (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb()));
                 let mut fold_disco = FoldDisco::new_with_params(
                     pdb_path_vec.to_vec(), hash_type, true, num_threads, 
-                    num_bin_dist, num_bin_angle, index_path.clone(), grid_width,
+                    num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode,
                 );
                 
                 match index_mode {
@@ -224,8 +224,8 @@ mod tests {
         // let pdb_dir = "analysis/e_coli/sample";
         let hash_type = "pdbtr";
         // let index_path = "analysis/e_coli/test_index";
-        let index_path = "data/serine_peptidases_pdbtr_test";
-        let index_mode = "big";
+        let index_path = "data/serine_peptidases_pdbtr_small";
+        let index_mode = "id";
         let num_threads = 8;
         let num_bin_dist = 16;
         let num_bin_angle = 4;

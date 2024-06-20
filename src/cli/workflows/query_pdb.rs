@@ -153,7 +153,7 @@ pub fn query_pdb(env: AppArgs) {
                 let query_structure = pdb_file.read_structure().expect(
                     &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &pdb_path))
                 ).to_compact();
-                let query_residues = parse_query_string(&query_string, query_structure.chains[0]);
+                let (query_residues, aa_substitutions) = parse_query_string(&query_string, query_structure.chains[0]);
                 
                 let _residue_count = if query_residues.is_empty() {
                     query_structure.num_residues
@@ -176,9 +176,12 @@ pub fn query_pdb(env: AppArgs) {
                         let num_bin_angle = config.num_bin_angle;
                         let mode = config.mode;
                         let (pdb_query_map, query_indices) = if verbose { measure_time!(make_query_map(
-                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds
+                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitutions
                         )) } else {
-                            make_query_map(&pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds)
+                            make_query_map(
+                                &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, 
+                                &dist_thresholds, &angle_thresholds, &aa_substitutions
+                            )
                         };
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
                         match mode {
@@ -393,9 +396,9 @@ pub fn parse_multiple_queries(
             &log_msg(FAIL, &format!("Failed to read the structure from {}", &pdb_path))
         );
         // Make query with pdb
-        let query_residues = parse_query_string(&query_string, structure.chains[0]);
+        let (query_residues, aa_substitions) = parse_query_string(&query_string, structure.chains[0]);
         let (pdb_query_map, _query_indices) =  measure_time!(make_query_map(
-            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds
+            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitions
         ));
         let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();
         query_map_vec.push((pdb_query_map, pdb_query, query_residues, pdb_path.clone(), output_path.clone()));
@@ -459,7 +462,7 @@ mod tests {
         let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let query_string = String::from("B57,B102,C195");
         let threads = 1;
-        let index_path = Some(String::from("data/serine_peptidases_pdbtr_test"));
+        let index_path = Some(String::from("data/serine_peptidases_pdbtr_small"));
         // let index_path = Some(String::from("analysis/e_coli/test_index"));
         let retrieve = true;
         let dist_threshold = Some(String::from("0.5,1.0"));

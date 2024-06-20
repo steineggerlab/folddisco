@@ -125,3 +125,54 @@ pub fn map_u32_to_aa_pair(pair: u32) -> (String, String) {
     let aa2 = (pair % 20) as u8;
     (map_u8_to_aa(aa1).to_string() , map_u8_to_aa(aa2).to_string())
 }
+
+pub fn map_one_letter_to_u8_vec(aa: char) -> Vec<u8> {
+    match aa {
+        'A' => vec![0],
+        'R' => vec![1],
+        'N' => vec![2],
+        'D' => vec![3],
+        'C' => vec![4],
+        'Q' => vec![5],
+        'E' => vec![6],
+        'G' => vec![7],
+        'H' => vec![8],
+        'I' => vec![9],
+        'L' => vec![10],
+        'K' => vec![11],
+        'M' => vec![12],
+        'F' => vec![13],
+        'P' => vec![14],
+        'S' => vec![15],
+        'T' => vec![16],
+        'W' => vec![17],
+        'Y' => vec![18],
+        'V' => vec![19],
+        // Handle the case of non-standard amino acids
+        'B' => vec![2, 3], // Asn, Asp
+        'Z' => vec![5, 6], // Gln, Glu
+        'X' => vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // All
+        'J' => vec![9, 10], // Ile, Leu
+        'U' => vec![4], // Selenocysteine 
+        'O' => vec![11], // Pyrrolysine
+        // Custom characters to represent groups of amino acids
+        // Positively charged: +, Negatively charged: -, Polar or hydrophilic: ^, Non-polar or hydrophobic: ~, Aromatic: @
+        '+' => vec![1, 8, 11], // Arg, His, Lys
+        '-' => vec![3, 6], // Asp, Glu
+        '^' => vec![2, 5, 15, 16, 18], // Asn, Gln, Ser, Thr, Tyr
+        '~' => vec![0, 7, 9, 10, 12, 13, 14, 19], // Ala, Gly, Ile, Leu, Met, Phe, Pro, Val
+        '@' => vec![8, 13, 17, 18], // His, Phe, Trp, Tyr
+        _ => vec![255], // Unknown
+    }
+}
+
+pub fn is_aa_group_char(c: char) -> bool {
+    if c.is_ascii_alphabetic() {
+        true
+    } else {
+        match c {
+            '+' | '-' | '^' | '~' | '@' => true,
+             _ => false,
+        }
+    }
+}

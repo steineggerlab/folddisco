@@ -16,6 +16,7 @@ use crate::controller::mode::{parse_path_vec_by_id_type, IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::write_usize_vector_in_bits;
 use crate::prelude::*;
+use memmap2::MmapMut;
 use peak_alloc::PeakAlloc;
 
 #[global_allocator]
@@ -76,7 +77,10 @@ pub fn build_index(env: AppArgs) {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(1);
             };
+            let index_mode = IndexMode::get_with_str(mode.as_str());
             let chunk_size = if chunk_size > u16::max_value() as usize { u16::max_value() as usize } else { chunk_size };
+            // Overwrite chunk_size if index_mode is Big
+            let chunk_size = if index_mode == IndexMode::Big { pdb_path_vec.len() } else { chunk_size };
             let num_chunks = if pdb_path_vec.len() < chunk_size { 1 } else { (pdb_path_vec.len() as f64 / chunk_size as f64).ceil() as usize };
             if verbose { 
                 print_log_msg(
@@ -90,7 +94,6 @@ pub fn build_index(env: AppArgs) {
             let hash_type = HashType::get_with_str(hash_type.as_str());
             if verbose { print_log_msg(INFO, &format!("Hash type: {:?}", hash_type)); }
             let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);
-            let index_mode = IndexMode::get_with_str(mode.as_str());
             let id_type = IdType::get_with_str(id_type.as_str());
             
             pdb_path_chunks.into_iter().enumerate().for_each(|(i, pdb_path_vec)| {
@@ -101,24 +104,21 @@ pub fn build_index(env: AppArgs) {
                     if verbose { print_log_msg(INFO, &format!("Indexing chunk {}", i)); }
                     format!("{}_{}", index_path, i)
                 };
+                print_log_msg(INFO, &format!("Before initializing (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb()));
                 let mut fold_disco = FoldDisco::new_with_params(
                     pdb_path_vec.to_vec(), hash_type, true, num_threads, 
-                    num_bin_dist, num_bin_angle, index_path.clone(), grid_width,
+                    num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode,
                 );
                 
                 match index_mode {
                     IndexMode::Id => {
                         if verbose { print_log_msg(INFO, "Collecting ids of the structures"); }
-                        // measure_time!(fold_disco.collect_hash_pairs());
                         measure_time!(fold_disco.collect_hash_vec());
                         if verbose {
                             print_log_msg(INFO, 
-                                // &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pairs.len(), PEAK_ALLOC.current_usage_as_mb())
                                 &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_vec.len(), PEAK_ALLOC.current_usage_as_mb())
-                                // &format!("Total {} hashes collected", fold_disco.hash_id_pairs.len())
                             );
                         }
-                        // measure_time!(fold_disco.sort_hash_pairs());
                         measure_time!(fold_disco.sort_hash_vec());
                     }
                     IndexMode::Grid => {
@@ -142,55 +142,54 @@ pub fn build_index(env: AppArgs) {
                         // }
                         todo!("Implement this part");
                     }
+                    IndexMode::Big => {
+                        if verbose { print_log_msg(INFO, "Collecting ids of the structures"); }
+                        measure_time!(fold_disco.collect_and_count());
+                        if verbose {
+                            print_log_msg(INFO, 
+                                &format!("Hashes collected (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
+                            );
+                        }
+                        measure_time!(fold_disco.fold_disco_index.allocate_entries());
+                        measure_time!(fold_disco.add_entries());
+                        measure_time!(fold_disco.fold_disco_index.finish_index());
+                        measure_time!(fold_disco.fold_disco_index.save_offset_to_file());
+                    }
                 }
                 if verbose { print_log_msg(INFO,
                     &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
                     // "Hash sorted"
                 ); }
                 fold_disco.fill_numeric_id_vec();
-
-                let (offset_map, value_vec) = match index_mode {
-                    IndexMode::Id => {
-                        // measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_pairs))
-                        measure_time!(convert_sorted_hash_vec_to_simplemap(fold_disco.hash_id_vec))
-                    }
-                    IndexMode::Grid => {
-                        measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_grids))
-                    }
-                    IndexMode::Pos => {
-                        todo!("Implement this part");
-                    }
-                };
-
-                if verbose { print_log_msg(INFO, 
-                    &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
-                    // &format!("Offset & values acquired")
-                ); }
-                let offset_path = format!("{}.offset", index_path);
-                // measure_time!(save_offset_vec(&offset_path, &offset_table).expect(
-                //     &log_msg(FAIL, "Failed to save offset table")
-                // ));
-                measure_time!(offset_map.dump_to_disk(&PathBuf::from(&offset_path)).expect(
-                    &log_msg(FAIL, "Failed to save offset table")
-                ));
-                let value_path = format!("{}.value", index_path);
                 match index_mode {
                     IndexMode::Id => {
+                        let (offset_map, value_vec) = measure_time!(convert_sorted_hash_vec_to_simplemap(fold_disco.hash_id_vec));
+                        if verbose { print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
+                        let offset_path = format!("{}.offset", index_path);
+                        let value_path = format!("{}.value", index_path);
+                        measure_time!(offset_map.dump_to_disk(&PathBuf::from(&offset_path)).expect(
+                           &log_msg(FAIL, "Failed to save offset table")
+                        ));
                         measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 16).expect(
                             &log_msg(FAIL, "Failed to save values")
                         ));
                     }
                     IndexMode::Grid => {
+                        let (offset_map, value_vec) = measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_grids));
+                        if verbose { print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
+                        let offset_path = format!("{}.offset", index_path);
+                        let value_path = format!("{}.value", index_path);
+                        measure_time!(offset_map.dump_to_disk(&PathBuf::from(&offset_path)).expect(
+                           &log_msg(FAIL, "Failed to save offset table")
+                        ));
                         measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 24).expect(
                             &log_msg(FAIL, "Failed to save values")
                         ));
                     }
                     IndexMode::Pos => {
                         todo!("Implement this part");
-                        // measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 48).expect(
-                        //     &log_msg(FAIL, "Failed to save values")
-                        // ));
                     }
+                    IndexMode::Big => {}
                 }
                 let lookup_path = format!("{}.lookup", index_path);
                 let id_vec = parse_path_vec_by_id_type(&fold_disco.path_vec, id_type.clone());
@@ -225,7 +224,7 @@ mod tests {
         // let pdb_dir = "analysis/e_coli/sample";
         let hash_type = "pdbtr";
         // let index_path = "analysis/e_coli/test_index";
-        let index_path = "data/serine_peptidases_pdbtr_test";
+        let index_path = "data/serine_peptidases_pdbtr_small";
         let index_mode = "id";
         let num_threads = 8;
         let num_bin_dist = 16;

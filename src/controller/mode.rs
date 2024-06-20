@@ -136,6 +136,7 @@ pub enum IndexMode {
     Id,
     Grid,
     Pos,
+    Big,
 }
 
 impl IndexMode {
@@ -144,6 +145,7 @@ impl IndexMode {
             "Id" | "id" => Self::Id,
             "Grid" | "grid" => Self::Grid,
             "Pos" | "Position" | "position" | "pos" => Self::Pos,
+            "Big" | "big" => Self::Big,
             _ => Self::Id,
         }
     }
@@ -152,6 +154,7 @@ impl IndexMode {
             Self::Id => "id".to_string(),
             Self::Grid => "grid".to_string(),
             Self::Pos => "pos".to_string(),
+            Self::Big => "big".to_string(),
         }
     }
     pub fn get_with_u8(mode: u8) -> Self {
@@ -159,6 +162,7 @@ impl IndexMode {
             0 => Self::Id,
             1 => Self::Grid,
             2 => Self::Pos,
+            3 => Self::Big,
             _ => Self::Id,
         }
     }
@@ -167,6 +171,7 @@ impl IndexMode {
             Self::Id => 0,
             Self::Grid => 1,
             Self::Pos => 2,
+            Self::Big => 3,
         }
     }
 }

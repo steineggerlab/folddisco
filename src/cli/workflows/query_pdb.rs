@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 
-use memmap2::Mmap;
+use memmap2::{Mmap, MmapMut};
 use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig};
@@ -19,8 +19,9 @@ use crate::controller::mode::IndexMode;
 use crate::cli::*;
 use crate::controller::io::{read_u16_vector, read_u8_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
-use crate::controller::rank::{count_query_gridmode, count_query_idmode, QueryResult};
+use crate::controller::rank::{count_query_bigmode, count_query_gridmode, count_query_idmode, QueryResult};
 use crate::controller::retrieve::retrieval_wrapper;
+use crate::index::indextable::load_big_index;
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
 
@@ -89,6 +90,16 @@ pub fn query_pdb(env: AppArgs) {
             if verbose {
                 print_log_msg(INFO, &format!("Found {} index file(s). Querying with {} threads", index_paths.len(), threads));
             }
+            
+            let mut big_index = false;
+            if index_paths.len() == 1 {
+                // Check index mode is Big
+                let (_, _, _, hash_type_path) = get_offset_value_lookup_type(index_paths[0].clone());
+                let config = read_index_config_from_file(&hash_type_path);
+                if config.mode == IndexMode::Big {
+                    big_index = true;
+                }
+            }
             // Set thread pool
             let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
             
@@ -117,10 +128,13 @@ pub fn query_pdb(env: AppArgs) {
             let loaded_index_vec = index_paths.into_par_iter().map(|index_path| {
                 let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
                 let config = read_index_config_from_file(&hash_type_path);
-                let (offset_table, offset_mmap) = if verbose { measure_time!(
+                let (offset_table, offset_mmap) = if verbose && !big_index { measure_time!(
                     SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
-                ) } else {
+                ) } else if !big_index {
                     SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
+                } else {
+                    let anon_mmap: Mmap = MmapMut::map_anon(0).unwrap().make_read_only().unwrap();
+                    (Ok(SimpleHashMap::new(0)), anon_mmap)
                 };
                 let offset_table = offset_table.unwrap();
                 let lookup = if verbose {
@@ -139,7 +153,7 @@ pub fn query_pdb(env: AppArgs) {
                 let query_structure = pdb_file.read_structure().expect(
                     &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &pdb_path))
                 ).to_compact();
-                let query_residues = parse_query_string(&query_string, query_structure.chains[0]);
+                let (query_residues, aa_substitutions) = parse_query_string(&query_string, query_structure.chains[0]);
                 
                 let _residue_count = if query_residues.is_empty() {
                     query_structure.num_residues
@@ -162,9 +176,12 @@ pub fn query_pdb(env: AppArgs) {
                         let num_bin_angle = config.num_bin_angle;
                         let mode = config.mode;
                         let (pdb_query_map, query_indices) = if verbose { measure_time!(make_query_map(
-                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds
+                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitutions
                         )) } else {
-                            make_query_map(&pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds)
+                            make_query_map(
+                                &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, 
+                                &dist_thresholds, &angle_thresholds, &aa_substitutions
+                            )
                         };
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
                         match mode {
@@ -266,6 +283,57 @@ pub fn query_pdb(env: AppArgs) {
                             IndexMode::Pos => {
                                 todo!()
                             },
+                            IndexMode::Big => {
+                                // Get index prefix from value path. index_prefix is just without .value
+                                let index_prefix = value_path.rsplitn(2, '.').collect::<Vec<&str>>()[1];
+                                let (big_index, big_offset_mmap) = if verbose {
+                                    load_big_index(index_prefix)
+                                } else {
+                                    load_big_index(index_prefix)
+                                };
+                                let query_count_map = measure_time!(count_query_bigmode(
+                                    &pdb_query, &pdb_query_map, &big_index, &lookup
+                                ));
+                                
+                                let mut match_count_filter = get_match_count_filter(
+                                    match_cutoff.clone(), pdb_query.len(), query_residues.len()
+                                );
+                                if retrieve {
+                                    match_count_filter[1] = if node_count > match_count_filter[1] {node_count} else {match_count_filter[1]};
+                                    if verbose {
+                                        print_log_msg(INFO, &format!("Filtering result with residue >= {}", match_count_filter[1]));
+                                    }
+                                }
+                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
+                                    v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
+                                    v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
+                                    v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
+                                    v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
+                                }).collect();
+                                if verbose {
+                                    print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
+                                }
+
+                                // IF retrieve is true, retrieve matching residues
+                                if retrieve {
+                                    measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                        let retrieval_result = retrieval_wrapper(
+                                            &v.id, node_count, &pdb_query,
+                                            hash_type, num_bin_dist, num_bin_angle,
+                                            &pdb_query_map, &query_structure, &query_indices,
+                                        );
+                                        v.matching_residues = retrieval_result;
+                                    }));
+                                    // Filter query_count_vec with reasonable retrieval results
+                                    query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
+                                    drop(big_offset_mmap);
+                                    drop(match_count_filter);
+                                    return query_count_vec;
+                                }
+                                drop(big_offset_mmap);
+                                drop(match_count_filter);
+                                query_count_vec
+                            },
                         } // match mode
                     }
                 ).reduce(|| Vec::new(), |mut acc, x| {
@@ -328,9 +396,9 @@ pub fn parse_multiple_queries(
             &log_msg(FAIL, &format!("Failed to read the structure from {}", &pdb_path))
         );
         // Make query with pdb
-        let query_residues = parse_query_string(&query_string, structure.chains[0]);
+        let (query_residues, aa_substitions) = parse_query_string(&query_string, structure.chains[0]);
         let (pdb_query_map, _query_indices) =  measure_time!(make_query_map(
-            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds
+            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitions
         ));
         let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();
         query_map_vec.push((pdb_query_map, pdb_query, query_residues, pdb_path.clone(), output_path.clone()));
@@ -394,7 +462,7 @@ mod tests {
         let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let query_string = String::from("B57,B102,C195");
         let threads = 1;
-        let index_path = Some(String::from("data/serine_peptidases_pdbtr_test"));
+        let index_path = Some(String::from("data/serine_peptidases_pdbtr_small"));
         // let index_path = Some(String::from("analysis/e_coli/test_index"));
         let retrieve = true;
         let dist_threshold = Some(String::from("0.5,1.0"));

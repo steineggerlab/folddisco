@@ -1,33 +1,31 @@
 # Development note
 
 ## TODOs
+> 2024-06-20 14:44:32
 INDEXING
-- [ ] Scalability
+- [x] DONE: Scalability
+- [x] DONE: Implemented MMseqs2 like index scheme
+- [x] IMPORTANT: DONE: When mode is Id or Grid, don't allocate huge memory as in Big mode
+QUERYING
+- [x] DONE: allowing different amino acid pairs.
+  - [ ] ISSUE: WARNING: slows down when there are too many combinations of amino acid pairs
+DEV
+- [ ] IMPORTANT: MAJOR: TODO: Foldcomp DB reader
+  - [ ] Current idea: having DB reader with rust & decompression with C++
 
 QUERYING
-- [ ] Allow different amino acid pairs
-- [ ] TODO: allowing different amino acid pairs.
-  - [ ] TODO: Policies: Any, Exact, Same property
 - [ ] Collect test query info / commands in QUERY.md
-
-- [x] DONE: FEATURE: multiple queries
-- [x] DONE: measure time for querying with retrieval of matched positions
 
 QUERYING
 - [ ] IMPORTANT: TODO: Rename features --> default goes to PDBTrRosetta
-- [x] DONE: retrieving long motifs takes too much time even with node filtering option
-  - [x] DONE: Introduced new iterator for amino acid prefilter
-  - [ ] TODO: Restore tests for retrieve.rs & combination.rs
+- [ ] TODO: Restore tests for retrieve.rs & combination.rs
 - [ ] TODO: Print only top N result (--top)
 - [ ] TODO: Add ID-handling to 
-
-DEV
 - [ ] Set default options; PDBTrRosetta, 16, 4, ID, relpath
 - [ ] Write rustdoc
-- [ ] TODO: Foldcomp DB reader
 - [ ] Check verbosity flag works
 
-BENCHMARKa
+BENCHMARK
 - [ ] TODO: Add an option to select metrics to calculate
   - [ ] TODO: Metric at specific FPs (--fp, --k)
 - [ ] TODO: Index should not be a mandatory parameter --> Fix this
@@ -423,4 +421,149 @@ model_benchmark/e_coli/pdb/AF-P39393-F1-model_v4.pdb	12.2677	1	2	1	1	0	1	906	86.
 [DONE] Indexing done for chunk 0 - analysis/s_cerevisiae/pdbtr_d16a4
 [DONE] Done.
       332.71 real      1692.11 user        27.89 sys
+```
+
+
+[INFO] count_query_bigmode: 8.771499ms
+[INFO] query_count_vec.par_iter_mut: 25.258137ms
+data/serine_peptidases_filtered/4cha.pdb        38.9306 6       3       6       6       0       1       477     13.5404 B57,B102,C195:0.0000;F57,F102,G195:0.0612       B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_test
+data/serine_peptidases_filtered/1pq5.pdb        31.7623 4       3       4       2       0       1       224     5.1340  A56,A99,A195:0.1541     B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_test
+data/serine_peptidases_filtered/1whs.pdb        15.2664 2       2       2       0       0       1       392     27.3961 _,A118,A102:0.6296      B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_test
+data/serine_peptidases_filtered/1azw.pdb        13.9158 2       2       2       0       0       1       626     34.2399 A179,_,B176:0.6896      B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_test
+data/serine_peptidases_filtered/1ju3.pdb        11.0163 2       2       2       2       0       1       570     19.4881 _,A223,A234:0.6475      B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_test
+data/serine_peptidases_filtered/1l7a.pdb        10.7002 2       2       2       2       0       1       636     11.7037 _,A146,A127:0.6089;_,B146,B127:0.6183   B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_test
+
+successes:
+    cli::workflows::query_pdb::tests::test_query_pdb_workflow
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 63 filtered out; finished in 0.04s
+
+---- cli::workflows::query_pdb::tests::test_query_pdb_workflow stdout ----
+[INFO] query_count_vec.par_iter_mut: 30.171421ms
+data/serine_peptidases_filtered/4cha.pdb        38.9306 6       3       6       6       0       1       477     13.5404 B57,B102,C195:0.0000;F57,F102,G195:0.0612       B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_small
+data/serine_peptidases_filtered/1pq5.pdb        31.7623 4       3       4       2       0       1       224     5.1340  A56,A99,A195:0.1541     B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_small
+data/serine_peptidases_filtered/1whs.pdb        15.2664 2       2       2       0       0       1       392     27.3961 _,A118,A102:0.6296      B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_small
+data/serine_peptidases_filtered/1azw.pdb        13.9158 2       2       2       0       0       1       626     34.2399 A179,_,B176:0.6896      B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_small
+data/serine_peptidases_filtered/1ju3.pdb        11.0163 2       2       2       2       0       1       570     19.4881 _,A223,A234:0.6475      B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_small
+data/serine_peptidases_filtered/1l7a.pdb        10.7002 2       2       2       2       0       1       636     11.7037 _,A146,A127:0.6089;_,B146,B127:0.6183   B57,B102,C195   data/serine_peptidases_filtered/4cha.pdb        data/serine_peptidases_pdbtr_small
+
+
+successes:
+    cli::workflows::query_pdb::tests::test_query_pdb_workflow
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 63 filtered out; finished in 0.05s
+
+```sh
+# 2024-06-20 15:20:03
+# Swissprot indexing with Big mode
+(base) hyunbin@super003:/fast/hyunbin/motif$ \time -v ~/Projects/06_Motifsearch/motifsearch/target/release/folddisco index -p swissprot_benchmark/swissprot_v4_raw/ -i swissprot_benchmark/pdbtr/big/swissprot_folddisco -d 16 -a 4 -m big -v -y pdbtr -t 90
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing swissprot_benchmark/swissprot_v4_raw/ with 90 threads and 1 chunks
+[INFO] Hash type: PDBTrRosetta
+[INFO] Indexing all PDB files in one chunk
+[INFO] Before initializing (Allocated 56.08046MB)
+[INFO] Collecting ids of the structures
+[INFO] fold_disco.collect_and_count: 6296.334342332s
+[INFO] Hashes collected (Allocated 16495.18MB)
+[INFO] fold_disco.fold_disco_index.allocate_entries: 1.3220278s
+[INFO] fold_disco.add_entries: 12775.486748174s
+[INFO] fold_disco.fold_disco_index.finish_index: 1.072913145s
+[INFO] fold_disco.fold_disco_index.save_offset_to_file: 28.556452598s
+[INFO] Hash sorted (Allocated 16495.564MB)
+[INFO] save_lookup_to_file: 356.80547ms
+[DONE] Indexing done for chunk 0 - swissprot_benchmark/pdbtr/big/swissprot_folddisco
+[DONE] Done.
+        Command being timed: "/home/hyunbin/Projects/06_Motifsearch/motifsearch/target/release/folddisco index -p swissprot_benchmark/swissprot_v4_raw/ -i swissprot_benchmark/pdbtr/big/swissprot_folddisco -d 16 -a 4 -m big -v -y pdbtr -t 90"
+        User time (seconds): 1151658.21
+        System time (seconds): 71792.40
+        Percent of CPU this job got: 6386%
+        Elapsed (wall clock) time (h:mm:ss or m:ss): 5:19:17
+        Average shared text size (kbytes): 0
+        Average unshared data size (kbytes): 0
+        Average stack size (kbytes): 0
+        Average total size (kbytes): 0
+        Maximum resident set size (kbytes): 100760080
+        Average resident set size (kbytes): 0
+        Major (requiring I/O) page faults: 4391
+        Minor (reclaiming a frame) page faults: 1007175216
+        Voluntary context switches: 8198488
+        Involuntary context switches: 132041495
+        Swaps: 0
+        File system inputs: 374493136
+        File system outputs: 6910392728
+        Socket messages sent: 0
+        Socket messages received: 0
+        Signals delivered: 0
+        Page size (bytes): 4096
+        Exit status: 0
+# Seems like having index at fast is problem for slowing
+
+(base) hyunbin@hulk:/fast/hyunbin/motif/swissprot_benchmark/pdbtr/big$ ll -h
+total 30G
+drwxrwsr-x 2 hyunbin steineggerlab 4.0K Jun 20 15:14 ./
+drwxrwsr-x 6 hyunbin steineggerlab 4.0K Jun 20 09:42 ../
+-rw-rw-r-- 1 hyunbin steineggerlab  43M Jun 20 15:14 swissprot_folddisco.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 8.1G Jun 20 15:13 swissprot_folddisco.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  134 Jun 20 15:14 swissprot_folddisco.type
+-rw-rw-r-- 1 hyunbin steineggerlab  22G Jun 20 15:13 swissprot_folddisco.value
+(base) hyunbin@hulk:/fast/hyunbin/motif/swissprot_benchmark/pdbtr/big$ du -h .
+30G	.
+
+(base) hyunbin@super003:/mnt/scratch/hyunbin/motif/swissprot$ ll -h
+total 35G
+drwxr-sr-x 2 hyunbin steineggerlab 4.0K Jun  4 16:44 ./
+drwxr-sr-x 6 hyunbin steineggerlab 4.0K Jun  4 18:46 ../
+-rw-rw-r-- 1 hyunbin steineggerlab 5.2M Jun  4 15:11 pdbtr_d16a4_index_0.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 608M Jun  4 15:10 pdbtr_d16a4_index_0.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 15:11 pdbtr_d16a4_index_0.type
+-rw-rw-r-- 1 hyunbin steineggerlab 3.6G Jun  4 15:10 pdbtr_d16a4_index_0.value
+-rw-rw-r-- 1 hyunbin steineggerlab 5.2M Jun  4 15:23 pdbtr_d16a4_index_1.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 608M Jun  4 15:23 pdbtr_d16a4_index_1.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 15:23 pdbtr_d16a4_index_1.type
+-rw-rw-r-- 1 hyunbin steineggerlab 3.6G Jun  4 15:23 pdbtr_d16a4_index_1.value
+-rw-rw-r-- 1 hyunbin steineggerlab 5.2M Jun  4 15:37 pdbtr_d16a4_index_2.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 608M Jun  4 15:37 pdbtr_d16a4_index_2.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 15:37 pdbtr_d16a4_index_2.type
+-rw-rw-r-- 1 hyunbin steineggerlab 3.6G Jun  4 15:37 pdbtr_d16a4_index_2.value
+-rw-rw-r-- 1 hyunbin steineggerlab 5.2M Jun  4 15:50 pdbtr_d16a4_index_3.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 609M Jun  4 15:50 pdbtr_d16a4_index_3.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 15:50 pdbtr_d16a4_index_3.type
+-rw-rw-r-- 1 hyunbin steineggerlab 3.7G Jun  4 15:50 pdbtr_d16a4_index_3.value
+-rw-rw-r-- 1 hyunbin steineggerlab 5.2M Jun  4 16:03 pdbtr_d16a4_index_4.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 609M Jun  4 16:03 pdbtr_d16a4_index_4.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 16:03 pdbtr_d16a4_index_4.type
+-rw-rw-r-- 1 hyunbin steineggerlab 3.6G Jun  4 16:03 pdbtr_d16a4_index_4.value
+-rw-rw-r-- 1 hyunbin steineggerlab 5.2M Jun  4 16:15 pdbtr_d16a4_index_5.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 609M Jun  4 16:15 pdbtr_d16a4_index_5.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 16:15 pdbtr_d16a4_index_5.type
+-rw-rw-r-- 1 hyunbin steineggerlab 3.6G Jun  4 16:15 pdbtr_d16a4_index_5.value
+-rw-rw-r-- 1 hyunbin steineggerlab 5.2M Jun  4 16:28 pdbtr_d16a4_index_6.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 609M Jun  4 16:28 pdbtr_d16a4_index_6.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 16:28 pdbtr_d16a4_index_6.type
+-rw-rw-r-- 1 hyunbin steineggerlab 3.7G Jun  4 16:28 pdbtr_d16a4_index_6.value
+-rw-rw-r-- 1 hyunbin steineggerlab 5.2M Jun  4 16:40 pdbtr_d16a4_index_7.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 608M Jun  4 16:40 pdbtr_d16a4_index_7.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 16:40 pdbtr_d16a4_index_7.type
+-rw-rw-r-- 1 hyunbin steineggerlab 3.6G Jun  4 16:40 pdbtr_d16a4_index_7.value
+-rw-rw-r-- 1 hyunbin steineggerlab 1.5M Jun  4 16:44 pdbtr_d16a4_index_8.lookup
+-rw-rw-r-- 1 hyunbin steineggerlab 521M Jun  4 16:44 pdbtr_d16a4_index_8.offset
+-rw-rw-r-- 1 hyunbin steineggerlab  132 Jun  4 16:44 pdbtr_d16a4_index_8.type
+-rw-rw-r-- 1 hyunbin steineggerlab 1.0G Jun  4 16:44 pdbtr_d16a4_index_8.value
+
+```
+```sh
+# 2024-06-20 17:53:58 Tested with enolase query. Amino acid substitution works.
+(base) hbk@Hyunbinui-MacBookPro motifsearch % ./target/release/folddisco query -p analysis/query/2mnr.pdb -q A221,A247:DEN,A195,A164:HK,A297:HK -i analysis/e_coli/pdbtr_d16a4 -t 4 -v -r -d 0.5 -a 5 --node 3
+analysis/e_coli/pdb/AF-Q6BF17-F1-model_v4.pdb   150.7637        12      5       12      6       0       1       382     95.7401 A209,A235,A183,A144,A285:0.2086 A164,A195,A221,A247,A297        analysis/query/2mnr.pdb analysis/e_coli/pdbtr_d16a4
+analysis/e_coli/pdb/AF-P77215-F1-model_v4.pdb   115.2222        10      5       10      4       0       1       401     98.7105 A248,A276,A222,A185,A325:0.2365 A164,A195,A221,A247,A297        analysis/query/2mnr.pdb analysis/e_coli/pdbtr_d16a4
+analysis/e_coli/pdb/AF-P38104-F1-model_v4.pdb   92.9816 8       4       8       4       0       1       404     96.6068 A238,A264,A212,_,A314:0.2793    A164,A195,A221,A247,A297        analysis/query/2mnr.pdb analysis/e_coli/pdbtr_d16a4
+analysis/e_coli/pdb/AF-P51981-F1-model_v4.pdb   45.3552 4       3       4       2       0       1       321     97.8201 A202,_,A176,A149,_:0.1167       A164,A195,A221,A247,A297        analysis/query/2mnr.pdb analysis/e_coli/pdbtr_d16a4
+analysis/e_coli/pdb/AF-P0AES2-F1-model_v4.pdb   43.4573 4       3       4       2       0       1       446     98.0012 A260,_,A235,A205,_:0.1746       A164,A195,A221,A247,A297        analysis/query/2mnr.pdb analysis/e_coli/pdbtr_d16a4
+
+(base) hbk@Hyunbinui-MacBookPro motifsearch % ./target/release/folddisco query -p analysis/query/2mnr.pdb -q A221,A247:DEN,A195,A164:HK,A297:HK -i analysis/h_sapiens/d16a4/index -t 4 -v -r -d 0.5 -a 5 --node 3 
+analysis/h_sapiens/pdb/AF-Q7L5Y1-F1-model_v4.pdb        87.2214 8       5       8       4       0       1       443     97.3225 A276,A305,A250,A220,A355:0.1090 A164,A195,A221,A247,A297        analysis/query/2mnr.pdb analysis/h_sapiens/d16a4/index
 ```

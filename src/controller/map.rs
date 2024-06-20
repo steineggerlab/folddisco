@@ -54,7 +54,7 @@ pub struct SimpleHashMap {
 }
 
 impl SimpleHashMap {
-    fn new(capacity: usize) -> Self {
+    pub fn new(capacity: usize) -> Self {
         SimpleHashMap {
             buckets: ManuallyDrop::new(vec![0; capacity]),
             occupancy: BitVec::new(capacity),

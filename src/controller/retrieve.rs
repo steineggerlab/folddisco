@@ -345,7 +345,7 @@ mod tests {
     fn test_prefilter_aa_pair() {
         let path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let query_string = "B57,B102,C195";
-        let query_residues = parse_query_string(query_string, b'A');
+        let (query_residues, aa_substitutions) = parse_query_string(query_string, b'A');
         let hash_type = HashType::PDBTrRosetta;
         let nbin_dist = 16;
         let nbin_angle = 4;
@@ -353,7 +353,7 @@ mod tests {
         let dist_thresholds: Vec<f32> = vec![0.5];
         let angle_thresholds: Vec<f32> = vec![5.0];
         let queries = make_query(
-            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds
+            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds, &aa_substitutions
         );    
         let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
         let compact = pdb_loaded.read_structure().expect("Error reading structure");
@@ -391,7 +391,7 @@ mod tests {
         let query_string = "B57,B102,C195";
         // let path = String::from("analysis/1g91.pdb");
         // let query_string = "A30,A32,A35";
-        let query_residues = parse_query_string(query_string, b'A');
+        let (query_residues, aa_substitions) = parse_query_string(query_string, b'A');
         let hash_type = HashType::PDBMotifSinCos;
         let nbin_dist = 16;
         let nbin_angle = 4;
@@ -399,7 +399,7 @@ mod tests {
         let dist_thresholds: Vec<f32> = vec![0.5];
         let angle_thresholds: Vec<f32> = vec![5.0, 10.0];
         let queries = make_query(
-            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds
+            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds, &aa_substitions
         );
         let hash_set: HashSet<GeometricHash> = queries.iter().cloned().collect();
     

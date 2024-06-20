@@ -6,15 +6,17 @@
 use std::collections::HashMap;
 
 use crate::geometry::core::{GeometricHash, HashType};
+use crate::geometry::util::{is_aa_group_char, map_one_letter_to_u8_vec, map_u8_to_aa};
 use crate::prelude::{print_log_msg, PDBReader, INFO};
 use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
-use super::feature::get_single_feature;
+use super::feature::{self, get_single_feature};
 
 // Query is expected to be given as a path, and a list of tuples of chain and residue index
 pub fn make_query(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
-    nbin_dist: usize, nbin_angle: usize, exact_match: bool, dist_thresholds: Vec<f32>, angle_thresholds: Vec<f32>
+    nbin_dist: usize, nbin_angle: usize, exact_match: bool, dist_thresholds: Vec<f32>, angle_thresholds: Vec<f32>,
+    amino_acid_substitutions: &Vec<Option<Vec<u8>>>,
 ) -> Vec<GeometricHash> {
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
     let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
@@ -34,12 +36,17 @@ pub fn make_query(
         }
     }
 
-    for (chain, ri) in query_residues {
+    let mut substitution_map: HashMap<usize, Vec<u8>> = HashMap::new();
+    
+    for (i, (chain, ri)) in query_residues.iter().enumerate() {
         let index = compact.get_index(&chain, &ri);
         if let Some(index) = index {
             // convert u8 array to string
             let _residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
             indices.push(index);
+            if let Some(substitution) = amino_acid_substitutions[i].clone() {
+                substitution_map.insert(index, substitution);
+            }
         }
     }
     let dist_indices = hash_type.dist_index();
@@ -139,7 +146,8 @@ pub fn parse_threshold_string(threshold_string: Option<String>) -> Vec<f32> {
 
 pub fn make_query_map(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
-    nbin_dist: usize, nbin_angle: usize, dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>
+    nbin_dist: usize, nbin_angle: usize, dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
+    amino_acid_substitutions: &Vec<Option<Vec<u8>>>,
 ) -> (HashMap<GeometricHash, ((usize, usize), bool)>, Vec<usize>) {
 
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
@@ -151,6 +159,7 @@ pub fn make_query_map(
     // Convert residue indices to vector indices
     let mut indices = Vec::new();
     let mut query_residues = query_residues.clone();
+    
     if query_residues.is_empty() {
         // Iterate over all residues and set to query_residues
         for i in 0..compact.num_residues {
@@ -160,12 +169,17 @@ pub fn make_query_map(
         }
     }
 
-    for (chain, ri) in query_residues {
+    let mut substitution_map: HashMap<usize, Vec<u8>> = HashMap::new();
+    
+    for (i, (chain, ri)) in query_residues.iter().enumerate() {
         let index = compact.get_index(&chain, &ri);
         if let Some(index) = index {
             // convert u8 array to string
             let _residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
             indices.push(index);
+            if let Some(substitution) = amino_acid_substitutions[i].clone() {
+                substitution_map.insert(index, substitution);
+            }
         }
     }
     let dist_indices = hash_type.dist_index();
@@ -190,6 +204,65 @@ pub fn make_query_map(
                 let hash_value = GeometricHash::perfect_hash(feature_clone, hash_type, nbin_dist, nbin_angle);
                 hash_collection.insert(hash_value, ((indices[i], indices[j]), true));
             }
+            // Get zip of substitution of i and j
+            if let Some(aa_index) = hash_type.amino_acid_index() {
+                if let Some(sub_i) = substitution_map.get(&indices[i]) {
+                    // Substitute amino acid of i only
+                    for sub_i in sub_i.iter() {
+                        let mut feature = feature.clone();
+                        feature[aa_index[0]] = *sub_i as f32;
+                        let hash_value = if nbin_dist == 0 || nbin_angle == 0 {
+                            GeometricHash::perfect_hash_default(feature, hash_type)
+                        } else {
+                            GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+                        };
+                        if hash_collection.contains_key(&hash_value) {
+                            continue;
+                        } else {
+                            hash_collection.insert(hash_value, ((indices[i], indices[j]), false));
+                        }
+                    }
+                    // Substitute amino acid of both i and j
+                    if let Some(sub_j) = substitution_map.get(&indices[j]) {
+                        for sub_i in sub_i.iter() {
+                            for sub_j in sub_j.iter() {
+                                let mut feature = feature.clone();
+                                feature[aa_index[0]] = *sub_i as f32;
+                                feature[aa_index[1]] = *sub_j as f32;
+                                let hash_value = if nbin_dist == 0 || nbin_angle == 0 {
+                                    GeometricHash::perfect_hash_default(feature, hash_type)
+                                } else {
+                                    GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+                                };
+                                if hash_collection.contains_key(&hash_value) {
+                                    continue;
+                                } else {
+                                    hash_collection.insert(hash_value, ((indices[i], indices[j]), false));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if let Some(sub_j) = substitution_map.get(&indices[j]) {
+                        // Substitute amino acid of j only
+                        for sub_j in sub_j.iter() {
+                            let mut feature = feature.clone();
+                            feature[aa_index[1]] = *sub_j as f32;
+                            let hash_value = if nbin_dist == 0 || nbin_angle == 0 {
+                                GeometricHash::perfect_hash_default(feature, hash_type)
+                            } else {
+                                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+                            };
+                            if hash_collection.contains_key(&hash_value) {
+                                continue;
+                            } else {
+                                hash_collection.insert(hash_value, ((indices[i], indices[j]), false));
+                            }
+                        }
+                    }
+                }
+            }
+
             if let Some(dist_indices) = &dist_indices {
                 for dist_threshold in dist_thresholds.iter() {
                     for dist_index in dist_indices.iter() {
@@ -271,10 +344,12 @@ pub fn make_query_map(
     (hash_collection, indices)
 }
 
-pub fn parse_query_string(query_string: &str, default_chain: u8) -> Vec<(u8, u64)> {
+
+pub fn parse_query_string(query_string: &str, default_chain: u8) -> (Vec<(u8, u64)>, Vec<Option<Vec<u8>>>) {
     let mut query_residues: Vec<(u8, u64)> = Vec::new();
+    let mut amino_acid_substitutions: Vec<Option<Vec<u8>>> = Vec::new();
     if query_string.is_empty() {
-        return query_residues;
+        return (query_residues, amino_acid_substitutions);
     }
     let mut default_chain = default_chain;
     // If default chain is not alphabetic, just use A as default
@@ -284,11 +359,21 @@ pub fn parse_query_string(query_string: &str, default_chain: u8) -> Vec<(u8, u64
 
     let mut chain = b' ';
     let mut residue = String::new();
+    let mut residue_substitution: Option<Vec<u8>> = None;
     for c in query_string.chars() {
-        if c.is_ascii_alphabetic() {
-            chain = c as u8;
+        if is_aa_group_char(c) {
+            if residue.is_empty() {
+                chain = c as u8;
+            } else {
+                let curr_sub_aa = map_one_letter_to_u8_vec(c);
+                if residue_substitution.is_some() {
+                    residue_substitution.as_mut().unwrap().extend(curr_sub_aa);
+                } // If None, it's a problem. Don't consider the case. 
+            }
         } else if c.is_ascii_digit() {
             residue.push(c);
+        } else if c == ':' {
+            residue_substitution = Some(Vec::new());
         } else if c == ',' {
             let res_u64 = residue.parse::<u64>().expect(
                 &log_msg(FAIL,  "Failed to parse residue")
@@ -297,9 +382,11 @@ pub fn parse_query_string(query_string: &str, default_chain: u8) -> Vec<(u8, u64
                 chain = default_chain;
             }
             query_residues.push((chain, res_u64));
+            amino_acid_substitutions.push(residue_substitution);
             // Reset
             chain = b' ';
             residue.clear();
+            residue_substitution = None;
         } else if c == ' ' {
             continue;
         } else {
@@ -312,7 +399,9 @@ pub fn parse_query_string(query_string: &str, default_chain: u8) -> Vec<(u8, u64
     }
     let res_u64 = residue.parse::<u64>().expect("Failed to parse residue");
     query_residues.push((chain, res_u64));
-    query_residues
+    amino_acid_substitutions.push(residue_substitution);
+    assert_eq!(query_residues.len(), amino_acid_substitutions.len());
+    (query_residues, amino_acid_substitutions)
 }
 
 pub fn get_offset_value_lookup_type(index_path: String) -> (String, String, String, String) {
@@ -365,10 +454,13 @@ mod tests {
         let query_residues = vec![
             (b'A', 250), (b'A', 232), (b'A', 269)
         ];
+        let aa_substitution = vec![Some(vec![1]), Some(vec![11]), Some(vec![5])];
         let dist_thresholds: Vec<f32> = vec![0.5];
         let angle_thresholds: Vec<f32> = vec![5.0];
         let hash_type = HashType::PDBMotifSinCos;
-        let hash_collection = make_query(&path, &query_residues, hash_type, 8, 6, false, dist_thresholds, angle_thresholds);
+        let hash_collection = make_query(
+            &path, &query_residues, hash_type, 8, 6, false, dist_thresholds, angle_thresholds, &aa_substitution
+        );
         // let hash_collection = make_query(&path, &query_residues, hash_type, 8, 3, true, dist_thresholds, angle_thresholds);
         println!("{:?}", hash_collection);
         println!("{}", hash_collection.len());
@@ -387,7 +479,9 @@ mod tests {
         let dist_thresholds: Vec<f32> = vec![0.5];
         let angle_thresholds: Vec<f32> = vec![5.0,10.0,15.0];
         let hash_type = HashType::PDBMotifSinCos;
-        let (hash_collection, _index_found) = make_query_map(&path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds);
+        let (hash_collection, _index_found) = make_query_map(
+            &path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds, &vec![None, None, None]
+        );
         println!("{:?}", hash_collection);
         println!("{}", hash_collection.len());
         // Print the count where value.1 is true
@@ -405,19 +499,31 @@ mod tests {
     fn test_parse_query_string() {
         let query_string = "A250,B232,C269";
         let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, vec![(b'A', 250), (b'B', 232), (b'C', 269)]);
+        assert_eq!(query_residues, (vec![(b'A', 250), (b'B', 232), (b'C', 269)], vec![None, None, None]));
     }
     #[test]
     fn test_parse_query_string_with_space() {
         let query_string = "A250, A232, A269";
         let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, vec![(b'A', 250), (b'A', 232), (b'A', 269)]);
+        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![None, None, None]));
     }
     
     #[test]
     fn test_parse_query_string_with_space_and_no_chain() {
         let query_string = "250, 232, 269";
         let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, vec![(b'A', 250), (b'A', 232), (b'A', 269)]);
+        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![None, None, None]));
+    }
+
+    #[test]
+    fn test_parse_query_string_with_aa_substitution() {
+        let query_string = "A250:R,B232:K,C269:Q";
+        let query_residues = parse_query_string(query_string, b'A');
+        // R = 1, K = 11, Q = 5
+        assert_eq!(query_residues, (vec![(b'A', 250), (b'B', 232), (b'C', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5])]));
+        let query_string = "250:R,232:K,269:Q";
+        let query_residues = parse_query_string(query_string, b'A');
+        // R = 1, K = 11, Q = 5
+        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5])]));
     }
 }

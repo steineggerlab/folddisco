@@ -55,6 +55,10 @@ pub struct SimpleHashMap {
 
 impl SimpleHashMap {
     pub fn new(capacity: usize) -> Self {
+        // Print the capacity if capacity is larger than u32::MAX
+        if capacity > u32::MAX as usize {
+            eprintln!("Capacity is larger than u32::MAX. Capacity: {}", capacity);
+        }
         SimpleHashMap {
             buckets: ManuallyDrop::new(vec![0; capacity]),
             occupancy: BitVec::new(capacity),

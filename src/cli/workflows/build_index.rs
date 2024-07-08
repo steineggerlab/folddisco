@@ -78,10 +78,13 @@ pub fn build_index(env: AppArgs) {
                 std::process::exit(1);
             };
             let index_mode = IndexMode::get_with_str(mode.as_str());
+            if index_mode == IndexMode::Big {
+                print_log_msg(INFO, "Indexing in Big mode");
+            }
             let chunk_size = if chunk_size > u16::max_value() as usize { u16::max_value() as usize } else { chunk_size };
             // Overwrite chunk_size if index_mode is Big
             let chunk_size = if index_mode == IndexMode::Big { pdb_path_vec.len() } else { chunk_size };
-            let num_chunks = if pdb_path_vec.len() < chunk_size { 1 } else { (pdb_path_vec.len() as f64 / chunk_size as f64).ceil() as usize };
+            let num_chunks = if pdb_path_vec.len() <= chunk_size { 1 } else { (pdb_path_vec.len() as f64 / chunk_size as f64).ceil() as usize };
             if verbose { 
                 print_log_msg(
                     INFO,&format!(

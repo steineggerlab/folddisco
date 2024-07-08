@@ -127,17 +127,19 @@ pub fn count_query_idmode(
     value_vec: &[u16],
     lookup: &(Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
 ) -> HashMap<usize, QueryResult> {
+    println!("Counting queries...");
     let mut query_count_map = HashMap::new();
     for (_i, query) in queries.iter().enumerate() {
+        println!("{:?}", query); // WARNING: DELETE AFTER DEBUGGING
         let offset = offset_table.get(query);
         if offset.is_none() {
             continue;
         } 
         let offset = offset.unwrap();
         // Print query and offset
-        println!("{:?}, {:?}", query, offset);
+        println!("{:?}, {:?}", query, offset); // WARNING: DELETE AFTER DEBUGGING
         let single_queried_values = get_values_with_offset_u16(value_vec, offset.0, offset.1);
-        println!("{:?}", single_queried_values);
+        println!("{:?}", single_queried_values); // WARNING: DELETE AFTER DEBUGGING
         let edge_info = query_map.get(query).unwrap();
         let is_exact = edge_info.1;
         let edge = edge_info.0;

@@ -55,10 +55,6 @@ pub struct SimpleHashMap {
 
 impl SimpleHashMap {
     pub fn new(capacity: usize) -> Self {
-        // Print the capacity if capacity is larger than u32::MAX
-        if capacity > u32::MAX as usize {
-            eprintln!("Capacity is larger than u32::MAX. Capacity: {}", capacity);
-        }
         SimpleHashMap {
             buckets: ManuallyDrop::new(vec![0; capacity]),
             occupancy: BitVec::new(capacity),
@@ -99,7 +95,6 @@ impl SimpleHashMap {
     }
 
     fn hash(&self, hash: u32) -> usize {
-        //
         hash as usize % self.capacity
     }
 
@@ -152,9 +147,6 @@ impl SimpleHashMap {
     
 
     pub fn get(&self, key: &GeometricHash) -> Option<&(usize, usize)> {
-        // DEBUGGING: Print all information in here
-        println!("KEY: {:?}", key);
-        println!("size: {}, capacity: {}", self.size, self.capacity);
         let key_u32 = key.as_u32();
         let hash = self.hash(key_u32); // Assuming `hash_u32` is your perfect hash function
         let mut index = hash;
@@ -191,7 +183,6 @@ impl SimpleHashMap {
         file.set_len(self.estimate_file_size() as u64)?;
         let mut writer = BufWriter::new(file);
         // Serialize and write metadata
-        println!("Size: {}, Capacity: {}", &self.size, &self.capacity); // DELETE AFTER DEBUGGING WARNING:
         writer.write_all(&self.size.to_le_bytes())?;
         writer.write_all(&self.capacity.to_le_bytes())?;
 
@@ -241,7 +232,6 @@ impl SimpleHashMap {
         let mut capacity_bytes = [0u8; mem::size_of::<usize>()];
         capacity_bytes.copy_from_slice(&mmap[offset..offset + mem::size_of::<usize>()]);
         let capacity = usize::from_le_bytes(capacity_bytes);
-        println!("Size: {}, Capacity: {}", size, capacity); // DELETE AFTER DEBUGGING WARNING:
         offset += mem::size_of::<usize>();
 
         let keys_count = size;
@@ -346,8 +336,6 @@ pub fn convert_sorted_hash_vec_to_simplemap(
 ) -> (SimpleHashMap, Vec<usize>) {
     // OffsetMap - key: hash, value: (offset, length)
     let (total_hashes, total_values) = estimate_hash_size(&sorted_vec);
-    println!("Total hashes: {}, Total values: {}", total_hashes, total_values);
-    println!("Making hashmap with capacity: {}", total_hashes * 3);
     let mut offset_map = SimpleHashMap::new(total_hashes * 3);
     let mut vec: Vec<usize> = Vec::with_capacity(total_values);
 

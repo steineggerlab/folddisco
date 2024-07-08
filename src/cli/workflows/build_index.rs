@@ -79,7 +79,7 @@ pub fn build_index(env: AppArgs) {
             };
             let index_mode = IndexMode::get_with_str(mode.as_str());
             if index_mode == IndexMode::Big {
-                print_log_msg(INFO, "Indexing in Big mode");
+                print_log_msg(INFO, "Indexing in Big mode.");
             }
             let chunk_size = if chunk_size > u16::max_value() as usize { u16::max_value() as usize } else { chunk_size };
             // Overwrite chunk_size if index_mode is Big

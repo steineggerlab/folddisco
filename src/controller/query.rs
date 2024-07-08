@@ -159,13 +159,15 @@ pub fn make_query_map(
     // Convert residue indices to vector indices
     let mut indices = Vec::new();
     let mut query_residues = query_residues.clone();
-    
+    let mut amino_acid_substitutions = amino_acid_substitutions.clone();
+
     if query_residues.is_empty() {
         // Iterate over all residues and set to query_residues
         for i in 0..compact.num_residues {
             let chain = compact.chain_per_residue[i];
             let residue_index = compact.residue_serial[i];
             query_residues.push((chain, residue_index));
+            amino_acid_substitutions.push(None);
         }
     }
 

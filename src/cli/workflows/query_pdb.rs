@@ -191,8 +191,6 @@ pub fn query_pdb(env: AppArgs) {
                                 )) } else {
                                     read_u16_vector(&value_path).expect(&log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path)))
                                 };
-                                println!("{:?}", value_vec.len());
-                                println!("HERE WE ARE");
                                 let query_count_map = if verbose { measure_time!(count_query_idmode(
                                     &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
                                 ))} else {

@@ -134,7 +134,10 @@ pub fn count_query_idmode(
             continue;
         } 
         let offset = offset.unwrap();
+        // Print query and offset
+        println!("{:?}, {:?}", query, offset);
         let single_queried_values = get_values_with_offset_u16(value_vec, offset.0, offset.1);
+        println!("{:?}", single_queried_values);
         let edge_info = query_map.get(query).unwrap();
         let is_exact = edge_info.1;
         let edge = edge_info.0;

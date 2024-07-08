@@ -95,7 +95,7 @@ impl SimpleHashMap {
     }
 
     fn hash(&self, hash: u32) -> usize {
-        (hash % self.capacity as u32) as usize
+        (hash as usize) % self.capacity
     }
 
     fn insert(&mut self, key: GeometricHash, value: (usize, usize)) {

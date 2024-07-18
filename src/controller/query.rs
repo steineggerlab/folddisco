@@ -6,8 +6,9 @@
 use std::collections::HashMap;
 
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::geometry::util::{is_aa_group_char, map_one_letter_to_u8_vec, map_u8_to_aa};
+use crate::utils::convert::{is_aa_group_char, map_aa_to_u8, map_one_letter_to_u8_vec, map_u8_to_aa};
 use crate::prelude::{print_log_msg, PDBReader, INFO};
+use crate::structure::core::CompactStructure;
 use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
 use super::feature::{self, get_single_feature};
@@ -144,17 +145,19 @@ pub fn parse_threshold_string(threshold_string: Option<String>) -> Vec<f32> {
     thresholds
 }
 
+
 pub fn make_query_map(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
     nbin_dist: usize, nbin_angle: usize, dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
     amino_acid_substitutions: &Vec<Option<Vec<u8>>>,
-) -> (HashMap<GeometricHash, ((usize, usize), bool)>, Vec<usize>) {
+) -> (HashMap<GeometricHash, ((usize, usize), bool)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
 
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
     let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
     let compact = compact.to_compact();
     
     let mut hash_collection = HashMap::new();
+    let mut observed_distance_map: HashMap<(u8, u8), Vec<(f32, usize)>> = HashMap::new();
     
     // Convert residue indices to vector indices
     let mut indices = Vec::new();
@@ -197,6 +200,18 @@ pub fn make_query_map(
         );
         
         if feature.is_some() {
+            // Gather observed distance & aa pairs.
+            let aa_dist_info = compact.get_list_amino_acids_and_distances(indices[i], indices[j]);
+            if let Some(aa_dist_info) = aa_dist_info {
+                // Check if the pair is already in the map
+                let aa_pair = (aa_dist_info.0, aa_dist_info.1);
+                if observed_distance_map.contains_key(&aa_pair) {
+                    observed_distance_map.get_mut(&aa_pair).unwrap().push((aa_dist_info.2, indices[i]));
+                } else {
+                    observed_distance_map.insert(aa_pair, vec![(aa_dist_info.2, indices[i])]);
+                }
+            }
+
             let feature = feature.unwrap();
             let feature_clone = feature.clone();
             if nbin_dist == 0 || nbin_angle == 0 {
@@ -343,7 +358,7 @@ pub fn make_query_map(
 
         }
     });
-    (hash_collection, indices)
+    (hash_collection, indices, observed_distance_map)
 }
 
 
@@ -481,11 +496,12 @@ mod tests {
         let dist_thresholds: Vec<f32> = vec![0.5];
         let angle_thresholds: Vec<f32> = vec![5.0,10.0,15.0];
         let hash_type = HashType::PDBMotifSinCos;
-        let (hash_collection, _index_found) = make_query_map(
+        let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
             &path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds, &vec![None, None, None]
         );
         println!("{:?}", hash_collection);
         println!("{}", hash_collection.len());
+        println!("{:?}", _observed_dist_map);
         // Print the count where value.1 is true
         let mut count = 0;
         hash_collection.iter().for_each(|item| {

@@ -5,8 +5,8 @@
 
 use std::fmt;
 use crate::geometry::core::HashType;
-use crate::geometry::util::discretize_f32_value_into_u32 as discretize_value;
-use crate::geometry::util::continuize_u32_value_into_f32 as continuize_value;
+use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
+use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 
 // Residue 1: 5 bits; Residue 2: 5 bits; Distances: 16 bins 4 bits; 
 // Angle: 32 bins 5 bits; total: 23 bits
@@ -118,7 +118,7 @@ impl fmt::Display for HashValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::util::map_aa_to_u8;
+    use crate::utils::convert::map_aa_to_u8;
     #[test]
     fn test_default_hash_works() {
         // Test perfect hash

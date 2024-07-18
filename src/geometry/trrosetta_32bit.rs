@@ -6,12 +6,10 @@
  
 use std::fmt;
 use crate::geometry::core::HashType;
-use crate::geometry::util::discretize_f32_value_into_u32 as discretize_value;
-use crate::geometry::util::continuize_u32_value_into_f32 as continuize_value;
-use crate::geometry::util::*;
-
-
-use super::util::map_u32_to_aa_u32_pair;
+use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
+use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
+use crate::utils::convert::map_u32_to_aa_u32_pair;
+use crate::utils::convert::*;
 
 // TODO: IMPORTANT: Implement this to reduce execution time
 // 9 bit for AA pairs, 3 bit for distance, 2 bits for sin & cos (4 bits for one angle)
@@ -175,7 +173,7 @@ impl fmt::Display for HashValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::util::map_aa_to_u8;
+    use crate::utils::convert::map_aa_to_u8;
     use crate::geometry::core::GeometricHash;
     #[test]
     fn test_default_hash_works() {

@@ -4,6 +4,5 @@ pub mod pdb_motif;
 pub mod pdb_motif_sincos;
 pub mod pdb_halfmatch;
 pub mod ppf;
-pub mod util;
 pub mod pdb_tr;
 pub mod tertiary_interaction;

@@ -28,6 +28,7 @@ pub struct QueryResult {
     pub grid_set: HashMap<(u8, u8, u8), usize>,
     pub pos_set: HashMap<(u16, u16), usize>,
     pub matching_residues: Vec<(String, f32)>,
+    pub matching_residues_processed: Vec<(String, f32)>,
 }
 
 impl QueryResult {
@@ -53,6 +54,7 @@ impl QueryResult {
             grid_set: HashMap::new(),
             pos_set: HashMap::new(),
             matching_residues: Vec::new(),
+            matching_residues_processed: Vec::new(),
         }
     }
 }
@@ -67,11 +69,19 @@ impl fmt::Display for QueryResult {
                 |(x, y)| format!("{}:{:.4}", x, y)
             ).collect::<Vec<String>>().join(";")
         };
+        let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
+            "NA".to_string()
+        } else {
+            self.matching_residues_processed.iter().map(
+                // Only print score with 4 decimal places
+                |(x, y)| format!("{}:{:.4}", x, y)
+            ).collect::<Vec<String>>().join(";")
+        };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, matching_residues_with_score
+            self.nres, self.plddt, matching_residues_with_score, matching_residues_processed_with_score
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
@@ -88,11 +98,19 @@ impl fmt::Debug for QueryResult {
                 |(x, y)| format!("{}:{:.4}", x, y)
             ).collect::<Vec<String>>().join(";")
         };
+        let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
+            "NA".to_string()
+        } else {
+            self.matching_residues_processed.iter().map(
+                // Only print score with 4 decimal places
+                |(x, y)| format!("{}:{:.4}", x, y)
+            ).collect::<Vec<String>>().join(";")
+        };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, matching_residues_with_score
+            self.nres, self.plddt, matching_residues_with_score, matching_residues_processed_with_score
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )
@@ -109,11 +127,19 @@ impl QueryResult {
                 |(x, y)| format!("{}:{:.4}", x, y)
             ).collect::<Vec<String>>().join(";")
         };
+        let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
+            "NA".to_string()
+        } else {
+            self.matching_residues_processed.iter().map(
+                // Only print score with 4 decimal places
+                |(x, y)| format!("{}:{:.4}", x, y)
+            ).collect::<Vec<String>>().join(";")
+        };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.exact_match_count, self.overflow_count, self.grid_count,
-            self.nres, self.plddt, matching_residues_with_score
+            self.nres, self.plddt, matching_residues_with_score, matching_residues_processed_with_score
             // self.pos_set.len(),
             // self.node_set, self.edge_set, self.grid_set, self.pos_set
         )

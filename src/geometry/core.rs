@@ -3,6 +3,8 @@
 // Description: Core geometric hash enum and types
 
 use std::{fmt, io::{BufRead, Write}};
+use rayon::iter::ParallelExtend;
+
 use crate::HashableSync;
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]

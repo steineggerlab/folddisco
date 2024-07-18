@@ -46,8 +46,8 @@ Options:
     --header                         Print header in output
     --node <NODE_COUNT>              Number of nodes to retrieve (default 2)
 ";
-
-pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tgrid_count\tnres\tplddt\tmatching_residues\tquery_residues\tquery_file\tindex_path";
+// TODO: need to think about the column name
+pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tgrid_count\tnres\tplddt\tmatching_residues\tresidues_rescued\tquery_residues\tquery_file\tindex_path";
 
 pub const DEFAULT_NODE_COUNT: usize = 2;
 
@@ -175,7 +175,7 @@ pub fn query_pdb(env: AppArgs) {
                         let num_bin_dist = config.num_bin_dist;
                         let num_bin_angle = config.num_bin_angle;
                         let mode = config.mode;
-                        let (pdb_query_map, query_indices) = if verbose { measure_time!(make_query_map(
+                        let (pdb_query_map, query_indices, aa_dist_map ) = if verbose { measure_time!(make_query_map(
                             &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitutions
                         )) } else {
                             make_query_map(
@@ -222,8 +222,10 @@ pub fn query_pdb(env: AppArgs) {
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
+                                            &aa_dist_map
                                         );
-                                        v.matching_residues = retrieval_result;
+                                        v.matching_residues = retrieval_result.0;
+                                        v.matching_residues_processed = retrieval_result.1;
                                     }));
                                     // Filter query_count_vec with reasonable retrieval results
                                     query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
@@ -267,8 +269,10 @@ pub fn query_pdb(env: AppArgs) {
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
+                                            &aa_dist_map
                                         );
-                                        v.matching_residues = retrieval_result;
+                                        v.matching_residues = retrieval_result.0;
+                                        v.matching_residues_processed = retrieval_result.1;
                                     }));
                                     query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
                                     println!("{:?}", query_count_vec.len());
@@ -321,8 +325,10 @@ pub fn query_pdb(env: AppArgs) {
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
+                                            &aa_dist_map
                                         );
-                                        v.matching_residues = retrieval_result;
+                                        v.matching_residues = retrieval_result.0;
+                                        v.matching_residues_processed = retrieval_result.1;
                                     }));
                                     // Filter query_count_vec with reasonable retrieval results
                                     query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
@@ -397,7 +403,7 @@ pub fn parse_multiple_queries(
         );
         // Make query with pdb
         let (query_residues, aa_substitions) = parse_query_string(&query_string, structure.chains[0]);
-        let (pdb_query_map, _query_indices) =  measure_time!(make_query_map(
+        let (pdb_query_map, _query_indices, _) =  measure_time!(make_query_map(
             &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitions
         ));
         let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();

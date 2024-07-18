@@ -2,10 +2,10 @@
 
 use std::fmt;
 use crate::geometry::core::HashType;
-use crate::geometry::util::discretize_f32_value_into_u32 as discretize_value;
-use crate::geometry::util::continuize_u32_value_into_f32 as continuize_value;
-use crate::geometry::util::map_u8_to_aa;
-use crate::geometry::util::*;
+use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
+use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
+use crate::utils::convert::map_u8_to_aa;
+use crate::utils::convert::*;
 
 // 5 bit for AA, 4 bit for distance, 3 bit for sin & cos
 
@@ -178,7 +178,7 @@ impl fmt::Display for HashValue {
 
 #[cfg(test)]
 mod tests {
-    use crate::geometry::util::map_aa_to_u8;
+    use crate::utils::convert::map_aa_to_u8;
     use super::*;
 
     #[test]

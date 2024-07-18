@@ -1,14 +1,9 @@
 # Development note
 
 ## TODOs
-> 2024-06-20 14:44:32
-INDEXING
-- [x] DONE: Scalability
-- [x] DONE: Implemented MMseqs2 like index scheme
-- [x] IMPORTANT: DONE: When mode is Id or Grid, don't allocate huge memory as in Big mode
 QUERYING
-- [x] DONE: allowing different amino acid pairs.
-  - [ ] ISSUE: WARNING: slows down when there are too many combinations of amino acid pairs
+- [ ] ISSUE: WARNING: slows down when there are too many combinations of amino acid pairs
+- [x] DONE: rescue residues based on the distance
 DEV
 - [ ] IMPORTANT: MAJOR: TODO: Foldcomp DB reader
   - [ ] Current idea: having DB reader with rust & decompression with C++
@@ -566,4 +561,56 @@ analysis/e_coli/pdb/AF-P0AES2-F1-model_v4.pdb   43.4573 4       3       4       
 
 (base) hbk@Hyunbinui-MacBookPro motifsearch % ./target/release/folddisco query -p analysis/query/2mnr.pdb -q A221,A247:DEN,A195,A164:HK,A297:HK -i analysis/h_sapiens/d16a4/index -t 4 -v -r -d 0.5 -a 5 --node 3 
 analysis/h_sapiens/pdb/AF-Q7L5Y1-F1-model_v4.pdb        87.2214 8       5       8       4       0       1       443     97.3225 A276,A305,A250,A220,A355:0.1090 A164,A195,A221,A247,A297        analysis/query/2mnr.pdb analysis/h_sapiens/d16a4/index
+```
+
+---
+
+> 2024-07-09 14:54:45
+```sh
+(base) hyunbin@super003:/mnt/scratch/hyunbin/motif$ \time -v ~/Projects/06_Motifsearch/motifsearch/target/release/folddisco index -t 128 -p afdb50 -i afdb50_folddisco/afdb50_folddisco -y pdbtr -d 16 -a 4 -m big -v
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing in Big mode.
+[INFO] Indexing afdb50 with 128 threads and 1 chunks
+[INFO] Hash type: PDBTrRosetta
+[INFO] Indexing all PDB files in one chunk
+[INFO] Before initializing (Allocated 173.14626MB)
+[INFO] Collecting ids of the structures
+[INFO] fold_disco.collect_and_count: 15659.65740181s
+[INFO] Hashes collected (Allocated 16730.66MB)
+[INFO] fold_disco.fold_disco_index.allocate_entries: 1.291601146s
+[INFO] fold_disco.add_entries: 18703.347006601s
+[INFO] fold_disco.fold_disco_index.finish_index: 1.298452001s
+[INFO] fold_disco.fold_disco_index.save_offset_to_file: 5.7042418sf
+[INFO] Hash sorted (Allocated 16730.588MB)
+[INFO] save_lookup_to_file: 961.524124ms
+[DONE] Indexing done for chunk 0 - afdb50_folddisco/afdb50_folddisco
+[DONE] Done.
+        Command being timed: "/home/hyunbin/Projects/06_Motifsearch/motifsearch/target/release/folddisco index -t 128 -p afdb50 -i afdb50_folddisco/afdb50_folddisco -y pdbtr -d 16 -a 4 -m big -v"
+        User time (seconds): 4028793.69
+        System time (seconds): 25264.24
+        Percent of CPU this job got: 11726%
+        Elapsed (wall clock) time (h:mm:ss or m:ss): 9:36:12
+        Average shared text size (kbytes): 0
+        Average unshared data size (kbytes): 0
+        Average stack size (kbytes): 0
+        Average total size (kbytes): 0
+        Maximum resident set size (kbytes): 108572104
+        Average resident set size (kbytes): 0
+        Major (requiring I/O) page faults: 14170928
+        Minor (reclaiming a frame) page faults: 642527135
+        Voluntary context switches: 6115608
+        Involuntary context switches: 400530866
+        Swaps: 0
+        File system inputs: 115928
+        File system outputs: 2713814896
+        Socket messages sent: 0
+        Socket messages received: 0
+        Signals delivered: 0
+        Page size (bytes): 4096
+        Exit status: 0
+(base) hyunbin@super003:/mnt/scratch/hyunbin/motif$ 
 ```

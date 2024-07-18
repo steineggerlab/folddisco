@@ -7,9 +7,9 @@
 
 use std::fmt;
 use crate::geometry::core::HashType;
-use crate::geometry::util::discretize_f32_value_into_u32 as discretize_value;
-use crate::geometry::util::continuize_u32_value_into_f32 as continuize_value;
-use crate::geometry::util::*;
+use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
+use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
+use crate::utils::convert::*;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
@@ -157,7 +157,8 @@ impl fmt::Display for HashValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::{core::GeometricHash, util::map_aa_to_u8};
+    use crate::geometry::core::GeometricHash;
+    use crate::utils::convert::map_aa_to_u8;
     #[test]
     fn test_geometrichash_works() {
         // Test perfect hash

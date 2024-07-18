@@ -4,6 +4,7 @@ use crate::structure::feature::{Torsion, TorsionType};
 use crate::utils::calculator::Calculate;
 
 use crate::structure::coordinate::{calc_angle_point, calc_cos2_torsion_angle};
+use crate::utils::convert::map_aa_to_u8;
 
 use super::coordinate::{calc_torsion_radian, calc_angle_radian};
 
@@ -472,6 +473,23 @@ impl CompactStructure {
     
     pub fn get_avg_plddt(&self) -> f32 {
         self.get_avg_bfactor()
+    }
+    
+    pub fn get_list_amino_acids_and_distances(&self, i: usize, j: usize) -> Option<(u8, u8, f32)> {
+        // Return i, j, aa_i, aa_j, distance
+        let aa_i = map_aa_to_u8(self.get_res_name(i));
+        let aa_j = map_aa_to_u8(self.get_res_name(j));
+        let distance = self.get_ca_distance(i, j);
+        if distance.is_none() {
+            None
+        } else {
+            let distance = distance.unwrap();
+            if distance <= 20.0 {
+                Some((aa_i, aa_j, distance))
+            } else {
+                None
+            }
+        }
     }
     
 }

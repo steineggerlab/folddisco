@@ -3,7 +3,7 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-use crate::geometry::util::map_aa_to_u8;
+use crate::utils::convert::map_aa_to_u8;
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::structure::grid::{get_grid_index_vector_from_compact, merge_id_with_grid, nearby};

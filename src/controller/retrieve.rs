@@ -474,8 +474,8 @@ mod tests {
         let nbin_dist = 16;
         let nbin_angle = 4;
         let exact_match = false;
-        let dist_thresholds: Vec<f32> = vec![0.0];
-        let angle_thresholds: Vec<f32> = vec![5.0];
+        let dist_thresholds: Vec<f32> = vec![0.5,1.0];
+        let angle_thresholds: Vec<f32> = vec![5.0,10.0];
         let queries = make_query(
             &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds.clone(), angle_thresholds.clone(), &aa_substitutions
         );
@@ -485,7 +485,7 @@ mod tests {
         let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
         let compact = pdb_loaded.read_structure().expect("Error reading structure");
         let compact = compact.to_compact();
-        let new_path = String::from("analysis/AF-P81661-F1-model_v4.pdb");
+        let new_path = String::from("data/serine_peptidases_filtered/1azw.pdb");
         let output = measure_time!(retrieval_wrapper(
             &new_path, query_residues.len(), &queries, hash_type, nbin_dist, nbin_angle, &query_map, &compact, &query_indices, &aa_dist_map
         ));
@@ -504,7 +504,7 @@ mod tests {
         let nbin_dist = 16;
         let nbin_angle = 4;
         let exact_match = false;
-        let dist_thresholds: Vec<f32> = vec![0.5];
+        let dist_thresholds: Vec<f32> = vec![0.5,1.0];
         let angle_thresholds: Vec<f32> = vec![5.0, 10.0];
         let queries = make_query(
             &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds, &aa_substitions

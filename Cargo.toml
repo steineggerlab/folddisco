@@ -35,4 +35,9 @@ libc = "0.2.155"
 
 
 [build-dependencies]
-bindgen = "0.69.4"
+bindgen = { version = "0.69.4", optional = true }
+cmake = { version = "0.1.50", optional = true }
+
+
+[features]
+foldcomp = ["bindgen", "cmake"]

@@ -1,12 +1,23 @@
 # Development note
 
 ## TODOs
-QUERYING
-- [ ] ISSUE: WARNING: slows down when there are too many combinations of amino acid pairs
-- [x] DONE: rescue residues based on the distance
 DEV
 - [ ] IMPORTANT: MAJOR: TODO: Foldcomp DB reader
   - [ ] Current idea: having DB reader with rust & decompression with C++
+  - [x] DONE: Reading FCZ in Rust is working
+  - [x] DONE: Checked Foldcomp DB is readable through Rust
+  - [ ] TODO: Integrate with CLI - both indexing and querying
+  - [ ] TODO: Need to convert atom_t to compact structure
+- [x] TODOs for Foldcomp DB Reader
+  - [x] Place at structure/io/
+  - [x] Add local copy of foldcomp:minimal in lib + modification of CMakeLists.txt to support ffi build
+  - [x] Parallel reading of the DB (rayon-based reader on Foldcomp DB, load lookup & index once)
+  - [x] Make Foldcomp DB reader as an optional feature; Build dependencies should be optional as well
+
+QUERYING
+- [ ] ISSUE: WARNING: slows down when there are too many combinations of amino acid pairs
+- [x] DONE: rescue residues based on the distance
+
 
 QUERYING
 - [ ] Collect test query info / commands in QUERY.md

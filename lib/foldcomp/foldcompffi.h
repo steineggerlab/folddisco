@@ -1,17 +1,18 @@
 #pragma once
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
     typedef struct {
-        char aa[3];
-        char chain;
-        char atom[4];
         float x, y, z;
+        char atom[4];
+        uint64_t atomIdx;
+        char chain;
+        char aa[3];
+        uint64_t resIdx;
         float bfactor;
-        int atomIdx;
-        int resIdx;
     } atom_t;
 
     void* foldcomp_create();

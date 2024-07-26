@@ -9,8 +9,9 @@ pub mod fcz;
 pub enum StructureFileFormat {
     PDB,
     PDBGZ,
-    CIF,
+    CIF, // TODO: Implement CIF parser
     FCZ,
+    FCZDB,
     MMTF,
     Unknown,
 }

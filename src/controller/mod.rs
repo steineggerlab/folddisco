@@ -33,11 +33,13 @@ use crate::controller::feature::get_geometric_hash_from_structure;
 
 use self::feature::get_geometric_hash_with_grid;
 
+#[cfg(feature = "foldcomp")]
+use crate::structure::io::fcz::{FoldcompDbReader, get_id_vector_subset_out_of_lookup};
+
 const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
 const DEFAULT_HASH_TYPE: HashType = HashType::PDBTrRosetta;
 const DEFAULT_MAX_RESIDUE: usize = 50000;
-
 
 pub struct FoldDisco {
     pub path_vec: Vec<String>,
@@ -59,6 +61,12 @@ pub struct FoldDisco {
     pub grid_width: f32,
     pub index_mode: IndexMode,
     pub fold_disco_index: FolddiscoIndex,
+    pub foldcomp_db_path: String,
+    #[cfg(not(feature = "foldcomp"))]
+    pub foldcomp_db_reader: bool,
+    #[cfg(feature = "foldcomp")]
+    pub foldcomp_db_reader: FoldcompDbReader,
+    pub is_foldcomp_enabled: bool,
 }
 
 impl FoldDisco {
@@ -84,6 +92,13 @@ impl FoldDisco {
             grid_width: DEFAULT_GRID_WIDTH,
             index_mode: IndexMode::Id,
             fold_disco_index: FolddiscoIndex::new(0usize, String::new()),
+            // By default, foldcomp is not enabled. foldcomp reading is enabled within new_with_params
+            foldcomp_db_path: String::new(),
+            #[cfg(not(feature = "foldcomp"))]
+            foldcomp_db_reader: false,
+            #[cfg(feature = "foldcomp")]
+            foldcomp_db_reader: FoldcompDbReader::empty(),
+            is_foldcomp_enabled: false,
         }
     }
     pub fn new_with_hash_type(path_vec: Vec<String>, hash_type: HashType) -> FoldDisco {
@@ -108,6 +123,12 @@ impl FoldDisco {
             grid_width: DEFAULT_GRID_WIDTH,
             index_mode: IndexMode::Id,
             fold_disco_index: FolddiscoIndex::new(0usize, String::new()),
+            foldcomp_db_path: String::new(),
+            #[cfg(not(feature = "foldcomp"))]
+            foldcomp_db_reader: false,
+            #[cfg(feature = "foldcomp")]
+            foldcomp_db_reader: FoldcompDbReader::empty(),
+            is_foldcomp_enabled: false,
         }
     }
 
@@ -120,11 +141,15 @@ impl FoldDisco {
         let total_hashes = match index_mode {
             IndexMode::Id | IndexMode::Grid | IndexMode::Pos => 0,
             IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
-            _ => 0,
         };
+        #[cfg(feature = "foldcomp")]
+        let numeric_id_vec = numeric_id_vec_from_string_vec(&path_vec);
         FoldDisco {
             path_vec: path_vec,
+            #[cfg(not(feature = "foldcomp"))]
             numeric_id_vec: Vec::with_capacity(length),
+            #[cfg(feature = "foldcomp")]
+            numeric_id_vec: numeric_id_vec,
             nres_vec: Vec::with_capacity(length),
             plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),
@@ -142,8 +167,57 @@ impl FoldDisco {
             grid_width: grid_width,
             index_mode: index_mode,
             fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone()),
+            foldcomp_db_path: String::new(),
+            #[cfg(not(feature = "foldcomp"))]
+            foldcomp_db_reader: false,
+            #[cfg(feature = "foldcomp")]
+            foldcomp_db_reader: FoldcompDbReader::empty(),
+            is_foldcomp_enabled: false,
         }
     }
+
+    #[cfg(feature = "foldcomp")]
+    pub fn new_with_foldcomp_db(
+        path_vec: Vec<String>, hash_type: HashType, remove_redundancy: bool,
+        num_threads: usize, num_bin_dist: usize, num_bin_angle: usize, output_path: String,
+        grid_width: f32, index_mode: IndexMode, foldcomp_db_path: &'static str
+    ) -> FoldDisco {
+        let length = path_vec.len();
+        let total_hashes = match index_mode {
+            IndexMode::Id | IndexMode::Grid | IndexMode::Pos => 0,
+            IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
+        };
+        let foldcomp_db_reader = FoldcompDbReader::new(&foldcomp_db_path);
+        let numeric_id_vec = get_id_vector_subset_out_of_lookup(
+            &foldcomp_db_reader.lookup, &path_vec
+        );
+        
+        FoldDisco {
+            path_vec: path_vec,
+            numeric_id_vec: numeric_id_vec,
+            nres_vec: Vec::with_capacity(length),
+            plddt_vec: Vec::with_capacity(length),
+            hash_collection: Vec::new(),
+            hash_id_pairs: Vec::new(),
+            hash_id_grids: Vec::new(),
+            hash_id_vec: Vec::new(),
+            index_builder: IndexBuilder::empty(),
+            hash_type: hash_type,
+            remove_redundancy: remove_redundancy,
+            num_threads: num_threads,
+            num_bin_dist: num_bin_dist,
+            num_bin_angle: num_bin_angle,
+            output_path: output_path.clone(),
+            max_residue: DEFAULT_MAX_RESIDUE,
+            grid_width: grid_width,
+            index_mode: index_mode,
+            fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone()),
+            foldcomp_db_path: foldcomp_db_path.to_string(),
+            foldcomp_db_reader: foldcomp_db_reader,
+            is_foldcomp_enabled: true,
+        }
+    }
+
     // Setters
     pub fn set_path_vec(&mut self, path_vec: Vec<String>) {
         self.path_vec = path_vec;
@@ -175,6 +249,7 @@ impl FoldDisco {
         string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
     }
 
+    // #[deprecated]
     pub fn collect_hash(&mut self) {
         let path_order: Arc<Vec<usize>> = Arc::new(Vec::with_capacity(self.path_vec.len()));
         let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
@@ -393,10 +468,13 @@ impl FoldDisco {
             self.path_vec
                 .par_iter()
                 .map(|pdb_path| {
+                    #[cfg(not(feature = "foldcomp"))]
                     let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                    #[cfg(not(feature = "foldcomp"))]
                     let pdb_reader = PDBReader::from_file(pdb_path).expect(
                         log_msg(FAIL, "PDB file not found").as_str()
                     );
+                    #[cfg(not(feature = "foldcomp"))]
                     let compact = if pdb_path.ends_with(".gz") {
                         pdb_reader.read_structure_from_gz().expect(
                             log_msg(FAIL, "Failed to read structure").as_str()
@@ -406,11 +484,37 @@ impl FoldDisco {
                             log_msg(FAIL, "Failed to read structure").as_str()
                         )
                     };
+                    #[cfg(feature = "foldcomp")]
+                    let pdb_pos = {
+                        let i = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                        self.numeric_id_vec[i]
+                    };
+                    #[cfg(feature = "foldcomp")]
+                    let compact = if self.is_foldcomp_enabled {
+                        self.foldcomp_db_reader.read_single_structure_by_id(pdb_pos).expect(
+                            log_msg(FAIL, "Failed to read structure").as_str()
+                        )
+                    } else {
+                        let pdb_reader = PDBReader::from_file(pdb_path).expect(
+                            log_msg(FAIL, "PDB file not found").as_str()
+                        );
+                        if pdb_path.ends_with(".gz") {
+                            pdb_reader.read_structure_from_gz().expect(
+                                log_msg(FAIL, "Failed to read structure").as_str()
+                            )
+                        } else {
+                            pdb_reader.read_structure().expect(
+                                log_msg(FAIL, "Failed to read structure").as_str()
+                            )
+                        }
+                    };  
+
                     if compact.num_residues > self.max_residue {
                         print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                         // skip this file
                         // Drop intermediate variables
                         drop(compact);
+                        #[cfg(not(feature = "foldcomp"))]
                         drop(pdb_reader);
                         return Vec::new();
                     }
@@ -429,6 +533,7 @@ impl FoldDisco {
                     );
                     // Drop intermediate variables
                     drop(compact);
+                    #[cfg(not(feature = "foldcomp"))]
                     drop(pdb_reader);
                     // If remove_redundancy is true, remove duplicates
                     if self.remove_redundancy {
@@ -464,10 +569,13 @@ impl FoldDisco {
                 chunk
                     .par_iter()
                     .map(|pdb_path| {
+                        #[cfg(not(feature = "foldcomp"))]
                         let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                        #[cfg(not(feature = "foldcomp"))]
                         let pdb_reader = PDBReader::from_file(pdb_path).expect(
                             log_msg(FAIL, "PDB file not found").as_str()
                         );
+                        #[cfg(not(feature = "foldcomp"))]
                         let compact = if pdb_path.ends_with(".gz") {
                             pdb_reader.read_structure_from_gz().expect(
                                 log_msg(FAIL, "Failed to read structure").as_str()
@@ -477,11 +585,22 @@ impl FoldDisco {
                                 log_msg(FAIL, "Failed to read structure").as_str()
                             )
                         };
+                        #[cfg(feature = "foldcomp")]
+                        let pdb_pos = {
+                            let i = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                            self.numeric_id_vec[i]
+                        };
+                        #[cfg(feature = "foldcomp")]
+                        let compact = self.foldcomp_db_reader.read_single_structure_by_id(pdb_pos).expect(
+                            log_msg(FAIL, "Failed to read structure").as_str()
+                        );
+
                         if compact.num_residues > self.max_residue {
                             print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                             // skip this file
                             // Drop intermediate variables
                             drop(compact);
+                            #[cfg(not(feature = "foldcomp"))]
                             drop(pdb_reader);
                             return Vec::new();
                         }
@@ -500,6 +619,7 @@ impl FoldDisco {
                         );
                         // Drop intermediate variables
                         drop(compact);
+                        #[cfg(not(feature = "foldcomp"))]
                         drop(pdb_reader);
                         // If remove_redundancy is true, remove duplicates
                         if self.remove_redundancy {
@@ -544,10 +664,13 @@ impl FoldDisco {
                 chunk
                     .par_iter()
                     .map(|pdb_path| {
+                        #[cfg(not(feature = "foldcomp"))]
                         let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                        #[cfg(not(feature = "foldcomp"))]
                         let pdb_reader = PDBReader::from_file(pdb_path).expect(
                             log_msg(FAIL, "PDB file not found").as_str()
                         );
+                        #[cfg(not(feature = "foldcomp"))]
                         let compact = if pdb_path.ends_with(".gz") {
                             pdb_reader.read_structure_from_gz().expect(
                                 log_msg(FAIL, "Failed to read structure").as_str()
@@ -557,11 +680,21 @@ impl FoldDisco {
                                 log_msg(FAIL, "Failed to read structure").as_str()
                             )
                         };
+                        #[cfg(feature = "foldcomp")]
+                        let pdb_pos = {
+                            let i = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                            self.numeric_id_vec[i]
+                        };
+                        #[cfg(feature = "foldcomp")]
+                        let compact = self.foldcomp_db_reader.read_single_structure_by_id(pdb_pos).expect(
+                            log_msg(FAIL, "Failed to read structure").as_str()
+                        );
                         if compact.num_residues > self.max_residue {
                             print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                             // skip this file
                             // Drop intermediate variables
                             drop(compact);
+                            #[cfg(not(feature = "foldcomp"))]
                             drop(pdb_reader);
                             return Vec::new();
                         }
@@ -572,6 +705,7 @@ impl FoldDisco {
                         );
                         // Drop intermediate variables
                         drop(compact);
+                        #[cfg(not(feature = "foldcomp"))]
                         drop(pdb_reader);
                         // If remove_redundancy is true, remove duplicates
                         if self.remove_redundancy {
@@ -703,3 +837,10 @@ fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut V
     }
 }
 
+fn numeric_id_vec_from_string_vec(string_vec: &Vec<String>) -> Vec<usize> {
+    let mut numeric_id_vec = Vec::with_capacity(string_vec.len());
+    for i in 0..string_vec.len() {
+        numeric_id_vec.push(i);
+    }
+    numeric_id_vec
+}

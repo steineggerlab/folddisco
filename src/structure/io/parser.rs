@@ -12,9 +12,9 @@ pub fn parse_line(line: &String) -> Result<Atom, &str> {
     let z = line[46..54].trim().parse::<f32>();
     let atom_name = parse_atom(&line[12..16]);
     let atom_serial = line[6..11].trim().parse::<u64>();
+    let chain = line[21..22].as_bytes()[0];
     let res_name = parse_residue(&line[17..20]);
     let res_serial = line[22..26].trim().parse::<u64>();
-    let chain = line[21..22].as_bytes()[0];
     let b_factor = line[60..66].trim().parse::<f32>();
     // let occupancy = &line[54..60]; // NOT USING occupancy yet
 
@@ -44,9 +44,9 @@ pub fn parse_line(line: &String) -> Result<Atom, &str> {
             z,
             atom_name,
             atom_serial,
+            chain,
             res_name,
             res_serial,
-            chain,
             b_factor,
         )),
         _ => Err("Error parsing line"),

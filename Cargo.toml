@@ -2,7 +2,7 @@
 name = "folddisco"
 version = "1.0.0"
 edition = "2021"
-authors = ["Hyunbin Kim <khb7840@gmail.com>", "Rachel Kim <seamustard52@gmail.com>"]
+authors = ["Hyunbin Kim <khb7840@gmail.com>", "Rachel Kim <seamustard52@gmail.com>", "Milot Mirdita <milot@mirdita.de>"]
 description = "A bioinformatics tool for finding discontinuous motifs in protein structures"
 repository = "https://github.com/steineggerlab/folddisco"
 

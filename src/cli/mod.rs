@@ -15,7 +15,7 @@ pub enum AppArgs {
         help: bool,
     },
     Index {
-        pdb_dir: Option<String>,
+        pdb_container: Option<String>,
         hash_type: String,
         index_path: String,
         mode: String,

@@ -1,15 +1,16 @@
 use crate::structure::coordinate::{Coordinate, CoordinateVector};
 
-#[derive(Debug)]
+#[repr(C)]
+#[derive(Debug, Clone)]
 pub struct Atom {
     pub x: f32,
     pub y: f32,
     pub z: f32,
     pub atom_name: [u8; 4],
     pub atom_serial: u64,
+    pub chain: u8,
     pub res_name: [u8; 3],
     pub res_serial: u64,
-    pub chain: u8,
     pub b_factor: f32,
 }
 
@@ -21,9 +22,9 @@ impl Atom {
         z: f32,
         atom_name: [u8; 4],
         atom_serial: u64,
+        chain: u8,
         res_name: [u8; 3],
         res_serial: u64,
-        chain: u8,
         b_factor: f32,
     ) -> Atom {
         Atom {
@@ -32,9 +33,9 @@ impl Atom {
             z,
             atom_name,
             atom_serial,
+            chain,
             res_name,
             res_serial,
-            chain,
             b_factor,
         }
     }
@@ -45,9 +46,9 @@ impl Atom {
             z: 0.0,
             atom_name: [0; 4],
             atom_serial: 0,
+            chain: 0,
             res_name: [0; 3],
             res_serial: 0,
-            chain: 0,
             b_factor: 0.0,
         }
     }

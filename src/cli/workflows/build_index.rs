@@ -19,32 +19,37 @@ use crate::prelude::*;
 use memmap2::MmapMut;
 use peak_alloc::PeakAlloc;
 
+#[cfg(feature= "foldcomp")]
+use crate::structure::io::fcz::*;
+
+
+
 #[global_allocator]
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 pub const HELP_INDEX: &str = "\
 USAGE: folddisco index [OPTIONS]
 Options:
-    -p, --pdbs <PDB_DIR>         Directory containing PDB files
-    -y, --type <HASH_TYPE>       Hash type to use (pdb, trrosetta, default)
-    -i, --index <INDEX_PATH>     Path to save the index table
-    -m, --mode <MODE>            Mode to index (default=id, id: index only id, grid: index id and grid, pos: index id and position)
-    -t, --threads <THREADS>      Number of threads to use
-    -d, --distance <NBIN_DIST>   Number of distance bins (default 0, zero means default)
-    -a, --angle <NBIN_ANGLE>     Number of angle bins (default 0, zero means default)
-    -g, --grid <GRID_WIDTH>      Grid width (default 30.0)
-    -c, --chunk <CHUNK_SIZE>     Number of PDB files to index at once (default, max=65535)
-    -r, --recursive              Index PDB files in subdirectories
-    -n, --max-residue <MAX_RES>  Maximum number of residues in a PDB file (default=3000)
-    --id <ID_TYPE>               ID type to use (pdb, uniprot, afdb, relpath, abspath, default=relpath)
-    -v, --verbose                Print verbose messages
-    -h, --help                   Print this help menu
+    -p, --pdbs <PDB_DIR|FOLDCOMP_DB>   Directory or Foldcomp DB containing PDB files
+    -y, --type <HASH_TYPE>             Hash type to use (pdb, trrosetta, default)
+    -i, --index <INDEX_PATH>           Path to save the index table
+    -m, --mode <MODE>                  Mode to index (default=id, id: index only id, grid: index id and grid, pos: index id and position)
+    -t, --threads <THREADS>            Number of threads to use
+    -d, --distance <NBIN_DIST>         Number of distance bins (default 0, zero means default)
+    -a, --angle <NBIN_ANGLE>           Number of angle bins (default 0, zero means default)
+    -g, --grid <GRID_WIDTH>            Grid width (default 30.0)
+    -c, --chunk <CHUNK_SIZE>           Number of PDB files to index at once (default, max=65535)
+    -r, --recursive                    Index PDB files in subdirectories
+    -n, --max-residue <MAX_RES>        Maximum number of residues in a PDB file (default=3000)
+    --id <ID_TYPE>                     ID type to use (pdb, uniprot, afdb, relpath, abspath, default=relpath)
+    -v, --verbose                      Print verbose messages
+    -h, --help                         Print this help menu
 ";
 
 pub fn build_index(env: AppArgs) {
     match env {
         AppArgs::Index {
-            pdb_dir,
+            pdb_container,
             hash_type,
             index_path,
             num_threads,
@@ -60,7 +65,7 @@ pub fn build_index(env: AppArgs) {
             help,
         } => {
             // Check if arguments are valid
-            if pdb_dir.is_none() {
+            if pdb_container.is_none() {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(1);
             }
@@ -68,15 +73,35 @@ pub fn build_index(env: AppArgs) {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(0);
             }
-            let pdb_dir_clone = pdb_dir.clone();
+            let pdb_container_clone = pdb_container.clone();
+            let pdb_container_name: &'static str = Box::leak(pdb_container.clone().unwrap().into_boxed_str());
             // Load PDB files
-            let pdb_path_vec = if pdb_dir.is_some() {
-                load_path(&pdb_dir.unwrap(), recursive)
+            let pdb_path_vec = if pdb_container.is_some() {
+                // TODO: IMPORTANT: Check if pdb_dir is a directory or db file
+                // If not foldcomp, just load
+                #[cfg(not(feature = "foldcomp"))]
+                { load_path(&pdb_container.unwrap(), recursive) }
+                #[cfg(feature = "foldcomp")]
+                {
+                    let pdb_container = pdb_container.unwrap();
+                    // Check if pdb_container is a directory or a file
+                    let is_dir = PathBuf::from(&pdb_container).is_dir();
+                    if is_dir {
+                        load_path(&pdb_container, recursive)
+                    } else {
+                        let lookup_path = PathBuf::from(format!("{}.lookup", pdb_container));
+                        let lookup_vec = read_foldcomp_db_lookup(&pdb_container).expect(
+                            &log_msg(FAIL, "Failed to read Foldcomp DB lookup")
+                        );
+                        get_path_vector_out_of_lookup(&lookup_vec)
+                    }
+                }
             } else {
                 print_log_msg(FAIL, "Directory containing PDB files is not provided");
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(1);
             };
+            
             let index_mode = IndexMode::get_with_str(mode.as_str());
             if index_mode == IndexMode::Big {
                 print_log_msg(INFO, "Indexing in Big mode.");
@@ -89,7 +114,7 @@ pub fn build_index(env: AppArgs) {
                 print_log_msg(
                     INFO,&format!(
                         "Indexing {} with {} threads and {} chunks",
-                        pdb_dir_clone.unwrap_or("None".to_string()),
+                        pdb_container_clone.unwrap_or("None".to_string()),
                         num_threads, num_chunks
                     )
                 );
@@ -100,6 +125,7 @@ pub fn build_index(env: AppArgs) {
             let id_type = IdType::get_with_str(id_type.as_str());
             
             pdb_path_chunks.into_iter().enumerate().for_each(|(i, pdb_path_vec)| {
+                // let pdb_container_name_inner: &'static str = pdb_container_name.clone();
                 let index_path = if num_chunks == 1 {
                     if verbose { print_log_msg(INFO, "Indexing all PDB files in one chunk"); }
                     index_path.clone()
@@ -108,10 +134,23 @@ pub fn build_index(env: AppArgs) {
                     format!("{}_{}", index_path, i)
                 };
                 print_log_msg(INFO, &format!("Before initializing (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb()));
+                #[cfg(not(feature = "foldcomp"))]
                 let mut fold_disco = FoldDisco::new_with_params(
                     pdb_path_vec.to_vec(), hash_type, true, num_threads, 
                     num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode,
                 );
+                #[cfg(feature = "foldcomp")]
+                let mut fold_disco = if PathBuf::from(&pdb_container_name).is_dir() {
+                    FoldDisco::new_with_params(
+                        pdb_path_vec.to_vec(), hash_type, true, num_threads, 
+                        num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode,
+                    )
+                } else {
+                    FoldDisco::new_with_foldcomp_db(
+                        pdb_path_vec.to_vec(), hash_type, true, num_threads, 
+                        num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode, pdb_container_name,
+                    )
+                };
                 
                 match index_mode {
                     IndexMode::Id => {
@@ -163,7 +202,10 @@ pub fn build_index(env: AppArgs) {
                     &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
                     // "Hash sorted"
                 ); }
+                // Don't fill numeric id if foldcomp is enabled
+                #[cfg(not(feature = "foldcomp"))]
                 fold_disco.fill_numeric_id_vec();
+
                 match index_mode {
                     IndexMode::Id => {
                         let (offset_map, value_vec) = measure_time!(convert_sorted_hash_vec_to_simplemap(fold_disco.hash_id_vec));
@@ -240,7 +282,7 @@ mod tests {
         let help = false;
         let id_type = "relpath";
         let env = AppArgs::Index {
-            pdb_dir: Some(pdb_dir.to_string()),
+            pdb_container: Some(pdb_dir.to_string()),
             hash_type: hash_type.to_string(),
             index_path: index_path.to_string(),
             mode: index_mode.to_string(),
@@ -256,5 +298,42 @@ mod tests {
             help,
         };
         build_index(env);
+    }
+    #[test]
+    fn test_build_index_of_foldcomp_db() {
+        #[cfg(feature = "foldcomp")]
+        {
+            let pdb_dir = "data/foldcomp/example_db";
+            let hash_type = "pdbtr";
+            let index_path = "data/example_db_folddisco_db";
+            let index_mode = "id";
+            let num_threads = 8;
+            let num_bin_dist = 16;
+            let num_bin_angle = 4;
+            let chunk_size = 65535;
+            let max_residue = 3000;
+            let grid_width = 40.0;
+            let recursive = true;
+            let verbose = true;
+            let help = false;
+            let id_type = "relpath";
+            let env = AppArgs::Index {
+                pdb_container: Some(pdb_dir.to_string()),
+                hash_type: hash_type.to_string(),
+                index_path: index_path.to_string(),
+                mode: index_mode.to_string(),
+                num_threads,
+                num_bin_dist,
+                num_bin_angle,
+                grid_width,
+                chunk_size,
+                max_residue,
+                recursive,
+                id_type: id_type.to_string(),
+                verbose,
+                help,
+            };
+            build_index(env);
+        }
     }
 }

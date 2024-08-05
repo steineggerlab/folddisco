@@ -34,7 +34,7 @@ use crate::controller::feature::get_geometric_hash_from_structure;
 use self::feature::get_geometric_hash_with_grid;
 
 #[cfg(feature = "foldcomp")]
-use crate::structure::io::fcz::{FoldcompDbReader, get_id_vector_subset_out_of_lookup};
+use crate::structure::io::fcz::{FoldcompDbReader, get_id_vector_subset_out_of_lookup, get_name_vector_subset_out_of_lookup};
 
 const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
@@ -187,9 +187,15 @@ impl FoldDisco {
             IndexMode::Id | IndexMode::Grid | IndexMode::Pos => 0,
             IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
         };
-        let foldcomp_db_reader = FoldcompDbReader::new(&foldcomp_db_path);
-        let numeric_id_vec = get_id_vector_subset_out_of_lookup(
+        let mut foldcomp_db_reader = FoldcompDbReader::new(&foldcomp_db_path);
+        let mut numeric_id_vec = get_id_vector_subset_out_of_lookup(
             &foldcomp_db_reader.lookup, &path_vec
+        );
+        // Sort path_vec and numeric_id_vec by numeric_id_vec
+        numeric_id_vec.sort_unstable();
+        foldcomp_db_reader.sort_lookup_by_id();
+        let path_vec = get_name_vector_subset_out_of_lookup(
+            &foldcomp_db_reader.lookup, &numeric_id_vec
         );
         
         FoldDisco {

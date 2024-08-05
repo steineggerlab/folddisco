@@ -21,6 +21,7 @@ pub fn save_lookup_to_file(
     if optional_float_vec.is_some() {
         assert_eq!(path_vec.len(), optional_float_vec.unwrap().len());
     }
+    
     // Save the vector of file names to a file
     let mut file = BufWriter::new(File::create(path).expect(&log_msg(FAIL, "Unable to create the lookup file")));
     for i in 0..path_vec.len() {

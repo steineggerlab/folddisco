@@ -8,8 +8,13 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write, Error};
 use memmap2::Mmap;
-use crate::prelude::{GeometricHash, HashType};
+use crate::prelude::{log_msg, GeometricHash, HashType, FAIL};
+use crate::structure::core::CompactStructure;
+use crate::PDBReader;
 use std::mem::size_of;
+
+#[cfg(feature="foldcomp")]
+use crate::structure::io::fcz::FoldcompDbReader;
 
 
 pub fn save_offset_map(
@@ -292,6 +297,46 @@ pub fn read_u32_vector(path: &str)-> Result<(Mmap, &'static [u32]), Error> {
         mmap.len() / size_of::<u32>())
     };
     Ok((mmap, vec))
+}
+
+pub fn read_compact_structure(path: &str) -> Result<(CompactStructure, bool), ()> {
+    #[cfg(not(feature="foldcomp"))]
+    let use_foldcomp = false;
+    #[cfg(feature="foldcomp")]
+    let use_foldcomp = if path.contains(':') { true } else { false };
+
+    
+    #[cfg(not(feature="foldcomp"))]
+    let compact_structure = {
+        let pdb_file = PDBReader::from_file(&path).expect(
+            &log_msg(FAIL, &format!("Failed to read PDB file: {}", &path))
+        );
+        pdb_file.read_structure().expect(
+            &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &path))
+        ).to_compact()
+    };
+    
+    #[cfg(feature="foldcomp")]
+    let compact_structure = if !use_foldcomp {
+        let pdb_file = PDBReader::from_file(&path).expect(
+            &log_msg(FAIL, &format!("Failed to read PDB file: {}", &path))
+        );
+        pdb_file.read_structure().expect(
+            &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &path))
+        ).to_compact()
+    } else {
+        let mut split = path.split(':');
+        let db_path = split.next().unwrap();
+        let id = split.next().unwrap();
+        let foldcomp_db_reader = FoldcompDbReader::new(db_path);
+        let structure_io_result = foldcomp_db_reader.read_single_structure(id);
+        if let Ok(structure) = structure_io_result {
+            structure.to_compact()
+        } else {
+            return Err(());
+        }
+    };
+    Ok((compact_structure, use_foldcomp))
 }
 
 #[cfg(test)]

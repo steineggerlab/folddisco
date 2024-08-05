@@ -3,11 +3,14 @@
 ## TODOs
 DEV
 - [ ] IMPORTANT: MAJOR: TODO: Foldcomp DB reader
-  - [ ] Current idea: having DB reader with rust & decompression with C++
+  - [x] Current idea: having DB reader with rust & decompression with C++
   - [x] DONE: Reading FCZ in Rust is working
   - [x] DONE: Checked Foldcomp DB is readable through Rust
   - [ ] TODO: Integrate with CLI - both indexing and querying
-  - [ ] TODO: Need to convert atom_t to compact structure
+    - [x] DONE: Indexing
+    - [ ] TODO: Querying
+  - [x] DONE: Need to convert atom_t to compact structure
+  - [ ] TODO: Add io type in configuration file
 - [x] TODOs for Foldcomp DB Reader
   - [x] Place at structure/io/
   - [x] Add local copy of foldcomp:minimal in lib + modification of CMakeLists.txt to support ffi build

@@ -16,6 +16,7 @@ use crate::controller::mode::{parse_path_vec_by_id_type, IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::write_usize_vector_in_bits;
 use crate::prelude::*;
+use crate::structure::io::StructureFileFormat;
 use memmap2::MmapMut;
 use peak_alloc::PeakAlloc;
 
@@ -75,6 +76,7 @@ pub fn build_index(env: AppArgs) {
             }
             let pdb_container_clone = pdb_container.clone();
             let pdb_container_name: &'static str = Box::leak(pdb_container.clone().unwrap().into_boxed_str());
+            let mut input_format: StructureFileFormat = StructureFileFormat::PDB;
             // Load PDB files
             let pdb_path_vec = if pdb_container.is_some() {
                 // TODO: IMPORTANT: Check if pdb_dir is a directory or db file
@@ -93,6 +95,7 @@ pub fn build_index(env: AppArgs) {
                         let lookup_vec = read_foldcomp_db_lookup(&pdb_container).expect(
                             &log_msg(FAIL, "Failed to read Foldcomp DB lookup")
                         );
+                        input_format = StructureFileFormat::FCZDB;
                         get_path_vector_out_of_lookup(&lookup_vec)
                     }
                 }
@@ -244,9 +247,15 @@ pub fn build_index(env: AppArgs) {
                 ));
                 let hash_type_path = format!("{}.type", index_path);
                 let chunk_size = pdb_path_vec.len();
+                #[cfg(not(feature = "foldcomp"))]
                 let index_config = IndexConfig::new(
                     hash_type, num_bin_dist, num_bin_angle, index_mode.clone(),
-                    grid_width, chunk_size, max_residue
+                    grid_width, chunk_size, max_residue, input_format.clone(), None
+                );
+                #[cfg(feature = "foldcomp")]
+                let index_config = IndexConfig::new(
+                    hash_type, num_bin_dist, num_bin_angle, index_mode.clone(),
+                    grid_width, chunk_size, max_residue, input_format.clone(), Some(pdb_container_name.to_string())
                 );
                 write_index_config_to_file(&hash_type_path, index_config);
                 if verbose { print_log_msg(DONE, &format!("Indexing done for chunk {} - {}", i, index_path)); }

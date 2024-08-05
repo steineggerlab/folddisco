@@ -109,6 +109,14 @@ impl FoldcompDbReader {
     pub fn get_paths(&self) -> Vec<String> {
         get_path_vector_out_of_lookup(&self.lookup)
     }
+    
+    pub fn sort_lookup_by_id(&mut self) {
+        self.lookup.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+    }
+    
+    pub fn sort_lookup_by_name(&mut self) {
+        self.lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
+    }
 }
 
 // Methods to convert atom_t to Atom
@@ -211,6 +219,20 @@ pub fn get_id_vector_subset_out_of_lookup(lookup: &Vec<(usize, String)>, subset_
             Err(_) => continue,
         };
         output.push(entry.0);
+    }
+    output
+}
+
+pub fn get_name_vector_subset_out_of_lookup(lookup: &Vec<(usize, String)>, subset_ids: &Vec<usize>) -> Vec<String> {
+    let mut output: Vec<String> = Vec::new();
+    // Order should be maintained
+    for id in subset_ids {
+        let entry_index = lookup.binary_search_by_key(id, |(id, _)| *id);
+        let entry: &(usize, String) = match entry_index {
+            Ok(index) => lookup.get(index).unwrap(),
+            Err(_) => continue,
+        };
+        output.push(entry.1.clone());
     }
     output
 }
@@ -335,6 +357,16 @@ mod tests {
             structure.to_compact()
         }).collect::<Vec<_>>(); 
         for compact_structure in compact_structure_vector {
+            println!("Compact Structure: {:?}", compact_structure);
+        }
+        
+        let path_vector_subset = vec![path_vector[0].clone(), path_vector[1].clone()];
+        let id_vector_subset = get_id_vector_subset_out_of_lookup(&reader.lookup, &path_vector_subset);
+        let compact_structure_vector_subset = id_vector_subset.par_iter().map(|id| {
+            let structure = reader.read_single_structure_by_id(*id).unwrap();
+            structure.to_compact()
+        }).collect::<Vec<_>>();
+        for compact_structure in compact_structure_vector_subset {
             println!("Compact Structure: {:?}", compact_structure);
         }
     }

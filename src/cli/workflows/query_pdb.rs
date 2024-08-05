@@ -17,13 +17,20 @@ use crate::cli::config::{read_index_config_from_file, IndexConfig};
 use crate::controller::map::SimpleHashMap;
 use crate::controller::mode::IndexMode;
 use crate::cli::*;
-use crate::controller::io::{read_u16_vector, read_u8_vector};
+use crate::controller::io::{read_compact_structure, read_u16_vector, read_u8_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
 use crate::controller::rank::{count_query_bigmode, count_query_gridmode, count_query_idmode, QueryResult};
 use crate::controller::retrieve::retrieval_wrapper;
 use crate::index::indextable::load_big_index;
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
+
+#[cfg(feature = "foldcomp")]
+use crate::controller::retrieve::retrieval_wrapper_for_foldcompdb;
+#[cfg(feature = "foldcomp")]
+use crate::structure::io::fcz::FoldcompDbReader;
+#[cfg(feature = "foldcomp")]
+use crate::structure::io::StructureFileFormat;
 
 pub const HELP_QUERY: &str = "\
 USAGE: folddisco query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
@@ -145,14 +152,30 @@ pub fn query_pdb(env: AppArgs) {
                 (offset_table, offset_mmap, lookup, config, value_path)
             }).collect::<Vec<(SimpleHashMap, Mmap, (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>), IndexConfig, String)>>();
 
+            // Load foldcomp db 
+            #[cfg(feature = "foldcomp")]
+            let config = &loaded_index_vec[0].3;
+            #[cfg(feature = "foldcomp")]
+            let using_foldcomp = config.foldcomp_db.is_some() && config.input_format == StructureFileFormat::FCZDB;
+
+            #[cfg(feature = "foldcomp")]
+            let foldcomp_db_reader = match config.input_format {
+                StructureFileFormat::FCZDB => {
+                    let foldcomp_db_path = config.foldcomp_db.clone().unwrap();
+                    FoldcompDbReader::new(foldcomp_db_path.as_str())
+                },
+                _ => FoldcompDbReader::empty(),
+            };
+
+            #[cfg(not(feature = "foldcomp"))]
+            let using_foldcomp = false;
+
             // Iterate over queries
             queries.into_par_iter().for_each(|(pdb_path, query_string, output_path)| {
-                let pdb_file = PDBReader::from_file(&pdb_path).expect(
-                    &log_msg(FAIL, &format!("Failed to read PDB file: {}", &pdb_path))
+                let (query_structure, _) = read_compact_structure(&pdb_path).expect(
+                    &log_msg(FAIL, &format!("Failed to read structure: {}", &pdb_path))
                 );
-                let query_structure = pdb_file.read_structure().expect(
-                    &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &pdb_path))
-                ).to_compact();
+                
                 let (query_residues, aa_substitutions) = parse_query_string(&query_string, query_structure.chains[0]);
                 
                 let _residue_count = if query_residues.is_empty() {
@@ -167,7 +190,7 @@ pub fn query_pdb(env: AppArgs) {
                     query_residues.sort();
                     res_chain_to_string(&query_residues)
                 };
-                drop(pdb_file);
+
                 // Get query map for each query in all indices
                 let mut queried_from_indices: Vec<(usize, QueryResult)> = loaded_index_vec.par_iter().map(
                     |(offset_table, _offset_mmap, lookup, config, value_path)| {
@@ -218,12 +241,29 @@ pub fn query_pdb(env: AppArgs) {
                                 // IF retrieve is true, retrieve matching residues
                                 if retrieve {
                                     measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                        #[cfg(not(feature = "foldcomp"))]
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
                                             &aa_dist_map
                                         );
+                                        #[cfg(feature = "foldcomp")]
+                                        let retrieval_result = if using_foldcomp {
+                                            retrieval_wrapper_for_foldcompdb(
+                                                v.nid, node_count, &pdb_query,
+                                                hash_type, num_bin_dist, num_bin_angle,
+                                                &pdb_query_map, &query_structure, &query_indices,
+                                                &aa_dist_map, &foldcomp_db_reader
+                                            )
+                                        } else {
+                                            retrieval_wrapper(
+                                                &v.id, node_count, &pdb_query,
+                                                hash_type, num_bin_dist, num_bin_angle,
+                                                &pdb_query_map, &query_structure, &query_indices,
+                                                &aa_dist_map
+                                            )
+                                        };
                                         v.matching_residues = retrieval_result.0;
                                         v.matching_residues_processed = retrieval_result.1;
                                     }));
@@ -265,12 +305,29 @@ pub fn query_pdb(env: AppArgs) {
                                 // IF retrieve is true, retrieve matching residues
                                 if retrieve {
                                     measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                        #[cfg(not(feature = "foldcomp"))]
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
                                             &aa_dist_map
                                         );
+                                        #[cfg(feature = "foldcomp")]
+                                        let retrieval_result = if using_foldcomp {
+                                            retrieval_wrapper_for_foldcompdb(
+                                                v.nid, node_count, &pdb_query,
+                                                hash_type, num_bin_dist, num_bin_angle,
+                                                &pdb_query_map, &query_structure, &query_indices,
+                                                &aa_dist_map, &foldcomp_db_reader
+                                            )
+                                        } else {
+                                            retrieval_wrapper(
+                                                &v.id, node_count, &pdb_query,
+                                                hash_type, num_bin_dist, num_bin_angle,
+                                                &pdb_query_map, &query_structure, &query_indices,
+                                                &aa_dist_map
+                                            )
+                                        };
                                         v.matching_residues = retrieval_result.0;
                                         v.matching_residues_processed = retrieval_result.1;
                                     }));
@@ -321,12 +378,29 @@ pub fn query_pdb(env: AppArgs) {
                                 // IF retrieve is true, retrieve matching residues
                                 if retrieve {
                                     measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                        #[cfg(not(feature = "foldcomp"))]
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
                                             hash_type, num_bin_dist, num_bin_angle,
                                             &pdb_query_map, &query_structure, &query_indices,
                                             &aa_dist_map
                                         );
+                                        #[cfg(feature = "foldcomp")]
+                                        let retrieval_result = if using_foldcomp {
+                                            retrieval_wrapper_for_foldcompdb(
+                                                v.nid, node_count, &pdb_query,
+                                                hash_type, num_bin_dist, num_bin_angle,
+                                                &pdb_query_map, &query_structure, &query_indices,
+                                                &aa_dist_map, &foldcomp_db_reader
+                                            )
+                                        } else {
+                                            retrieval_wrapper(
+                                                &v.id, node_count, &pdb_query,
+                                                hash_type, num_bin_dist, num_bin_angle,
+                                                &pdb_query_map, &query_structure, &query_indices,
+                                                &aa_dist_map
+                                            )
+                                        };
                                         v.matching_residues = retrieval_result.0;
                                         v.matching_residues_processed = retrieval_result.1;
                                     }));
@@ -500,6 +574,46 @@ mod tests {
             help,
         };
         query_pdb(env);
+    }
+    #[test]
+    fn test_query_with_foldcompdb() {
+        #[cfg(feature = "foldcomp")] {
+            let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
+            let query_string = String::from("B57,B102,C195");
+            let threads = 1;
+            let index_path = Some(String::from("data/example_db_folddisco_db"));
+            // let index_path = Some(String::from("analysis/e_coli/test_index"));
+            let retrieve = true;
+            let dist_threshold = Some(String::from("0.5,1.0"));
+            let angle_threshold = Some(String::from("5.0,10.0"));
+            let help = false;
+            let match_cutoff = Some(String::from("0.0"));
+            let score_cutoff = 0.0;
+            let num_res_cutoff = 3000;
+            let plddt_cutoff = 0.0;
+            let node_count = 2;
+            let header = false;
+            let verbose = false;
+            let env = AppArgs::Query {
+                pdb_path,
+                query_string,
+                threads,
+                index_path,
+                retrieve,
+                amino_acid: 0,
+                dist_threshold,
+                angle_threshold,
+                match_cutoff,
+                score_cutoff,
+                num_res_cutoff,
+                plddt_cutoff,
+                node_count,
+                header,
+                verbose,
+                help,
+            };
+            query_pdb(env);
+        }
     }
     #[test]
     #[ignore]

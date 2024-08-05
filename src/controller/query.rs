@@ -12,6 +12,7 @@ use crate::structure::core::CompactStructure;
 use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
 use super::feature::{self, get_single_feature};
+use super::io::read_compact_structure;
 
 // Query is expected to be given as a path, and a list of tuples of chain and residue index
 pub fn make_query(
@@ -152,9 +153,7 @@ pub fn make_query_map(
     amino_acid_substitutions: &Vec<Option<Vec<u8>>>,
 ) -> (HashMap<GeometricHash, ((usize, usize), bool)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
 
-    let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
-    let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
-    let compact = compact.to_compact();
+    let (compact, _) = read_compact_structure(path).expect("Failed to read compact structure");
     
     let mut hash_collection = HashMap::new();
     let mut observed_distance_map: HashMap<(u8, u8), Vec<(f32, usize)>> = HashMap::new();

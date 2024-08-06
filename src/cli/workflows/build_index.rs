@@ -205,8 +205,6 @@ pub fn build_index(env: AppArgs) {
                     &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
                     // "Hash sorted"
                 ); }
-                // Don't fill numeric id if foldcomp is enabled
-                #[cfg(not(feature = "foldcomp"))]
                 fold_disco.fill_numeric_id_vec();
 
                 match index_mode {

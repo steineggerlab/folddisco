@@ -142,14 +142,9 @@ impl FoldDisco {
             IndexMode::Id | IndexMode::Grid | IndexMode::Pos => 0,
             IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
         };
-        #[cfg(feature = "foldcomp")]
-        let numeric_id_vec = numeric_id_vec_from_string_vec(&path_vec);
         FoldDisco {
             path_vec: path_vec,
-            #[cfg(not(feature = "foldcomp"))]
             numeric_id_vec: Vec::with_capacity(length),
-            #[cfg(feature = "foldcomp")]
-            numeric_id_vec: numeric_id_vec,
             nres_vec: Vec::with_capacity(length),
             plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),
@@ -188,19 +183,10 @@ impl FoldDisco {
             IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
         };
         let mut foldcomp_db_reader = FoldcompDbReader::new(&foldcomp_db_path);
-        let mut numeric_id_vec = get_id_vector_subset_out_of_lookup(
-            &foldcomp_db_reader.lookup, &path_vec
-        );
-        // Sort path_vec and numeric_id_vec by numeric_id_vec
-        numeric_id_vec.sort_unstable();
-        foldcomp_db_reader.sort_lookup_by_id();
-        let path_vec = get_name_vector_subset_out_of_lookup(
-            &foldcomp_db_reader.lookup, &numeric_id_vec
-        );
         
         FoldDisco {
             path_vec: path_vec,
-            numeric_id_vec: numeric_id_vec,
+            numeric_id_vec: Vec::with_capacity(length),
             nres_vec: Vec::with_capacity(length),
             plddt_vec: Vec::with_capacity(length),
             hash_collection: Vec::new(),

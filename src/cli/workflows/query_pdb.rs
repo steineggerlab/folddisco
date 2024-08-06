@@ -544,7 +544,7 @@ mod tests {
         let threads = 1;
         let index_path = Some(String::from("data/serine_peptidases_pdbtr_small"));
         // let index_path = Some(String::from("analysis/e_coli/test_index"));
-        let retrieve = true;
+        let retrieve = false;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;
@@ -554,7 +554,7 @@ mod tests {
         let plddt_cutoff = 0.0;
         let node_count = 2;
         let header = false;
-        let verbose = false;
+        let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
             query_string,

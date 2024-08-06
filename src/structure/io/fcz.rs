@@ -42,7 +42,6 @@ impl FoldcompDbReader {
         let index = read_foldcomp_db_index(path).expect("Error reading foldcomp db index file.");
         let path_string_to_return = path.to_string();
         
-        // Sort lookup by name
         let mut lookup = lookup;
         lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
         
@@ -171,8 +170,6 @@ pub fn read_foldcomp_db_lookup(db_path: &str) -> Result<Vec<(usize, String)>, &'
         let name = split.next().unwrap().to_string();
         output.push((id, name));
     }
-    // Sort by name to use binary search afterwards
-    output.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
     
     // Return
     Ok(output)

@@ -41,6 +41,11 @@ impl FoldcompDbReader {
         let lookup = read_foldcomp_db_lookup(path).expect("Error reading foldcomp db lookup file.");
         let index = read_foldcomp_db_index(path).expect("Error reading foldcomp db index file.");
         let path_string_to_return = path.to_string();
+        
+        // Sort lookup by name
+        let mut lookup = lookup;
+        lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        
         FoldcompDbReader {
             path: path_string_to_return,
             input_type: StructureFileFormat::FCZDB,

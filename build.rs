@@ -1,6 +1,6 @@
 
-#[cfg(feature = "foldcomp")] 
-extern crate bindgen;
+// #[cfg(feature = "foldcomp")] 
+// extern crate bindgen;
 #[cfg(feature = "foldcomp")] 
 extern crate cmake;
 
@@ -38,15 +38,16 @@ fn main() {
         }
     }
 
-    let bindings = bindgen::Builder::default()
-        .header("lib/foldcomp/foldcompffi.h")
-        .generate()
-        .expect("Unable to generate bindings");
+    // Generate bindings. If regeneration is needed, uncomment the following code
+    // let bindings = bindgen::Builder::default()
+    //     .header("lib/foldcomp/foldcompffi.h")
+    //     .generate()
+    //     .expect("Unable to generate bindings");
 
-    let out_path = PathBuf::from("lib/foldcomp");
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
+    // let out_path = PathBuf::from("lib/foldcomp");
+    // bindings
+    //     .write_to_file(out_path.join("bindings.rs"))
+    //     .expect("Couldn't write bindings!");
 
     }
 }

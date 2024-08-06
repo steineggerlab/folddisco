@@ -67,7 +67,7 @@ impl FoldcompDbReader {
         }
     }
 
-    pub fn read_single_structure(&self, name: &str) -> Result<Structure, &str> {
+    pub fn read_single_structure(&self, name: &str) -> Result<Structure, String> {
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
         let entry = get_foldcomp_db_entry_by_name(&self.db, &self.lookup, &self.index, name);
@@ -85,11 +85,11 @@ impl FoldcompDbReader {
                 foldcomp_free(output_ptr);
                 Ok(structure)
             }
-            None => Err(format!("Entry with name {} not found.", name).as_str()),
+            None => Err(format!("Entry with name {} not found.", name)),
         }
     }
     
-    pub fn read_single_structure_by_id(&self, id: usize) -> Result<Structure, &str> {
+    pub fn read_single_structure_by_id(&self, id: usize) -> Result<Structure, String> {
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
         let entry = get_foldcomp_db_entry_by_id(&self.db, &self.index, id);
@@ -107,7 +107,7 @@ impl FoldcompDbReader {
                 foldcomp_free(output_ptr);
                 Ok(structure)
             }
-            None => Err(format!("Entry with ID {} not found.", id).as_str()),
+            None => Err(format!("Entry with ID {} not found.", id)),
         }
     }
     

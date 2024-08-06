@@ -260,6 +260,7 @@ pub fn get_foldcomp_db_entry<'a>(db: &'a ManuallyDrop<Vec<u8>>, index: &(usize, 
 }
 
 pub fn get_foldcomp_db_entry_by_id<'a>(db: &'a ManuallyDrop<Vec<u8>>, index_vector: &Vec<(usize, usize, usize)>, id: usize) -> Option<&'a [u8]> {
+    println!("ID: {}", id); // TODO: DEBUG, REMOVE
     let entry_index = index_vector.binary_search_by_key(&id, |&(id, _, _)| id);
     let entry: &(usize, usize, usize) = match entry_index {
         Ok(index) => index_vector.get(index).unwrap(),
@@ -271,6 +272,7 @@ pub fn get_foldcomp_db_entry_by_id<'a>(db: &'a ManuallyDrop<Vec<u8>>, index_vect
 pub fn get_foldcomp_db_entry_by_name<'a>(
     db: &'a ManuallyDrop<Vec<u8>>, lookup: &Vec<(usize, String)>, index: &Vec<(usize, usize, usize)>, name: &str
 ) -> Option<&'a [u8]> {
+    println!("Name: {}", name); // TODO: DEBUG, REMOVE
     let entry_index = lookup.binary_search_by_key(&name, |(_, name)| name);
     let entry: &(usize, String) = match entry_index {
         Ok(index) => lookup.get(index).unwrap(),

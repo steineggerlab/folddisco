@@ -112,7 +112,7 @@ impl FoldcompDbReader {
     }
     
     pub fn get_paths(&self) -> Vec<String> {
-        get_path_vector_out_of_lookup(&self.lookup)
+        get_path_vector_out_of_lookup_and_index(&self.lookup, &self.index)
     }
     
     pub fn sort_lookup_by_id(&mut self) {
@@ -198,10 +198,15 @@ pub fn read_foldcomp_db_index(db_path: &str) -> Result<Vec<(usize, usize, usize)
     Ok(output)
 }
 
-pub fn get_path_vector_out_of_lookup(lookup: &Vec<(usize, String)>) -> Vec<String> {
+pub fn get_path_vector_out_of_lookup_and_index(lookup: &Vec<(usize, String)>, index: &Vec<(usize, usize, usize)>) -> Vec<String> {
     let mut output: Vec<String> = Vec::new();
-    for (_, name) in lookup {
-        output.push(name.clone());
+    for (id, _, _) in index {
+        let entry_index = lookup.binary_search_by_key(id, |(id, _)| *id);
+        let entry: &(usize, String) = match entry_index {
+            Ok(index) => lookup.get(index).unwrap(),
+            Err(_) => continue,
+        };
+        output.push(entry.1.clone());
     }
     output
 }
@@ -260,7 +265,6 @@ pub fn get_foldcomp_db_entry<'a>(db: &'a ManuallyDrop<Vec<u8>>, index: &(usize, 
 }
 
 pub fn get_foldcomp_db_entry_by_id<'a>(db: &'a ManuallyDrop<Vec<u8>>, index_vector: &Vec<(usize, usize, usize)>, id: usize) -> Option<&'a [u8]> {
-    println!("ID: {}", id); // TODO: DEBUG, REMOVE
     let entry_index = index_vector.binary_search_by_key(&id, |&(id, _, _)| id);
     let entry: &(usize, usize, usize) = match entry_index {
         Ok(index) => index_vector.get(index).unwrap(),
@@ -272,7 +276,6 @@ pub fn get_foldcomp_db_entry_by_id<'a>(db: &'a ManuallyDrop<Vec<u8>>, index_vect
 pub fn get_foldcomp_db_entry_by_name<'a>(
     db: &'a ManuallyDrop<Vec<u8>>, lookup: &Vec<(usize, String)>, index: &Vec<(usize, usize, usize)>, name: &str
 ) -> Option<&'a [u8]> {
-    println!("Name: {}", name); // TODO: DEBUG, REMOVE
     let entry_index = lookup.binary_search_by_key(&name, |(_, name)| name);
     let entry: &(usize, String) = match entry_index {
         Ok(index) => lookup.get(index).unwrap(),
@@ -309,7 +312,7 @@ mod tests {
             let (db_mmap, db) = read_foldcomp_db(db_path).unwrap();
             let lookup = read_foldcomp_db_lookup(db_path).unwrap();
             let index = read_foldcomp_db_index(db_path).unwrap();
-            let path_vector = get_path_vector_out_of_lookup(&lookup);
+            let path_vector = get_path_vector_out_of_lookup_and_index(&lookup, &index);
             
             // Test single entry
             let path1 = &path_vector[0];
@@ -352,7 +355,7 @@ mod tests {
     fn test_foldcomp_db_reader() {
         let db_path = "data/foldcomp/example_db";
         let reader = FoldcompDbReader::new(db_path);
-        let path_vector = get_path_vector_out_of_lookup(&reader.lookup);
+        let path_vector = reader.get_paths();
         let path1 = &path_vector[0];
         let structure = reader.read_single_structure(path1).unwrap();
         let compact = structure.to_compact();

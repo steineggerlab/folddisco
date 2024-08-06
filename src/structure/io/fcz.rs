@@ -85,7 +85,7 @@ impl FoldcompDbReader {
                 foldcomp_free(output_ptr);
                 Ok(structure)
             }
-            None => Err("Entry not found."),
+            None => Err(format!("Entry with name {} not found.", name).as_str()),
         }
     }
     
@@ -107,7 +107,7 @@ impl FoldcompDbReader {
                 foldcomp_free(output_ptr);
                 Ok(structure)
             }
-            None => Err("Entry not found."),
+            None => Err(format!("Entry with ID {} not found.", id).as_str()),
         }
     }
     

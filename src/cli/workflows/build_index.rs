@@ -91,12 +91,14 @@ pub fn build_index(env: AppArgs) {
                     if is_dir {
                         load_path(&pdb_container, recursive)
                     } else {
-                        let lookup_path = PathBuf::from(format!("{}.lookup", pdb_container));
                         let lookup_vec = read_foldcomp_db_lookup(&pdb_container).expect(
                             &log_msg(FAIL, "Failed to read Foldcomp DB lookup")
                         );
+                        let index_vec = read_foldcomp_db_index(&pdb_container).expect(
+                            &log_msg(FAIL, "Failed to read Foldcomp DB index")
+                        );
                         input_format = StructureFileFormat::FCZDB;
-                        get_path_vector_out_of_lookup(&lookup_vec)
+                        get_path_vector_out_of_lookup_and_index(&lookup_vec, &index_vec)
                     }
                 }
             } else {
@@ -205,8 +207,6 @@ pub fn build_index(env: AppArgs) {
                     &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
                     // "Hash sorted"
                 ); }
-                // Don't fill numeric id if foldcomp is enabled
-                #[cfg(not(feature = "foldcomp"))]
                 fold_disco.fill_numeric_id_vec();
 
                 match index_mode {

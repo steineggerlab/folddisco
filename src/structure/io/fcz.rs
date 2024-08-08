@@ -41,6 +41,10 @@ impl FoldcompDbReader {
         let lookup = read_foldcomp_db_lookup(path).expect("Error reading foldcomp db lookup file.");
         let index = read_foldcomp_db_index(path).expect("Error reading foldcomp db index file.");
         let path_string_to_return = path.to_string();
+        
+        let mut lookup = lookup;
+        lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        
         FoldcompDbReader {
             path: path_string_to_return,
             input_type: StructureFileFormat::FCZDB,
@@ -62,7 +66,7 @@ impl FoldcompDbReader {
         }
     }
 
-    pub fn read_single_structure(&self, name: &str) -> Result<Structure, &str> {
+    pub fn read_single_structure(&self, name: &str) -> Result<Structure, String> {
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
         let entry = get_foldcomp_db_entry_by_name(&self.db, &self.lookup, &self.index, name);
@@ -80,11 +84,11 @@ impl FoldcompDbReader {
                 foldcomp_free(output_ptr);
                 Ok(structure)
             }
-            None => Err("Entry not found."),
+            None => Err(format!("Entry with name {} not found.", name)),
         }
     }
     
-    pub fn read_single_structure_by_id(&self, id: usize) -> Result<Structure, &str> {
+    pub fn read_single_structure_by_id(&self, id: usize) -> Result<Structure, String> {
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
         let entry = get_foldcomp_db_entry_by_id(&self.db, &self.index, id);
@@ -102,12 +106,12 @@ impl FoldcompDbReader {
                 foldcomp_free(output_ptr);
                 Ok(structure)
             }
-            None => Err("Entry not found."),
+            None => Err(format!("Entry with ID {} not found.", id)),
         }
     }
     
     pub fn get_paths(&self) -> Vec<String> {
-        get_path_vector_out_of_lookup(&self.lookup)
+        get_path_vector_out_of_lookup_and_index(&self.lookup, &self.index)
     }
     
     pub fn sort_lookup_by_id(&mut self) {
@@ -166,8 +170,6 @@ pub fn read_foldcomp_db_lookup(db_path: &str) -> Result<Vec<(usize, String)>, &'
         let name = split.next().unwrap().to_string();
         output.push((id, name));
     }
-    // Sort by name to use binary search afterwards
-    output.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
     
     // Return
     Ok(output)
@@ -193,10 +195,15 @@ pub fn read_foldcomp_db_index(db_path: &str) -> Result<Vec<(usize, usize, usize)
     Ok(output)
 }
 
-pub fn get_path_vector_out_of_lookup(lookup: &Vec<(usize, String)>) -> Vec<String> {
+pub fn get_path_vector_out_of_lookup_and_index(lookup: &Vec<(usize, String)>, index: &Vec<(usize, usize, usize)>) -> Vec<String> {
     let mut output: Vec<String> = Vec::new();
-    for (_, name) in lookup {
-        output.push(name.clone());
+    for (id, _, _) in index {
+        let entry_index = lookup.binary_search_by_key(id, |(id, _)| *id);
+        let entry: &(usize, String) = match entry_index {
+            Ok(index) => lookup.get(index).unwrap(),
+            Err(_) => continue,
+        };
+        output.push(entry.1.clone());
     }
     output
 }
@@ -302,7 +309,7 @@ mod tests {
             let (db_mmap, db) = read_foldcomp_db(db_path).unwrap();
             let lookup = read_foldcomp_db_lookup(db_path).unwrap();
             let index = read_foldcomp_db_index(db_path).unwrap();
-            let path_vector = get_path_vector_out_of_lookup(&lookup);
+            let path_vector = get_path_vector_out_of_lookup_and_index(&lookup, &index);
             
             // Test single entry
             let path1 = &path_vector[0];
@@ -345,7 +352,7 @@ mod tests {
     fn test_foldcomp_db_reader() {
         let db_path = "data/foldcomp/example_db";
         let reader = FoldcompDbReader::new(db_path);
-        let path_vector = get_path_vector_out_of_lookup(&reader.lookup);
+        let path_vector = reader.get_paths();
         let path1 = &path_vector[0];
         let structure = reader.read_single_structure(path1).unwrap();
         let compact = structure.to_compact();

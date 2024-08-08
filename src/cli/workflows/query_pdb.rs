@@ -251,7 +251,7 @@ pub fn query_pdb(env: AppArgs) {
                                         #[cfg(feature = "foldcomp")]
                                         let retrieval_result = if using_foldcomp {
                                             retrieval_wrapper_for_foldcompdb(
-                                                v.nid, node_count, &pdb_query,
+                                                &v.id, node_count, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, &foldcomp_db_reader
@@ -315,7 +315,7 @@ pub fn query_pdb(env: AppArgs) {
                                         #[cfg(feature = "foldcomp")]
                                         let retrieval_result = if using_foldcomp {
                                             retrieval_wrapper_for_foldcompdb(
-                                                v.nid, node_count, &pdb_query,
+                                                &v.id, node_count, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, &foldcomp_db_reader
@@ -388,7 +388,7 @@ pub fn query_pdb(env: AppArgs) {
                                         #[cfg(feature = "foldcomp")]
                                         let retrieval_result = if using_foldcomp {
                                             retrieval_wrapper_for_foldcompdb(
-                                                v.nid, node_count, &pdb_query,
+                                                &v.id, node_count, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, &foldcomp_db_reader

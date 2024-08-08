@@ -18,6 +18,7 @@ DEV
   - [x] Make Foldcomp DB reader as an optional feature; Build dependencies should be optional as well
 - [ ] TODO: Handle architecture specific build for Foldcomp DB reader
 - [ ] TODO: Edit github action to test foldcomp features in the CI
+- [ ] TODO: IMPORTANT: handle cases where lookup is not start from 0 to N. 
 
 QUERYING
 - [ ] ISSUE: WARNING: slows down when there are too many combinations of amino acid pairs

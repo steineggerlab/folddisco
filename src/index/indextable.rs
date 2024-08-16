@@ -4,10 +4,9 @@ use std::cell::UnsafeCell;
 use std::io::Write;
 use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
 use memmap2::{Mmap, MmapMut};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+// use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
 
 pub struct FolddiscoIndex {
@@ -23,7 +22,7 @@ unsafe impl Sync for FolddiscoIndex {}
 
 impl FolddiscoIndex {
     pub fn new(total_hashes: usize, path: String) -> Self {
-        let mut offsets = vec![0usize; total_hashes + 1];
+        let offsets = vec![0usize; total_hashes + 1];
         let last_id = vec![usize::MAX; total_hashes];
         let entries = MmapMut::map_anon(1024).unwrap();
 
@@ -318,7 +317,7 @@ mod tests {
     #[test]
     fn test_folddisco_index() {
         let total_hashes = 10;
-        let mut index = FolddiscoIndex::new(total_hashes, "test.index".to_string());
+        let index = FolddiscoIndex::new(total_hashes, "test.index".to_string());
 
         let hashes1: Vec<u32> = (0u32..7).collect();
         let id1 = 1usize;

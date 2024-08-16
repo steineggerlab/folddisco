@@ -2,13 +2,14 @@
 // TODO: 
 // Us
 // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+#![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 include!("../../../lib/foldcomp/bindings.rs");
 
 use libc;
 use memmap2::{Mmap, MmapMut};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
-use std::{fs::File, io::{BufRead, Read}};
+use std::fs::File;
+use std::io::BufRead;
 use std::mem::ManuallyDrop;
 
 use crate::structure::atom::Atom;
@@ -157,7 +158,7 @@ pub unsafe fn atom_t_slice_to_structure(slice: &[atom_t]) -> Structure {
 pub fn read_foldcomp_db_lookup(db_path: &str) -> Result<Vec<(usize, String)>, &'static str> {
     // Check if the file exists
     let lookup_path = format!("{}.lookup", db_path);
-    let mut lookup_file = match File::open(&lookup_path) {
+    let lookup_file = match File::open(&lookup_path) {
         Ok(file) => file,
         Err(_) => return Err("Lookup file not found."),
     };
@@ -246,7 +247,7 @@ pub fn get_name_vector_subset_out_of_lookup(lookup: &Vec<(usize, String)>, subse
 
 pub fn read_foldcomp_db(db_path: &str) -> Result<(Mmap, ManuallyDrop<Vec<u8>>), &'static str> {
     // Check if the file exists
-    let mut db_file = match File::open(&db_path) {
+    let db_file = match File::open(&db_path) {
         Ok(file) => file,
         Err(_) => return Err("DB file not found."),
     };
@@ -284,6 +285,9 @@ pub fn get_foldcomp_db_entry_by_name<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rayon::iter::IntoParallelRefIterator;
+    use std::io::Read;
+    use rayon::iter::ParallelIterator;
     #[test]
     fn test_foldcomp() {
         unsafe {
@@ -306,7 +310,7 @@ mod tests {
         unsafe {
             let db_path = "data/foldcomp/example_db";
             // let db_path = "data/s_cerevisiae";
-            let (db_mmap, db) = read_foldcomp_db(db_path).unwrap();
+            let (_db_mmap, db) = read_foldcomp_db(db_path).unwrap();
             let lookup = read_foldcomp_db_lookup(db_path).unwrap();
             let index = read_foldcomp_db_index(db_path).unwrap();
             let path_vector = get_path_vector_out_of_lookup_and_index(&lookup, &index);

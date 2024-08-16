@@ -4,8 +4,9 @@
 #[cfg(feature = "foldcomp")] 
 extern crate cmake;
 
-use std::env;
-use std::path::PathBuf;
+// commented out together with bindgen
+//use std::env;
+//use std::path::PathBuf;
 
 fn main() {
     #[cfg(feature = "foldcomp")] 

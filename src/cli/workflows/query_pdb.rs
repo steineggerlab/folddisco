@@ -167,8 +167,8 @@ pub fn query_pdb(env: AppArgs) {
                 _ => FoldcompDbReader::empty(),
             };
 
-            #[cfg(not(feature = "foldcomp"))]
-            let using_foldcomp = false;
+            // #[cfg(not(feature = "foldcomp"))]
+            // let using_foldcomp = false;
 
             // Iterate over queries
             queries.into_par_iter().for_each(|(pdb_path, query_string, output_path)| {
@@ -579,8 +579,8 @@ mod tests {
     #[ignore]
     fn test_query_with_foldcompdb() {
         #[cfg(feature = "foldcomp")] {
-            let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
-            let query_string = String::from("B57,B102,C195");
+            let pdb_path = String::from("data/foldcomp/example_db:d1asha_");
+            let query_string = String::from("1,2,3,4");
             let threads = 1;
             let index_path = Some(String::from("data/example_db_folddisco_db"));
             // let index_path = Some(String::from("analysis/e_coli/test_index"));

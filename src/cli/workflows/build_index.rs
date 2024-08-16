@@ -17,7 +17,6 @@ use crate::cli::*;
 use crate::controller::io::write_usize_vector_in_bits;
 use crate::prelude::*;
 use crate::structure::io::StructureFileFormat;
-use memmap2::MmapMut;
 use peak_alloc::PeakAlloc;
 
 #[cfg(feature= "foldcomp")]
@@ -75,7 +74,9 @@ pub fn build_index(env: AppArgs) {
                 std::process::exit(0);
             }
             let pdb_container_clone = pdb_container.clone();
+            #[cfg(feature = "foldcomp")]
             let pdb_container_name: &'static str = Box::leak(pdb_container.clone().unwrap().into_boxed_str());
+            #[allow(unused_mut)]
             let mut input_format: StructureFileFormat = StructureFileFormat::PDB;
             // Load PDB files
             let pdb_path_vec = if pdb_container.is_some() {

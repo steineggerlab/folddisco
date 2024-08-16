@@ -16,7 +16,7 @@ DEV
   - [x] Add local copy of foldcomp:minimal in lib + modification of CMakeLists.txt to support ffi build
   - [x] Parallel reading of the DB (rayon-based reader on Foldcomp DB, load lookup & index once)
   - [x] Make Foldcomp DB reader as an optional feature; Build dependencies should be optional as well
-- [ ] TODO: Handle architecture specific build for Foldcomp DB reader
+- [x] DONE: Handle architecture specific build for Foldcomp DB reader; <- bindgen is only needed once
 - [ ] TODO: Edit github action to test foldcomp features in the CI
 - [ ] TODO: IMPORTANT: handle cases where lookup is not start from 0 to N. 
 

@@ -73,7 +73,6 @@ pub fn connected_components_with_given_node_count(
 mod tests {
     use petgraph::Undirected;
     use crate::measure_time;
-    use crate::prelude::*;
     use super::*;
 
     #[test]

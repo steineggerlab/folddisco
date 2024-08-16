@@ -6,12 +6,11 @@
 use std::collections::HashMap;
 
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::utils::convert::{is_aa_group_char, map_aa_to_u8, map_one_letter_to_u8_vec, map_u8_to_aa};
+use crate::utils::convert::{is_aa_group_char, map_one_letter_to_u8_vec};
 use crate::prelude::{print_log_msg, PDBReader, INFO};
-use crate::structure::core::CompactStructure;
 use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
-use super::feature::{self, get_single_feature};
+use super::feature::get_single_feature;
 use super::io::read_compact_structure;
 
 // Query is expected to be given as a path, and a list of tuples of chain and residue index

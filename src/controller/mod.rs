@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 use feature::get_geometric_hash_as_u32_from_structure;
 use mode::IndexMode;
 // External imports
-use rayon::{current_thread_index, prelude::*};
+use rayon::prelude::*;
 
 use crate::index::indextable::FolddiscoIndex;
 // Internal imports
@@ -34,7 +34,7 @@ use crate::controller::feature::get_geometric_hash_from_structure;
 use self::feature::get_geometric_hash_with_grid;
 
 #[cfg(feature = "foldcomp")]
-use crate::structure::io::fcz::{FoldcompDbReader, get_id_vector_subset_out_of_lookup, get_name_vector_subset_out_of_lookup};
+use crate::structure::io::fcz::FoldcompDbReader;
 
 const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
@@ -182,7 +182,7 @@ impl FoldDisco {
             IndexMode::Id | IndexMode::Grid | IndexMode::Pos => 0,
             IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
         };
-        let mut foldcomp_db_reader = FoldcompDbReader::new(&foldcomp_db_path);
+        let foldcomp_db_reader = FoldcompDbReader::new(&foldcomp_db_path);
         
         FoldDisco {
             path_vec: path_vec,
@@ -615,7 +615,7 @@ impl FoldDisco {
             pool.install(|| {
                 (0..self.num_threads).into_par_iter().for_each(| tid | {
                     // Thread only saves hashes with same modulos
-                    &collected.iter().for_each(|(hash, pdb_pos)| {
+                    let _ = &collected.iter().for_each(|(hash, pdb_pos)| {
                         if hash % self.num_threads as u32 == tid as u32 {
                             self.fold_disco_index.count_single_entry(*hash, *pdb_pos);
                         }
@@ -697,7 +697,7 @@ impl FoldDisco {
             pool.install(|| {
                 (0..self.num_threads).into_par_iter().for_each(| tid | {
                     // Thread only saves hashes with same modulos
-                    &collected.iter().for_each(|(hash, pdb_pos)| {
+                    let _ = &collected.iter().for_each(|(hash, pdb_pos)| {
                         if hash % self.num_threads as u32 == tid as u32 {
                             self.fold_disco_index.add_single_entry(*hash, *pdb_pos);
                         }
@@ -814,6 +814,7 @@ fn string_vec_to_numeric_id_vec(string_vec: &Vec<String>, numeric_id_vec: &mut V
     }
 }
 
+#[allow(dead_code)]
 fn numeric_id_vec_from_string_vec(string_vec: &Vec<String>) -> Vec<usize> {
     let mut numeric_id_vec = Vec::with_capacity(string_vec.len());
     for i in 0..string_vec.len() {

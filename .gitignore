@@ -33,6 +33,7 @@ data/index.bin
 *.value
 *.offset
 *.lookup
+!data/foldcomp/example_db.lookup
 *.type
 data/test_write_hashmap_to_file
 test_write_u64_vector

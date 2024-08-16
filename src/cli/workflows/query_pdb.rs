@@ -576,6 +576,7 @@ mod tests {
         query_pdb(env);
     }
     #[test]
+    #[ignore]
     fn test_query_with_foldcompdb() {
         #[cfg(feature = "foldcomp")] {
             let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");

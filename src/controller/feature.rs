@@ -215,7 +215,7 @@ pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type
 
 pub fn get_geometric_hash_as_u32_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<u32> {
     let res_bound = CombinationIterator::new(structure.num_residues);
-    let mut hash_vec = Vec::new();
+    let mut hash_vec = Vec::with_capacity(res_bound.len());
 
     res_bound.for_each(|(i, j)| {
         if i == j {

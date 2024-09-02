@@ -12,6 +12,9 @@ impl CombinationIterator {
             j: 0,
         }
     }
+    pub fn len(&self) -> usize {
+        self.n * self.n
+    }
 }
 
 impl Iterator for CombinationIterator {

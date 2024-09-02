@@ -14,6 +14,7 @@ pub mod rank;
 pub mod map;
 pub mod mode;
 
+use std::cell::UnsafeCell;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 use feature::get_geometric_hash_as_u32_from_structure;
@@ -23,7 +24,7 @@ use rayon::prelude::*;
 
 use crate::index::indextable::FolddiscoIndex;
 // Internal imports
-use crate::prelude::print_log_msg;
+use crate::prelude::{print_log_msg, INFO};
 use crate::structure::grid::DEFAULT_GRID_WIDTH;
 use crate::{measure_time, PDBReader};
 use crate::geometry::core::{GeometricHash, HashType};
@@ -40,6 +41,10 @@ const DEFAULT_REMOVE_REDUNDANCY: bool = true;
 const DEFAULT_NUM_THREADS: usize = 4;
 const DEFAULT_HASH_TYPE: HashType = HashType::PDBTrRosetta;
 const DEFAULT_MAX_RESIDUE: usize = 50000;
+
+
+unsafe impl Send for FoldDisco {}
+unsafe impl Sync for FoldDisco {}
 
 pub struct FoldDisco {
     pub path_vec: Vec<String>,
@@ -446,46 +451,38 @@ impl FoldDisco {
         self.plddt_vec = Arc::try_unwrap(plddt_vec).unwrap().into_inner().unwrap();
         drop(pool);
     }
-
+    
     pub fn collect_hash_vec(&mut self) {
-        let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
-        let plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
+        // let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
+        // let plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
+        // Mutex free version
+        let shared_data = SharedData::new(self.path_vec.len());
+        
         // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating files");
         // For iterating files, apply multi-threading with num_threads_for_file
-        let collected: Vec<(u32, usize)> = pool.install(|| {
-            self.path_vec
-                .par_iter()
-                .map(|pdb_path| {
-                    let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
-                    #[cfg(not(feature = "foldcomp"))]
-                    let pdb_reader = PDBReader::from_file(pdb_path).expect(
-                        log_msg(FAIL, "PDB file not found").as_str()
-                    );
-                    #[cfg(not(feature = "foldcomp"))]
-                    let compact = if pdb_path.ends_with(".gz") {
-                        pdb_reader.read_structure_from_gz().expect(
-                            log_msg(FAIL, "Failed to read structure").as_str()
-                        )
-                    } else {
-                        pdb_reader.read_structure().expect(
-                            log_msg(FAIL, "Failed to read structure").as_str()
-                        )
-                    };
 
-                    #[cfg(feature = "foldcomp")]
-                    let compact = if self.is_foldcomp_enabled {
-                        self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
-                            log_msg(FAIL, "Failed to read structure").as_str()
-                        )
-                    } else {
+        let collected: Vec<(u32, usize)> = pool.install(|| {
+            // Preserve locality for multi-threading
+            self.path_vec
+                .par_chunks(self.path_vec.len() / self.num_threads)
+                .enumerate()
+                .map(|(chunk_index, chunk)| {
+                    let chunk_size = self.path_vec.len() / self.num_threads;
+                    let curr_chunk_size = chunk.len();
+                    let mut local_collected = Vec::new();
+                    for (i, pdb_path) in chunk.iter().enumerate() {
+                        let pdb_pos = chunk_index * chunk_size + i;
+                        // let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                        #[cfg(not(feature = "foldcomp"))]
                         let pdb_reader = PDBReader::from_file(pdb_path).expect(
                             log_msg(FAIL, "PDB file not found").as_str()
                         );
-                        if pdb_path.ends_with(".gz") {
+                        #[cfg(not(feature = "foldcomp"))]
+                        let compact = if pdb_path.ends_with(".gz") {
                             pdb_reader.read_structure_from_gz().expect(
                                 log_msg(FAIL, "Failed to read structure").as_str()
                             )
@@ -493,49 +490,81 @@ impl FoldDisco {
                             pdb_reader.read_structure().expect(
                                 log_msg(FAIL, "Failed to read structure").as_str()
                             )
-                        }
-                    };  
+                        };
 
-                    if compact.num_residues > self.max_residue {
-                        print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
-                        // skip this file
+                        #[cfg(feature = "foldcomp")]
+                        let compact = if self.is_foldcomp_enabled {
+                            self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
+                                log_msg(FAIL, "Failed to read structure").as_str()
+                            )
+                        } else {
+                            let pdb_reader = PDBReader::from_file(pdb_path).expect(
+                                log_msg(FAIL, "PDB file not found").as_str()
+                            );
+                            if pdb_path.ends_with(".gz") {
+                                pdb_reader.read_structure_from_gz().expect(
+                                    log_msg(FAIL, "Failed to read structure").as_str()
+                                )
+                            } else {
+                                pdb_reader.read_structure().expect(
+                                    log_msg(FAIL, "Failed to read structure").as_str()
+                                )
+                            }
+                        };  
+
+                        if compact.num_residues > self.max_residue {
+                            print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
+                            // skip this file
+                            // Drop intermediate variables
+                            drop(compact);
+                            #[cfg(not(feature = "foldcomp"))]
+                            drop(pdb_reader);
+                            return Vec::new();
+                        }
+                        let compact = compact.to_compact();
+                        // Directly write num_residues and avg_plddt to the vectors
+                        let nres = compact.num_residues;
+                        let plddt = compact.get_avg_plddt();
+                        // Mutex free version
+                        unsafe {
+                            let nres_vec = shared_data.get_nres_vec();
+                            let plddt_vec = shared_data.get_plddt_vec();
+                            let nres_vec = &mut *nres_vec.get();
+                            let plddt_vec = &mut *plddt_vec.get();
+                            nres_vec[pdb_pos] = nres;
+                            plddt_vec[pdb_pos] = plddt;
+                        }
+                        // {
+                        //     let mut nres_vec = nres_vec.lock().unwrap();
+                        //     let mut plddt_vec = plddt_vec.lock().unwrap();
+                        //     nres_vec[pdb_pos] = nres;
+                        //     plddt_vec[pdb_pos] = plddt;
+                        // }
+                        let mut hash_vec = get_geometric_hash_as_u32_from_structure(
+                            &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
+                        );
                         // Drop intermediate variables
                         drop(compact);
                         #[cfg(not(feature = "foldcomp"))]
                         drop(pdb_reader);
-                        return Vec::new();
+                        // If remove_redundancy is true, remove duplicates
+                        if self.remove_redundancy {
+                            hash_vec.sort_unstable();
+                            hash_vec.dedup();
+                        }
+                        local_collected.extend(hash_vec.iter().map(|x| (*x, pdb_pos)));
                     }
-                    let compact = compact.to_compact();
-                    // Directly write num_residues and avg_plddt to the vectors
-                    let nres = compact.num_residues;
-                    let plddt = compact.get_avg_plddt();
-                    {
-                        let mut nres_vec = nres_vec.lock().unwrap();
-                        let mut plddt_vec = plddt_vec.lock().unwrap();
-                        nres_vec[pdb_pos] = nres;
-                        plddt_vec[pdb_pos] = plddt;
-                    }
-                    let mut hash_vec = get_geometric_hash_as_u32_from_structure(
-                        &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
-                    );
-                    // Drop intermediate variables
-                    drop(compact);
-                    #[cfg(not(feature = "foldcomp"))]
-                    drop(pdb_reader);
-                    // If remove_redundancy is true, remove duplicates
-                    if self.remove_redundancy {
-                        hash_vec.sort_unstable();
-                        hash_vec.dedup();
-                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect()
-                    } else {
-                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect()
-                    }
+                    local_collected
                 }).flatten().collect()
             });
         self.hash_id_vec = collected;
         // self.hash_id_grids = collected;
-        self.nres_vec = Arc::try_unwrap(nres_vec).unwrap().into_inner().unwrap();
-        self.plddt_vec = Arc::try_unwrap(plddt_vec).unwrap().into_inner().unwrap();
+        // self.nres_vec = Arc::try_unwrap(nres_vec).unwrap().into_inner().unwrap();
+        // self.plddt_vec = Arc::try_unwrap(plddt_vec).unwrap().into_inner().unwrap();
+        // Mutex free version
+
+        self.nres_vec = shared_data.get_nres_vec_clone();
+        self.plddt_vec = shared_data.get_plddt_vec_clone();
         drop(pool);
     }
     
@@ -551,7 +580,10 @@ impl FoldDisco {
         let chunk_size = 65536;
         // Chunk pdb paths
         let chunked_paths = self.path_vec.chunks(chunk_size);
-        chunked_paths.for_each(|chunk| {
+        let total_chunks = chunked_paths.len();
+        chunked_paths.enumerate().for_each(|(chunk_index, chunk)| {
+            // Print percentage of completion
+            print_log_msg(INFO, &format!("Processing chunk {}/{}", chunk_index, total_chunks));
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
                     .par_iter()
@@ -640,7 +672,9 @@ impl FoldDisco {
         let chunk_size = 65536;
         // Chunk pdb paths
         let chunked_paths = self.path_vec.chunks(chunk_size);
-        chunked_paths.for_each(|chunk| {
+        let total_chunks = chunked_paths.len();
+        chunked_paths.enumerate().for_each(|(chunk_index, chunk)| {
+            print_log_msg(INFO, &format!("\rProcessing chunk {}/{}", chunk_index, total_chunks));
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
                     .par_iter()
@@ -821,4 +855,40 @@ fn numeric_id_vec_from_string_vec(string_vec: &Vec<String>) -> Vec<usize> {
         numeric_id_vec.push(i);
     }
     numeric_id_vec
+}
+
+struct SharedData {
+    nres_vec: Arc<UnsafeCell<Vec<usize>>>,
+    plddt_vec: Arc<UnsafeCell<Vec<f32>>>,
+}
+
+unsafe impl Sync for SharedData {}
+
+impl SharedData {
+    fn new(size: usize) -> Self {
+        SharedData {
+            nres_vec: Arc::new(UnsafeCell::new(vec![0; size])),
+            plddt_vec: Arc::new(UnsafeCell::new(vec![0.0; size])),
+        }
+    }
+
+    fn get_nres_vec(&self) -> &UnsafeCell<Vec<usize>> {
+        &self.nres_vec
+    }
+
+    fn get_plddt_vec(&self) -> &UnsafeCell<Vec<f32>> {
+        &self.plddt_vec
+    }
+    
+    fn get_nres_vec_clone(&self) -> Vec<usize> {
+        unsafe {
+            (*self.nres_vec.get()).clone()
+        }
+    }
+    
+    fn get_plddt_vec_clone(&self) -> Vec<f32> {
+        unsafe {
+            (*self.plddt_vec.get()).clone()
+        }
+    }
 }

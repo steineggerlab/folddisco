@@ -631,3 +631,145 @@ analysis/h_sapiens/pdb/AF-Q7L5Y1-F1-model_v4.pdb        87.2214 8       5       
         Exit status: 0
 (base) hyunbin@super003:/mnt/scratch/hyunbin/motif$ 
 ```
+
+---
+
+# Problem: not scaling well with the number of threads
+
+hbk@arm64-apple-darwin20 motifsearch % \time -v ./target/release/folddisco index -p analysis/e_coli/e_coli -i analysis/temp/e_coli_folddisco -d 16 -a 4 -y pdbtr -v -t 4
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing analysis/e_coli/e_coli with 4 threads and 1 chunks
+[INFO] Hash type: PDBTrRosetta
+[INFO] Indexing all PDB files in one chunk
+[INFO] Before initializing (Allocated 0.58336926MB)
+[INFO] Collecting ids of the structures
+[INFO] fold_disco.collect_hash_vec: 126.726404042s
+[INFO] Total 243179436 hashes collected (Allocated 3712.9578MB)
+[INFO] fold_disco.sort_hash_vec: 2.470366375s
+[INFO] Hash sorted (Allocated 3712.9705MB)
+[INFO] convert_sorted_hash_vec_to_simplemap: 1.045732333s
+[INFO] Offset & values acquired (Allocated 2717.204MB)
+[INFO] offset_map.dump_to_disk: 109.124916ms
+[INFO] write_usize_vector_in_bits: 382.192791ms
+[INFO] save_lookup_to_file: 3.931417ms
+[DONE] Indexing done for chunk 0 - analysis/temp/e_coli_folddisco
+[DONE] Done.
+        Command being timed: "./target/release/folddisco index -p analysis/e_coli/e_coli -i analysis/temp/e_coli_folddisco -d 16 -a 4 -y pdbtr -v -t 4"
+        User time (seconds): 502.49
+        System time (seconds): 3.47
+        Percent of CPU this job got: 385%
+        Elapsed (wall clock) time (h:mm:ss or m:ss): 2:11.28
+        Average shared text size (kbytes): 0
+        Average unshared data size (kbytes): 0
+        Average stack size (kbytes): 0
+        Average total size (kbytes): 0
+        Maximum resident set size (kbytes): 5738128
+        Average resident set size (kbytes): 0
+        Major (requiring I/O) page faults: 0
+        Minor (reclaiming a frame) page faults: 1050417
+        Voluntary context switches: 397
+        Involuntary context switches: 196024
+        Swaps: 0
+        File system inputs: 0
+        File system outputs: 0
+        Socket messages sent: 0
+        Socket messages received: 0
+        Signals delivered: 0
+        Page size (bytes): 16384
+        Exit status: 0
+
+hbk@arm64-apple-darwin20 motifsearch % \time -v ./target/release/folddisco index -p analysis/e_coli/e_coli -i analysis/temp/e_coli_folddisco -d 16 -a 4 -y pdbtr -v -t 8
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing analysis/e_coli/e_coli with 8 threads and 1 chunks
+[INFO] Hash type: PDBTrRosetta
+[INFO] Indexing all PDB files in one chunk
+[INFO] Before initializing (Allocated 0.58336926MB)
+[INFO] Collecting ids of the structures
+[INFO] fold_disco.collect_hash_vec: 208.7481115s
+[INFO] Total 243179436 hashes collected (Allocated 3712.9854MB)
+[INFO] fold_disco.sort_hash_vec: 2.339895416s
+[INFO] Hash sorted (Allocated 3713.0154MB)
+[INFO] convert_sorted_hash_vec_to_simplemap: 997.13825ms
+[INFO] Offset & values acquired (Allocated 2717.2375MB)
+[INFO] offset_map.dump_to_disk: 105.728833ms
+[INFO] write_usize_vector_in_bits: 385.86825ms
+[INFO] save_lookup_to_file: 4.041ms
+[DONE] Indexing done for chunk 0 - analysis/temp/e_coli_folddisco
+[DONE] Done.
+        Command being timed: "./target/release/folddisco index -p analysis/e_coli/e_coli -i analysis/temp/e_coli_folddisco -d 16 -a 4 -y pdbtr -v -t 8"
+        User time (seconds): 1463.08
+        System time (seconds): 8.69
+        Percent of CPU this job got: 689%
+        Elapsed (wall clock) time (h:mm:ss or m:ss): 3:33.34
+        Average shared text size (kbytes): 0
+        Average unshared data size (kbytes): 0
+        Average stack size (kbytes): 0
+        Average total size (kbytes): 0
+        Maximum resident set size (kbytes): 5388512
+        Average resident set size (kbytes): 0
+        Major (requiring I/O) page faults: 0
+        Minor (reclaiming a frame) page faults: 1155657
+        Voluntary context switches: 426
+        Involuntary context switches: 1359809
+        Swaps: 0
+        File system inputs: 0
+        File system outputs: 0
+        Socket messages sent: 0
+        Socket messages received: 0
+        Signals delivered: 0
+        Page size (bytes): 16384
+        Exit status: 0
+
+hbk@arm64-apple-darwin20 motifsearch % \time -v ./target/release/folddisco index -p analysis/e_coli/e_coli -i analysis/temp/e_coli_folddisco -d 16 -a 4 -y pdbtr -v -t 4
+
+░█▀▀░█▀█░█░░░█▀▄░█▀▄░▀█▀░█▀▀░█▀▀░█▀█
+░█▀▀░█░█░█░░░█░█░█░█░░█░░▀▀█░█░░░█░█
+░▀░░░▀▀▀░▀▀▀░▀▀░░▀▀░░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+
+[INFO] Indexing analysis/e_coli/e_coli with 4 threads and 1 chunks
+[INFO] Hash type: PDBTrRosetta
+[INFO] Indexing all PDB files in one chunk
+[INFO] Before initializing (Allocated 0.58336926MB)
+[INFO] Collecting ids of the structures
+[INFO] fold_disco.collect_hash_vec: 128.017602833s
+[INFO] Total 243179436 hashes collected (Allocated 3712.9392MB)
+[INFO] fold_disco.sort_hash_vec: 2.160621625s
+[INFO] Hash sorted (Allocated 3712.9768MB)
+[INFO] convert_sorted_hash_vec_to_simplemap: 1.368127083s
+[INFO] Offset & values acquired (Allocated 2717.204MB)
+[INFO] offset_map.dump_to_disk: 103.404083ms
+[INFO] write_usize_vector_in_bits: 422.923125ms
+[INFO] save_lookup_to_file: 5.496667ms
+[DONE] Indexing done for chunk 0 - analysis/temp/e_coli_folddisco
+[DONE] Done.
+        Command being timed: "./target/release/folddisco index -p analysis/e_coli/e_coli -i analysis/temp/e_coli_folddisco -d 16 -a 4 -y pdbtr -v -t 4"
+        User time (seconds): 481.65
+        System time (seconds): 4.03
+        Percent of CPU this job got: 365%
+        Elapsed (wall clock) time (h:mm:ss or m:ss): 2:12.85
+        Average shared text size (kbytes): 0
+        Average unshared data size (kbytes): 0
+        Average stack size (kbytes): 0
+        Average total size (kbytes): 0
+        Maximum resident set size (kbytes): 4815328
+        Average resident set size (kbytes): 0
+        Major (requiring I/O) page faults: 0
+        Minor (reclaiming a frame) page faults: 1476573
+        Voluntary context switches: 378
+        Involuntary context switches: 55527
+        Swaps: 0
+        File system inputs: 0
+        File system outputs: 0
+        Socket messages sent: 0
+        Socket messages received: 0
+        Signals delivered: 0
+        Page size (bytes): 16384
+        Exit status: 0

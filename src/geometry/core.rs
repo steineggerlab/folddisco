@@ -144,6 +144,16 @@ pub enum GeometricHash {
 impl HashableSync for GeometricHash {}
 
 impl GeometricHash {
+    pub fn perfect_hash_new(feature: &Vec<f32>, hash_type: HashType) -> Self {
+        match hash_type {
+            HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
+                super::pdb_tr::HashValue::perfect_hash_new(feature)
+            ),
+            _ => panic!("Invalid hash type"),
+        }
+    }
+    
+    
     pub fn perfect_hash_default(feature: Vec<f32>, hash_type: HashType) -> Self {
         match hash_type {
             HashType::PDBMotif => GeometricHash::PDBMotif(

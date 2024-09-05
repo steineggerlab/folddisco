@@ -3,6 +3,8 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
+use rayon::vec;
+
 use crate::utils::convert::map_aa_to_u8;
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};
@@ -151,6 +153,41 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
     }
 }
 
+pub fn get_single_feature_new(i: usize, j: usize, structure: &CompactStructure, hash_type: HashType, outfeature: &mut Vec<f32>) -> bool {
+    let res1 = structure.get_res_name(i);
+    let res2 = structure.get_res_name(j);
+    let res1 = map_aa_to_u8(res1) as f32;
+    let res2 = map_aa_to_u8(res2) as f32;
+    if res1 == 255.0 || res2 == 255.0 {
+        return false;
+    }
+    match &hash_type {
+        HashType::PDBTrRosetta => {
+            let feature = structure.get_pdb_tr_feature_new(i, j);
+            if feature.is_some() {
+                let feature = feature.unwrap();
+                if feature.0 > 20.0 {
+                    return false;
+                } else {
+                    outfeature[0] = res1;
+                    outfeature[1] = res2;
+                    outfeature[2] = feature.0;
+                    outfeature[3] = feature.1;
+                    outfeature[4] = feature.2;
+                    outfeature[5] = feature.3;
+                    outfeature[6] = feature.4;
+                    return true;
+                }
+            } else {
+                return false;
+            }
+        }
+        _ => {
+            return false;
+        }
+    }
+}
+
 pub fn _get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<GeometricHash> {
     let res_bound = get_all_combination(
         structure.num_residues, false
@@ -216,18 +253,21 @@ pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type
 pub fn get_geometric_hash_as_u32_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<u32> {
     let res_bound = CombinationIterator::new(structure.num_residues);
     let mut hash_vec = Vec::with_capacity(res_bound.len());
-
+    let mut feature = vec![0.0; 7];
     res_bound.for_each(|(i, j)| {
         if i == j {
             return;
         }
-        let feature = get_single_feature(i, j, structure, hash_type);
-        if let Some(feature) = feature {
-            let hash = if nbin_dist == 0 || nbin_angle == 0 {
-                GeometricHash::perfect_hash_default(feature, hash_type)
-            } else {
-                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
-            };
+        let has_feature = get_single_feature_new(i, j, structure, hash_type, &mut feature);
+        // if let Some(feature) = feature {
+        if has_feature {
+            //
+            // let hash = if nbin_dist == 0 || nbin_angle == 0 {
+            //     GeometricHash::perfect_hash_default(feature, hash_type)
+            // } else {
+            //     GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+            // };
+            let hash = GeometricHash::perfect_hash_new(&feature, hash_type);
             hash_vec.push(hash.as_u32());
         }
     });

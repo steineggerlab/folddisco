@@ -14,6 +14,50 @@ use crate::utils::convert::*;
 pub struct HashValue(pub u32);
 
 impl HashValue {
+    pub fn perfect_hash_new(feature: &Vec<f32>) -> Self {
+        let nbin_dist = 16.0;
+        let nbin_angle = 4.0;
+        let res1 = feature[0] as u32;
+        let res2 = feature[1] as u32;
+        let ca_dist = discretize_value(
+            feature[2], MIN_DIST, MAX_DIST, nbin_dist
+        );
+        let cb_dist = discretize_value(
+            feature[3], MIN_DIST, MAX_DIST, nbin_dist
+        );
+        // Angle is expected to be in radians
+        let sin_ca_cb_angle = feature[4].sin();
+        let cos_ca_cb_angle = feature[4].cos();
+        let sin_ca_cb_angle = discretize_value(
+            sin_ca_cb_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        let cos_ca_cb_angle = discretize_value(
+            cos_ca_cb_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        // Two torsion angles: 
+        let sin_phi1 = feature[5].sin();
+        let cos_phi1 = feature[5].cos();
+        let sin_phi2 = feature[6].sin();
+        let cos_phi2 = feature[6].cos();
+        let sin_phi1 = discretize_value(
+            sin_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        let cos_phi1 = discretize_value(
+            cos_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        let sin_phi2 = discretize_value(
+            sin_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        let cos_phi2 = discretize_value(
+            cos_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+
+        let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
+            | cb_dist << 12 | sin_ca_cb_angle << 10 | cos_ca_cb_angle << 8
+            | sin_phi1 << 6 | cos_phi1 << 4 | sin_phi2 << 2 | cos_phi2;
+        HashValue(hashvalue)
+    }
+    
     pub fn perfect_hash(feature: Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> Self {
         // Added one more quantization for distance
         let nbin_dist = if nbin_dist > 16 { 16.0 } else { nbin_dist as f32 };

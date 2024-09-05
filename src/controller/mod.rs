@@ -627,7 +627,7 @@ impl FoldDisco {
                             nres_vec[pdb_pos] = nres;
                             plddt_vec[pdb_pos] = plddt;
                         }
-                        let mut hash_vec = get_geometric_hash_from_structure(
+                        let mut hash_vec = get_geometric_hash_as_u32_from_structure(
                             &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
                         );
                         // Drop intermediate variables
@@ -638,9 +638,9 @@ impl FoldDisco {
                         if self.remove_redundancy {
                             hash_vec.sort_unstable();
                             hash_vec.dedup();
-                            hash_vec.iter().map(|x| (x.as_u32(), pdb_pos)).collect()
+                            hash_vec.iter().map(|x| (x.clone(), pdb_pos)).collect()
                         } else {
-                            hash_vec.iter().map(|x| (x.as_u32(), pdb_pos)).collect()
+                            hash_vec.iter().map(|x| (x.clone(), pdb_pos)).collect()
                         }
                     }).flatten().collect()
                 });
@@ -711,7 +711,7 @@ impl FoldDisco {
                         }
                         let compact = compact.to_compact();
                         // Directly write num_residues and avg_plddt to the vectors
-                        let mut hash_vec = get_geometric_hash_from_structure(
+                        let mut hash_vec = get_geometric_hash_as_u32_from_structure(
                             &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle
                         );
                         // Drop intermediate variables
@@ -722,9 +722,9 @@ impl FoldDisco {
                         if self.remove_redundancy {
                             hash_vec.sort_unstable();
                             hash_vec.dedup();
-                            hash_vec.iter().map(|x| (x.as_u32(), pdb_pos)).collect()
+                            hash_vec.iter().map(|x| (x.clone(), pdb_pos)).collect()
                         } else {
-                            hash_vec.iter().map(|x| (x.as_u32(), pdb_pos)).collect()
+                            hash_vec.iter().map(|x| (x.clone(), pdb_pos)).collect()
                         }
                     }).flatten().collect()
                 });

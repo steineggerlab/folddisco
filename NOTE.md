@@ -2,23 +2,19 @@
 
 ## TODOs
 DEV
-- [x] IMPORTANT: MAJOR: DONE: Foldcomp DB reader
-  - [x] Current idea: having DB reader with rust & decompression with C++
-  - [x] DONE: Reading FCZ in Rust is working
-  - [x] DONE: Checked Foldcomp DB is readable through Rust
-  - [x] DONE: Integrate with CLI - both indexing and querying
-    - [x] DONE: Indexing
-    - [x] DONE: Querying
-  - [x] DONE: Need to convert atom_t to compact structure
-  - [x] DONE: Add io type in configuration file
-- [x] TODOs for Foldcomp DB Reader
-  - [x] Place at structure/io/
-  - [x] Add local copy of foldcomp:minimal in lib + modification of CMakeLists.txt to support ffi build
-  - [x] Parallel reading of the DB (rayon-based reader on Foldcomp DB, load lookup & index once)
-  - [x] Make Foldcomp DB reader as an optional feature; Build dependencies should be optional as well
-- [x] DONE: Handle architecture specific build for Foldcomp DB reader; <- bindgen is only needed once
+- [ ] TODO: IMPORTANT: Remove unnecessary allocations inside feature calculation
+- [ ] TODO: IMPORTANT: Pre-terminate feature calculation when the distance is too far
+- [ ] TODO: Test which parallelization is better for calculation
+  - [ ] 1. par_chunk
+  - [ ] 2. par_iter
+  - [ ] 3. receiver / sender; par_iter; isolated foldcomp reader
+- [ ] DONE: discretizer - inlining
+
 - [ ] TODO: Edit github action to test foldcomp features in the CI
 - [ ] TODO: IMPORTANT: handle cases where lookup is not start from 0 to N. 
+
+- [ ] TODO: When foldcomp is enabled in feature, normal directory handling is not working well. need check.
+- [ ] TODO: remove Grid mode
 
 QUERYING
 - [ ] ISSUE: WARNING: slows down when there are too many combinations of amino acid pairs
@@ -773,3 +769,30 @@ hbk@arm64-apple-darwin20 motifsearch % \time -v ./target/release/folddisco index
         Signals delivered: 0
         Page size (bytes): 16384
         Exit status: 0
+        
+Number of residues: 477
+Square of number of residues: 227529
+
+
+Reading structure: 1.583337ms
+SIMD memory allocation: 9.4 ms
+SIMD distance calculation: 16.35 ms (16.35 - 9.4 = 6.95 ms)
+SIMD angle calculation: 18.58 ms (18.58 - 9.4 = 9.18 ms)
+SIMD torsion angle computation: 29.12 ms (29.12 - 9.4 = 19.72 ms)
+SIMD (distance + angle + torsion; all): 40.15 ms (9.4 + 6.95 + 9.18 + 19.72 = 45.25 ms)
+SIMD (distance + angle + torsion; preterminate): 18 ms
+SIMD (distance + angle + torsion + hashing; preterminate;): 24.12 ms
+Current feature computation (distance + angle + torsion + hashing; all) : 53.18 ms
+Current feature computation (distance + angle + torsion + hashing; preterminate) : 29.283924ms - 35.56ms
+
+Computation Type	Time (ms)	Calculation Breakdown	Classification	Feature Type
+Reading structure	1.583337 ms		Current	Structure
+SIMD memory allocation	9.4 ms		SIMD	Memory allocation
+SIMD distance calculation	16.35 ms	6.95 ms	SIMD	Distance calculation
+SIMD angle calculation	18.58 ms	9.18 ms	SIMD	Angle calculation
+SIMD torsion angle computation	29.12 ms	19.72 ms	SIMD	Torsion angle calculation
+SIMD (distance + angle + torsion; all)	40.15 ms		SIMD	Distance, angle, torsion (combined)
+SIMD (distance + angle + torsion; preterminate)	18 ms		SIMD	Distance, angle, torsion (preterminate)
+SIMD (distance + angle + torsion + hashing; preterminate)	24.12 ms		SIMD	Distance, angle, torsion, hashing
+Current feature computation (distance + angle + torsion + hashing; all)	53.18 ms		Current	Distance, angle, torsion, hashing
+Current feature computation (distance + angle + torsion + hashing; preterminate)	29.283924 ms	35.56 ms	Current	Distance, angle, torsion, hashing (preterminate)

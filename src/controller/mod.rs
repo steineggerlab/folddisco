@@ -16,7 +16,7 @@ pub mod mode;
 
 use std::cell::UnsafeCell;
 use std::io::Write;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use feature::get_geometric_hash_as_u32_from_structure;
 use mode::IndexMode;
 // External imports
@@ -452,7 +452,7 @@ impl FoldDisco {
         drop(pool);
     }
     
-    pub fn collect_hash_vec(&mut self) {
+    pub fn collect_hash_vec(&mut self) { // THISONE
         // let nres_vec: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![0; self.path_vec.len()]));
         // let plddt_vec: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0; self.path_vec.len()]));
         // Mutex free version
@@ -468,15 +468,17 @@ impl FoldDisco {
         let collected: Vec<(u32, usize)> = pool.install(|| {
             // Preserve locality for multi-threading
             self.path_vec
-                .par_chunks(self.path_vec.len() / self.num_threads)
+                .par_iter()
+            // .par_chunks(self.path_vec.len() / self.num_threads)
                 .enumerate()
-                .map(|(chunk_index, chunk)| {
-                    let chunk_size = self.path_vec.len() / self.num_threads;
-                    let curr_chunk_size = chunk.len();
-                    let mut local_collected = Vec::new();
-                    for (i, pdb_path) in chunk.iter().enumerate() {
-                        let pdb_pos = chunk_index * chunk_size + i;
-                        // let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                // .map(|(chunk_index, chunk)| {
+                .map(|(pdb_pos, pdb_path)| {
+                // let chunk_size = self.path_vec.len() / self.num_threads;
+                //     let curr_chunk_size = chunk.len();
+                //     let mut local_collected = Vec::new();
+                //     for (i, pdb_path) in chunk.iter().enumerate() {
+                //         let pdb_pos = chunk_index * chunk_size + i;
+                // let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
                         #[cfg(not(feature = "foldcomp"))]
                         let pdb_reader = PDBReader::from_file(pdb_path).expect(
                             log_msg(FAIL, "PDB file not found").as_str()
@@ -552,9 +554,10 @@ impl FoldDisco {
                             hash_vec.sort_unstable();
                             hash_vec.dedup();
                         }
-                        local_collected.extend(hash_vec.iter().map(|x| (*x, pdb_pos)));
-                    }
-                    local_collected
+                        hash_vec.iter().map(|x| (*x, pdb_pos)).collect()
+                    //     local_collected.extend(hash_vec.iter().map(|x| (*x, pdb_pos)));
+                    // }
+                    // local_collected
                 }).flatten().collect()
             });
         self.hash_id_vec = collected;

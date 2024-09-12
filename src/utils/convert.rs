@@ -20,28 +20,30 @@ pub const BITMASK64_4BIT: u64 = 0x000000000000000F;
 pub const BITMASK64_5BIT: u64 = 0x000000000000001F;
 
 // Discretizers 
+#[inline(always)]
 pub fn discretize_f32_value_into_u64(val: f32, min: f32, max: f32, num_bin: f32) -> u64 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     let disc_f = 1.0_f32 / cont_f;
     ((val - min) * (disc_f) + 0.5) as u64
 }
 
+#[inline(always)]
 pub fn discretize_f32_value_into_u32(val: f32, min: f32, max: f32, num_bin: f32) -> u32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     let disc_f = 1.0_f32 / cont_f;
     ((val - min) * (disc_f) + 0.5) as u32
 }
-
+#[inline(always)]
 pub fn continuize_u64_value_into_f32(val: u64, min: f32, max: f32, num_bin: f32) -> f32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     (val as f32) * (cont_f) + min
 }
-
+#[inline(always)]
 pub fn continuize_u32_value_into_f32(val: u32, min: f32, max: f32, num_bin: f32) -> f32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     (val as f32) * (cont_f) + min
 }
-
+// #[inline(always)]
 pub fn normalize_f32_value(val: f32, min: f32, max: f32) -> f32 {
     (val - min) / (max - min)
 }
@@ -102,24 +104,28 @@ pub fn map_u8_to_aa(aa: u8) -> &'static str {
     }
 }
 
+#[inline(always)]
 pub fn map_aa_pair_to_u32(aa1: &[u8; 3], aa2: &[u8; 3]) -> u32 {
     let output = (map_aa_to_u8(aa1) as u32) * 20 + map_aa_to_u8(aa2) as u32;
     assert!(output < 512);
     output
 }
 
+#[inline(always)]
 pub fn map_aa_u32_pair_to_u32(aa1: u32, aa2: u32) -> u32 {
     let output = aa1 * 20 + aa2;
     assert!(output < 512);
     output
 }
 
+#[inline(always)]
 pub fn map_u32_to_aa_u32_pair(pair: u32) -> (u32, u32) {
     let aa1 = (pair / 20) as u32;
     let aa2 = (pair % 20) as u32;
     (aa1, aa2)
 }
 
+#[inline(always)]
 pub fn map_u32_to_aa_pair(pair: u32) -> (String, String) {
     let aa1 = (pair / 20) as u8;
     let aa2 = (pair % 20) as u8;
@@ -166,6 +172,7 @@ pub fn map_one_letter_to_u8_vec(aa: char) -> Vec<u8> {
     }
 }
 
+#[inline(always)]
 pub fn is_aa_group_char(c: char) -> bool {
     if c.is_ascii_alphabetic() {
         true

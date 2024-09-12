@@ -114,6 +114,9 @@ pub struct CompactStructure {
     pub n_vector: CarbonCoordinateVector,
     pub ca_vector: CarbonCoordinateVector,
     pub cb_vector: CarbonCoordinateVector,
+    pub n_vector2: (Vec<f32>, Vec<f32>, Vec<f32>),
+    pub ca_vector2: (Vec<f32>, Vec<f32>, Vec<f32>),
+    pub cb_vector2: (Vec<f32>, Vec<f32>, Vec<f32>),
     pub b_factors: Vec<f32>,
 }
 
@@ -129,6 +132,17 @@ impl CompactStructure {
         let mut ca_vec = CarbonCoordinateVector::new();
         let mut cb_vec = CarbonCoordinateVector::new();
 
+        let mut n_vec_x: Vec<f32> = Vec::new();
+        let mut n_vec_y: Vec<f32> = Vec::new();
+        let mut n_vec_z: Vec<f32> = Vec::new();
+        let mut ca_vec_x: Vec<f32> = Vec::new();
+        let mut ca_vec_y: Vec<f32> = Vec::new();
+        let mut ca_vec_z: Vec<f32> = Vec::new();
+        let mut cb_vec_x: Vec<f32> = Vec::new();
+        let mut cb_vec_y: Vec<f32> = Vec::new();
+        let mut cb_vec_z: Vec<f32> = Vec::new();
+        
+        
         let mut chain_per_residue: Vec<u8> = Vec::new();
         let mut prev_res_serial: Option<u64> = None;
         let mut prev_res_name: Option<&[u8; 3]> = None;
@@ -154,6 +168,16 @@ impl CompactStructure {
                         res_name_vec.push(*resn);
                         chain_per_residue.push(origin.atom_vector.chain[idx]);
                         b_factors.push(origin.atom_vector.b_factor[idx]);
+                        n_vec_x.push(n.x);
+                        n_vec_y.push(n.y);
+                        n_vec_z.push(n.z);
+                        ca_vec_x.push(ca.x);
+                        ca_vec_y.push(ca.y);
+                        ca_vec_z.push(ca.z);
+                        cb_vec_x.push(cb.x);
+                        cb_vec_y.push(cb.y);
+                        cb_vec_z.push(cb.z);
+                        
                     }
                     (Some(n), Some(ca), None) => {
                         let resi = prev_res_serial.expect("expected residue serial number");
@@ -170,9 +194,19 @@ impl CompactStructure {
                             // Approximate CB
                             let cb = approx_cb(&ca, gly_n, gly_c);
                             cb_vec.push(&cb);
+                            cb_vec_x.push(cb.x);
+                            cb_vec_y.push(cb.y);
+                            cb_vec_z.push(cb.z);
                         } else {
                             cb_vec.push_none();
                         }
+                        n_vec_x.push(n.x);
+                        n_vec_y.push(n.y);
+                        n_vec_z.push(n.z);
+                        ca_vec_x.push(ca.x);
+                        ca_vec_y.push(ca.y);
+                        ca_vec_z.push(ca.z);
+
                     }
                     (None, None, None) => {}
                     (None, None, Some(_)) => {}
@@ -221,6 +255,9 @@ impl CompactStructure {
             ca_vector: ca_vec,
             cb_vector: cb_vec,
             b_factors: b_factors,
+            n_vector2: (n_vec_x, n_vec_y, n_vec_z),
+            ca_vector2: (ca_vec_x, ca_vec_y, ca_vec_z),
+            cb_vector2: (cb_vec_x, cb_vec_y, cb_vec_z),
         }
     }
 
@@ -315,6 +352,9 @@ impl CompactStructure {
     }
     
     pub fn get_res_name(&self, idx: usize) -> &[u8; 3] {
+        if idx >= self.num_residues {
+            return b"UNK";
+        }
         &self.residue_name[idx]
     }
 
@@ -444,6 +484,9 @@ impl CompactStructure {
         {
 
             let ca_dist =self.get_ca_distance(idx1, idx2).unwrap();
+            if ca_dist > 20.0 {
+                return None;
+            }
             let cb_dist = self.get_cb_distance(idx1, idx2).unwrap();
             let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2).unwrap().to_radians();
             let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
@@ -467,6 +510,9 @@ impl CompactStructure {
         {
 
             let ca_dist =self.get_ca_distance(idx1, idx2).unwrap();
+            if ca_dist > 20.0 {
+                return None;
+            }
             let cb_dist = self.get_cb_distance(idx1, idx2).unwrap();
             let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2).unwrap().to_radians();
             let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);

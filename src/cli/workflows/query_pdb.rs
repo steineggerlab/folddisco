@@ -19,7 +19,7 @@ use crate::controller::mode::IndexMode;
 use crate::cli::*;
 use crate::controller::io::{read_compact_structure, read_u16_vector, read_u8_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
-use crate::controller::rank::{count_query_bigmode, count_query_gridmode, count_query_idmode, QueryResult};
+use crate::controller::rank::{count_query_bigmode, count_query_idmode, QueryResult};
 use crate::controller::retrieve::retrieval_wrapper;
 use crate::index::indextable::load_big_index;
 use crate::index::lookup::load_lookup_from_file;
@@ -54,7 +54,7 @@ Options:
     --node <NODE_COUNT>              Number of nodes to retrieve (default 2)
 ";
 // TODO: need to think about the column name
-pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tgrid_count\tnres\tplddt\tmatching_residues\tresidues_rescued\tquery_residues\tquery_file\tindex_path";
+pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tnres\tplddt\tmatching_residues\tresidues_rescued\tquery_residues\tquery_file\tindex_path";
 
 pub const DEFAULT_NODE_COUNT: usize = 2;
 
@@ -276,73 +276,6 @@ pub fn query_pdb(env: AppArgs) {
                                 drop(value_mmap);
                                 drop(match_count_filter);
                                 query_count_vec
-                            },
-                            IndexMode::Grid => {
-                                let (value_mmap, value_vec) = measure_time!(read_u8_vector(&value_path).expect(
-                                    &log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path))
-                                ));
-                                let query_count_map = measure_time!(count_query_gridmode(
-                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
-                                ));
-                                let mut match_count_filter = get_match_count_filter(
-                                    match_cutoff.clone(), pdb_query.len(), query_residues.len()
-                                );
-                                if retrieve {
-                                    match_count_filter[1] = if node_count > match_count_filter[1] {node_count} else {match_count_filter[1]};
-                                    if verbose {
-                                        print_log_msg(INFO, &format!("Filtering result with residue >= {}", match_count_filter[1]));
-                                    }
-                                }
-                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
-                                    v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
-                                    v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
-                                    v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
-                                    v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
-                                }).collect();
-                                if verbose {
-                                    print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
-                                }
-                                // IF retrieve is true, retrieve matching residues
-                                if retrieve {
-                                    measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
-                                        #[cfg(not(feature = "foldcomp"))]
-                                        let retrieval_result = retrieval_wrapper(
-                                            &v.id, node_count, &pdb_query,
-                                            hash_type, num_bin_dist, num_bin_angle,
-                                            &pdb_query_map, &query_structure, &query_indices,
-                                            &aa_dist_map
-                                        );
-                                        #[cfg(feature = "foldcomp")]
-                                        let retrieval_result = if using_foldcomp {
-                                            retrieval_wrapper_for_foldcompdb(
-                                                &v.id, node_count, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle,
-                                                &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map, &foldcomp_db_reader
-                                            )
-                                        } else {
-                                            retrieval_wrapper(
-                                                &v.id, node_count, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle,
-                                                &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map
-                                            )
-                                        };
-                                        v.matching_residues = retrieval_result.0;
-                                        v.matching_residues_processed = retrieval_result.1;
-                                    }));
-                                    query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
-                                    println!("{:?}", query_count_vec.len());
-                                    drop(value_mmap);
-                                    drop(match_count_filter);
-                                    return query_count_vec;
-                                }
-                                drop(value_mmap);
-                                drop(match_count_filter);
-                                query_count_vec
-                            },
-                            IndexMode::Pos => {
-                                todo!()
                             },
                             IndexMode::Big => {
                                 // Get index prefix from value path. index_prefix is just without .value

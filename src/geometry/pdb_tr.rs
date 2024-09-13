@@ -13,10 +13,25 @@ use crate::utils::convert::*;
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
+pub const PDBTR_NBIN_DIST: f32 = 16.0;
+pub const PDBTR_NBIN_SIN_COS: f32 = 4.0;
+
 impl HashValue {
-    pub fn perfect_hash_new(feature: &Vec<f32>) -> Self {
-        let nbin_dist = 16.0;
-        let nbin_angle = 4.0;
+    pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
+        let nbin_dist = if nbin_dist > 16 {
+            16.0
+        } else if nbin_dist == 0 {
+            PDBTR_NBIN_DIST
+        } else {
+            nbin_dist as f32
+        };
+        let nbin_angle = if nbin_angle > 4 {
+            4.0
+        } else if nbin_angle == 0 {
+            PDBTR_NBIN_SIN_COS
+        } else {
+            nbin_angle as f32
+        };
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         let ca_dist = discretize_value(
@@ -39,53 +54,6 @@ impl HashValue {
         let cos_phi1 = feature[5].cos();
         let sin_phi2 = feature[6].sin();
         let cos_phi2 = feature[6].cos();
-        let sin_phi1 = discretize_value(
-            sin_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        let cos_phi1 = discretize_value(
-            cos_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        let sin_phi2 = discretize_value(
-            sin_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        let cos_phi2 = discretize_value(
-            cos_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-
-        let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
-            | cb_dist << 12 | sin_ca_cb_angle << 10 | cos_ca_cb_angle << 8
-            | sin_phi1 << 6 | cos_phi1 << 4 | sin_phi2 << 2 | cos_phi2;
-        HashValue(hashvalue)
-    }
-    
-    pub fn perfect_hash_new2(
-        res1: u32, res2: u32, ca_dist: f32, cb_dist: f32, 
-        sin_ca_cb_angle: f32, cos_ca_cb_angle: f32, tan_phi1: f32, tan_phi2: f32
-    ) -> u32 {
-        // Check nan
-        if ca_dist.is_nan() || cb_dist.is_nan() || sin_ca_cb_angle.is_nan() || cos_ca_cb_angle.is_nan() {
-            return 0;
-        }
-        let nbin_dist = 16.0;
-        let nbin_angle = 4.0;
-        let ca_dist = discretize_value(
-            ca_dist, MIN_DIST, MAX_DIST, nbin_dist
-        );
-        let cb_dist = discretize_value(
-            cb_dist, MIN_DIST, MAX_DIST, nbin_dist
-        );
-        // Angle is expected to be in radians
-        let sin_ca_cb_angle = discretize_value(
-            sin_ca_cb_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        let cos_ca_cb_angle = discretize_value(
-            cos_ca_cb_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        // Two torsion angles: 
-        let sin_phi1 = tan_phi1.atan().sin();
-        let cos_phi1 = tan_phi1.atan().cos();
-        let sin_phi2 = tan_phi2.atan().sin();
-        let cos_phi2 = tan_phi2.atan().cos();
         let sin_phi1 = discretize_value(
             sin_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         );
@@ -105,64 +73,15 @@ impl HashValue {
         hashvalue
     }
     
-    
-    
-    
-    
-    pub fn perfect_hash(feature: Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> Self {
-        // Added one more quantization for distance
-        let nbin_dist = if nbin_dist > 16 { 16.0 } else { nbin_dist as f32 };
-        let nbin_angle = if nbin_angle > 4 { 4.0 } else { nbin_angle as f32 };
-        let res1 = feature[0] as u32;
-        let res2 = feature[1] as u32;
-        let ca_dist = discretize_value(
-            feature[2], MIN_DIST, MAX_DIST, nbin_dist
-        );
-        let cb_dist = discretize_value(
-            feature[3], MIN_DIST, MAX_DIST, nbin_dist
-        );
-        // Angle is expected to be in radians
-        let sin_ca_cb_angle = feature[4].sin();
-        let cos_ca_cb_angle = feature[4].cos();
-        let sin_ca_cb_angle = discretize_value(
-            sin_ca_cb_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        let cos_ca_cb_angle = discretize_value(
-            cos_ca_cb_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        // Two torsion angles: 
-        let sin_phi1 = feature[5].sin();
-        let cos_phi1 = feature[5].cos();
-        let sin_phi2 = feature[6].sin();
-        let cos_phi2 = feature[6].cos();
-        let sin_phi1 = discretize_value(
-            sin_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        let cos_phi1 = discretize_value(
-            cos_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        let sin_phi2 = discretize_value(
-            sin_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-        let cos_phi2 = discretize_value(
-            cos_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-        );
-
-        let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
-            | cb_dist << 12 | sin_ca_cb_angle << 10 | cos_ca_cb_angle << 8
-            | sin_phi1 << 6 | cos_phi1 << 4 | sin_phi2 << 2 | cos_phi2;
-        HashValue(hashvalue)
-    }
-
-    pub fn perfect_hash_default(feature: Vec<f32>) -> Self {
-       Self::perfect_hash(feature, NBIN_DIST as usize, NBIN_SIN_COS as usize)
+    pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
+        HashValue::perfect_hash(feature, PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
     }
     
-    pub fn reverse_hash_default(&self) -> Vec<f32> {
-        self.reverse_hash(NBIN_DIST as usize, NBIN_SIN_COS as usize)
+    pub fn reverse_hash_default(&self) -> [f32; 7] {
+        self.reverse_hash(PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
     }
     
-    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> Vec<f32> {
+    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 7] {
         let res1 = ((self.0 >> 25) & BITMASK32_5BIT)as f32;
         let res2 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
         let ca_dist = continuize_value(
@@ -202,7 +121,7 @@ impl HashValue {
         let phi1 = sin_phi1.atan2(cos_phi1).to_degrees();
         let phi2 = sin_phi2.atan2(cos_phi2).to_degrees();
         
-        vec![res1, res2, ca_dist, cb_dist, ca_cb_angle, phi1, phi2]
+        [res1, res2, ca_dist, cb_dist, ca_cb_angle, phi1, phi2]
     }
     
     pub fn hash_type(&self) -> HashType {
@@ -255,9 +174,8 @@ mod tests {
             raw_feature.2, raw_feature.3, raw_feature.4.to_radians(),
             raw_feature.5.to_radians(), raw_feature.6.to_radians()
         ];
-        let hash: GeometricHash = GeometricHash::PDBTrRosetta(
-            HashValue::perfect_hash(raw_feature, 8, 3)
-        );
+        let hash = HashValue::perfect_hash_default(&raw_feature);
+        let hash = GeometricHash::PDBTrRosetta(HashValue::from_u32(hash));
         match hash {
             GeometricHash::PDBTrRosetta(hash) => {
                 println!("{:?}", hash);

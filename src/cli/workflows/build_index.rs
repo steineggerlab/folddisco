@@ -33,11 +33,10 @@ Options:
     -p, --pdbs <PDB_DIR|FOLDCOMP_DB>   Directory or Foldcomp DB containing PDB files
     -y, --type <HASH_TYPE>             Hash type to use (pdb, trrosetta, default)
     -i, --index <INDEX_PATH>           Path to save the index table
-    -m, --mode <MODE>                  Mode to index (default=id, id: index only id, grid: index id and grid, pos: index id and position)
+    -m, --mode <MODE>                  Mode to index (default=id, id: index size is dynamic; pack 65536 entries; big: fixed size index)
     -t, --threads <THREADS>            Number of threads to use
     -d, --distance <NBIN_DIST>         Number of distance bins (default 0, zero means default)
     -a, --angle <NBIN_ANGLE>           Number of angle bins (default 0, zero means default)
-    -g, --grid <GRID_WIDTH>            Grid width (default 30.0)
     -c, --chunk <CHUNK_SIZE>           Number of PDB files to index at once (default, max=65535)
     -r, --recursive                    Index PDB files in subdirectories
     -n, --max-residue <MAX_RES>        Maximum number of residues in a PDB file (default=3000)
@@ -141,7 +140,7 @@ pub fn build_index(env: AppArgs) {
                 };
                 print_log_msg(INFO, &format!("Before initializing (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb()));
                 #[cfg(not(feature = "foldcomp"))]
-                let mut fold_disco = FoldDisco::new_with_params(
+                let mut fold_disco = FoldDisco::new(
                     pdb_path_vec.to_vec(), hash_type, true, num_threads, 
                     num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode,
                 );

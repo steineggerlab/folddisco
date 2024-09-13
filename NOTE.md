@@ -5,13 +5,12 @@ DEV
 - [ ] TODO: IMPORTANT: Remove unnecessary allocations inside feature calculation
 - [ ] TODO: IMPORTANT: Pre-terminate feature calculation when the distance is too far
 - [ ] TODO: Test which parallelization is better for calculation
-  - [ ] 1. par_chunk
   - [ ] 2. par_iter
-  - [ ] 3. receiver / sender; par_iter; isolated foldcomp reader
 - [ ] DONE: discretizer - inlining
 
-- [ ] TODO: Edit github action to test foldcomp features in the CI
-- [ ] TODO: IMPORTANT: handle cases where lookup is not start from 0 to N. 
+- [x] DONE: Edit github action to test foldcomp features in the CI
+  - [ ] TODO: Pass the tests
+- [x] DONE: handle cases where lookup is not start from 0 to N. 
 
 - [ ] TODO: When foldcomp is enabled in feature, normal directory handling is not working well. need check.
 - [ ] TODO: remove Grid mode

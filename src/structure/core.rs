@@ -1,9 +1,6 @@
 use crate::structure::atom::{Atom, AtomVector};
 use crate::structure::coordinate::{approx_cb, CarbonCoordinateVector, Coordinate};
 use crate::structure::feature::{Torsion, TorsionType};
-use crate::utils::calculator::Calculate;
-
-use crate::structure::coordinate::{calc_angle_point, calc_cos2_torsion_angle};
 use crate::utils::convert::map_aa_to_u8;
 
 use super::coordinate::{calc_torsion_radian, calc_angle_radian};
@@ -45,52 +42,6 @@ impl Structure {
         self.atom_vector.push_atom(atom);
     }
 
-    // fn _fill_gly_cbeta(&mut self) {
-    //     // Iterate over self.atom_vector
-
-    //     let mut curr_res_serial: u64 = 0;
-
-    //     let mut gly_n = Atom::new_empty();
-    //     let mut gly_ca = Atom::new_empty();
-    //     let mut gly_c = Atom::new_empty();
-    //     let mut gly_o = Atom::new_empty();
-
-    //     for i in 0..self.atom_vector.len() {
-    //         if self.atom_vector.res_name.get(i) == Some(b"GLY") {
-    //             match self.atom_vector.res_serial.get(i) {
-    //                 Some(res_serial) => {
-    //                     if curr_res_serial != *res_serial {
-    //                         curr_res_serial = *res_serial;
-    //                         gly_n = Atom::new_empty();
-    //                         gly_ca = Atom::new_empty();
-    //                         gly_c = Atom::new_empty();
-    //                         gly_o = Atom::new_empty();
-    //                     }
-    //                 }
-    //                 None => (),
-    //             }
-    //             match self.atom_vector.atom_name.get(i) {
-    //                 Some(b" N  ") => gly_n = self.atom_vector.get(i),
-    //                 Some(b" CA ") => gly_ca = self.atom_vector.get(i),
-    //                 Some(b" C  ") => gly_c = self.atom_vector.get(i),
-    //                 Some(b" O  ") => gly_o = self.atom_vector.get(i),
-    //                 _ => (),
-    //             }
-    //             if gly_n.is_empty() || gly_ca.is_empty() || gly_c.is_empty() || gly_o.is_empty() {
-    //                 continue;
-    //             } else {
-    //                 let cbeta_coord = approx_cb(
-    //                     &gly_ca.get_coordinate(),
-    //                     &gly_n.get_coordinate(),
-    //                     &gly_c.get_coordinate(),
-    //                 );
-    //                 // // Make new cbeta atom
-    //                 // let cbeta_atom = Atom::new(cbeta_coord.x, cbeta_coord.y, cbeta_coord.z, b"CB  ", b"GLY", gly_ca.chain, gly_ca.res_serial, gly_ca.res_name, );
-    //             }
-    //         }
-    //     }
-    // }
-
     pub fn to_compact(&self) -> CompactStructure {
         CompactStructure::build(self)
     }
@@ -98,9 +49,7 @@ impl Structure {
         //FIXME: Right now, only Psi is calculated
         Torsion::build(self, TorsionType::Psi)
     }
-    // pub fn count_chains() {}
-    // pub fn count_atoms() {}
-    // pub fn count_residues() {}
+
 }
 
 #[derive(Debug, Clone)]
@@ -326,7 +275,7 @@ impl CompactStructure {
         }
     }
     
-    pub fn get_ca_cb_angle(&self, idx1: usize, idx2: usize) -> Option<f32> {
+    pub fn get_ca_cb_angle(&self, idx1: usize, idx2: usize, return_radian: bool) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
         let ca2 = self.get_ca(idx2);
@@ -336,19 +285,12 @@ impl CompactStructure {
                 &cb1.expect("Unable to get CB1 coordinate"),
                 &ca2.expect("Unable to get CA2 coordinate"),
                 &cb2.expect("Unable to get CB2 coordinate"),
+                return_radian,
             );
             Some(angle)
         } else {
             None
         }
-    }
-    
-    pub fn get_pdb_feature(&self, idx1: usize, idx2: usize) -> Vec<f32> {
-        let cb_dist = self.get_cb_distance(idx1, idx2).unwrap();
-        let angle = self.get_ca_cb_angle(idx1, idx2).unwrap();
-        let ca_dist = self.get_ca_distance(idx1, idx2).unwrap();
-        let feature = vec![ca_dist, cb_dist, angle];
-        feature
     }
     
     pub fn get_res_name(&self, idx: usize) -> &[u8; 3] {
@@ -362,7 +304,7 @@ impl CompactStructure {
         (self.residue_serial[idx1], self.residue_serial[idx2])
     }
 
-    pub fn get_ppf(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
+    pub fn get_ppf(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<[f32; 4]> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
         let cb2 = self.get_cb(idx2);
@@ -370,14 +312,16 @@ impl CompactStructure {
             let rel_cb1 = cb1.unwrap().sub(&ca1.unwrap());
             let rel_cb2 = cb2.unwrap().sub(&ca1.unwrap());
             let ppf = rel_cb1.get_ppf(&rel_cb2);
-            let ppf = ppf.to_vec();
+            if ppf[0] > dist_cutoff {
+                return None;
+            }
             Some(ppf)
         } else {
             None
         }
     }
 
-    fn _get_trrosetta_feature(&self, idx1: usize, idx2: usize) -> Option<[f32; 6]> {
+    pub fn get_trrosetta_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
         let cb1 = self.get_cb(idx1);
@@ -388,59 +332,15 @@ impl CompactStructure {
             (ca1, ca2, cb1, cb2, n1, n2)
         {
             let cb_dist = cb1.calc_distance(&cb2);
-            let omega = calc_cos2_torsion_angle(&ca1, &cb1, &cb2, &ca2);
-            let theta1 = calc_cos2_torsion_angle(&n1, &ca1, &cb1, &cb2);
-            let theta2 = calc_cos2_torsion_angle(&cb1, &cb2, &ca2, &n2);
-            let phi1 = calc_angle_point(&ca1, &cb1, &cb2);
-            let phi2 = calc_angle_point(&cb1, &cb2, &ca2);
-            let feature = [cb_dist, omega, theta1, theta2, phi1, phi2];
-            Some(feature)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_trrosetta_feature(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
-        let ca1 = self.get_ca(idx1);
-        let ca2 = self.get_ca(idx2);
-        let cb1 = self.get_cb(idx1);
-        let cb2 = self.get_cb(idx2);
-        let n1 = self.get_n(idx1);
-        let n2 = self.get_n(idx2);
-        if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2)) =
-            (ca1, ca2, cb1, cb2, n1, n2)
-        {
-            let cb_dist = cb1.calc_distance(&cb2);
+            if cb_dist > dist_cutoff {
+                return None;
+            }
             let omega = calc_torsion_radian(&ca1, &cb1, &cb2, &ca2);
             let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
             let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
             let phi1 = calc_angle_radian(&ca1, &cb1, &cb2);
             let phi2 = calc_angle_radian(&cb1, &cb2, &ca2);
-            let feature = vec![cb_dist, omega, theta1, theta2, phi1, phi2];
-            Some(feature)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_default_feature(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
-        let ca1 = self.get_ca(idx1);
-        let ca2 = self.get_ca(idx2);
-        let cb1 = self.get_cb(idx1);
-        let cb2 = self.get_cb(idx2);
-        let n1 = self.get_n(idx1);
-        let n2 = self.get_n(idx2);
-        if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2)) =
-            (ca1, ca2, cb1, cb2, n1, n2)
-        {
-            let cb_dist = cb1.calc_distance(&cb2);
-            let omega = calc_torsion_radian(&ca1, &cb1, &cb2, &ca2);
-            let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
-            let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
-            let phi1 = calc_angle_radian(&ca1, &cb1, &cb2);
-            let phi2 = calc_angle_radian(&cb1, &cb2, &ca2);
-            let feature = vec![cb_dist, omega, theta1, theta2, phi1, phi2];
-            Some(feature)
+            Some((cb_dist, omega, theta1, theta2, phi1, phi2))
         } else {
             None
         }
@@ -471,8 +371,8 @@ impl CompactStructure {
             None
         }
     }
-    
-    pub fn get_pdb_tr_feature(&self, idx1: usize, idx2: usize) -> Option<Vec<f32>> {
+
+    pub fn get_pdb_tr_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
         let cb1 = self.get_cb(idx1);
@@ -483,41 +383,14 @@ impl CompactStructure {
             (ca1, ca2, cb1, cb2, n1, n2)
         {
 
-            let ca_dist =self.get_ca_distance(idx1, idx2).unwrap();
-            if ca_dist > 20.0 {
+            let ca_dist = self.get_ca_distance(idx1, idx2).unwrap();
+            if ca_dist > dist_cutoff {
                 return None;
             }
             let cb_dist = self.get_cb_distance(idx1, idx2).unwrap();
-            let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2).unwrap().to_radians();
+            let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2, true).unwrap();
             let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
             let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
-            let feature = vec![ca_dist, cb_dist, ca_cb_angle, theta1, theta2];
-            Some(feature)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_pdb_tr_feature_new(&self, idx1: usize, idx2: usize) -> Option<(f32, f32, f32, f32, f32)> {
-        let ca1 = self.get_ca(idx1);
-        let ca2 = self.get_ca(idx2);
-        let cb1 = self.get_cb(idx1);
-        let cb2 = self.get_cb(idx2);
-        let n1 = self.get_n(idx1);
-        let n2 = self.get_n(idx2);
-        if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2)) =
-            (ca1, ca2, cb1, cb2, n1, n2)
-        {
-
-            let ca_dist =self.get_ca_distance(idx1, idx2).unwrap();
-            if ca_dist > 20.0 {
-                return None;
-            }
-            let cb_dist = self.get_cb_distance(idx1, idx2).unwrap();
-            let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2).unwrap().to_radians();
-            let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
-            let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
-            // let feature = vec![ca_dist, cb_dist, ca_cb_angle, theta1, theta2];
             Some((ca_dist, cb_dist, ca_cb_angle, theta1, theta2))
             // Some(feature)
         } else {

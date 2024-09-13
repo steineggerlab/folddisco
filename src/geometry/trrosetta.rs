@@ -19,7 +19,7 @@ use crate::utils::convert::*;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    pub fn perfect_hash(feature: Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> Self {
+    pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         HashValue::_perfect_hash(
@@ -28,7 +28,7 @@ impl HashValue {
             nbin_dist as f32, nbin_angle as f32
         )
     }
-    pub fn perfect_hash_default(feature: Vec<f32>) -> Self {
+    pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         HashValue::_perfect_hash(
@@ -50,7 +50,7 @@ impl HashValue {
     fn _perfect_hash(
         res1: u32, res2: u32, cb_dist: f32, omega: f32, theta1: f32, theta2: f32,
         phi1: f32, phi2: f32, nbin_dist: f32, nbin_angle: f32
-    ) -> Self {
+    ) -> u32 {
         // By default, bit for the distance is 3 and angle is 2
         let nbin_dist = if nbin_dist > 8.0 { 8.0 } else { nbin_dist };
         let nbin_angle = if nbin_angle > 4.0 { 4.0 } else { nbin_angle };
@@ -60,35 +60,34 @@ impl HashValue {
         
         // Convert angles to sin and cos
         let angles = [omega, theta1, theta2, phi1, phi2];
-        let sin_cos_angles = angles.iter().map(
-            |&x| (x.sin(), x.cos())
-        ).collect::<Vec<(f32, f32)>>();
+        let sin_cos_angles = [
+            (omega.sin(), omega.cos()), (theta1.sin(), theta1.cos()),
+            (theta2.sin(), theta2.cos()), (phi1.sin(), phi1.cos()),
+            (phi2.sin(), phi2.cos())
+        ];
+
         // Discretize sin and cos
-        let sin_cos_angles = sin_cos_angles.iter().enumerate().map(
-            |(i, &(sin, cos))| {
-                if i < 3 {
-                    (
-                        discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, nbin_angle),
-                        discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, nbin_angle)
-                    )
-                } else {
-                    (
-                        discretize_value(sin, MIN_SIN_COS, MAX_SIN_COS, nbin_angle),
-                        discretize_value(cos, MIN_SIN_COS, MAX_SIN_COS, nbin_angle)
-                    )
-                }
-            }
-        ).collect::<Vec<(u32, u32)>>();
+        let sin_cos_angles = [
+            discretize_value(sin_cos_angles[0].0, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_omega
+            discretize_value(sin_cos_angles[0].1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_omega
+            discretize_value(sin_cos_angles[1].0, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_theta1
+            discretize_value(sin_cos_angles[1].1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_theta1
+            discretize_value(sin_cos_angles[2].0, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_theta2
+            discretize_value(sin_cos_angles[2].1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_theta2
+            discretize_value(sin_cos_angles[3].0, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_phi1
+            discretize_value(sin_cos_angles[3].1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_phi1
+            discretize_value(sin_cos_angles[4].0, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_phi2
+            discretize_value(sin_cos_angles[4].1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_phi2
+        ];
         
         // Combine all the hash values
         let hashvalue = res_pair << 23 | h_cb_dist << 20
-            | sin_cos_angles[0].0 << 18 | sin_cos_angles[0].1 << 16 // sin_omega, cos_omega
-            | sin_cos_angles[1].0 << 14 | sin_cos_angles[1].1 << 12 // sin_theta1, cos_theta1
-            | sin_cos_angles[2].0 << 10 | sin_cos_angles[2].1 << 8 // sin_theta2, cos_theta2
-            | sin_cos_angles[3].0 << 6 | sin_cos_angles[3].1 << 4 // sin_phi1, cos_phi1
-            | sin_cos_angles[4].0 << 2 | sin_cos_angles[4].1; // sin_phi2, cos_phi2
-
-        HashValue(hashvalue)
+            | sin_cos_angles[0] << 18 | sin_cos_angles[1] << 16 // sin_omega, cos_omega
+            | sin_cos_angles[2] << 14 | sin_cos_angles[3] << 12 // sin_theta1, cos_theta1
+            | sin_cos_angles[4] << 10 | sin_cos_angles[5] << 8 // sin_theta2, cos_theta2
+            | sin_cos_angles[6] << 6 | sin_cos_angles[7] << 4 // sin_phi1, cos_phi1
+            | sin_cos_angles[8] << 2 | sin_cos_angles[9]; // sin_phi2, cos_phi2
+        hashvalue
     }
 
     fn _reverse_hash(&self, _nbin_dist: f32, nbin_angle: f32) -> [f32; 8] {
@@ -109,20 +108,19 @@ impl HashValue {
             (self.0 & BITMASK32_2BIT), // cos_phi2
         ];
 
-        let sin_cos_vec = sin_cos_vec.iter().enumerate().map(
-            |(i, &x)| {
-                if i < 6 {
-                    continuize_value(
-                        x, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-                    )
-                } else {
-                    continuize_value(
-                        x, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
-                    )
-                }
-            }
-        ).collect::<Vec<f32>>();
-        
+        let sin_cos_vec = [
+            continuize_value(sin_cos_vec[0], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_omega
+            continuize_value(sin_cos_vec[1], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_omega
+            continuize_value(sin_cos_vec[2], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_theta1
+            continuize_value(sin_cos_vec[3], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_theta1
+            continuize_value(sin_cos_vec[4], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_theta2
+            continuize_value(sin_cos_vec[5], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_theta2
+            continuize_value(sin_cos_vec[6], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_phi1
+            continuize_value(sin_cos_vec[7], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_phi1
+            continuize_value(sin_cos_vec[8], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_phi2
+            continuize_value(sin_cos_vec[9], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_phi2
+        ];
+
         // Restores original angles
         let omega = sin_cos_vec[0].atan2(sin_cos_vec[1]).to_degrees();
         let theta1 = sin_cos_vec[2].atan2(sin_cos_vec[3]).to_degrees();
@@ -187,11 +185,11 @@ mod tests {
             raw_feature.4.to_radians(), raw_feature.5.to_radians(),
             raw_feature.6.to_radians(), raw_feature.7.to_radians(),
         ];
-        let hash = GeometricHash::perfect_hash_default(feature_input, HashType::TrRosetta);
+        let hash = GeometricHash::perfect_hash_default(&feature_input, HashType::TrRosetta);
         //
         println!("{:?}", hash);
-
-        let rev = hash.reverse_hash_default();
+        let mut rev = vec![0.0; 8];
+        hash.reverse_hash_default(&mut rev);
         assert_eq!(rev[0], 0.0);
         assert_eq!(rev[1], 1.0);
     }
@@ -210,9 +208,10 @@ mod tests {
                 raw_feature.6.to_radians(), raw_feature.7.to_radians(),
             ];
             let hash = GeometricHash::perfect_hash(
-                feature_input, HashType::TrRosetta, nbin_dist, nbin_angle
+                &feature_input, HashType::TrRosetta, nbin_dist, nbin_angle
             );
-            let rev = hash.reverse_hash(nbin_dist, nbin_angle);
+            let mut rev = vec![0.0; 8];
+            hash.reverse_hash(nbin_dist, nbin_angle, &mut rev);
             println!("{:?}", hash);
             println!("{:?}", rev);
         }

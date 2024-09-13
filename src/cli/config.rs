@@ -11,7 +11,6 @@ pub struct IndexConfig {
     pub num_bin_dist: usize,
     pub num_bin_angle: usize,
     pub mode: IndexMode,
-    pub grid_width: f32,
     pub chunk_size: usize,
     pub max_residue: usize,
     pub input_format: StructureFileFormat,
@@ -244,7 +243,7 @@ mod tests {
         let path = "data/index_config.toml";
         let index_config = IndexConfig::new(
             HashType::PDBTrRosetta, 10, 10,
-            IndexMode::Grid, 30.0, 65535, 4000,
+            IndexMode::Big, 30.0, 65535, 4000,
             StructureFileFormat::FCZDB, Some("data/foldcomp_db".to_string())
         );
         write_index_config_to_file(path, index_config.clone());

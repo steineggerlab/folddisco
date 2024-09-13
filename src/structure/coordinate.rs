@@ -1,6 +1,4 @@
 
-use crate::utils::calculator::Calculate;
-
 pub const CA_CB_DIST: f32 = 1.5336;
 
 #[derive(Debug, Clone, Copy)]
@@ -97,10 +95,8 @@ impl Coordinate {
     pub fn to_array(&self) -> [f32; 3] {
         [self.x, self.y, self.z]
     }
-}
 
-impl Calculate for Coordinate {
-    fn calc_distance(&self, other: &Coordinate) -> f32 {
+    pub fn calc_distance(&self, other: &Coordinate) -> f32 {
         let dx = self.x - other.x;
         let dy = self.y - other.y;
         let dz = self.z - other.z;
@@ -108,7 +104,7 @@ impl Calculate for Coordinate {
         dist
     }
 
-    fn calc_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate) -> f32 {
+    pub fn calc_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate, return_radian: bool) -> f32 {
         let (a, b, c, d) = (self, atom2, atom3, atom4);
         // Form vectors
         let v1 = (b.x - a.x, b.y - a.y, b.z - a.z); // vector 1
@@ -118,8 +114,11 @@ impl Calculate for Coordinate {
         let v2_len = (v2.0.powf(2.0) + v2.1.powf(2.0) + v2.2.powf(2.0)).sqrt(); // length of vector 2
         let cos = dot / (v1_len * v2_len); // cos of angle
         let radian = cos.acos(); // angle in radians
-        let degree = radian.to_degrees(); // angle in degrees
-        degree
+        if !return_radian {
+            radian.to_degrees()
+        } else {
+            radian
+        }
     }
 }
 

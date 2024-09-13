@@ -9,31 +9,12 @@ use rayon::prelude::*;
 mod common;
 use common::loader;
 
-#[test]
-fn test_folddisco_default() {
-    // Test if the default hashing schemes are working
-    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    let mut fold_disco = FoldDisco::new(pdb_paths);
-    measure_time!(fold_disco.collect_hash());
-    // fold_disco.fill_numeric_id_vec();
-    for i in 0..fold_disco.hash_collection.len() {
-        println!(
-            "{:?} | {:?} | {:?} hashes | {:?}",
-            fold_disco.numeric_id_vec.get(i).unwrap(),
-            fold_disco.path_vec.get(i).unwrap(),
-            fold_disco.hash_collection.get(i).unwrap_or(&Vec::new()).len(),
-            fold_disco.hash_collection.get(i).unwrap().get(0).unwrap(), 
-        );
-    }
-    measure_time!(fold_disco.set_index_table());
-    measure_time!(fold_disco.fill_index_table());
-}
 
 #[test]
 fn test_folddisco_pdbmotif() {
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotif);
+    let mut fold_disco = FoldDisco::create_with_hash_type(pdb_paths, HashType::PDBMotif);
     fold_disco.collect_hash();
     // fold_disco.fill_numeric_id_vec();
     for i in 0..fold_disco.hash_collection.len() {
@@ -54,7 +35,7 @@ fn test_folddisco_pdbmotif() {
 fn test_folddisco_pdbmotifsincos() {
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
+    let mut fold_disco = FoldDisco::create_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
     measure_time!(fold_disco.collect_hash_grids());
     fold_disco.fill_numeric_id_vec();
     let mut hashes = fold_disco.hash_id_grids.clone();
@@ -71,7 +52,7 @@ fn test_folddisco_pdbmotifsincos() {
 fn test_folddisco_pdbmotifhalf() {
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBMotifHalf);
+    let mut fold_disco = FoldDisco::create_with_hash_type(pdb_paths, HashType::PDBMotifHalf);
     measure_time!(fold_disco.collect_hash_pairs());
     fold_disco.fill_numeric_id_vec();
 }
@@ -81,7 +62,7 @@ fn test_folddisco_pdbmotifhalf() {
 fn test_folddisco_pdbmotifsincos_dashmap() {
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::PDBTrRosetta);
+    let mut fold_disco = FoldDisco::create_with_hash_type(pdb_paths, HashType::PDBTrRosetta);
     measure_time!(fold_disco.collect_hash());
     // fold_disco.fill_numeric_id_vec();
     for i in 0..fold_disco.hash_collection.len() {
@@ -103,7 +84,7 @@ fn test_folddisco_pdbmotifsincos_dashmap() {
 fn test_folddisco_trrosetta() {
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
-    let mut fold_disco = FoldDisco::new_with_hash_type(pdb_paths, HashType::TrRosetta);
+    let mut fold_disco = FoldDisco::create_with_hash_type(pdb_paths, HashType::TrRosetta);
     fold_disco.collect_hash();
     // fold_disco.fill_numeric_id_vec();
     for i in 0..fold_disco.hash_collection.len() {

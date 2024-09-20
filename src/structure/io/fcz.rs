@@ -162,17 +162,15 @@ pub fn read_foldcomp_db_lookup(db_path: &str) -> Result<Vec<(usize, String)>, &'
         Ok(file) => file,
         Err(_) => return Err("Lookup file not found."),
     };
-    let mut output: Vec<(usize, String)> = Vec::new();
-    let reader = std::io::BufReader::new(lookup_file);
-    for line in reader.lines() {
-        let line = line.unwrap();
+    // mmap+rayon
+    let mmap = unsafe { Mmap::map(&lookup_file).unwrap() };
+    let content = unsafe { std::str::from_utf8_unchecked(&mmap) };
+    let output = content.par_lines().map(|line| {
         let mut split = line.split_whitespace();
         let id = split.next().unwrap().parse::<usize>().unwrap();
         let name = split.next().unwrap().to_string();
-        output.push((id, name));
-    }
-    
-    // Return
+        (id, name)
+    }).collect::<Vec<_>>();
     Ok(output)
 }
 
@@ -183,29 +181,29 @@ pub fn read_foldcomp_db_index(db_path: &str) -> Result<Vec<(usize, usize, usize)
         Ok(file) => file,
         Err(_) => return Err("Index file not found."),
     };
-    let mut output: Vec<(usize, usize, usize)> = Vec::new();
-    let reader = std::io::BufReader::new(index_file);
-    for line in reader.lines() {
-        let line = line.unwrap();
+    // mmap+rayon
+    let mmap = unsafe { Mmap::map(&index_file).unwrap() };
+    let content = unsafe { std::str::from_utf8_unchecked(&mmap) };
+    let output = content.par_lines().map(|line| {
         let mut split = line.split_whitespace();
         let id = split.next().unwrap().parse::<usize>().unwrap();
         let start = split.next().unwrap().parse::<usize>().unwrap();
         let length = split.next().unwrap().parse::<usize>().unwrap();
-        output.push((id, start, length));
-    }
+        (id, start, length)
+    }).collect::<Vec<_>>();
     Ok(output)
 }
 
 pub fn get_path_vector_out_of_lookup_and_index(lookup: &Vec<(usize, String)>, index: &Vec<(usize, usize, usize)>) -> Vec<String> {
-    let mut output: Vec<String> = Vec::new();
-    for (id, _, _) in index {
+    let output = index.par_iter().map(|(id, _, _)| {
         let entry_index = lookup.binary_search_by_key(id, |(id, _)| *id);
-        let entry: &(usize, String) = match entry_index {
+        let entry = match entry_index {
             Ok(index) => lookup.get(index).unwrap(),
-            Err(_) => continue,
+            Err(_) => return String::new(),
         };
-        output.push(entry.1.clone());
-    }
+        entry.1.clone()
+    }).filter(|name| !name.is_empty()).collect::<Vec<_>>();
+
     output
 }
 

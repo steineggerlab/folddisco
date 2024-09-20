@@ -8,6 +8,8 @@ DEV
   - [ ] 2. par_iter
 - [ ] DONE: discretizer - inlining
 
+- [ ] TODO: read lookups (foldcomp, folddisco) parallelly: mmap + rayon
+
 - [x] DONE: Edit github action to test foldcomp features in the CI
   - [ ] TODO: Pass the tests
 - [x] DONE: handle cases where lookup is not start from 0 to N. 

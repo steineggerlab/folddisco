@@ -308,9 +308,8 @@ impl FoldDisco {
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
                     .par_iter()
-                    .enumerate()
-                    .map(|(pdb_pos, pdb_path)| {
-                        // let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                    .map(|(pdb_path)| {
+                        let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
                         #[cfg(not(feature = "foldcomp"))]
                         let pdb_reader = PDBReader::from_file(pdb_path).expect(
                             log_msg(FAIL, "PDB file not found").as_str()
@@ -418,9 +417,8 @@ impl FoldDisco {
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
                     .par_iter()
-                    .enumerate()
-                    .map(|(pdb_pos, pdb_path)| {
-                        // let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                    .map(|(pdb_path)| {
+                        let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
                         #[cfg(not(feature = "foldcomp"))]
                         let pdb_reader = PDBReader::from_file(pdb_path).expect(
                             log_msg(FAIL, "PDB file not found").as_str()

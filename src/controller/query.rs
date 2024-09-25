@@ -17,7 +17,7 @@ use super::io::read_compact_structure;
 pub fn make_query(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
     nbin_dist: usize, nbin_angle: usize, exact_match: bool, dist_thresholds: Vec<f32>, angle_thresholds: Vec<f32>,
-    amino_acid_substitutions: &Vec<Option<Vec<u8>>>,
+    amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32,
 ) -> Vec<GeometricHash> {
     let pdb_reader = PDBReader::from_file(path).expect("PDB file not found");
     let compact = pdb_reader.read_structure().expect("Failed to read PDB file");
@@ -54,26 +54,30 @@ pub fn make_query(
     let angle_indices = hash_type.angle_index();
     // Make combinations
     let comb_iter = CombinationIterator::new(indices.len());
+    let mut feature = vec![0.0; 9];
+    let mut feature_near = vec![0.0; 9];
+    let mut feature_far = vec![0.0; 9];
     comb_iter.for_each(|(i, j)| {
         if i == j {
             return;
         }
-        let feature = get_single_feature(
-            indices[i], indices[j], &compact, hash_type
-        );
-        if feature.is_some() {
-            let feature = feature.unwrap();
+        let is_feature = get_single_feature(i, j, &compact, hash_type, distance_cutoff, &mut feature);
+        if is_feature {
+            for k in 0..feature.len() {
+                feature_near[k] = feature[k].clone();
+                feature_far[k] = feature[k].clone();
+            }
             if !exact_match & (dist_thresholds.len() > 0 || angle_thresholds.len() > 0) {
                 if let Some(dist_indices) = &dist_indices {
                     for dist_threshold in dist_thresholds.iter() {
                         for dist_index in dist_indices.iter() {
-                            let mut feature_near = feature.clone();
                             feature_near[*dist_index] -= dist_threshold;
-                            let mut feature_far = feature.clone();
                             feature_far[*dist_index] += dist_threshold;
                             append_hash(
-                                nbin_dist, nbin_angle, feature_near, hash_type, feature_far, &mut hash_collection
+                                nbin_dist, nbin_angle, &feature_near, hash_type, &feature_far, &mut hash_collection
                             );
+                            feature_near[*dist_index] += dist_threshold;
+                            feature_far[*dist_index] -= dist_threshold;
                         }
                     }
                 }
@@ -81,24 +85,24 @@ pub fn make_query(
                     if let Some(angle_indices) = &angle_indices {
                         for angle_threshold in angle_thresholds.iter() {
                             for angle_index in angle_indices.iter() {
-                                let mut feature_near = feature.clone();
                                 let angle_threshold = angle_threshold.to_radians();
                                 feature_near[*angle_index] -= angle_threshold;
-                                let mut feature_far = feature.clone();
                                 feature_far[*angle_index] += angle_threshold;
                                 append_hash(
-                                    nbin_dist, nbin_angle, feature_near, hash_type, feature_far, &mut hash_collection
+                                    nbin_dist, nbin_angle, &feature_near, hash_type, &feature_far, &mut hash_collection
                                 );
+                                feature_near[*angle_index] += angle_threshold;
+                                feature_far[*angle_index] -= angle_threshold;
                             }
                         }
                     }
                 }
             } else {
                 if nbin_dist == 0 || nbin_angle == 0 {
-                    let hash_value = GeometricHash::perfect_hash_default(feature, hash_type);
+                    let hash_value = GeometricHash::perfect_hash_default(&feature, hash_type);
                     hash_collection.push(hash_value);
                 } else {
-                    let hash_value = GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle);
+                    let hash_value = GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle);
                     hash_collection.push(hash_value);
                 }
             }
@@ -112,7 +116,7 @@ pub fn make_query(
 }
 
 fn append_hash(
-    nbin_dist: usize, nbin_angle: usize, feature_near: Vec<f32>, hash_type: HashType, feature_far: Vec<f32>,
+    nbin_dist: usize, nbin_angle: usize, feature_near: &Vec<f32>, hash_type: HashType, feature_far: &Vec<f32>,
     hash_collection: &mut Vec<GeometricHash>
 ) {
     if nbin_dist == 0 || nbin_angle == 0 {
@@ -149,7 +153,7 @@ pub fn parse_threshold_string(threshold_string: Option<String>) -> Vec<f32> {
 pub fn make_query_map(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
     nbin_dist: usize, nbin_angle: usize, dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
-    amino_acid_substitutions: &Vec<Option<Vec<u8>>>,
+    amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32,
 ) -> (HashMap<GeometricHash, ((usize, usize), bool)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
 
     let (compact, _) = read_compact_structure(path).expect("Failed to read compact structure");
@@ -189,15 +193,22 @@ pub fn make_query_map(
     let angle_indices = hash_type.angle_index();
     // Make combinations
     let comb_iter = CombinationIterator::new(indices.len());
+    let mut feature = vec![0.0; 9];
+    let mut feature_near = vec![0.0; 9];
+    let mut feature_far = vec![0.0; 9];
     comb_iter.for_each(|(i, j)| {
         if i == j {
             return;
         }
-        let feature = get_single_feature(
-            indices[i], indices[j], &compact, hash_type
+        let is_feature = get_single_feature(
+            indices[i], indices[j], &compact, hash_type, distance_cutoff, &mut feature
         );
         
-        if feature.is_some() {
+        if is_feature {
+            for k in 0..feature.len() {
+                feature_near[k] = feature[k].clone();
+                feature_far[k] = feature[k].clone();
+            }
             // Gather observed distance & aa pairs.
             let aa_dist_info = compact.get_list_amino_acids_and_distances(indices[i], indices[j]);
             if let Some(aa_dist_info) = aa_dist_info {
@@ -210,27 +221,29 @@ pub fn make_query_map(
                 }
             }
 
-            let feature = feature.unwrap();
-            let feature_clone = feature.clone();
             if nbin_dist == 0 || nbin_angle == 0 {
-                let hash_value = GeometricHash::perfect_hash_default(feature_clone, hash_type);
+                let hash_value = GeometricHash::perfect_hash_default(&feature, hash_type);
                 hash_collection.insert(hash_value, ((indices[i], indices[j]), true));
             } else {
-                let hash_value = GeometricHash::perfect_hash(feature_clone, hash_type, nbin_dist, nbin_angle);
+                let hash_value = GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle);
                 hash_collection.insert(hash_value, ((indices[i], indices[j]), true));
             }
+
             // Get zip of substitution of i and j
             if let Some(aa_index) = hash_type.amino_acid_index() {
+                let orig_aa_value1 = feature[aa_index[0]];
+                let orig_aa_value2 = feature[aa_index[1]];
                 if let Some(sub_i) = substitution_map.get(&indices[i]) {
                     // Substitute amino acid of i only
                     for sub_i in sub_i.iter() {
                         let mut feature = feature.clone();
                         feature[aa_index[0]] = *sub_i as f32;
                         let hash_value = if nbin_dist == 0 || nbin_angle == 0 {
-                            GeometricHash::perfect_hash_default(feature, hash_type)
+                            GeometricHash::perfect_hash_default(&feature, hash_type)
                         } else {
-                            GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+                            GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle)
                         };
+                        feature[aa_index[0]] = orig_aa_value1;
                         if hash_collection.contains_key(&hash_value) {
                             continue;
                         } else {
@@ -241,14 +254,15 @@ pub fn make_query_map(
                     if let Some(sub_j) = substitution_map.get(&indices[j]) {
                         for sub_i in sub_i.iter() {
                             for sub_j in sub_j.iter() {
-                                let mut feature = feature.clone();
                                 feature[aa_index[0]] = *sub_i as f32;
                                 feature[aa_index[1]] = *sub_j as f32;
                                 let hash_value = if nbin_dist == 0 || nbin_angle == 0 {
-                                    GeometricHash::perfect_hash_default(feature, hash_type)
+                                    GeometricHash::perfect_hash_default(&feature, hash_type)
                                 } else {
-                                    GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+                                    GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle)
                                 };
+                                feature[aa_index[0]] = orig_aa_value1;
+                                feature[aa_index[1]] = orig_aa_value2;
                                 if hash_collection.contains_key(&hash_value) {
                                     continue;
                                 } else {
@@ -264,10 +278,11 @@ pub fn make_query_map(
                             let mut feature = feature.clone();
                             feature[aa_index[1]] = *sub_j as f32;
                             let hash_value = if nbin_dist == 0 || nbin_angle == 0 {
-                                GeometricHash::perfect_hash_default(feature, hash_type)
+                                GeometricHash::perfect_hash_default(&feature, hash_type)
                             } else {
-                                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+                                GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle)
                             };
+                            feature[aa_index[1]] = orig_aa_value2;
                             if hash_collection.contains_key(&hash_value) {
                                 continue;
                             } else {
@@ -281,13 +296,13 @@ pub fn make_query_map(
             if let Some(dist_indices) = &dist_indices {
                 for dist_threshold in dist_thresholds.iter() {
                     for dist_index in dist_indices.iter() {
-                        let mut feature_near = feature.clone();
                         feature_near[*dist_index] -= dist_threshold;
-                        let mut feature_far = feature.clone();
                         feature_far[*dist_index] += dist_threshold;
                         if nbin_dist == 0 || nbin_angle == 0 {
-                            let hash_near = GeometricHash::perfect_hash_default(feature_near, hash_type);
-                            let hash_far = GeometricHash::perfect_hash_default(feature_far, hash_type);
+                            let hash_near = GeometricHash::perfect_hash_default(&feature_near, hash_type);
+                            let hash_far = GeometricHash::perfect_hash_default(&feature_far, hash_type);
+                            feature_near[*dist_index] += dist_threshold;
+                            feature_far[*dist_index] -= dist_threshold;
                             if hash_collection.contains_key(&hash_near) {
                                 continue;
                             } else {
@@ -299,8 +314,10 @@ pub fn make_query_map(
                                 hash_collection.insert(hash_far, ((indices[i], indices[j]), false));
                             }
                         } else {
-                            let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
-                            let hash_far = GeometricHash::perfect_hash(feature_far, hash_type, nbin_dist, nbin_angle);
+                            let hash_near = GeometricHash::perfect_hash(&feature_near, hash_type, nbin_dist, nbin_angle);
+                            let hash_far = GeometricHash::perfect_hash(&feature_far, hash_type, nbin_dist, nbin_angle);
+                            feature_near[*dist_index] += dist_threshold;
+                            feature_far[*dist_index] -= dist_threshold;
                             if hash_collection.contains_key(&hash_near) {
                                 continue;
                             } else {
@@ -312,20 +329,22 @@ pub fn make_query_map(
                                 hash_collection.insert(hash_far, ((indices[i], indices[j]), false));
                             }
                         }
+
                     }
                 }
             }
             if let Some(angle_indices) = &angle_indices {
                 for angle_threshold in angle_thresholds.iter() {
                     for angle_index in angle_indices.iter() {
-                        let mut feature_near = feature.clone();
                         let angle_threshold = angle_threshold.to_radians();
                         feature_near[*angle_index] -= angle_threshold;
-                        let mut feature_far = feature.clone();
                         feature_far[*angle_index] += angle_threshold;
                         if nbin_dist == 0 || nbin_angle == 0 {
-                            let hash_near = GeometricHash::perfect_hash_default(feature_near, hash_type);
-                            let hash_far = GeometricHash::perfect_hash_default(feature_far, hash_type);
+                            let hash_near = GeometricHash::perfect_hash_default(&feature_near, hash_type);
+                            let hash_far = GeometricHash::perfect_hash_default(&feature_far, hash_type);
+                            // Reset
+                            feature_near[*angle_index] += angle_threshold;
+                            feature_far[*angle_index] -= angle_threshold;
                             if hash_collection.contains_key(&hash_near) {
                                 continue;
                             } else {
@@ -337,8 +356,11 @@ pub fn make_query_map(
                                 hash_collection.insert(hash_far, ((indices[i], indices[j]), false));
                             }
                         } else {
-                            let hash_near = GeometricHash::perfect_hash(feature_near, hash_type, nbin_dist, nbin_angle);
-                            let hash_far = GeometricHash::perfect_hash(feature_far, hash_type, nbin_dist, nbin_angle);
+                            let hash_near = GeometricHash::perfect_hash(&feature_near, hash_type, nbin_dist, nbin_angle);
+                            let hash_far = GeometricHash::perfect_hash(&feature_far, hash_type, nbin_dist, nbin_angle);
+                            // Reset
+                            feature_near[*angle_index] += angle_threshold;
+                            feature_far[*angle_index] -= angle_threshold;
                             if hash_collection.contains_key(&hash_near) {
                                 continue;
                             } else {
@@ -474,7 +496,7 @@ mod tests {
         let angle_thresholds: Vec<f32> = vec![5.0];
         let hash_type = HashType::PDBMotifSinCos;
         let hash_collection = make_query(
-            &path, &query_residues, hash_type, 8, 6, false, dist_thresholds, angle_thresholds, &aa_substitution
+            &path, &query_residues, hash_type, 8, 6, false, dist_thresholds, angle_thresholds, &aa_substitution, 20.0,
         );
         // let hash_collection = make_query(&path, &query_residues, hash_type, 8, 3, true, dist_thresholds, angle_thresholds);
         println!("{:?}", hash_collection);
@@ -495,7 +517,7 @@ mod tests {
         let angle_thresholds: Vec<f32> = vec![5.0,10.0,15.0];
         let hash_type = HashType::PDBMotifSinCos;
         let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
-            &path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds, &vec![None, None, None]
+            &path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds, &vec![None, None, None], 20.0,
         );
         println!("{:?}", hash_collection);
         println!("{}", hash_collection.len());

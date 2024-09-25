@@ -6,104 +6,114 @@
 use crate::utils::convert::map_aa_to_u8;
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::structure::grid::{get_grid_index_vector_from_compact, merge_id_with_grid, nearby};
 use crate::utils::combination::CombinationIterator;
 
-pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash_type: HashType) -> Option<Vec<f32>> {
+pub fn get_single_feature(
+    i: usize, j: usize, structure: &CompactStructure, hash_type: HashType, 
+    dist_cutoff: f32, feature_container: &mut Vec<f32>
+) -> bool {
+    if i == j {
+        return false;
+    }
     let res1 = structure.get_res_name(i);
     let res2 = structure.get_res_name(j);
     let res1 = map_aa_to_u8(res1) as f32;
     let res2 = map_aa_to_u8(res2) as f32;
     if res1 == 255.0 || res2 == 255.0 {
-        return None;
+        return false;
     }
     match &hash_type {
         HashType::PDBMotif => {
             let ca_dist = structure.get_ca_distance(i, j);
-            let cb_dist = structure.get_cb_distance(i, j);
-            let ca_cb_angle = structure.get_ca_cb_angle(i, j); // degree
-            if ca_dist.is_some() && cb_dist.is_some() && ca_cb_angle.is_some() {
-                let feature = vec![
-                    res1, res2, ca_dist.unwrap(), cb_dist.unwrap(), ca_cb_angle.unwrap().to_radians()
-                ];
-                // Ignore distant interactions
-                if feature[2] > 20.0 {
-                    None    
-                } else {
-                    Some(feature)
+            if let Some(ca_dist) = ca_dist {
+                if ca_dist > dist_cutoff {
+                    return false;
                 }
+            } 
+            let cb_dist = structure.get_cb_distance(i, j);
+            // Uses angle in degree
+            let ca_cb_angle = structure.get_ca_cb_angle(i, j, false); // degree
+            if ca_dist.is_some() && cb_dist.is_some() && ca_cb_angle.is_some() {
+                feature_container[0] = res1;
+                feature_container[1] = res2;
+                feature_container[2] = ca_dist.unwrap();
+                feature_container[3] = cb_dist.unwrap();
+                feature_container[4] = ca_cb_angle.unwrap();
+                return true;
             } else {
-                None
+                return false;
             }
         },
-        HashType::PDBMotifSinCos | HashType::PDBMotifHalf => {
+        HashType::PDBMotifSinCos => {
             let ca_dist = structure.get_ca_distance(i, j);
-            let cb_dist = structure.get_cb_distance(i, j);
-            let ca_cb_angle = structure.get_ca_cb_angle(i, j);
-            if ca_dist.is_some() && cb_dist.is_some() && ca_cb_angle.is_some() {
-                let ca_cb_angle_radian = ca_cb_angle.unwrap().to_radians();
-                let feature = vec![
-                    res1, res2, ca_dist.unwrap(), cb_dist.unwrap(), ca_cb_angle_radian,
-                ];
-                // Ignore distant interactions
-                if feature[2] > 20.0 {
-                    None
-                } else {
-                    Some(feature)
+            if let Some(ca_dist) = ca_dist {
+                if ca_dist > dist_cutoff {
+                    return false;
                 }
+            }
+            let cb_dist = structure.get_cb_distance(i, j);
+            // Uses angle in radians
+            let ca_cb_angle_radian = structure.get_ca_cb_angle(i, j, true);
+            if ca_dist.is_some() && cb_dist.is_some() && ca_cb_angle_radian.is_some() {
+                feature_container[0] = res1;
+                feature_container[1] = res2;
+                feature_container[2] = ca_dist.unwrap();
+                feature_container[3] = cb_dist.unwrap();
+                feature_container[4] = ca_cb_angle_radian.unwrap();
+                return true;
             } else {
-                None
+                return false;
             }
         },
-        HashType::TrRosetta => {
-            let feature = structure.get_default_feature(i, j);
-            if feature.is_some() {
-                // Concatenate res1 and res2 to the feature
-                let mut feature = feature.unwrap();
-                if feature[0] > 20.0 {
-                    None
-                } else {
-                    feature.insert(0, res1);
-                    feature.insert(1, res2);
-                    Some(feature)
-                }
+        HashType::TrRosetta => { 
+            let feature = structure.get_trrosetta_feature(i, j, dist_cutoff);
+            if let Some(feature) = feature {
+                feature_container[0] = res1;
+                feature_container[1] = res2;
+                feature_container[2] = feature.0;
+                feature_container[3] = feature.1;
+                feature_container[4] = feature.2;
+                feature_container[5] = feature.3;
+                feature_container[6] = feature.4;
+                feature_container[7] = feature.5;
+                return true;
             } else {
-                None
+                return false;
+            }
+        },
+        HashType::PDBTrRosetta => {
+            let feature = structure.get_pdb_tr_feature(i, j, dist_cutoff);
+            if feature.is_some() {
+                let feature = feature.unwrap();
+                feature_container[0] = res1;
+                feature_container[1] = res2;
+                feature_container[2] = feature.0;
+                feature_container[3] = feature.1;
+                feature_container[4] = feature.2;
+                feature_container[5] = feature.3;
+                feature_container[6] = feature.4;
+                return true;
+            } else {
+                return false;
             }
         },
         HashType::PointPairFeature => {
-            let feature = structure.get_ppf(i, j);
-            if feature.is_some() {
-                let mut feature = feature.unwrap();
-                if feature[0] > 20.0 {
-                    None
-                } else {
-                    feature.insert(0, res1);
-                    feature.insert(1, res2);
-                    Some(feature)
-                }
+            let feature = structure.get_ppf(i, j, dist_cutoff);
+            if let Some(feature) = feature {
+                feature_container[0] = res1;
+                feature_container[1] = res2;
+                feature_container[2] = feature[0];
+                feature_container[3] = feature[1];
+                feature_container[4] = feature[2];
+                feature_container[5] = feature[3];
+                return true;
             } else {
-                None
+                return false;
             }
-        }
-        HashType::PDBTrRosetta => {
-            let feature = structure.get_pdb_tr_feature(i, j);
-            if feature.is_some() {
-                let mut feature = feature.unwrap();
-                if feature[0] > 20.0 {
-                    None
-                } else {
-                    feature.insert(0, res1);
-                    feature.insert(1, res2);
-                    Some(feature)
-                }
-            } else {
-                None
-            }
-        }
+        },
         HashType::TertiaryInteraction => {
             if i == 0 || j == 0 || i == structure.num_residues - 1 || j == structure.num_residues - 1 {
-                return None;
+                return false;
             }
             let ca_1i = structure.get_ca(i-1);
             let ca_i = structure.get_ca(i);
@@ -113,13 +123,13 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
             let ca_j1 = structure.get_ca(j+1);
             
             if ca_1i.is_none() || ca_i.is_none() || ca_i1.is_none() || ca_1j.is_none() || ca_j.is_none() || ca_j1.is_none() {
-                return None;
+                return false;
             } else {
                 let ca_i = ca_i.unwrap();
                 let ca_j = ca_j.unwrap();
                 let ca_dist = ca_i.distance(&ca_j);
-                if ca_dist > 20.0 {
-                    return None;
+                if ca_dist > dist_cutoff {
+                    return false;
                 }
                 let ca_1i = ca_1i.unwrap();
                 let ca_i1 = ca_i1.unwrap();
@@ -138,127 +148,49 @@ pub fn get_single_feature(i: usize, j: usize, structure: &CompactStructure, hash
                 let phi_23 = u2.dot(&u3).acos();
                 let phi_13 = u1.dot(&u3).acos();
                 let seq_dist = j as f32 - i as f32;
-                let feature = vec![
-                    phi_12, phi_34, phi_15, phi_35, phi_14, phi_23, phi_13, ca_dist, seq_dist
-                ];
-                Some(feature)
+                // let feature = vec![
+                //     phi_12, phi_34, phi_15, phi_35, phi_14, phi_23, phi_13, ca_dist, seq_dist
+                // ];
+                feature_container[0] = phi_12;
+                feature_container[1] = phi_34;
+                feature_container[2] = phi_15;
+                feature_container[3] = phi_35;
+                feature_container[4] = phi_14;
+                feature_container[5] = phi_23;
+                feature_container[6] = phi_13;
+                feature_container[7] = ca_dist;
+                feature_container[8] = seq_dist;
+                return true;
             }
-        }
+        },
         // append new hash type here
         _ => {
-            None
+            return false;
         }
     }
 }
 
-pub fn _get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<GeometricHash> {
-    let res_bound = get_all_combination(
-        structure.num_residues, false
-    );
-
+pub fn get_geometric_hash_as_u32_from_structure(
+    structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32
+) -> Vec<u32> {
+    let res_bound = CombinationIterator::new(structure.num_residues);
     let mut hash_vec = Vec::with_capacity(res_bound.len());
-
-    res_bound.iter().for_each(|(i, j)| {
-        let feature = get_single_feature(*i, *j, structure, hash_type);
-        if feature.is_some() {
-            let feature = feature.unwrap();
+    let mut feature = vec![0.0; 9];
+    res_bound.for_each(|(i, j)| {
+        if i == j {
+            return;
+        }
+        let has_feature = get_single_feature(i, j, structure, hash_type, dist_cutoff, &mut feature);
+        if has_feature {
             if nbin_dist == 0 || nbin_angle == 0 {
-                let hash = GeometricHash::perfect_hash_default(feature, hash_type);
+                let hash = GeometricHash::perfect_hash_default_as_u32(&feature, hash_type);
                 hash_vec.push(hash);
             } else {
-                let hash = GeometricHash::perfect_hash(feature,hash_type, nbin_dist, nbin_angle);
+                let hash = GeometricHash::perfect_hash_as_u32(&feature, hash_type, nbin_dist, nbin_angle);
                 hash_vec.push(hash);
             }
         }
     });
-    // Reduce memory usage
-    hash_vec.shrink_to_fit();
-    hash_vec
-}
-
-fn get_all_combination(n: usize, include_same: bool) -> Vec<(usize, usize)> {
-    let mut res = Vec::new();
-    for i in 0..n {
-        for j in 0..n {
-            if i == j && !include_same {
-                continue;
-            }
-            res.push((i, j));
-        }
-    }
-    res
-}
-
-pub fn get_geometric_hash_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<GeometricHash> {
-    let res_bound = CombinationIterator::new(structure.num_residues);
-    let mut hash_vec = Vec::new();
-
-    res_bound.for_each(|(i, j)| {
-        if i == j {
-            return;
-        }
-        let feature = get_single_feature(i, j, structure, hash_type);
-        if let Some(feature) = feature {
-            let hash = if nbin_dist == 0 || nbin_angle == 0 {
-                GeometricHash::perfect_hash_default(feature, hash_type)
-            } else {
-                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
-            };
-            hash_vec.push(hash);
-        }
-    });
-
-    // Reduce memory usage
-    hash_vec.shrink_to_fit();
-    hash_vec
-}
-
-pub fn get_geometric_hash_as_u32_from_structure(structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize) -> Vec<u32> {
-    let res_bound = CombinationIterator::new(structure.num_residues);
-    let mut hash_vec = Vec::with_capacity(res_bound.len());
-
-    res_bound.for_each(|(i, j)| {
-        if i == j {
-            return;
-        }
-        let feature = get_single_feature(i, j, structure, hash_type);
-        if let Some(feature) = feature {
-            let hash = if nbin_dist == 0 || nbin_angle == 0 {
-                GeometricHash::perfect_hash_default(feature, hash_type)
-            } else {
-                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
-            };
-            hash_vec.push(hash.as_u32());
-        }
-    });
-
-    // Reduce memory usage
-    hash_vec.shrink_to_fit();
-    hash_vec
-}
-
-
-pub fn get_geometric_hash_with_grid(structure: &CompactStructure, id: usize, hash_type: HashType, nbin_dist: usize, nbin_angle: usize, grid_width: f32) -> Vec<(GeometricHash, usize)> {
-    let grid_indices = get_grid_index_vector_from_compact(structure, grid_width);
-    let res_bound = CombinationIterator::new(structure.num_residues);
-    let mut hash_vec = Vec::new();
-
-    res_bound.for_each(|(i, j)| {
-        if !nearby(grid_indices[i], grid_indices[j]) {
-            return;
-        }
-        let feature = get_single_feature(i, j, structure, hash_type);
-        if let Some(feature) = feature {
-            let hash = if nbin_dist == 0 || nbin_angle == 0 {
-                GeometricHash::perfect_hash_default(feature, hash_type)
-            } else {
-                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
-            };
-            let id_grid = merge_id_with_grid(id, grid_indices[i]);
-            hash_vec.push((hash, id_grid));
-        }
-    });
-
     // Reduce memory usage
     hash_vec.shrink_to_fit();
     hash_vec
@@ -267,7 +199,7 @@ pub fn get_geometric_hash_with_grid(structure: &CompactStructure, id: usize, has
 impl HashType {
     pub fn amino_acid_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf |
+            HashType::PDBMotif | HashType::PDBMotifSinCos | 
             HashType::TrRosetta | HashType::PointPairFeature | HashType::PDBTrRosetta => Some(vec![0, 1]), 
             _ => None
         }
@@ -275,8 +207,7 @@ impl HashType {
 
     pub fn dist_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf |
-            HashType::PDBTrRosetta  => Some(vec![2, 3]),
+            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBTrRosetta  => Some(vec![2, 3]),
             HashType::TrRosetta | HashType::PointPairFeature => Some(vec![2]),
             HashType::TertiaryInteraction => Some(vec![7]),
             _ => None
@@ -285,7 +216,7 @@ impl HashType {
     
     pub fn angle_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBMotifHalf => Some(vec![4]),
+            HashType::PDBMotif | HashType::PDBMotifSinCos => Some(vec![4]),
             HashType::TrRosetta => Some(vec![3, 4, 5, 6, 7]),
             HashType::PointPairFeature => Some(vec![3, 4, 5]),
             HashType::PDBTrRosetta => Some(vec![4, 5, 6]), 
@@ -294,3 +225,4 @@ impl HashType {
         }
     }
 }
+

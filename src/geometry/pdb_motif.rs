@@ -23,29 +23,35 @@ const BITMASK32_5BIT: u32 = 0x0000001F;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    pub fn perfect_hash(feature: Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> Self {
-        let nbin_dist = if nbin_dist > 32 { 32.0 } else { nbin_dist as f32 };
-        let nbin_angle = if nbin_angle > 32 { 32.0 } else { nbin_angle as f32 };
+    pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
+        let nbin_dist = if nbin_dist > 32 { 
+            32.0
+        } else if nbin_dist == 0 {
+            NBIN_DIST
+        } else { 
+            nbin_dist as f32 
+        };
+        let nbin_angle = if nbin_angle > 32 { 
+            32.0
+        } else if nbin_angle == 0 {
+            NBIN_ANGLE
+        } else { 
+            nbin_angle as f32 
+        };
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         let ca_dist = discretize_value(feature[2], MIN_DIST, MAX_DIST, nbin_dist);
         let cb_dist = discretize_value(feature[3], MIN_DIST, MAX_DIST, nbin_dist); 
-        let angle = feature[4].to_degrees();
+        let angle = feature[4];
         let angle = discretize_value(angle, MIN_ANGLE, MAX_ANGLE, nbin_angle);
         let hashvalue = res1 << 20 | res2 << 15 | ca_dist << 10 | cb_dist << 5 | angle;
-        HashValue(hashvalue)
+        hashvalue
     }
-    pub fn perfect_hash_default(feature: Vec<f32>) -> Self {
-        let res1 = feature[0] as u32;
-        let res2 = feature[1] as u32;
-        let ca_dist = discretize_value(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST);
-        let cb_dist = discretize_value(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST);
-        let angle = feature[4].to_degrees();
-        let angle = discretize_value(angle, MIN_ANGLE, MAX_ANGLE, NBIN_ANGLE);
-        let hashvalue = res1 << 20 | res2 << 15 | ca_dist << 10 | cb_dist << 5 | angle;
-        HashValue(hashvalue)
+    pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
+        HashValue::perfect_hash(feature, NBIN_DIST as usize, NBIN_ANGLE as usize)
     }
-    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> Vec<f32> {
+
+    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 5] {
         let res1 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
         let res2 = ((self.0 >> 15) & BITMASK32_5BIT) as f32;
         let ca_dist = continuize_value(
@@ -60,26 +66,13 @@ impl HashValue {
             self.0 & BITMASK32_5BIT as u32, 
             MIN_ANGLE, MAX_ANGLE, nbin_angle as f32
         );
-        vec![res1, res2, ca_dist, cb_dist, angle]
+        [res1, res2, ca_dist, cb_dist, angle]
     }
-    pub fn reverse_hash_default(&self) -> Vec<f32> {
-        let res1 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
-        let res2 = ((self.0 >> 15) & BITMASK32_5BIT) as f32;
-        let ca_dist = continuize_value(
-            (self.0 >> 10) & BITMASK32_5BIT as u32, 
-            MIN_DIST, MAX_DIST, NBIN_DIST
-        );
-        let cb_dist = continuize_value(
-            (self.0 >> 5) & BITMASK32_5BIT as u32, 
-            MIN_DIST, MAX_DIST, NBIN_DIST
-        );
-        let angle = continuize_value(
-            self.0 & BITMASK32_5BIT as u32, 
-            MIN_ANGLE, MAX_ANGLE, NBIN_ANGLE
-        );
-        vec![res1, res2, ca_dist, cb_dist, angle]
+
+    pub fn reverse_hash_default(&self) -> [f32; 5] {
+        self.reverse_hash(NBIN_DIST as usize, NBIN_ANGLE as usize)
     }
-    
+
     pub fn hash_type(&self) -> HashType {
         HashType::PDBMotif
     }
@@ -130,8 +123,8 @@ mod tests {
             raw_feature.2, raw_feature.3, raw_feature.4
         ];
 
-        let hash = HashValue::perfect_hash_default(raw_feature.clone());
-        let _reversed = hash.reverse_hash_default();
+        let hash = HashValue::perfect_hash_default(&raw_feature);
+        let _reversed = HashValue::from_u32(hash).reverse_hash_default();
         println!("{:?}", hash);
     }
     #[test]
@@ -143,8 +136,8 @@ mod tests {
             map_aa_to_u8(raw_feature.0) as f32, map_aa_to_u8(raw_feature.1) as f32,
             raw_feature.2, raw_feature.3, raw_feature.4
         ];
-        let hash = HashValue::perfect_hash(raw_feature.clone(), 16, 8);
-        let _reversed = hash.reverse_hash(16, 8);
+        let hash = HashValue::perfect_hash(&raw_feature, 16, 8);
+        let _reversed = HashValue::from_u32(hash).reverse_hash(16, 8);
         println!("{:?}", hash);
     }
 }

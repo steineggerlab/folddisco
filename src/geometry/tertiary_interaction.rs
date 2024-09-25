@@ -1,11 +1,6 @@
 // Hash based on feature to build 3Di character in Foldseek
 // Main features are angles from neighboring C-alpha atoms
 
-// TODO: Implement this module
-
-
-
-
 // File: pdb_tr.rs
 // Created: 2024-03-27 17:35:35
 // Author: Hyunbin Kim (khb7840@gmail.com)
@@ -22,11 +17,22 @@ use crate::utils::convert::*;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    pub fn perfect_hash(feature: Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> Self {
+    pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         // Added one more quantization for distance
-        let nbin_dist = if nbin_dist > 16 { 16.0 } else { nbin_dist as f32 };
-        let nbin_angle = if nbin_angle > 8 { 8.0 } else { nbin_angle as f32 };
-        
+        let nbin_dist = if nbin_dist > 16 {
+            16.0
+        } else if nbin_dist == 0 {
+            NBIN_DIST
+        } else {
+            nbin_dist as f32
+        };
+        let nbin_angle = if nbin_angle > 8 {
+            8.0
+        } else if nbin_angle == 0 {
+            NBIN_SIN_COS
+        } else {
+            nbin_angle as f32
+        };
         let cos_phi_12 = feature[0].cos();
         let cos_phi_12 = discretize_value(
             cos_phi_12, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
@@ -70,18 +76,18 @@ impl HashValue {
         let hashvalue = (cos_phi_12 << 26) | (cos_phi_34 << 23) | (cos_phi_15 << 20) |
                         (cos_phi_35 << 17) | (cos_phi_14 << 14) | (cos_phi_23 << 11) |
                         (cos_phi_13 << 8) | (ca_dist << 4) | (seq_dist);
-        HashValue(hashvalue)
+        hashvalue
     }
 
-    pub fn perfect_hash_default(feature: Vec<f32>) -> Self {
-       Self::perfect_hash(feature, NBIN_DIST as usize, NBIN_SIN_COS as usize)
+    pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
+        HashValue::perfect_hash(&feature, NBIN_DIST as usize, NBIN_SIN_COS as usize)
     }
     
-    pub fn reverse_hash_default(&self) -> Vec<f32> {
+    pub fn reverse_hash_default(&self) -> [f32; 9] {
         self.reverse_hash(NBIN_DIST as usize, NBIN_SIN_COS as usize)
     }
     
-    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> Vec<f32> {
+    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 9] {
         let nbin_dist = if nbin_dist > 16 { 16.0 } else { nbin_dist as f32 };
         let nbin_angle = if nbin_angle > 8 { 8.0 } else { nbin_angle as f32 };
         let cos_phi_12 = continuize_value(
@@ -109,12 +115,10 @@ impl HashValue {
             (self.0 >> 4) & BITMASK32_4BIT, MIN_DIST, MAX_DIST, nbin_dist
         );
         let seq_dist = (self.0 & BITMASK32_4BIT) as f32 - 4.0;
-
-        vec![
+        [
             cos_phi_12, cos_phi_34, cos_phi_15, cos_phi_35, cos_phi_14, cos_phi_23,
             cos_phi_13, ca_dist, seq_dist
         ]
-
     }
     
     pub fn hash_type(&self) -> HashType {
@@ -154,7 +158,7 @@ impl fmt::Display for HashValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::{core::GeometricHash};
+    use crate::geometry::core::GeometricHash;
     #[test]
     fn test_geometrichash_works() {
         // Test perfect hash
@@ -167,7 +171,7 @@ mod tests {
             raw_feature.6.to_radians(), raw_feature.7, raw_feature.8
         ];
         let hash: GeometricHash = GeometricHash::TertiaryInteraction(
-            HashValue::perfect_hash_default(raw_feature)
+            HashValue(HashValue::perfect_hash_default(&raw_feature))
         );
         match hash {
             GeometricHash::TertiaryInteraction(hash) => {

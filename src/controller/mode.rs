@@ -134,44 +134,34 @@ pub fn parse_path_vec_by_id_type(path_vec: &Vec<String>, id_type: IdType) -> Vec
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexMode {
     Id,
-    Grid,
-    Pos,
     Big,
 }
 
 impl IndexMode {
     pub fn get_with_str(mode: &str) -> Self {
         match mode {
-            "Id" | "id" => Self::Id,
-            "Grid" | "grid" => Self::Grid,
-            "Pos" | "Position" | "position" | "pos" => Self::Pos,
-            "Big" | "big" => Self::Big,
+            "Id" | "id" | "ID" => Self::Id,
+            "Big" | "big" | "BIG" => Self::Big,
             _ => Self::Id,
         }
     }
     pub fn to_string(&self) -> String {
         match self {
             Self::Id => "id".to_string(),
-            Self::Grid => "grid".to_string(),
-            Self::Pos => "pos".to_string(),
             Self::Big => "big".to_string(),
         }
     }
     pub fn get_with_u8(mode: u8) -> Self {
         match mode {
             0 => Self::Id,
-            1 => Self::Grid,
-            2 => Self::Pos,
-            3 => Self::Big,
+            1 => Self::Big,
             _ => Self::Id,
         }
     }
     pub fn to_u8(&self) -> u8 {
         match self {
             Self::Id => 0,
-            Self::Grid => 1,
-            Self::Pos => 2,
-            Self::Big => 3,
+            Self::Big => 1,
         }
     }
 }

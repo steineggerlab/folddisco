@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 
 use crate::cli::config::{write_index_config_to_file, IndexConfig};
-use crate::controller::map::{convert_sorted_hash_pairs_to_simplemap, convert_sorted_hash_vec_to_simplemap};
+use crate::controller::map::convert_sorted_hash_vec_to_simplemap;
 use crate::controller::mode::{parse_path_vec_by_id_type, IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::write_usize_vector_in_bits;
@@ -33,11 +33,10 @@ Options:
     -p, --pdbs <PDB_DIR|FOLDCOMP_DB>   Directory or Foldcomp DB containing PDB files
     -y, --type <HASH_TYPE>             Hash type to use (pdb, trrosetta, default)
     -i, --index <INDEX_PATH>           Path to save the index table
-    -m, --mode <MODE>                  Mode to index (default=id, id: index only id, grid: index id and grid, pos: index id and position)
+    -m, --mode <MODE>                  Mode to index (default=id, id: index size is dynamic; pack 65536 entries; big: fixed size index)
     -t, --threads <THREADS>            Number of threads to use
     -d, --distance <NBIN_DIST>         Number of distance bins (default 0, zero means default)
     -a, --angle <NBIN_ANGLE>           Number of angle bins (default 0, zero means default)
-    -g, --grid <GRID_WIDTH>            Grid width (default 30.0)
     -c, --chunk <CHUNK_SIZE>           Number of PDB files to index at once (default, max=65535)
     -r, --recursive                    Index PDB files in subdirectories
     -n, --max-residue <MAX_RES>        Maximum number of residues in a PDB file (default=3000)
@@ -141,19 +140,19 @@ pub fn build_index(env: AppArgs) {
                 };
                 print_log_msg(INFO, &format!("Before initializing (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb()));
                 #[cfg(not(feature = "foldcomp"))]
-                let mut fold_disco = FoldDisco::new_with_params(
-                    pdb_path_vec.to_vec(), hash_type, true, num_threads, 
+                let mut fold_disco = FoldDisco::new(
+                    pdb_path_vec.to_vec(), hash_type, num_threads, 
                     num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode,
                 );
                 #[cfg(feature = "foldcomp")]
                 let mut fold_disco = if PathBuf::from(&pdb_container_name).is_dir() {
-                    FoldDisco::new_with_params(
-                        pdb_path_vec.to_vec(), hash_type, true, num_threads, 
+                    FoldDisco::new(
+                        pdb_path_vec.to_vec(), hash_type, num_threads, 
                         num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode,
                     )
                 } else {
                     FoldDisco::new_with_foldcomp_db(
-                        pdb_path_vec.to_vec(), hash_type, true, num_threads, 
+                        pdb_path_vec.to_vec(), hash_type, num_threads, 
                         num_bin_dist, num_bin_angle, index_path.clone(), grid_width, index_mode, pdb_container_name,
                     )
                 };
@@ -168,27 +167,6 @@ pub fn build_index(env: AppArgs) {
                             );
                         }
                         measure_time!(fold_disco.sort_hash_vec());
-                    }
-                    IndexMode::Grid => {
-                        if verbose { print_log_msg(INFO, "Collecting ids and grids with hashes observed"); }
-                        measure_time!(fold_disco.collect_hash_grids());
-                        if verbose {
-                            print_log_msg(INFO, 
-                                &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_grids.len(), PEAK_ALLOC.current_usage_as_mb())
-                                // &format!("Total {} hashes collected", fold_disco.hash_id_grids.len())
-                            );
-                        }
-                        measure_time!(fold_disco.sort_hash_grids());
-                    }
-                    IndexMode::Pos => {
-                        if verbose { print_log_msg(INFO, "Collecting ids and positions with hashes"); }
-                        //measure_time!(fold_disco.collect_hash_positions());
-                        // if verbose {
-                        //     print_log_msg(INFO, 
-                        //         &format!("Total {} hashes collected (Allocated {}MB)", fold_disco.hash_id_pos.len(), PEAK_ALLOC.current_usage_as_mb())
-                        //     );
-                        // }
-                        todo!("Implement this part");
                     }
                     IndexMode::Big => {
                         if verbose { print_log_msg(INFO, "Collecting ids of the structures"); }
@@ -222,21 +200,6 @@ pub fn build_index(env: AppArgs) {
                         measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 16).expect(
                             &log_msg(FAIL, "Failed to save values")
                         ));
-                    }
-                    IndexMode::Grid => {
-                        let (offset_map, value_vec) = measure_time!(convert_sorted_hash_pairs_to_simplemap(fold_disco.hash_id_grids));
-                        if verbose { print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())); }
-                        let offset_path = format!("{}.offset", index_path);
-                        let value_path = format!("{}.value", index_path);
-                        measure_time!(offset_map.dump_to_disk(&PathBuf::from(&offset_path)).expect(
-                           &log_msg(FAIL, "Failed to save offset table")
-                        ));
-                        measure_time!(write_usize_vector_in_bits(&value_path, &value_vec, 24).expect(
-                            &log_msg(FAIL, "Failed to save values")
-                        ));
-                    }
-                    IndexMode::Pos => {
-                        todo!("Implement this part");
                     }
                     IndexMode::Big => {}
                 }
@@ -286,7 +249,7 @@ mod tests {
         let num_bin_angle = 4;
         let chunk_size = 65535;
         let max_residue = 3000;
-        let grid_width = 40.0;
+        let grid_width = 20.0;
         let recursive = true;
         let verbose = true;
         let help = false;
@@ -322,7 +285,7 @@ mod tests {
             let num_bin_angle = 4;
             let chunk_size = 65535;
             let max_residue = 3000;
-            let grid_width = 40.0;
+            let grid_width = 20.0;
             let recursive = true;
             let verbose = true;
             let help = false;

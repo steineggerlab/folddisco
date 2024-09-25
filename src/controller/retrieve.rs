@@ -15,15 +15,16 @@ use crate::structure::io::fcz::FoldcompDbReader;
 
 pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
     let mut output: HashSet<(u32, u32)> = HashSet::new();
+    let mut feature = vec![0.0; 9];
     for hash in hash_vec {
-        let feature = hash.reverse_hash_default(); 
+        hash.reverse_hash_default(&mut feature);
         output.insert((feature[0] as u32, feature[1] as u32));
     }
     output
 }
 
 pub fn retrieve_residue_with_hash(
-    hash_set: &HashSet<GeometricHash>, _aa_filter: &HashSet<(u32, u32)>, path: &str, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
+    hash_set: &HashSet<GeometricHash>, _aa_filter: &HashSet<(u32, u32)>, path: &str, hash_type: HashType, nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
 ) -> Option<Vec<((u8, u8), (u64, u64))>> {
 
     let file = File::open(path).expect("File not found");
@@ -32,18 +33,18 @@ pub fn retrieve_residue_with_hash(
     let compact = compact.to_compact();
     let comb = CombinationIterator::new(compact.num_residues);
     let mut output: Vec<((u8, u8), (u64, u64))> = Vec::new();
+    let mut feature = vec![0.0; 9];
     comb.for_each(|(i, j)| {
         // let aa_pair = (map_aa_to_u8(&compact.residue_name[i]) as u32, map_aa_to_u8(&compact.residue_name[j]) as u32);
         // if !aa_filter.contains(&aa_pair) {
         //     return;
         // }
-        let feature = get_single_feature(i, j, &compact, hash_type);
-        if feature.is_some() {
-            let feature = feature.unwrap();
+        let is_feature = get_single_feature(i, j, &compact, hash_type, dist_cutoff, &mut feature);
+        if is_feature {
             let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
-                GeometricHash::perfect_hash_default(feature, hash_type)
+                GeometricHash::perfect_hash_default(&feature, hash_type)
             } else {
-                GeometricHash::perfect_hash(feature, hash_type, nbin_dist, nbin_angle)
+                GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle)
             };
             if hash_set.get(&curr_hash).is_some() {
                 output.push((
@@ -133,8 +134,8 @@ pub fn prefilter_aa_pair(
         Some(index) => index,
         None => return CombinationVecIterator::new((0..compact.num_residues).collect(), (0..compact.num_residues).collect()),
     };
-
-    let feature = hash.reverse_hash_default();
+    let mut feature = vec![0.0; 9];
+    hash.reverse_hash_default(&mut feature);
     let aa1 = map_u8_to_aa(feature[aa_index[0]] as u8).as_bytes();
     let aa2 = map_u8_to_aa(feature[aa_index[1]] as u8).as_bytes();
 
@@ -160,17 +161,18 @@ pub fn retrieve_with_prefilter(
     hash_set: &HashSet<GeometricHash>,
     // prefilter: &Vec<(usize, usize)>, 
     prefilter: CombinationVecIterator,
-    nbin_dist: usize, nbin_angle: usize,
+    nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
     query_aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
 ) -> (Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>) {
     let mut output: Vec<(usize, usize, GeometricHash)> = Vec::new();
     let mut candidate_pairs: Vec<(usize, (usize, usize))> = Vec::new();
     let hash = hash_set.iter().next().cloned().unwrap();
+    let mut feature = vec![0.0; 9];
     if prefilter.is_empty() {
         let comb = CombinationIterator::new(compact.num_residues);
         comb.for_each(|(i, j)| {
-            let feature = get_single_feature(i, j, compact, hash.hash_type());
-            if feature.is_some() {
+            let is_feature = get_single_feature(i, j, compact, hash.hash_type(), dist_cutoff, &mut feature);
+            if is_feature {
                 // Check distance & if it is within the threshold, add to candidate_pairs
                 let aa1 = map_aa_to_u8(&compact.residue_name[i]);
                 let aa2 = map_aa_to_u8(&compact.residue_name[j]);
@@ -187,12 +189,10 @@ pub fn retrieve_with_prefilter(
                         }
                     }
                 }
-
-                let feature = feature.unwrap();
                 let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
-                    GeometricHash::perfect_hash_default(feature, hash.hash_type())
+                    GeometricHash::perfect_hash_default(&feature, hash.hash_type())
                 } else {
-                    GeometricHash::perfect_hash(feature, hash.hash_type(), nbin_dist, nbin_angle)
+                    GeometricHash::perfect_hash(&feature, hash.hash_type(), nbin_dist, nbin_angle)
                 };
                 if hash_set.contains(&curr_hash) {
                     output.push((i, j, curr_hash));
@@ -201,9 +201,8 @@ pub fn retrieve_with_prefilter(
         });
     } else {
         for (i, j) in prefilter {
-            // let feature = get_single_feature(*i, *j, compact, hash.hash_type());
-            let feature = get_single_feature(i, j, compact, hash.hash_type());
-            if feature.is_some() {
+            let is_feature = get_single_feature(i, j, compact, hash.hash_type(), dist_cutoff, &mut feature);
+            if is_feature {
                 // Check distance & if it is within the threshold, add to candidate_pairs
                 let aa1 = map_aa_to_u8(&compact.residue_name[i]);
                 let aa2 = map_aa_to_u8(&compact.residue_name[j]);
@@ -214,18 +213,17 @@ pub fn retrieve_with_prefilter(
                     if curr_dist.is_some() {
                         let curr_dist = curr_dist.unwrap();
                         for (dist, qi) in dists {
-                            if (curr_dist - dist).abs() < 1.0 {
+                            if (curr_dist - dist).abs() < 1.5 {
                                 candidate_pairs.push((*qi, (i, j)));
                             }
                         }
                     }
                 }
 
-                let feature = feature.unwrap();
                 let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
-                    GeometricHash::perfect_hash_default(feature, hash.hash_type())
+                    GeometricHash::perfect_hash_default(&feature, hash.hash_type())
                 } else {
-                    GeometricHash::perfect_hash(feature, hash.hash_type(), nbin_dist, nbin_angle)
+                    GeometricHash::perfect_hash(&feature, hash.hash_type(), nbin_dist, nbin_angle)
                 };
                 if hash_set.contains(&curr_hash) {
                     // output.push((*i, *j));
@@ -248,7 +246,7 @@ pub fn res_index_to_char(chain: u8, res_ind: u64) -> String {
 #[cfg(feature = "foldcomp")]
 pub fn retrieval_wrapper_for_foldcompdb(
     path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
-    _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize,
+    _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize, dist_cutoff: f32,
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
@@ -267,7 +265,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
     }).collect::<HashSet<CombinationVecIterator>>();
     
     let (indices_found , candidate_pairs) = prefilter_set.par_drain().map(|aa_filter| {
-        retrieve_with_prefilter(&compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, aa_dist_map)
+        retrieve_with_prefilter(&compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map)
     }).collect::<Vec<(Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>)>>().into_iter().fold(
         (Vec::new(), Vec::new()), |(mut indices_found, mut candidate_pairs), (indices, candidates)| {
             indices_found.extend(indices);
@@ -413,7 +411,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
 // Returns a vector of 1) chain+residue index as String and 2) RMSD value as f32
 pub fn retrieval_wrapper(
     path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
-    _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize,
+    _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize, dist_cutoff: f32,
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
@@ -431,7 +429,7 @@ pub fn retrieval_wrapper(
     }).collect::<HashSet<CombinationVecIterator>>();
     
     let (indices_found , candidate_pairs) = prefilter_set.par_drain().map(|aa_filter| {
-        retrieve_with_prefilter(&compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, aa_dist_map)
+        retrieve_with_prefilter(&compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map)
     }).collect::<Vec<(Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>)>>().into_iter().fold(
         (Vec::new(), Vec::new()), |(mut indices_found, mut candidate_pairs), (indices, candidates)| {
             indices_found.extend(indices);
@@ -644,18 +642,19 @@ mod tests {
         let exact_match = false;
         let dist_thresholds: Vec<f32> = vec![0.5,1.0];
         let angle_thresholds: Vec<f32> = vec![5.0,10.0];
+        let dist_cutoff = 20.0;
         let queries = make_query(
-            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds.clone(), angle_thresholds.clone(), &aa_substitutions
+            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds.clone(), angle_thresholds.clone(), &aa_substitutions, dist_cutoff
         );
         let (query_map, query_indices, aa_dist_map ) = make_query_map(
-            &path, &query_residues, hash_type, nbin_dist, nbin_angle, &dist_thresholds, &angle_thresholds, &aa_substitutions
+            &path, &query_residues, hash_type, nbin_dist, nbin_angle, &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff
         );
         let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
         let compact = pdb_loaded.read_structure().expect("Error reading structure");
         let compact = compact.to_compact();
         let new_path = String::from("data/serine_peptidases_filtered/1azw.pdb");
         let output = measure_time!(retrieval_wrapper(
-            &new_path, query_residues.len(), &queries, hash_type, nbin_dist, nbin_angle, &query_map, &compact, &query_indices, &aa_dist_map
+            &new_path, query_residues.len(), &queries, hash_type, nbin_dist, nbin_angle, dist_cutoff, &query_map, &compact, &query_indices, &aa_dist_map
         ));
         println!("{:?}", output);
     }
@@ -674,8 +673,9 @@ mod tests {
         let exact_match = false;
         let dist_thresholds: Vec<f32> = vec![0.5,1.0];
         let angle_thresholds: Vec<f32> = vec![5.0, 10.0];
+        let dist_cutoff = 20.0;
         let queries = make_query(
-            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds, &aa_substitions
+            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds, &aa_substitions, dist_cutoff
         );
         let hash_set: HashSet<GeometricHash> = queries.iter().cloned().collect();
     
@@ -687,7 +687,7 @@ mod tests {
         let aa_filter = hash_vec_to_aa_pairs(&queries);
         println!("{:?}", aa_filter);
         let retrieved = measure_time!(retrieve_residue_with_hash(
-            &hash_set, &aa_filter, &path, hash_type, nbin_dist, nbin_angle
+            &hash_set, &aa_filter, &path, hash_type, nbin_dist, nbin_angle, dist_cutoff
         ));
         println!("RETRIEVED: {:?}", retrieved);
         let connected = connected(&retrieved.unwrap(), query_residues.len());

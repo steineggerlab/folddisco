@@ -10,10 +10,9 @@ use crate::HashableSync;
 pub enum HashType {
     PDBMotif,
     PDBMotifSinCos,
-    PDBMotifHalf,
     TrRosetta,
-    PointPairFeature,
     PDBTrRosetta,
+    PointPairFeature,
     TertiaryInteraction,
     // append new hash type here
     Other,
@@ -24,24 +23,22 @@ impl HashType {
         match index {
             0 => HashType::PDBMotif,
             1 => HashType::PDBMotifSinCos,
-            2 => HashType::PDBMotifHalf,
-            3 => HashType::TrRosetta,
+            2 => HashType::TrRosetta,
+            3 => HashType::PDBTrRosetta,
             4 => HashType::PointPairFeature,
-            5 => HashType::PDBTrRosetta,
-            6 => HashType::TertiaryInteraction,
+            5 => HashType::TertiaryInteraction,
             // append new hash type here
             _ => HashType::Other,
         }
     }
     pub fn get_with_str(hash_type: &str) -> Self {
         match hash_type {
-            "0" | "PDBMotif" | "pyscomotif" => HashType::PDBMotif,
+            "0" | "PDBMotif" | "pyscomotif" | "orig_pdb" => HashType::PDBMotif,
             "1" | "PDBMotifSinCos" | "pdb" => HashType::PDBMotifSinCos,
-            "2" | "PDBMotifHalf" | "pdbhalf" => HashType::PDBMotifHalf,
-            "3" | "TrRosetta" | "trrosetta" => HashType::TrRosetta,
+            "2" | "TrRosetta" | "trrosetta" | "tr" => HashType::TrRosetta,
+            "3" | "PDBTrRosetta" | "pdbtr" | "default" | "folddisco" => HashType::PDBTrRosetta,
             "4" | "PointPairFeature" | "ppf" => HashType::PointPairFeature,
-            "5" | "PDBTrRosetta" | "pdbtr" | "default" => HashType::PDBTrRosetta,
-            "6" | "TertiaryInteraction" | "tertiary" | "3di" => HashType::TertiaryInteraction,
+            "5" | "TertiaryInteraction" | "tertiary" | "3di" => HashType::TertiaryInteraction,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -50,10 +47,9 @@ impl HashType {
         match self {
             HashType::PDBMotif => "PDBMotif".to_string(),
             HashType::PDBMotifSinCos => "PDBMotifSinCos".to_string(),
-            HashType::PDBMotifHalf => "PDBMotifHalf".to_string(),
             HashType::TrRosetta => "TrRosetta".to_string(),
-            HashType::PointPairFeature => "PointPairFeature".to_string(),
             HashType::PDBTrRosetta => "PDBTrRosetta".to_string(),
+            HashType::PointPairFeature => "PointPairFeature".to_string(),
             HashType::TertiaryInteraction => "TertiaryInteraction".to_string(),
             // append new hash type here
             HashType::Other => "Other".to_string(),
@@ -68,10 +64,9 @@ impl HashType {
         match self {
             HashType::PDBMotif => 25usize,
             HashType::PDBMotifSinCos => 26usize,
-            HashType::PDBMotifHalf => 30usize,
             HashType::TrRosetta => 32usize,
-            HashType::PointPairFeature => 32usize,
             HashType::PDBTrRosetta => 30usize,
+            HashType::PointPairFeature => 32usize,
             HashType::TertiaryInteraction => 29usize,
             // append new hash type here
             HashType::Other => 32usize,
@@ -92,10 +87,9 @@ impl HashType {
             hash_type = match line.as_str() {
                 "PDBMotif" => HashType::PDBMotif,
                 "PDBMotifSinCos" => HashType::PDBMotifSinCos,
-                "PDBMotifHalf" => HashType::PDBMotifHalf,
                 "TrRosetta" => HashType::TrRosetta,
-                "PointPairFeature" => HashType::PointPairFeature,
                 "PDBTrRosetta" => HashType::PDBTrRosetta,
+                "PointPairFeature" => HashType::PointPairFeature,
                 "TertiaryInteraction" => HashType::TertiaryInteraction,
                 // append new hash type here
                 _ => HashType::Other,
@@ -114,10 +108,9 @@ mod tests {
         let hash_type_vec = vec![
             HashType::PDBMotif,
             HashType::PDBMotifSinCos,
-            HashType::PDBMotifHalf,
             HashType::TrRosetta,
-            HashType::PointPairFeature,
             HashType::PDBTrRosetta,
+            HashType::PointPairFeature,
             HashType::TertiaryInteraction,
             // append new hash type here
         ];
@@ -133,10 +126,9 @@ mod tests {
 pub enum GeometricHash {
     PDBMotif(super::pdb_motif::HashValue),
     PDBMotifSinCos(super::pdb_motif_sincos::HashValue),
-    PDBMotifHalf(super::pdb_halfmatch::HashValue),
-    TrRosetta(super::trrosetta_32bit::HashValue),
-    PointPairFeature(super::ppf::HashValue),
+    TrRosetta(super::trrosetta::HashValue),
     PDBTrRosetta(super::pdb_tr::HashValue),
+    PointPairFeature(super::ppf::HashValue),
     TertiaryInteraction(super::tertiary_interaction::HashValue),
     // append new hash type here
 }
@@ -144,28 +136,77 @@ pub enum GeometricHash {
 impl HashableSync for GeometricHash {}
 
 impl GeometricHash {
-    pub fn perfect_hash_default(feature: Vec<f32>, hash_type: HashType) -> Self {
+    pub fn perfect_hash_default_as_u32(feature: &Vec<f32>, hash_type: HashType) -> u32 {
+        match hash_type {
+            HashType::PDBMotif => super::pdb_motif::HashValue::perfect_hash_default(feature),
+            HashType::PDBMotifSinCos => super::pdb_motif_sincos::HashValue::perfect_hash_default(feature),
+            HashType::TrRosetta => super::trrosetta::HashValue::perfect_hash_default(feature),
+            HashType::PDBTrRosetta => super::pdb_tr::HashValue::perfect_hash_default(feature),
+            HashType::PointPairFeature => super::ppf::HashValue::perfect_hash_default(feature),
+            HashType::TertiaryInteraction => super::tertiary_interaction::HashValue::perfect_hash_default(feature),
+            // append new hash type here
+            _ => panic!("Invalid hash type"),
+        }
+    }
+
+    pub fn perfect_hash_as_u32(
+        feature: &Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
+    ) -> u32 {
+        match hash_type {
+            HashType::PDBMotif => super::pdb_motif::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            HashType::PDBMotifSinCos => super::pdb_motif_sincos::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            HashType::TrRosetta => super::trrosetta::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            HashType::PDBTrRosetta => super::pdb_tr::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            HashType::PointPairFeature => super::ppf::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            HashType::TertiaryInteraction => super::tertiary_interaction::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            // append new hash type here
+            _ => panic!("Invalid hash type"),
+        }
+    }
+    
+    pub fn perfect_hash_default(feature: &Vec<f32>, hash_type: HashType) -> Self {
         match hash_type {
             HashType::PDBMotif => GeometricHash::PDBMotif(
-                super::pdb_motif::HashValue::perfect_hash_default(feature)
+                super::pdb_motif::HashValue(
+                    super::pdb_motif::HashValue::perfect_hash_default(feature)
+                )
             ),
             HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
-                super::pdb_motif_sincos::HashValue::perfect_hash_default(feature)
-            ),
-            HashType::PDBMotifHalf => GeometricHash::PDBMotifHalf(
-                super::pdb_halfmatch::HashValue::perfect_hash_default(feature)
+                super::pdb_motif_sincos::HashValue(
+                    super::pdb_motif_sincos::HashValue::perfect_hash_default(feature)
+                )
             ),
             HashType::TrRosetta => GeometricHash::TrRosetta(
-                super::trrosetta_32bit::HashValue::perfect_hash_default(feature)
-            ),
-            HashType::PointPairFeature => GeometricHash::PointPairFeature(
-                super::ppf::HashValue::perfect_hash_default(feature)
+                super::trrosetta::HashValue(
+                    super::trrosetta::HashValue::perfect_hash_default(feature)
+                )
             ),
             HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
-                super::pdb_tr::HashValue::perfect_hash_default(feature)
+                super::pdb_tr::HashValue(
+                    super::pdb_tr::HashValue::perfect_hash_default(feature)
+                )
+            ),
+            HashType::PointPairFeature => GeometricHash::PointPairFeature(
+                super::ppf::HashValue(
+                    super::ppf::HashValue::perfect_hash_default(feature)
+                )
             ),
             HashType::TertiaryInteraction => GeometricHash::TertiaryInteraction(
-                super::tertiary_interaction::HashValue::perfect_hash_default(feature)
+                super::tertiary_interaction::HashValue(
+                    super::tertiary_interaction::HashValue::perfect_hash_default(feature)
+                )
             ),
             // append new hash type here
             _ => panic!("Invalid hash type"),
@@ -173,73 +214,125 @@ impl GeometricHash {
     }
     
     pub fn perfect_hash(
-        feature: Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
+        feature: &Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
     ) -> Self {
-            match hash_type {
-                HashType::PDBMotif => GeometricHash::PDBMotif(
-                    super::pdb_motif::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
-                    super::pdb_motif_sincos::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                HashType::PDBMotifHalf => GeometricHash::PDBMotifHalf(
-                    super::pdb_halfmatch::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                HashType::TrRosetta => GeometricHash::TrRosetta(
-                    super::trrosetta_32bit::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                HashType::PointPairFeature => GeometricHash::PointPairFeature(
-                    super::ppf::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
-                    super::pdb_tr::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                HashType::TertiaryInteraction => GeometricHash::TertiaryInteraction(
-                    super::tertiary_interaction::HashValue::perfect_hash(
-                        feature, nbin_dist, nbin_angle
-                    )
-                ),
-                // append new hash type here
-                _ => panic!("Invalid hash type"),
-            }
+        match hash_type {
+            HashType::PDBMotif => GeometricHash::PDBMotif(
+                super::pdb_motif::HashValue(
+                    super::pdb_motif::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
+            HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
+                super::pdb_motif_sincos::HashValue(
+                    super::pdb_motif_sincos::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
+            HashType::TrRosetta => GeometricHash::TrRosetta(
+                super::trrosetta::HashValue(
+                    super::trrosetta::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
+            HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
+                super::pdb_tr::HashValue(
+                    super::pdb_tr::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
+            HashType::PointPairFeature => GeometricHash::PointPairFeature(
+                super::ppf::HashValue(
+                    super::ppf::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
+            HashType::TertiaryInteraction => GeometricHash::TertiaryInteraction(
+                super::tertiary_interaction::HashValue(
+                    super::tertiary_interaction::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
+            // append new hash type here
+            _ => panic!("Invalid hash type"),
+        }
     }
-    
-    
-    pub fn reverse_hash_default(&self) -> Vec<f32> {
+
+    pub fn reverse_hash_default(&self, output: &mut Vec<f32>) {
         match self {
-            GeometricHash::PDBMotif(hash) => hash.reverse_hash_default(),
-            GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash_default(),
-            GeometricHash::PDBMotifHalf(hash) => hash.reverse_hash_default(),
-            GeometricHash::TrRosetta(hash) => hash.reverse_hash_default(),
-            GeometricHash::PointPairFeature(hash) => hash.reverse_hash_default(),
-            GeometricHash::PDBTrRosetta(hash) => hash.reverse_hash_default(),
-            GeometricHash::TertiaryInteraction(hash) => hash.reverse_hash_default(),
+            GeometricHash::PDBMotif(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::PDBMotifSinCos(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::TrRosetta(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::PDBTrRosetta(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            }
+            GeometricHash::PointPairFeature(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::TertiaryInteraction(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
             // append new hash type here
             // _ => panic!("Invalid hash type"),
         }
     }
 
-    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> Vec<f32> {
+    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize, output: &mut Vec<f32>) {
         match self {
-            GeometricHash::PDBMotif(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
-            GeometricHash::PDBMotifSinCos(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
-            GeometricHash::PDBMotifHalf(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
-            GeometricHash::TrRosetta(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
-            GeometricHash::PointPairFeature(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
-            GeometricHash::PDBTrRosetta(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
-            GeometricHash::TertiaryInteraction(hash) => hash.reverse_hash(nbin_dist, nbin_angle),
+            GeometricHash::PDBMotif(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::PDBMotifSinCos(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::TrRosetta(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::PDBTrRosetta(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::PointPairFeature(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::TertiaryInteraction(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
             // append new hash type here
             // _ => panic!("Invalid hash type"),
         }
@@ -249,7 +342,6 @@ impl GeometricHash {
         match self {
             GeometricHash::PDBMotif(hash) => hash.hash_type(),
             GeometricHash::PDBMotifSinCos(hash) => hash.hash_type(),
-            GeometricHash::PDBMotifHalf(hash) => hash.hash_type(),
             GeometricHash::TrRosetta(hash) => hash.hash_type(),
             GeometricHash::PointPairFeature(hash) => hash.hash_type(),
             GeometricHash::PDBTrRosetta(hash) => hash.hash_type(),
@@ -267,17 +359,14 @@ impl GeometricHash {
             HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
                 super::pdb_motif_sincos::HashValue::from_u32(hashvalue)
             ),
-            HashType::PDBMotifHalf => GeometricHash::PDBMotifHalf(
-                super::pdb_halfmatch::HashValue::from_u32(hashvalue)
-            ),
-            HashType::PointPairFeature => GeometricHash::PointPairFeature(
-                super::ppf::HashValue::from_u32(hashvalue)
-            ),
             HashType::TrRosetta => GeometricHash::TrRosetta(
-                super::trrosetta_32bit::HashValue::from_u32(hashvalue)
+                super::trrosetta::HashValue::from_u32(hashvalue)
             ),
             HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
                 super::pdb_tr::HashValue::from_u32(hashvalue)
+            ),
+            HashType::PointPairFeature => GeometricHash::PointPairFeature(
+                super::ppf::HashValue::from_u32(hashvalue)
             ),
             HashType::TertiaryInteraction => GeometricHash::TertiaryInteraction(
                 super::tertiary_interaction::HashValue::from_u32(hashvalue)
@@ -295,17 +384,14 @@ impl GeometricHash {
             HashType::PDBMotifSinCos => GeometricHash::PDBMotifSinCos(
                 super::pdb_motif_sincos::HashValue::from_u64(hashvalue)
             ),
-            HashType::PDBMotifHalf => GeometricHash::PDBMotifHalf(
-                super::pdb_halfmatch::HashValue::from_u64(hashvalue)
-            ),
             HashType::TrRosetta => GeometricHash::TrRosetta(
-                super::trrosetta_32bit::HashValue::from_u64(hashvalue)
-            ),
-            HashType::PointPairFeature => GeometricHash::PointPairFeature(
-                super::ppf::HashValue::from_u64(hashvalue)
+                super::trrosetta::HashValue::from_u64(hashvalue)
             ),
             HashType::PDBTrRosetta => GeometricHash::PDBTrRosetta(
                 super::pdb_tr::HashValue::from_u64(hashvalue)
+            ),
+            HashType::PointPairFeature => GeometricHash::PointPairFeature(
+                super::ppf::HashValue::from_u64(hashvalue)
             ),
             HashType::TertiaryInteraction => GeometricHash::TertiaryInteraction(
                 super::tertiary_interaction::HashValue::from_u64(hashvalue)
@@ -319,10 +405,9 @@ impl GeometricHash {
         match self {
             GeometricHash::PDBMotif(hash) => hash.as_u32(),
             GeometricHash::PDBMotifSinCos(hash) => hash.as_u32(),
-            GeometricHash::PDBMotifHalf(hash) => hash.as_u32(),
-            GeometricHash::PointPairFeature(hash) => hash.as_u32(),
             GeometricHash::TrRosetta(hash) => hash.as_u32(),
             GeometricHash::PDBTrRosetta(hash) => hash.as_u32(),
+            GeometricHash::PointPairFeature(hash) => hash.as_u32(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u32(),
             // append new hash type here
         }
@@ -331,10 +416,9 @@ impl GeometricHash {
         match self {
             GeometricHash::PDBMotif(hash) => hash.as_u64(),
             GeometricHash::PDBMotifSinCos(hash) => hash.as_u64(),
-            GeometricHash::PDBMotifHalf(hash) => hash.as_u64(),
             GeometricHash::TrRosetta(hash) => hash.as_u64(),
-            GeometricHash::PointPairFeature(hash) => hash.as_u64(),
             GeometricHash::PDBTrRosetta(hash) => hash.as_u64(),
+            GeometricHash::PointPairFeature(hash) => hash.as_u64(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u64(),
             // append new hash type here
         }
@@ -352,13 +436,7 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
-    pub fn downcast_pdb_motif_half(&self) -> super::pdb_halfmatch::HashValue {
-        match self {
-            GeometricHash::PDBMotifHalf(hash) => hash.clone(),
-            _ => panic!("Invalid hash type"),
-        }
-    }
-    pub fn downcast_default_32bit(&self) -> super::trrosetta_32bit::HashValue {
+    pub fn downcast_default_32bit(&self) -> super::trrosetta::HashValue {
         match self {
             GeometricHash::TrRosetta(hash) => hash.clone(),
             _ => panic!("Invalid hash type"),
@@ -395,17 +473,14 @@ impl fmt::Debug for GeometricHash {
             GeometricHash::PDBMotifSinCos(hash) => {
                 write!(f, "PDBMotifSinCos({:?})", hash)
             },
-            GeometricHash::PDBMotifHalf(hash) => {
-                write!(f, "PDBMotifHalf({:?})", hash)
-            },
             GeometricHash::TrRosetta(hash) => {
                 write!(f, "TrRosetta({:?})", hash)
             },
-            GeometricHash::PointPairFeature(hash) => {
-                write!(f, "PointPairFeature({:?})", hash)
-            },
             GeometricHash::PDBTrRosetta(hash) => {
                 write!(f, "PDBTrRosetta({:?})", hash)
+            },
+            GeometricHash::PointPairFeature(hash) => {
+                write!(f, "PointPairFeature({:?})", hash)
             },
             GeometricHash::TertiaryInteraction(hash) => {
                 write!(f, "TertiaryInteraction({:?})", hash)
@@ -425,17 +500,14 @@ impl fmt::Display for GeometricHash {
             GeometricHash::PDBMotifSinCos(hash) => {
                 write!(f, "PDBMotifSinCos\t{:?}", hash)
             },
-            GeometricHash::PDBMotifHalf(hash) => {
-                write!(f, "PDBMotifHalf\t{:?}", hash)
-            },
             GeometricHash::TrRosetta(hash) => {
                 write!(f, "TrRosetta\t{:?}", hash)
             },
-            GeometricHash::PointPairFeature(hash) => {
-                write!(f, "PointPairFeature\t{:?}", hash)
-            },
             GeometricHash::PDBTrRosetta(hash) => {
                 write!(f, "PDBTrRosetta\t{:?}", hash)
+            },
+            GeometricHash::PointPairFeature(hash) => {
+                write!(f, "PointPairFeature\t{:?}", hash)
             },
             GeometricHash::TertiaryInteraction(hash) => {
                 write!(f, "TertiaryInteraction\t{:?}", hash)

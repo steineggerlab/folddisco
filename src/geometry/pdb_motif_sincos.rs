@@ -13,10 +13,22 @@ use crate::utils::convert::*;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    pub fn perfect_hash(feature: Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> Self {
+    pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         // Added one more quantization for distance
-        let nbin_dist = if nbin_dist > 16 { 16.0 } else { nbin_dist as f32 };
-        let nbin_angle = if nbin_angle > 16 { 16.0 } else { nbin_angle as f32 };
+        let nbin_dist = if nbin_dist > 16 { 
+            16.0
+        } else if nbin_dist == 0 {
+            NBIN_DIST
+        } else { 
+            nbin_dist as f32 
+        };
+        let nbin_angle = if nbin_angle > 16 {
+            16.0
+        } else if nbin_angle == 0 {
+            NBIN_SIN_COS
+        } else {
+            nbin_angle as f32
+        };
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         let ca_dist = discretize_value(
@@ -36,56 +48,14 @@ impl HashValue {
         );
         let hashvalue = res1 << 21 | res2 << 16 | ca_dist << 12 
             | cb_dist << 8 | sin_angle << 4 | cos_angle;
-        HashValue(hashvalue)
+        hashvalue
     }
 
-    pub fn perfect_hash_default(feature: Vec<f32>) -> Self {
-        let res1 = feature[0] as u32;
-        let res2 = feature[1] as u32;
-        let ca_dist = discretize_value(
-            feature[2], MIN_DIST, MAX_DIST, NBIN_DIST
-        );
-        let cb_dist = discretize_value(
-            feature[3], MIN_DIST, MAX_DIST, NBIN_DIST
-        );
-        // Angle is expected to be in radians
-        let sin_angle = feature[4].sin();
-        let cos_angle = feature[4].cos();
-        let sin_angle = discretize_value(
-            sin_angle, MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS
-        );
-        let cos_angle = discretize_value(
-            cos_angle, MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS
-        );
-        let hashvalue = res1 << 21 | res2 << 16 | ca_dist << 12 
-            | cb_dist << 8 | sin_angle << 4 | cos_angle;
-        HashValue(hashvalue)
+    pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
+        HashValue::perfect_hash(feature, NBIN_DIST as usize, NBIN_SIN_COS as usize)
     }
     
-    pub fn reverse_hash_default(&self) -> Vec<f32> {
-        let res1 = ((self.0 >> 21) & BITMASK32_5BIT)as f32;
-        let res2 = ((self.0 >> 16) & BITMASK32_5BIT) as f32;
-        let ca_dist = continuize_value(
-            (self.0 >> 12) & BITMASK32_4BIT as u32, 
-            MIN_DIST, MAX_DIST, NBIN_DIST
-        );
-        let cb_dist = continuize_value(
-            (self.0 >> 8) & BITMASK32_4BIT as u32,
-            MIN_DIST, MAX_DIST, NBIN_DIST
-        );
-        let sin_angle = continuize_value(
-            (self.0 >> 4) & BITMASK32_4BIT as u32,
-            MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS
-        );
-        let cos_angle = continuize_value(
-            self.0 & BITMASK32_4BIT as u32,
-            MIN_SIN_COS, MAX_SIN_COS, NBIN_SIN_COS
-        );
-        let angle = sin_angle.atan2(cos_angle).to_degrees();
-        vec![res1, res2, ca_dist, cb_dist, angle]
-    }
-    
-    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> Vec<f32> {
+    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 5] {
         let res1 = ((self.0 >> 21) & BITMASK32_5BIT)as f32;
         let res2 = ((self.0 >> 16) & BITMASK32_5BIT) as f32;
         let ca_dist = continuize_value(
@@ -105,7 +75,11 @@ impl HashValue {
             MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
         );
         let angle = sin_angle.atan2(cos_angle).to_degrees();
-        vec![res1, res2, ca_dist, cb_dist, angle]
+        [res1, res2, ca_dist, cb_dist, angle]
+    }
+    
+    pub fn reverse_hash_default(&self) -> [f32; 5] {
+        self.reverse_hash(NBIN_DIST as usize, NBIN_SIN_COS as usize)
     }
     
     pub fn hash_type(&self) -> HashType {
@@ -158,7 +132,7 @@ mod tests {
             raw_feature.2, raw_feature.3, raw_feature.4.to_radians()
         ];
         let hash: GeometricHash = GeometricHash::PDBMotifSinCos(
-            HashValue::perfect_hash(raw_feature, 8, 3)
+            HashValue(HashValue::perfect_hash(&raw_feature, 8, 3))
         );
         match hash {
             GeometricHash::PDBMotifSinCos(hash) => {

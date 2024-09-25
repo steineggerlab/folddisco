@@ -11,6 +11,7 @@ pub struct IndexConfig {
     pub num_bin_dist: usize,
     pub num_bin_angle: usize,
     pub mode: IndexMode,
+    pub grid_width: f32,
     pub chunk_size: usize,
     pub max_residue: usize,
     pub input_format: StructureFileFormat,

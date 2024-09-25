@@ -4,6 +4,6 @@ grid_width = 30.0
 hash_type = "PDBTrRosetta"
 input_format = "FCZDB"
 max_residue = 4000
-mode = "grid"
+mode = "big"
 num_bin_angle = 10
 num_bin_dist = 10

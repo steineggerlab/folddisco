@@ -17,7 +17,7 @@ use crate::cli::config::{read_index_config_from_file, IndexConfig};
 use crate::controller::map::SimpleHashMap;
 use crate::controller::mode::IndexMode;
 use crate::cli::*;
-use crate::controller::io::{read_compact_structure, read_u16_vector, read_u8_vector};
+use crate::controller::io::{read_compact_structure, read_u16_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
 use crate::controller::rank::{count_query_bigmode, count_query_idmode, QueryResult};
 use crate::controller::retrieve::retrieval_wrapper;
@@ -161,8 +161,12 @@ pub fn query_pdb(env: AppArgs) {
             #[cfg(feature = "foldcomp")]
             let foldcomp_db_reader = match config.input_format {
                 StructureFileFormat::FCZDB => {
-                    let foldcomp_db_path = config.foldcomp_db.clone().unwrap();
-                    FoldcompDbReader::new(foldcomp_db_path.as_str())
+                    if retrieve {
+                        let foldcomp_db_path = config.foldcomp_db.clone().unwrap();
+                        FoldcompDbReader::new(foldcomp_db_path.as_str())
+                    } else {
+                        FoldcompDbReader::empty()
+                    }
                 },
                 _ => FoldcompDbReader::empty(),
             };
@@ -198,12 +202,13 @@ pub fn query_pdb(env: AppArgs) {
                         let num_bin_dist = config.num_bin_dist;
                         let num_bin_angle = config.num_bin_angle;
                         let mode = config.mode;
+                        let dist_cutoff = config.grid_width;
                         let (pdb_query_map, query_indices, aa_dist_map ) = if verbose { measure_time!(make_query_map(
-                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitutions
+                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds,  &aa_substitutions, dist_cutoff,
                         )) } else {
                             make_query_map(
                                 &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, 
-                                &dist_thresholds, &angle_thresholds, &aa_substitutions
+                                &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff
                             )
                         };
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
@@ -231,7 +236,7 @@ pub fn query_pdb(env: AppArgs) {
                                 let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
-                                    v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
+                                    v.overflow_count <= match_count_filter[4] &&
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
                                 if verbose {
@@ -244,7 +249,7 @@ pub fn query_pdb(env: AppArgs) {
                                         #[cfg(not(feature = "foldcomp"))]
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
-                                            hash_type, num_bin_dist, num_bin_angle,
+                                            hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                             &pdb_query_map, &query_structure, &query_indices,
                                             &aa_dist_map
                                         );
@@ -252,14 +257,14 @@ pub fn query_pdb(env: AppArgs) {
                                         let retrieval_result = if using_foldcomp {
                                             retrieval_wrapper_for_foldcompdb(
                                                 &v.id, node_count, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle,
+                                                hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, &foldcomp_db_reader
                                             )
                                         } else {
                                             retrieval_wrapper(
                                                 &v.id, node_count, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle,
+                                                hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map
                                             )
@@ -301,7 +306,7 @@ pub fn query_pdb(env: AppArgs) {
                                 let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
                                     v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
                                     v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
-                                    v.overflow_count <= match_count_filter[4] && v.grid_count <= match_count_filter[5] &&
+                                    v.overflow_count <= match_count_filter[4] && 
                                     v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
                                 }).collect();
                                 if verbose {
@@ -314,7 +319,7 @@ pub fn query_pdb(env: AppArgs) {
                                         #[cfg(not(feature = "foldcomp"))]
                                         let retrieval_result = retrieval_wrapper(
                                             &v.id, node_count, &pdb_query,
-                                            hash_type, num_bin_dist, num_bin_angle,
+                                            hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                             &pdb_query_map, &query_structure, &query_indices,
                                             &aa_dist_map
                                         );
@@ -322,14 +327,14 @@ pub fn query_pdb(env: AppArgs) {
                                         let retrieval_result = if using_foldcomp {
                                             retrieval_wrapper_for_foldcompdb(
                                                 &v.id, node_count, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle,
+                                                hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, &foldcomp_db_reader
                                             )
                                         } else {
                                             retrieval_wrapper(
                                                 &v.id, node_count, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle,
+                                                hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map
                                             )
@@ -411,7 +416,7 @@ pub fn parse_multiple_queries(
         // Make query with pdb
         let (query_residues, aa_substitions) = parse_query_string(&query_string, structure.chains[0]);
         let (pdb_query_map, _query_indices, _) =  measure_time!(make_query_map(
-            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitions
+            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitions, 20.0
         ));
         let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();
         query_map_vec.push((pdb_query_map, pdb_query, query_residues, pdb_path.clone(), output_path.clone()));
@@ -477,7 +482,7 @@ mod tests {
         let threads = 1;
         let index_path = Some(String::from("data/serine_peptidases_pdbtr_small"));
         // let index_path = Some(String::from("analysis/e_coli/test_index"));
-        let retrieve = false;
+        let retrieve = true;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;

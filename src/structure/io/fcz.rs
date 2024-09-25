@@ -8,6 +8,8 @@ include!("../../../lib/foldcomp/bindings.rs");
 use libc;
 use memmap2::{Mmap, MmapMut};
 use rayon::prelude::ParallelSliceMut;
+use rayon::prelude::ParallelString;
+use rayon::prelude::*;
 use std::fs::File;
 use std::io::BufRead;
 use std::mem::ManuallyDrop;

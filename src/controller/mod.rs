@@ -326,10 +326,24 @@ impl FoldDisco {
                             )
                         };
                         #[cfg(feature = "foldcomp")]
-                        let compact = self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
-                            log_msg(FAIL, "Failed to read structure").as_str()
-                        );
-
+                        let compact = if self.is_foldcomp_enabled {
+                            self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
+                                log_msg(FAIL, "Failed to read structure").as_str()
+                            )
+                        } else {
+                            let pdb_reader = PDBReader::from_file(pdb_path).expect(
+                                log_msg(FAIL, "PDB file not found").as_str()
+                            );
+                            if pdb_path.ends_with(".gz") {
+                                pdb_reader.read_structure_from_gz().expect(
+                                    log_msg(FAIL, "Failed to read structure").as_str()
+                                )
+                            } else {
+                                pdb_reader.read_structure().expect(
+                                    log_msg(FAIL, "Failed to read structure").as_str()
+                                )
+                            }
+                        };
                         if compact.num_residues > self.max_residue {
                             print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
                             // skip this file
@@ -423,9 +437,24 @@ impl FoldDisco {
                         };
 
                         #[cfg(feature = "foldcomp")]
-                        let compact = self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
-                            log_msg(FAIL, "Failed to read structure").as_str()
-                        );
+                        let compact = if self.is_foldcomp_enabled {
+                            self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
+                                log_msg(FAIL, "Failed to read structure").as_str()
+                            )
+                        } else {
+                            let pdb_reader = PDBReader::from_file(pdb_path).expect(
+                                log_msg(FAIL, "PDB file not found").as_str()
+                            );
+                            if pdb_path.ends_with(".gz") {
+                                pdb_reader.read_structure_from_gz().expect(
+                                    log_msg(FAIL, "Failed to read structure").as_str()
+                                )
+                            } else {
+                                pdb_reader.read_structure().expect(
+                                    log_msg(FAIL, "Failed to read structure").as_str()
+                                )
+                            }
+                        };
 
                         if compact.num_residues > self.max_residue {
                             print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));

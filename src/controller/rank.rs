@@ -233,6 +233,10 @@ pub fn count_query_bigmode(
         let edge = edge_info.0;
         let hash_count = single_queried_values.len();
         for j in 0..single_queried_values.len() {
+            if single_queried_values[j] >= lookup.0.len() {
+                println!("Error: {} >= {}", single_queried_values[j], lookup.0.len());
+                println!("Error query: {:?}", query);
+            }
             let id = lookup.0[single_queried_values[j]].clone();
             let nid = lookup.1[single_queried_values[j]];
             let nres = lookup.2[single_queried_values[j]];

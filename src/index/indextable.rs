@@ -252,15 +252,22 @@ pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
 }
 
 
-
-fn split_by_seven_bits(id: usize) -> Vec<u8> {
-    let mut id_to_save = id;
+fn split_by_seven_bits(mut id: usize) -> Vec<u8> {
     let mut result = vec![];
-    while id_to_save > 0 {
-        let ending_bit = if id_to_save < 128 { 0x80 } else { 0 };
-        result.push((id_to_save & 0x7F) as u8 | ending_bit);
-        id_to_save >>= 7;
+    while id > 0 {
+        let byte = (id & 0x7F) as u8;
+        id >>= 7;
+        if id > 0 {
+            result.push(byte | 0x80); // Set continuation bit
+        } else {
+            result.push(byte); // Last byte, no continuation
+        }
     }
+
+    if result.is_empty() {
+        result.push(0); // Ensure at least one byte for id = 0
+    }
+
     result
 }
 
@@ -287,9 +294,7 @@ fn merge_usize_vec_from_bytes(bytes: &[u8]) -> Vec<usize> {
     let mut end: usize = 0;
     let mut prev: usize = usize::MAX;
     while end < bytes.len() {
-        // Check if first bit is set to 1
-        // If zero, continue
-        if bytes[end] & 0x80 == 0 {
+        if bytes[end] & 0x80 != 0 {
             end += 1;
             continue;
         } else {
@@ -320,24 +325,26 @@ mod tests {
         let index = FolddiscoIndex::new(total_hashes, "test.index".to_string());
 
         let hashes1: Vec<u32> = (0u32..7).collect();
-        let id1 = 1usize;
-        
+        let id1 = 0usize;
+        let hashes4: Vec<u32> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let id4 = 10usize;
+        let hashes3: Vec<u32> = vec![2, 4, 6, 8];
+        let id3 = 128usize;
         let hashes2: Vec<u32>= vec![1, 3, 5, 7, 9];
         let id2 = 655345usize;
-        
-        let hashes3: Vec<u32> = vec![2, 4, 6, 8];
-        let id3 = 256usize;
-        
+
         index.count_entries(&hashes1, id1);
-        index.count_entries(&hashes2, id2);
+        index.count_entries(&hashes4, id4);
         index.count_entries(&hashes3, id3);
+        index.count_entries(&hashes2, id2);
 
         index.allocate_entries();
         
         index.add_entries(&hashes1, id1);
-        index.add_entries(&hashes2, id2);
+        index.add_entries(&hashes4, id4);
         index.add_entries(&hashes3, id3);
-
+        index.add_entries(&hashes2, id2);
+        
         index.finish_index();
 
         // Print offsets
@@ -358,5 +365,6 @@ mod tests {
             println!("Entries for hash {}: {:?}", i, entries);
         }
     }
+    
 }
 

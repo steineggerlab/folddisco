@@ -34,7 +34,7 @@ use crate::structure::io::StructureFileFormat;
 
 pub const HELP_QUERY: &str = "\
 USAGE: folddisco query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
-Example: folddisco query -i index_table.index -t 6 1aq2.pdb A250,A232,A269
+Example: folddisco query -i index_table -t 6 1aq2.pdb A250,A232,A269
 Options:
     -p, --pdb <PDB_PATH>             Path of PDB file to query
     -q, --query <QUERY_STRING>       Query string

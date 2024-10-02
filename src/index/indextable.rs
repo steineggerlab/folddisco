@@ -51,7 +51,7 @@ impl FolddiscoIndex {
             (1 + (id - last_id[hash as usize]).ilog2() / 7) as usize
         };
         let atomic_offset = unsafe { AtomicUsize::from_ptr( &mut offsets[hash as usize] ) };
-        atomic_offset.fetch_add(count, Ordering::SeqCst);
+        atomic_offset.fetch_add(count, Ordering::Relaxed);
             // atomic_offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
         last_id[hash as usize] = id;
     }
@@ -60,13 +60,14 @@ impl FolddiscoIndex {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
         let offsets = unsafe { &mut *self.offsets.get() };
+        let id_log2 = if id == 0 { 0 } else { id.ilog2() };
 
         for &hash in hashes {
             let count = if last_id[hash as usize] == usize::MAX {
                 if id == 0 {
                     1usize
                 } else {
-                    (1 + id.ilog2() / 7) as usize
+                    (1 + id_log2 / 7) as usize
                 }
             } else {
                 (1 + (id - last_id[hash as usize]).ilog2() / 7) as usize
@@ -79,7 +80,7 @@ impl FolddiscoIndex {
         }
     }
 
-    pub fn add_entries(&self, hashes: &[u32], id: usize) {
+    pub fn add_entries(&self, hashes: &[u32], id: usize, bit_container: &mut Vec<u8>) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
         let offsets = unsafe { &mut *self.offsets.get() };
@@ -111,14 +112,15 @@ impl FolddiscoIndex {
                 usize::MAX => id,
                 _ => id - prev,
             };
-            let bits = split_by_seven_bits(id_to_split);
-            for (i, &bit) in bits.iter().enumerate() {
+            let nbit = split_by_seven_bits(id_to_split, bit_container);
+            for i in 0..nbit {
+                let bit = bit_container[i];
                 entries[offset + i] = bit;
             }
         }
     }
 
-    pub fn add_single_entry(&self, hash: u32, id: usize) {
+    pub fn add_single_entry(&self, hash: u32, id: usize, bit_container: &mut Vec<u8>) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
         let offsets = unsafe { &mut *self.offsets.get() };
@@ -136,7 +138,7 @@ impl FolddiscoIndex {
 
         // let offset = atomic_offsets[hash as usize].fetch_add(count, Ordering::SeqCst);
         let atomic_offset = unsafe { AtomicUsize::from_ptr( &mut offsets[hash as usize] ) };
-        let offset = atomic_offset.fetch_add(count, Ordering::SeqCst);
+        let offset = atomic_offset.fetch_add(count, Ordering::Relaxed);
         let prev = last_id[hash as usize];
         last_id[hash as usize] = id;
         let id_to_split: usize = match prev {
@@ -144,8 +146,9 @@ impl FolddiscoIndex {
             _ => id - prev,
         };
             
-        let bits = split_by_seven_bits(id_to_split);
-        for (i, &bit) in bits.iter().enumerate() {
+        let nbit = split_by_seven_bits(id_to_split, bit_container);
+        for i in 0..nbit {
+            let bit = bit_container[i];
             entries[offset + i] = bit;
         }
     }
@@ -252,24 +255,50 @@ pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
 }
 
 
-fn split_by_seven_bits(mut id: usize) -> Vec<u8> {
-    let mut result = vec![];
+// fn split_by_seven_bits(mut id: usize) -> Vec<u8> {
+//     let mut result = vec![];
+//     while id > 0 {
+//         let byte = (id & 0x7F) as u8;
+//         id >>= 7;
+//         if id > 0 {
+//             result.push(byte | 0x80); // Set continuation bit
+//         } else {
+//             result.push(byte); // Last byte, no continuation
+//         }
+//     }
+
+//     if result.is_empty() {
+//         result.push(0); // Ensure at least one byte for id = 0
+//     }
+
+//     result
+// }
+
+fn split_by_seven_bits(mut id: usize, bit_container: &mut Vec<u8>) -> usize {
+    let mut length = 0usize;
+    bit_container.clear();
     while id > 0 {
         let byte = (id & 0x7F) as u8;
         id >>= 7;
         if id > 0 {
-            result.push(byte | 0x80); // Set continuation bit
+            bit_container.push(byte | 0x80); // Set continuation bit
+            length += 1;
         } else {
-            result.push(byte); // Last byte, no continuation
+            bit_container.push(byte); // Last byte, no continuation
+            length += 1;
         }
     }
 
-    if result.is_empty() {
-        result.push(0); // Ensure at least one byte for id = 0
+    if bit_container.is_empty() {
+        bit_container.push(0); // Ensure at least one byte for id = 0
+        length += 1;
     }
 
-    result
+    length
 }
+
+
+
 
 fn merge_seven_bits(bytes: &[u8]) -> usize {
     let mut result = 0;
@@ -339,11 +368,11 @@ mod tests {
         index.count_entries(&hashes2, id2);
 
         index.allocate_entries();
-        
-        index.add_entries(&hashes1, id1);
-        index.add_entries(&hashes4, id4);
-        index.add_entries(&hashes3, id3);
-        index.add_entries(&hashes2, id2);
+        let mut bit_container = Vec::with_capacity(8);
+        index.add_entries(&hashes1, id1, &mut bit_container);
+        index.add_entries(&hashes4, id4, &mut bit_container);
+        index.add_entries(&hashes3, id3, &mut bit_container);
+        index.add_entries(&hashes2, id2, &mut bit_container);
         
         index.finish_index();
 

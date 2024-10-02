@@ -308,8 +308,10 @@ impl FoldDisco {
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
                     .par_iter()
-                    .map(|(pdb_path)| {
-                        let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                    .enumerate()
+                    .map(|(local_pos, pdb_path)| {
+                        let pdb_pos = chunk_index * chunk_size + local_pos;
+                        // let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
                         #[cfg(not(feature = "foldcomp"))]
                         let pdb_reader = PDBReader::from_file(pdb_path).expect(
                             log_msg(FAIL, "PDB file not found").as_str()
@@ -417,8 +419,10 @@ impl FoldDisco {
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
                     .par_iter()
-                    .map(|(pdb_path)| {
-                        let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
+                    .enumerate()
+                    .map(|(local_pos, pdb_path)| {
+                        let pdb_pos = chunk_index * chunk_size + local_pos;
+                        // let pdb_pos = self.path_vec.iter().position(|x| x == pdb_path).unwrap();
                         #[cfg(not(feature = "foldcomp"))]
                         let pdb_reader = PDBReader::from_file(pdb_path).expect(
                             log_msg(FAIL, "PDB file not found").as_str()
@@ -483,9 +487,10 @@ impl FoldDisco {
             pool.install(|| {
                 (0..self.num_threads).into_par_iter().for_each(| tid | {
                     // Thread only saves hashes with same modulos
+                    let mut bit_containers = Vec::with_capacity(8);
                     let _ = &collected.iter().for_each(|(hash, pdb_pos)| {
                         if hash % self.num_threads as u32 == tid as u32 {
-                            self.fold_disco_index.add_single_entry(*hash, *pdb_pos);
+                            self.fold_disco_index.add_single_entry(*hash, *pdb_pos, &mut bit_containers);
                         }
                     });
                 });

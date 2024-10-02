@@ -17,6 +17,7 @@ pub const PDBTR_NBIN_DIST: f32 = 16.0;
 pub const PDBTR_NBIN_SIN_COS: f32 = 4.0;
 
 impl HashValue {
+    #[inline(always)]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         let nbin_dist = if nbin_dist > 16 {
             16.0

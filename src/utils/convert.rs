@@ -52,112 +52,172 @@ pub fn normalize_f32_value(val: f32, min: f32, max: f32) -> f32 {
     (val - min) / (max - min)
 }
 
+#[inline(always)]
+pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
+    // Applied to handle the case of non-standard amino acids
+    // reference: gemmi/blob/master/src/resinfo.cpp (https://github.com/project-gemmi/gemmi)
+    match aa {
+        b"ALA" | b"ABA" | b"ORN" | b"DAL" | b"AIB" | b"ALC" | b"MDO" | b"MAA" | b"DAB" => 0, // ALA, A, total 9
+        b"ARG" | b"DAR" | b"CIR" | b"AGM" => 1, // ARG, R, total 4
+        b"ASN" | b"DSG" | b"MEN" | b"SNN" => 2, // ASN, N, total 4
+        b"ASP" | b"0TD" | b"DAS" | b"IAS" | b"PHD" | b"BFD" | b"ASX" => 3, // ASP, D, total 7, ASX is included here
+        b"CYS" | b"CSO" | b"CSD" | b"CME" | b"OCS" | b"CAS" | b"CSX" | b"CSS" | 
+        b"YCM" | b"DCY" | b"SMC" | b"SCH" | b"SCY" | b"CAF" | b"SNC" | b"SEC" => 4, // CYS, C, total 16, SEC is included here
+        b"GLN" | b"DGN" | b"CRQ" | b"MEQ" => 5, // GLN, Q, total 4
+        b"GLU" | b"PCA" | b"DGL" | b"CGU" | b"FGA" | b"B3E" | b"GLX" => 6, // GLU, E, total 7, GLX is included here
+        b"GLY" | b"CR2" | b"SAR" | b"GHP" | b"GL3" => 7, // GLY, G, total 5
+        b"HIS" | b"HIC" | b"DHI" | b"NEP" | b"CR8" | b"MHS" => 8, // HIS, H, total 6
+        b"ILE" | b"DIL" => 9, // ILE, I, total 2
+        b"LEU" | b"DLE" | b"NLE" | b"MLE" | b"MK8"=> 10, // LEU, L, total 5
+        b"LYS" | b"KCX" | b"LLP" | b"MLY" | b"M3L" | b"ALY" | b"MLZ" | b"DLY" | 
+        b"KPI" | b"PYL" => 11, // LYS, K, total 10, PYL is included here
+        b"MET" | b"MSE" | b"FME" | b"NRQ" | b"CXM" | b"SME" | b"MHO" | b"MED" => 12, // MET, M, total 8
+        b"PHE" | b"DPN" | b"PHI" | b"MEA" | b"PHL" => 13, // PHE, F, total 5
+        b"PRO" | b"HYP" | b"DPR" => 14, // PRO, P, total 3
+        b"SER" | b"CSH" | b"SEP" | b"DSN" | b"SAC" | b"GYS" | b"DHA" | b"OAS" => 15, // SER, S, total 8
+        b"THR" | b"TPO" | b"CRO" | b"DTH" | b"BMT" | b"CRF" => 16, // THR, T, total 6
+        b"TRP" | b"DTR" | b"TRQ" | b"TOX" | b"0AF" => 17, // TRP, W, total 5
+        b"TYR" | b"PTR" | b"TYS" | b"TPQ" | b"DTY" | b"OMY" => 18,
+        b"VAL" | b"DVA" | b"MVA" | b"FVA" => 19,
+        _ => 255,
+    }
+}
 
+// #[inline(always)]
+// fn hash_aa(aa: &[u8; 3]) -> u32 {
+//     // Simple hash function for 3-character strings
+//     (aa[0] as u32) << 16 | (aa[1] as u32) << 8 | (aa[2] as u32)
+// }
+
+// #[inline(always)]
 // pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
-//     // Applied to handle the case of non-standard amino acids
-//     // reference: gemmi/blob/master/src/resinfo.cpp (https://github.com/project-gemmi/gemmi)
-//     match aa {
-//         b"ALA" | b"ABA" | b"ORN" | b"DAL" | b"AIB" | b"ALC" | b"MDO" | b"MAA" | b"DAB" => 0, // ALA, A, total 9
-//         b"ARG" | b"DAR" | b"CIR" | b"AGM" => 1, // ARG, R, total 4
-//         b"ASN" | b"DSG" | b"MEN" | b"SNN" => 2, // ASN, N, total 4
-//         b"ASP" | b"0TD" | b"DAS" | b"IAS" | b"PHD" | b"BFD" | b"ASX" => 3, // ASP, D, total 7, ASX is included here
-//         b"CYS" | b"CSO" | b"CSD" | b"CME" | b"OCS" | b"CAS" | b"CSX" | b"CSS" | 
-//         b"YCM" | b"DCY" | b"SMC" | b"SCH" | b"SCY" | b"CAF" | b"SNC" | b"SEC" => 4, // CYS, C, total 16, SEC is included here
-//         b"GLN" | b"DGN" | b"CRQ" | b"MEQ" => 5, // GLN, Q, total 4
-//         b"GLU" | b"PCA" | b"DGL" | b"CGU" | b"FGA" | b"B3E" | b"GLX" => 6, // GLU, E, total 7, GLX is included here
-//         b"GLY" | b"CR2" | b"SAR" | b"GHP" | b"GL3" => 7, // GLY, G, total 5
-//         b"HIS" | b"HIC" | b"DHI" | b"NEP" | b"CR8" | b"MHS" => 8, // HIS, H, total 6
-//         b"ILE" | b"DIL" => 9, // ILE, I, total 2
-//         b"LEU" | b"DLE" | b"NLE" | b"MLE" | b"MK8"=> 10, // LEU, L, total 5
-//         b"LYS" | b"KCX" | b"LLP" | b"MLY" | b"M3L" | b"ALY" | b"MLZ" | b"DLY" | 
-//         b"KPI" | b"PYL" => 11, // LYS, K, total 10, PYL is included here
-//         b"MET" | b"MSE" | b"FME" | b"NRQ" | b"CXM" | b"SME" | b"MHO" | b"MED" => 12, // MET, M, total 8
-//         b"PHE" | b"DPN" | b"PHI" | b"MEA" | b"PHL" => 13, // PHE, F, total 5
-//         b"PRO" | b"HYP" | b"DPR" => 14, // PRO, P, total 3
-//         b"SER" | b"CSH" | b"SEP" | b"DSN" | b"SAC" | b"GYS" | b"DHA" | b"OAS" => 15, // SER, S, total 8
-//         b"THR" | b"TPO" | b"CRO" | b"DTH" | b"BMT" | b"CRF" => 16, // THR, T, total 6
-//         b"TRP" | b"DTR" | b"TRQ" | b"TOX" | b"0AF" => 17, // TRP, W, total 5
-//         b"TYR" | b"PTR" | b"TYS" | b"TPQ" | b"DTY" | b"OMY" => 18,
-//         b"VAL" | b"DVA" | b"MVA" | b"FVA" => 19,
+//     match hash_aa(aa) {
+//         // ALA group: ALA, ABA, ORN, DAL, AIB, ALC, MDO, MAA, DAB
+//         0x414C41 | 0x414241 | 0x4F524E | 0x44414C | 0x414942 | 0x414C43 | 0x4D444F | 0x4D4141 | 0x444142 => 0,
+
+//         // ARG group: ARG, DAR, CIR, AGM
+//         0x415247 | 0x444152 | 0x434952 | 0x41474D => 1,
+
+//         // ASN group: ASN, DSG, MEN, SNN
+//         0x41534E | 0x445347 | 0x4D454E | 0x534E4E => 2,
+
+//         // ASP group: ASP, 0TD, DAS, IAS, PHD, BFD, ASX
+//         0x415350 | 0x305444 | 0x444153 | 0x494153 | 0x504844 | 0x424644 | 0x415358 => 3,
+
+//         // CYS group: CYS, CSO, CSD, CME, OCS, CAS, CSX, CSS, YCM, DCY, SMC, SCH, SCY, CAF, SNC, SEC
+//         0x435953 | 0x43534F | 0x435344 | 0x434D45 | 0x4F4353 | 0x434153 | 0x435358 | 0x435353 | 
+//         0x59434D | 0x444359 | 0x534D43 | 0x534348 | 0x534359 | 0x434146 | 0x534E43 | 0x534543 => 4,
+
+//         // GLN group: GLN, DGN, CRQ, MEQ
+//         0x474C4E | 0x44474E | 0x435251 | 0x4D4551 => 5,
+
+//         // GLU group: GLU, PCA, DGL, CGU, FGA, B3E, GLX
+//         0x474C55 | 0x504341 | 0x44474C | 0x434755 | 0x464741 | 0x423345 | 0x474C58 => 6,
+
+//         // GLY group: GLY, CR2, SAR, GHP, GL3
+//         0x474C59 | 0x435232 | 0x534152 | 0x474850 | 0x474C33 => 7,
+
+//         // HIS group: HIS, HIC, DHI, NEP, CR8, MHS
+//         0x484953 | 0x484943 | 0x444849 | 0x4E4550 | 0x435238 | 0x4D4853 => 8,
+
+//         // ILE group: ILE, DIL
+//         0x494C45 | 0x44494C => 9,
+
+//         // LEU group: LEU, DLE, NLE, MLE, MK8
+//         0x4C4555 | 0x444C45 | 0x4E4C45 | 0x4D4C45 | 0x4D4B38 => 10,
+
+//         // LYS group: LYS, KCX, LLP, MLY, M3L, ALY, MLZ, DLY, KPI, PYL
+//         0x4C5953 | 0x4B4358 | 0x4C4C50 | 0x4D4C59 | 0x4D334C | 0x414C59 | 0x4D4C5A | 0x444C59 |
+//         0x4B5049 | 0x50594C => 11,
+
+//         // MET group: MET, MSE, FME, NRQ, CXM, SME, MHO, MED
+//         0x4D4554 | 0x4D5345 | 0x464D45 | 0x4E5251 | 0x43584D | 0x534D45 | 0x4D484F | 0x4D4544 => 12,
+
+//         // PHE group: PHE, DPN, PHI, MEA, PHL
+//         0x504845 | 0x44504E | 0x504849 | 0x4D4541 | 0x50484C => 13,
+
+//         // PRO group: PRO, HYP, DPR
+//         0x50524F | 0x485950 | 0x445052 => 14,
+
+//         // SER group: SER, CSH, SEP, DSN, SAC, GYS, DHA, OAS
+//         0x534552 | 0x435348 | 0x534550 | 0x44534E | 0x534143 | 0x475953 | 0x444841 | 0x4F4153 => 15,
+
+//         // THR group: THR, TPO, CRO, DTH, BMT, CRF
+//         0x544852 | 0x54504F | 0x43524F | 0x445448 | 0x424D54 | 0x435246 => 16,
+
+//         // TRP group: TRP, DTR, TRQ, TOX, 0AF
+//         0x545250 | 0x445452 | 0x545251 | 0x544F58 | 0x304146 => 17,
+
+//         // TYR group: TYR, PTR, TYS, TPQ, DTY, OMY
+//         0x545952 | 0x505452 | 0x545953 | 0x545051 | 0x445459 | 0x4F4D59 => 18,
+
+//         // VAL group: VAL, DVA, MVA, FVA
+//         0x56414C | 0x445641 | 0x4D5641 | 0x465641 => 19,
+
+//         // Default case for unknown amino acids
 //         _ => 255,
 //     }
 // }
 
-lazy_static! {
-    static ref AA_MAP: HashMap<&'static [u8; 3], u8> = {
-        let mut m: HashMap<&'static [u8; 3], u8> = HashMap::new();
-        // ALA group
-        let ala_codes = [b"ALA", b"ABA", b"ORN", b"DAL", b"AIB", b"ALC", b"MDO", b"MAA", b"DAB"];
-        for code in ala_codes.iter() {
-            m.insert(code, 0);
+
+mod tests {
+    use super::*;
+    #[test]
+    fn test_map_aa_to_u8() {
+        let start = std::time::Instant::now();
+        for i in 0..1000 {
+            assert_eq!(map_aa_to_u8(b"ALA"), 0);
+            assert_eq!(map_aa_to_u8(b"ARG"), 1);
+            assert_eq!(map_aa_to_u8(b"ASN"), 2);
+            assert_eq!(map_aa_to_u8(b"ASP"), 3);
+            assert_eq!(map_aa_to_u8(b"CYS"), 4);
+            assert_eq!(map_aa_to_u8(b"GLN"), 5);
+            assert_eq!(map_aa_to_u8(b"GLU"), 6);
+            assert_eq!(map_aa_to_u8(b"GLY"), 7);
+            assert_eq!(map_aa_to_u8(b"HIS"), 8);
+            assert_eq!(map_aa_to_u8(b"ILE"), 9);
+            assert_eq!(map_aa_to_u8(b"LEU"), 10);
+            assert_eq!(map_aa_to_u8(b"LYS"), 11);
+            assert_eq!(map_aa_to_u8(b"MET"), 12);
+            assert_eq!(map_aa_to_u8(b"PHE"), 13);
+            assert_eq!(map_aa_to_u8(b"PRO"), 14);
+            assert_eq!(map_aa_to_u8(b"SER"), 15);
+            assert_eq!(map_aa_to_u8(b"THR"), 16);
+            assert_eq!(map_aa_to_u8(b"TRP"), 17);
+            assert_eq!(map_aa_to_u8(b"TYR"), 18);
+            assert_eq!(map_aa_to_u8(b"VAL"), 19);
+            assert_eq!(map_aa_to_u8(b"UNK"), 255);
         }
-        // ARG group
-        let arg_codes = [b"ARG", b"DAR", b"CIR", b"AGM"];
-        for code in arg_codes.iter() { m.insert(code, 1); }
-        // ASN group
-        let asn_codes = [b"ASN", b"DSG", b"MEN", b"SNN"];
-        for code in asn_codes.iter() { m.insert(code, 2); }
-        // ASP group
-        let asp_codes = [b"ASP", b"0TD", b"DAS", b"IAS", b"PHD", b"BFD", b"ASX"];
-        for code in asp_codes.iter() { m.insert(code, 3); }
-        // CYS group (total 16 including SEC)
-        let cys_codes = [b"CYS", b"CSO", b"CSD", b"CME", b"OCS", b"CAS", b"CSX", b"CSS", b"YCM", b"DCY", b"SMC", b"SCH", b"SCY", b"CAF", b"SNC", b"SEC"];
-        for code in cys_codes.iter() {
-            m.insert(code, 4);
-        }
-        // GLN group
-        let gln_codes = [b"GLN", b"DGN", b"CRQ", b"MEQ"];
-        for code in gln_codes.iter() { m.insert(code, 5); }
-        // GLU group
-        let glu_codes = [b"GLU", b"PCA", b"DGL", b"CGU", b"FGA", b"B3E", b"GLX"];
-        for code in glu_codes.iter() { m.insert(code, 6); }
-        // GLY group
-        let gly_codes = [b"GLY", b"CR2", b"SAR", b"GHP", b"GL3"];
-        for code in gly_codes.iter() { m.insert(code, 7); }
-        // HIS group
-        let his_codes = [b"HIS", b"HIC", b"DHI", b"NEP", b"CR8", b"MHS"];
-        for code in his_codes.iter() { m.insert(code, 8); }
-        // ILE group
-        let ile_codes = [b"ILE", b"DIL"];
-        for code in ile_codes.iter() { m.insert(code, 9); }
-        // LEU group
-        let leu_codes = [b"LEU", b"DLE", b"NLE", b"MLE", b"MK8"];
-        for code in leu_codes.iter() { m.insert(code, 10); }
-        // LYS group
-        let lys_codes = [b"LYS", b"KCX", b"LLP", b"MLY", b"M3L", b"ALY", b"MLZ", b"DLY", b"KPI", b"PYL"];
-        for code in lys_codes.iter() { m.insert(code, 11); }
-        // MET group
-        let met_codes = [b"MET", b"MSE", b"FME", b"NRQ", b"CXM", b"SME", b"MHO", b"MED"];
-        for code in met_codes.iter() { m.insert(code, 12); }
-        // PHE group
-        let phe_codes = [b"PHE", b"DPN", b"PHI", b"MEA", b"PHL"];
-        for code in phe_codes.iter() { m.insert(code, 13); }
-        // PRO group
-        let pro_codes = [b"PRO", b"HYP", b"DPR"];
-        for code in pro_codes.iter() { m.insert(code, 14); }
-        // SER group
-        let ser_codes = [b"SER", b"CSH", b"SEP", b"DSN", b"SAC", b"GYS", b"DHA", b"OAS"];
-        for code in ser_codes.iter() { m.insert(code, 15); }
-        // THR group
-        let thr_codes = [b"THR", b"TPO", b"CRO", b"DTH", b"BMT", b"CRF"];
-        for code in thr_codes.iter() { m.insert(code, 16); }
-        // TRP group
-        let trp_codes = [b"TRP", b"DTR", b"TRQ", b"TOX", b"0AF"];
-        for code in trp_codes.iter() { m.insert(code, 17); }
-        // TYR group
-        let tyr_codes = [b"TYR", b"PTR", b"TYS", b"TPQ", b"DTY", b"OMY"];
-        for code in tyr_codes.iter() { m.insert(code, 18); }
-        // VAL group
-        let val_codes = [b"VAL", b"DVA", b"MVA", b"FVA"];
-        for code in val_codes.iter() { m.insert(code, 19); }
-        m
-    };
+        println!("Time elapsed: {:?}", start.elapsed());
+        // let start = std::time::Instant::now();
+        // for i in 0..1000 {
+        //     assert_eq!(old_map_aa_to_u8(b"ALA"), 0);
+        //     assert_eq!(old_map_aa_to_u8(b"ARG"), 1);
+        //     assert_eq!(old_map_aa_to_u8(b"ASN"), 2);
+        //     assert_eq!(old_map_aa_to_u8(b"ASP"), 3);
+        //     assert_eq!(old_map_aa_to_u8(b"CYS"), 4);
+        //     assert_eq!(old_map_aa_to_u8(b"GLN"), 5);
+        //     assert_eq!(old_map_aa_to_u8(b"GLU"), 6);
+        //     assert_eq!(old_map_aa_to_u8(b"GLY"), 7);
+        //     assert_eq!(old_map_aa_to_u8(b"HIS"), 8);
+        //     assert_eq!(old_map_aa_to_u8(b"ILE"), 9);
+        //     assert_eq!(old_map_aa_to_u8(b"LEU"), 10);
+        //     assert_eq!(old_map_aa_to_u8(b"LYS"), 11);
+        //     assert_eq!(old_map_aa_to_u8(b"MET"), 12);
+        //     assert_eq!(old_map_aa_to_u8(b"PHE"), 13);
+        //     assert_eq!(old_map_aa_to_u8(b"PRO"), 14);
+        //     assert_eq!(old_map_aa_to_u8(b"SER"), 15);
+        //     assert_eq!(old_map_aa_to_u8(b"THR"), 16);
+        //     assert_eq!(old_map_aa_to_u8(b"TRP"), 17);
+        //     assert_eq!(old_map_aa_to_u8(b"TYR"), 18);
+        //     assert_eq!(old_map_aa_to_u8(b"VAL"), 19);
+        //     assert_eq!(old_map_aa_to_u8(b"UNK"), 255);
+        // }
+        // println!("Time elapsed: {:?}", start.elapsed());
+    }
 }
 
-pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
-    *AA_MAP.get(aa).unwrap_or(&255)
-}
-
+#[inline(always)]
 pub fn map_u8_to_aa(aa: u8) -> &'static str {
     match aa {
         0 => "ALA",
@@ -211,7 +271,7 @@ pub fn map_u32_to_aa_pair(pair: u32) -> (String, String) {
     let aa2 = (pair % 20) as u8;
     (map_u8_to_aa(aa1).to_string() , map_u8_to_aa(aa2).to_string())
 }
-
+#[inline(always)]
 pub fn map_one_letter_to_u8_vec(aa: char) -> Vec<u8> {
     match aa {
         'A' => vec![0],

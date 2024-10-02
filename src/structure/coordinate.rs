@@ -19,6 +19,7 @@ impl Coordinate {
             z: z.expect("Unable to get coordinate"),
         }
     }
+    #[inline(always)]
     pub fn add(&self, other: &Coordinate) -> Coordinate {
         Coordinate {
             x: self.x + other.x,
@@ -26,6 +27,7 @@ impl Coordinate {
             z: self.z + other.z,
         }
     }
+    #[inline(always)]
     pub fn sub(&self, other: &Coordinate) -> Coordinate {
         Coordinate {
             x: self.x - other.x,
@@ -33,9 +35,11 @@ impl Coordinate {
             z: self.z - other.z,
         }
     }
+    #[inline(always)]
     pub fn dot(&self, other: &Coordinate) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
+    #[inline(always)]
     pub fn cross(&self, other: &Coordinate) -> Coordinate {
         Coordinate {
             x: self.y * other.z - self.z * other.y,
@@ -43,6 +47,7 @@ impl Coordinate {
             z: self.x * other.y - self.y * other.x,
         }
     }
+    #[inline(always)]
     pub fn outer(&self, other: &Coordinate) -> Vec<f32> {
         vec![
             self.x * other.x,
@@ -56,9 +61,11 @@ impl Coordinate {
             self.z * other.z,
         ]
     }
+    #[inline(always)]
     pub fn norm(&self) -> f32 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
+    #[inline(always)]
     pub fn normalize(&self) -> Coordinate {
         let norm = self.norm();
         Coordinate {
@@ -67,6 +74,7 @@ impl Coordinate {
             z: self.z / norm,
         }
     }
+    #[inline(always)]
     pub fn scale(&self, factor: f32) -> Coordinate {
         Coordinate {
             x: self.x * factor,
@@ -74,13 +82,14 @@ impl Coordinate {
             z: self.z * factor,
         }
     }
+    #[inline(always)]
     pub fn distance(&self, other: &Coordinate) -> f32 {
         let dx = self.x - other.x;
         let dy = self.y - other.y;
         let dz = self.z - other.z;
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
-
+    #[inline(always)]
     pub fn get_ppf(&self, other: &Coordinate) -> [f32; 4] {
         let n1 = self.normalize();
         let n2 = other.normalize();
@@ -91,11 +100,12 @@ impl Coordinate {
         let n1_n2 = n1.dot(&n2).acos();
         [d.norm(), n1_nd, n2_nd, n1_n2]
     }
-
+    #[inline(always)]
     pub fn to_array(&self) -> [f32; 3] {
         [self.x, self.y, self.z]
     }
 
+    #[inline(always)]
     pub fn calc_distance(&self, other: &Coordinate) -> f32 {
         let dx = self.x - other.x;
         let dy = self.y - other.y;
@@ -104,6 +114,7 @@ impl Coordinate {
         dist
     }
 
+    #[inline(always)]
     pub fn calc_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate, return_radian: bool) -> f32 {
         let (a, b, c, d) = (self, atom2, atom3, atom4);
         // Form vectors
@@ -122,6 +133,7 @@ impl Coordinate {
     }
 }
 
+#[inline(always)]
 pub fn calc_angle_point(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordinate) -> f32 {
     let (a, b, c) = (atom1, atom2, atom3);
     // Form vectors
@@ -135,6 +147,7 @@ pub fn calc_angle_point(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordina
     let degree = radian.to_degrees(); // angle in degrees
     degree
 }
+#[inline(always)]
 pub fn calc_angle_radian(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordinate) -> f32 {
     let (a, b, c) = (atom1, atom2, atom3);
     // Form vectors
@@ -150,6 +163,7 @@ pub fn calc_angle_radian(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordin
 
 // Originally from foldseek StructureTo3DiBase::approxCBetaPosition
 // link: https://github.com/steineggerlab/foldseek/blob/master/lib/3di/structureto3di.cpp
+#[inline(always)]
 pub fn approx_cb(ca: &Coordinate, n: &Coordinate, c: &Coordinate) -> Coordinate {
     // Assumption: CA forms with its four ligands a tetrahedral.
     let v1 = c.sub(ca).normalize();
@@ -171,6 +185,7 @@ pub fn approx_cb(ca: &Coordinate, n: &Coordinate, c: &Coordinate) -> Coordinate 
     cb
 }
 
+#[inline(always)]
 pub fn calc_cos2_torsion_angle(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate) -> f32 {
     let v1 = b.sub(a);
     let v2 = c.sub(b);
@@ -185,6 +200,7 @@ pub fn calc_cos2_torsion_angle(a: &Coordinate, b: &Coordinate, c: &Coordinate, d
     (2.0 * out).cos()
 }
 
+#[inline(always)]
 pub fn calc_torsion_radian(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate) -> f32 {
     let v1 = b.sub(a);
     let v2 = c.sub(b);

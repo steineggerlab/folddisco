@@ -383,12 +383,13 @@ impl CompactStructure {
             (ca1, ca2, cb1, cb2, n1, n2)
         {
 
-            let ca_dist = self.get_ca_distance(idx1, idx2).unwrap();
+            let ca_dist = ca1.calc_distance(&ca2);
             if ca_dist > dist_cutoff {
                 return None;
             }
-            let cb_dist = self.get_cb_distance(idx1, idx2).unwrap();
-            let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2, true).unwrap();
+            let cb_dist = cb1.calc_distance(&cb2);
+            // let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2, true).unwrap();
+            let ca_cb_angle = ca1.calc_angle(&cb1, &ca2, &cb2, true);
             let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
             let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
             Some((ca_dist, cb_dist, ca_cb_angle, theta1, theta2))

@@ -37,6 +37,7 @@ impl FolddiscoIndex {
         }
     }
 
+    #[inline(always)]
     pub fn count_single_entry(&self, hash: u32, id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
@@ -120,6 +121,7 @@ impl FolddiscoIndex {
         }
     }
 
+    #[inline(always)]
     pub fn add_single_entry(&self, hash: u32, id: usize, bit_container: &mut Vec<u8>) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
@@ -274,6 +276,7 @@ pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
 //     result
 // }
 
+#[inline(always)]
 fn split_by_seven_bits(mut id: usize, bit_container: &mut Vec<u8>) -> usize {
     let mut length = 0usize;
     bit_container.clear();
@@ -297,9 +300,7 @@ fn split_by_seven_bits(mut id: usize, bit_container: &mut Vec<u8>) -> usize {
     length
 }
 
-
-
-
+#[inline(always)]
 fn merge_seven_bits(bytes: &[u8]) -> usize {
     let mut result = 0;
     let mut i = bytes.len() - 1;
@@ -317,6 +318,7 @@ fn merge_seven_bits(bytes: &[u8]) -> usize {
     result
 }
 
+#[inline(always)]
 fn merge_usize_vec_from_bytes(bytes: &[u8]) -> Vec<usize> {
     let mut result = vec![];
     let mut start: usize = 0;

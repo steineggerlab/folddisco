@@ -148,7 +148,7 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
-
+    #[inline(always)]
     pub fn perfect_hash_as_u32(
         feature: &Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
     ) -> u32 {
@@ -212,7 +212,7 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
-    
+    #[inline(always)]
     pub fn perfect_hash(
         feature: &Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
     ) -> Self {
@@ -295,6 +295,7 @@ impl GeometricHash {
         }
     }
 
+    #[inline(always)]
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize, output: &mut Vec<f32>) {
         match self {
             GeometricHash::PDBMotif(hash) => {

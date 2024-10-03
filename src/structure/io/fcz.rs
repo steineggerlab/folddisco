@@ -68,7 +68,7 @@ impl FoldcompDbReader {
             index: Vec::new(),
         }
     }
-    #[inline(always)]
+
     pub fn read_single_structure(&self, name: &str) -> Result<Structure, String> {
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
@@ -90,7 +90,7 @@ impl FoldcompDbReader {
             None => Err(format!("Entry with name {} not found.", name)),
         }
     }
-    #[inline(always)]
+
     pub fn read_single_structure_by_id(&self, id: usize) -> Result<Structure, String> {
         let mut structure = Structure::new(); // revise
         let mut record = (b' ', 0);
@@ -146,7 +146,6 @@ impl Atom {
 }
 
 // Convert atom_t slice to Structure
-#[inline(always)]
 pub unsafe fn atom_t_slice_to_structure(slice: &[atom_t]) -> Structure {
     let mut structure = Structure::new(); 
     let mut record = (b' ', 0);
@@ -263,7 +262,6 @@ pub fn get_foldcomp_db_entry<'a>(db: &'a ManuallyDrop<Vec<u8>>, index: &(usize, 
     &db[index.1..index.1 + index.2]
 }
 
-#[inline(always)]
 pub fn get_foldcomp_db_entry_by_id<'a>(db: &'a ManuallyDrop<Vec<u8>>, index_vector: &Vec<(usize, usize, usize)>, id: usize) -> Option<&'a [u8]> {
     let entry_index = index_vector.binary_search_by_key(&id, |&(id, _, _)| id);
     let entry: &(usize, usize, usize) = match entry_index {
@@ -273,7 +271,6 @@ pub fn get_foldcomp_db_entry_by_id<'a>(db: &'a ManuallyDrop<Vec<u8>>, index_vect
     Some(get_foldcomp_db_entry(db, entry))
 }
 
-#[inline(always)]
 pub fn get_foldcomp_db_entry_by_name<'a>(
     db: &'a ManuallyDrop<Vec<u8>>, lookup: &Vec<(usize, String)>, index: &Vec<(usize, usize, usize)>, name: &str
 ) -> Option<&'a [u8]> {

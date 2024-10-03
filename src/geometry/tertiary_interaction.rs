@@ -17,7 +17,7 @@ use crate::utils::convert::*;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    #[inline(always)]
+    
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         // Added one more quantization for distance
         let nbin_dist = if nbin_dist > 16 {
@@ -79,15 +79,15 @@ impl HashValue {
                         (cos_phi_13 << 8) | (ca_dist << 4) | (seq_dist);
         hashvalue
     }
-    #[inline(always)]
+    
     pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
         HashValue::perfect_hash(&feature, NBIN_DIST as usize, NBIN_SIN_COS as usize)
     }
-    #[inline(always)]
+    
     pub fn reverse_hash_default(&self) -> [f32; 9] {
         self.reverse_hash(NBIN_DIST as usize, NBIN_SIN_COS as usize)
     }
-    #[inline(always)]
+    
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 9] {
         let nbin_dist = if nbin_dist > 16 { 16.0 } else { nbin_dist as f32 };
         let nbin_angle = if nbin_angle > 8 { 8.0 } else { nbin_angle as f32 };
@@ -121,23 +121,23 @@ impl HashValue {
             cos_phi_13, ca_dist, seq_dist
         ]
     }
-    #[inline(always)]
+    
     pub fn hash_type(&self) -> HashType {
         HashType::TertiaryInteraction
     }
-    #[inline(always)]
+    
     pub fn from_u32(hashvalue: u32) -> Self {
         HashValue(hashvalue)
     }
-    #[inline(always)]
+    
     pub fn as_u32(&self) -> u32 {
         self.0
     }
-    #[inline(always)]
+    
     pub fn from_u64(hashvalue: u64) -> Self {
         HashValue(hashvalue as u32)
     }
-    #[inline(always)]
+    
     pub fn as_u64(&self) -> u64 {
         self.0 as u64
     }

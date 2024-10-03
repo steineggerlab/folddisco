@@ -19,7 +19,7 @@ pub enum HashType {
 }
 
 impl HashType {
-    #[inline(always)]
+    
     pub fn get_with_index(index: usize) -> Self {
         match index {
             0 => HashType::PDBMotif,
@@ -32,7 +32,7 @@ impl HashType {
             _ => HashType::Other,
         }
     }
-    #[inline(always)]
+    
     pub fn get_with_str(hash_type: &str) -> Self {
         match hash_type {
             "0" | "PDBMotif" | "pyscomotif" | "orig_pdb" => HashType::PDBMotif,
@@ -45,7 +45,7 @@ impl HashType {
             _ => HashType::Other,
         }
     }
-    #[inline(always)]
+    
     pub fn to_string(&self) -> String {
         match self {
             HashType::PDBMotif => "PDBMotif".to_string(),
@@ -58,12 +58,12 @@ impl HashType {
             HashType::Other => "Other".to_string(),
         }
     }
-    #[inline(always)]
+
     pub fn encoding_type(&self) -> usize {
         // Unified to u32 encoding
         32usize
     }
-    #[inline(always)]
+
     pub fn encoding_bits(&self) -> usize {
         match self {
             HashType::PDBMotif => 25usize,
@@ -152,7 +152,7 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
-    #[inline(always)]
+
     pub fn perfect_hash_as_u32(
         feature: &Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
     ) -> u32 {
@@ -216,7 +216,7 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
-    #[inline(always)]
+
     pub fn perfect_hash(
         feature: &Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
     ) -> Self {
@@ -299,7 +299,7 @@ impl GeometricHash {
         }
     }
 
-    #[inline(always)]
+
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize, output: &mut Vec<f32>) {
         match self {
             GeometricHash::PDBMotif(hash) => {
@@ -343,7 +343,7 @@ impl GeometricHash {
         }
     }
 
-    #[inline(always)]
+
     pub fn hash_type(&self) -> HashType {
         match self {
             GeometricHash::PDBMotif(hash) => hash.hash_type(),
@@ -357,7 +357,7 @@ impl GeometricHash {
         }
     }
 
-    #[inline(always)]
+
     pub fn from_u32(hashvalue: u32, hash_type: HashType) -> Self {
         match hash_type {
             HashType::PDBMotif => GeometricHash::PDBMotif(

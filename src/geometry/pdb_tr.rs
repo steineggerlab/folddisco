@@ -17,7 +17,7 @@ pub const PDBTR_NBIN_DIST: f32 = 16.0;
 pub const PDBTR_NBIN_SIN_COS: f32 = 4.0;
 
 impl HashValue {
-    #[inline(always)]
+    
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         let nbin_dist = if nbin_dist > 16 {
             16.0
@@ -73,15 +73,15 @@ impl HashValue {
             | sin_phi1 << 6 | cos_phi1 << 4 | sin_phi2 << 2 | cos_phi2;
         hashvalue
     }
-    #[inline(always)]
+    
     pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
         HashValue::perfect_hash(feature, PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
     }
-    #[inline(always)]
+    
     pub fn reverse_hash_default(&self) -> [f32; 7] {
         self.reverse_hash(PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
     }
-    #[inline(always)]
+    
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 7] {
         let res1 = ((self.0 >> 25) & BITMASK32_5BIT)as f32;
         let res2 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
@@ -124,23 +124,23 @@ impl HashValue {
         
         [res1, res2, ca_dist, cb_dist, ca_cb_angle, phi1, phi2]
     }
-    #[inline(always)]
+    
     pub fn hash_type(&self) -> HashType {
         HashType::PDBTrRosetta
     }
-    #[inline(always)]
+    
     pub fn from_u32(hashvalue: u32) -> Self {
         HashValue(hashvalue)
     }
-    #[inline(always)]
+    
     pub fn as_u32(&self) -> u32 {
         self.0
     }
-    #[inline(always)]
+    
     pub fn from_u64(hashvalue: u64) -> Self {
         HashValue(hashvalue as u32)
     }
-    #[inline(always)]
+    
     pub fn as_u64(&self) -> u64 {
         self.0 as u64
     }

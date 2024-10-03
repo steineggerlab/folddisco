@@ -47,7 +47,7 @@ pub fn continuize_u32_value_into_f32(val: u32, min: f32, max: f32, num_bin: f32)
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     (val as f32) * (cont_f) + min
 }
-// #[inline(always)]
+#[inline(always)]
 pub fn normalize_f32_value(val: f32, min: f32, max: f32) -> f32 {
     (val - min) / (max - min)
 }

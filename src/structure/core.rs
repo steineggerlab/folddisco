@@ -248,7 +248,7 @@ impl CompactStructure {
             None
         }
     }
-    #[inline(always)]
+
     pub fn get_ca_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -261,7 +261,7 @@ impl CompactStructure {
             None
         }
     }
-    #[inline(always)]
+
     pub fn get_cb_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let cb1 = self.get_cb(idx1);
         let cb2 = self.get_cb(idx2);
@@ -274,7 +274,7 @@ impl CompactStructure {
             None
         }
     }
-    #[inline(always)]
+
     pub fn get_ca_cb_angle(&self, idx1: usize, idx2: usize, return_radian: bool) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -303,7 +303,7 @@ impl CompactStructure {
     pub fn get_res_serial(&self, idx1: usize, idx2: usize) -> (u64, u64) {
         (self.residue_serial[idx1], self.residue_serial[idx2])
     }
-    #[inline(always)]
+
     pub fn get_ppf(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<[f32; 4]> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -320,7 +320,7 @@ impl CompactStructure {
             None
         }
     }
-    #[inline(always)]
+
     pub fn get_trrosetta_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -345,7 +345,7 @@ impl CompactStructure {
             None
         }
     }
-    #[inline(always)]
+
     pub fn get_trrosetta_feature2(&self, idx1: usize, idx2: usize) -> Option<[f32; 7]> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -372,7 +372,6 @@ impl CompactStructure {
         }
     }
 
-    #[inline(always)]
     pub fn get_pdb_tr_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -422,7 +421,7 @@ impl CompactStructure {
     pub fn get_avg_plddt(&self) -> f32 {
         self.get_avg_bfactor()
     }
-    #[inline(always)]
+
     pub fn get_list_amino_acids_and_distances(&self, i: usize, j: usize) -> Option<(u8, u8, f32)> {
         // Return i, j, aa_i, aa_j, distance
         let aa_i = map_aa_to_u8(self.get_res_name(i));

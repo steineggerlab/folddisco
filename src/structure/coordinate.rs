@@ -89,7 +89,7 @@ impl Coordinate {
         let dz = self.z - other.z;
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
-    #[inline(always)]
+
     pub fn get_ppf(&self, other: &Coordinate) -> [f32; 4] {
         let n1 = self.normalize();
         let n2 = other.normalize();

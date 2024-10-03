@@ -33,7 +33,7 @@ impl Reader<File> {
             .map(Reader::new)
             .map_err(|_e| "Error opening file")
     }
-    #[inline(always)]
+
     pub fn read_structure(&self) -> Result<Structure, &str> {
         let reader = BufReader::new(&self.reader);
         let mut structure = Structure::new(); // revise
@@ -74,7 +74,7 @@ impl Reader<File> {
         // println!("{structure:?}");
         Ok(structure)
     }
-    #[inline(always)]
+
     pub fn read_structure_from_gz(&self) -> Result<Structure, &str> {
         // Load whole file and close the file
         let mut decoder = GzDecoder::new(&self.reader);

@@ -19,6 +19,7 @@ use crate::utils::convert::*;
 pub struct HashValue(pub u32);
 
 impl HashValue {
+    #[inline(always)]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
@@ -28,6 +29,7 @@ impl HashValue {
             nbin_dist as f32, nbin_angle as f32
         )
     }
+    #[inline(always)]
     pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
@@ -37,16 +39,19 @@ impl HashValue {
             NBIN_DIST as f32, NBIN_SIN_COS as f32
         )
     }
+    #[inline(always)]
     pub fn reverse_hash(&self, nbin_dist:usize, nbin_angle:usize) -> Vec<f32> {
         self._reverse_hash(nbin_dist as f32, nbin_angle as f32).to_vec()
     }
+    #[inline(always)]
     pub fn reverse_hash_default(&self) -> Vec<f32> {
         self._reverse_hash(NBIN_DIST, NBIN_SIN_COS).to_vec()
     }
+    #[inline(always)]
     pub fn hash_type(&self) -> super::core::HashType {
         HashType::TrRosetta
     }
-
+    #[inline(always)]
     fn _perfect_hash(
         res1: u32, res2: u32, cb_dist: f32, omega: f32, theta1: f32, theta2: f32,
         phi1: f32, phi2: f32, nbin_dist: f32, nbin_angle: f32
@@ -89,7 +94,7 @@ impl HashValue {
             | sin_cos_angles[8] << 2 | sin_cos_angles[9]; // sin_phi2, cos_phi2
         hashvalue
     }
-
+    #[inline(always)]
     fn _reverse_hash(&self, _nbin_dist: f32, nbin_angle: f32) -> [f32; 8] {
         let res_pair = ((self.0 >> 23) & BITMASK32_9BIT) as u32;
         let (res1, res2) = map_u32_to_aa_u32_pair(res_pair);
@@ -129,21 +134,23 @@ impl HashValue {
         let phi2 = sin_cos_vec[8].atan2(sin_cos_vec[9]).to_degrees();
         [res1 as f32, res2 as f32, cb_dist, omega, theta1, theta2, phi1, phi2]
     }
-    
+    #[inline(always)]
     pub fn from_u32(hashvalue: u32) -> Self {
         HashValue(hashvalue)
     }
-    
+    #[inline(always)]
     pub fn as_u32(&self) -> u32 {
         self.0
     }
-    
+    #[inline(always)]
     pub fn from_u64(hashvalue: u64) -> Self {
         HashValue(hashvalue as u32)
     }
+    #[inline(always)]
     pub fn as_u64(&self) -> u64 {
         self.0 as u64
     }
+    #[inline(always)]
     pub fn as_usize(&self) -> usize {
         self.0 as usize
     }

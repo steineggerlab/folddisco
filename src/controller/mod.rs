@@ -298,7 +298,7 @@ impl FoldDisco {
             .build()
             .expect("Failed to build thread pool for iterating hashes");
         // For iterating files, apply multi-threading with num_threads_for_file
-        let chunk_size = 65536;
+        let chunk_size = self.num_threads * 128;
         // Chunk pdb paths
         let chunked_paths = self.path_vec.chunks(chunk_size);
         let total_chunks = chunked_paths.len();
@@ -410,7 +410,7 @@ impl FoldDisco {
             .build()
             .expect("Failed to build thread pool for iterating hashes");
         // For iterating files, apply multi-threading with num_threads_for_file
-        let chunk_size = 65536;
+        let chunk_size = self.num_threads * 128;
         // Chunk pdb paths
         let chunked_paths = self.path_vec.chunks(chunk_size);
         let total_chunks = chunked_paths.len();

@@ -37,7 +37,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             num_bin_dist: args.value_from_str(["-d", "--distance"]).unwrap_or(0),
             num_bin_angle: args.value_from_str(["-a", "--angle"]).unwrap_or(0),
             grid_width: args.value_from_str(["-g", "--grid"]).unwrap_or(20.0),
-            chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(65535),
+            chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(65535), // TODO: 8192
             max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             recursive: args.contains(["-r", "--recursive"]),
             id_type: args.value_from_str("--id").unwrap_or("relpath".into()),
@@ -59,6 +59,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
             node_count: args.value_from_str("--node").unwrap_or(2),
             header: args.contains("--header"),
+            id_type: args.value_from_str("--id").unwrap_or("relpath".into()),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
         }),

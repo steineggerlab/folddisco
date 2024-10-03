@@ -73,15 +73,15 @@ impl HashValue {
             | sin_phi1 << 6 | cos_phi1 << 4 | sin_phi2 << 2 | cos_phi2;
         hashvalue
     }
-    
+    #[inline(always)]
     pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
         HashValue::perfect_hash(feature, PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
     }
-    
+    #[inline(always)]
     pub fn reverse_hash_default(&self) -> [f32; 7] {
         self.reverse_hash(PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
     }
-    
+    #[inline(always)]
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 7] {
         let res1 = ((self.0 >> 25) & BITMASK32_5BIT)as f32;
         let res2 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
@@ -124,22 +124,23 @@ impl HashValue {
         
         [res1, res2, ca_dist, cb_dist, ca_cb_angle, phi1, phi2]
     }
-    
+    #[inline(always)]
     pub fn hash_type(&self) -> HashType {
         HashType::PDBTrRosetta
     }
+    #[inline(always)]
     pub fn from_u32(hashvalue: u32) -> Self {
         HashValue(hashvalue)
     }
-
+    #[inline(always)]
     pub fn as_u32(&self) -> u32 {
         self.0
     }
-    
+    #[inline(always)]
     pub fn from_u64(hashvalue: u64) -> Self {
         HashValue(hashvalue as u32)
     }
-    
+    #[inline(always)]
     pub fn as_u64(&self) -> u64 {
         self.0 as u64
     }
@@ -170,11 +171,26 @@ mod tests {
         let raw_feature = (
             b"PHE", b"VAL", 14.0_f32, 15.9_f32, 116.0_f32, 80.0_f32, -100.0_f32
         );
+        let raw_feature2 = (
+            b"VAL", b"PHE", 15.9_f32, 14.0_f32, 116.0_f32, 80.0_f32, -100.0_f32
+        );
         let raw_feature = vec![
             map_aa_to_u8(raw_feature.0) as f32, map_aa_to_u8(raw_feature.1) as f32,
             raw_feature.2, raw_feature.3, raw_feature.4.to_radians(),
             raw_feature.5.to_radians(), raw_feature.6.to_radians()
         ];
+        let raw_feature2 = vec![
+            map_aa_to_u8(raw_feature2.0) as f32, map_aa_to_u8(raw_feature2.1) as f32,
+            raw_feature2.2, raw_feature2.3, raw_feature2.4.to_radians(),
+            raw_feature2.5.to_radians(), raw_feature2.6.to_radians()
+        ];
+        let start = std::time::Instant::now();
+        for _ in 0..10000 {
+            let hash = HashValue::perfect_hash_default(&raw_feature);
+            let hash2 = HashValue::perfect_hash_default(&raw_feature2);
+        }
+        let duration = start.elapsed();
+        println!("Time elapsed in perfect_hash_default() is: {:?}", duration);
         let hash = HashValue::perfect_hash_default(&raw_feature);
         let hash = GeometricHash::PDBTrRosetta(HashValue::from_u32(hash));
         match hash {

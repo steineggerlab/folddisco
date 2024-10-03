@@ -15,7 +15,7 @@ use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig};
 use crate::controller::map::SimpleHashMap;
-use crate::controller::mode::IndexMode;
+use crate::controller::mode::{parse_path_by_id_type, IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::{read_compact_structure, read_u16_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
@@ -49,8 +49,8 @@ Options:
     -n, --num-res <NUM_RES_CUTOFF>   Number of residues cutoff (default 3000)
     -l, --plddt <PLDDT_CUTOFF>       PLDDT cutoff (default 0.0)
     -h, --help                       Print this help menu
-    --amino-acid <MODE>              Amino acid mode (default 0=matching, 1=all, 2=similar)
     --header                         Print header in output
+    --id <ID_TYPE>                     ID type to use (pdb, uniprot, afdb, relpath, abspath, default=relpath)
     --node <NODE_COUNT>              Number of nodes to retrieve (default 2)
 ";
 // TODO: need to think about the column name
@@ -75,6 +75,7 @@ pub fn query_pdb(env: AppArgs) {
             plddt_cutoff,
             node_count,
             header,
+            id_type,
             verbose,
             help,
         } => {
@@ -107,6 +108,7 @@ pub fn query_pdb(env: AppArgs) {
                     big_index = true;
                 }
             }
+            let id_type = IdType::get_with_str(id_type.as_str());
             // Set thread pool
             let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
             
@@ -387,7 +389,8 @@ pub fn query_pdb(env: AppArgs) {
                     if header {
                         println!("{}", QUERY_RESULT_HEADER);
                     }
-                    for (_k, v) in queried_from_indices.iter() {
+                    for (_k, v) in queried_from_indices.iter_mut() {
+                        v.id = parse_path_by_id_type(&v.id, &id_type);
                         println!("{:?}\t{}\t{}\t{}", v, query_string, pdb_path, index_path.clone().unwrap());
                     }
                 }
@@ -492,6 +495,7 @@ mod tests {
         let plddt_cutoff = 0.0;
         let node_count = 2;
         let header = false;
+        let idtype = "relpath".to_string();
         let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
@@ -508,6 +512,7 @@ mod tests {
             plddt_cutoff,
             node_count,
             header,
+            id_type: idtype,
             verbose,
             help,
         };
@@ -532,6 +537,7 @@ mod tests {
             let plddt_cutoff = 0.0;
             let node_count = 2;
             let header = false;
+            let idtype = "relpath".to_string();
             let verbose = false;
             let env = AppArgs::Query {
                 pdb_path,
@@ -548,6 +554,7 @@ mod tests {
                 plddt_cutoff,
                 node_count,
                 header,
+                id_type: idtype,
                 verbose,
                 help,
             };
@@ -560,8 +567,8 @@ mod tests {
         let pdb_path = String::from("");
         let query_string = String::from("data/query.tsv");
         let threads = 4;
-        let index_path = Some(String::from("analysis/e_coli/test_index"));
-        let retrieve = true;
+        let index_path = Some(String::from("analysis/e_coli/test"));
+        let retrieve = false;
         let dist_threshold = Some(String::from("0.5,1.0"));
         let angle_threshold = Some(String::from("5.0,10.0"));
         let help = false;
@@ -571,6 +578,7 @@ mod tests {
         let plddt_cutoff = 0.0;
         let node_count = 2;
         let header = true;
+        let idtype = "uniprot".to_string();
         let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
@@ -587,6 +595,7 @@ mod tests {
             plddt_cutoff,
             node_count,
             header,
+            id_type: idtype,
             verbose,
             help,
         };

@@ -83,83 +83,6 @@ pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
     }
 }
 
-// #[inline(always)]
-// fn hash_aa(aa: &[u8; 3]) -> u32 {
-//     // Simple hash function for 3-character strings
-//     (aa[0] as u32) << 16 | (aa[1] as u32) << 8 | (aa[2] as u32)
-// }
-
-// #[inline(always)]
-// pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
-//     match hash_aa(aa) {
-//         // ALA group: ALA, ABA, ORN, DAL, AIB, ALC, MDO, MAA, DAB
-//         0x414C41 | 0x414241 | 0x4F524E | 0x44414C | 0x414942 | 0x414C43 | 0x4D444F | 0x4D4141 | 0x444142 => 0,
-
-//         // ARG group: ARG, DAR, CIR, AGM
-//         0x415247 | 0x444152 | 0x434952 | 0x41474D => 1,
-
-//         // ASN group: ASN, DSG, MEN, SNN
-//         0x41534E | 0x445347 | 0x4D454E | 0x534E4E => 2,
-
-//         // ASP group: ASP, 0TD, DAS, IAS, PHD, BFD, ASX
-//         0x415350 | 0x305444 | 0x444153 | 0x494153 | 0x504844 | 0x424644 | 0x415358 => 3,
-
-//         // CYS group: CYS, CSO, CSD, CME, OCS, CAS, CSX, CSS, YCM, DCY, SMC, SCH, SCY, CAF, SNC, SEC
-//         0x435953 | 0x43534F | 0x435344 | 0x434D45 | 0x4F4353 | 0x434153 | 0x435358 | 0x435353 | 
-//         0x59434D | 0x444359 | 0x534D43 | 0x534348 | 0x534359 | 0x434146 | 0x534E43 | 0x534543 => 4,
-
-//         // GLN group: GLN, DGN, CRQ, MEQ
-//         0x474C4E | 0x44474E | 0x435251 | 0x4D4551 => 5,
-
-//         // GLU group: GLU, PCA, DGL, CGU, FGA, B3E, GLX
-//         0x474C55 | 0x504341 | 0x44474C | 0x434755 | 0x464741 | 0x423345 | 0x474C58 => 6,
-
-//         // GLY group: GLY, CR2, SAR, GHP, GL3
-//         0x474C59 | 0x435232 | 0x534152 | 0x474850 | 0x474C33 => 7,
-
-//         // HIS group: HIS, HIC, DHI, NEP, CR8, MHS
-//         0x484953 | 0x484943 | 0x444849 | 0x4E4550 | 0x435238 | 0x4D4853 => 8,
-
-//         // ILE group: ILE, DIL
-//         0x494C45 | 0x44494C => 9,
-
-//         // LEU group: LEU, DLE, NLE, MLE, MK8
-//         0x4C4555 | 0x444C45 | 0x4E4C45 | 0x4D4C45 | 0x4D4B38 => 10,
-
-//         // LYS group: LYS, KCX, LLP, MLY, M3L, ALY, MLZ, DLY, KPI, PYL
-//         0x4C5953 | 0x4B4358 | 0x4C4C50 | 0x4D4C59 | 0x4D334C | 0x414C59 | 0x4D4C5A | 0x444C59 |
-//         0x4B5049 | 0x50594C => 11,
-
-//         // MET group: MET, MSE, FME, NRQ, CXM, SME, MHO, MED
-//         0x4D4554 | 0x4D5345 | 0x464D45 | 0x4E5251 | 0x43584D | 0x534D45 | 0x4D484F | 0x4D4544 => 12,
-
-//         // PHE group: PHE, DPN, PHI, MEA, PHL
-//         0x504845 | 0x44504E | 0x504849 | 0x4D4541 | 0x50484C => 13,
-
-//         // PRO group: PRO, HYP, DPR
-//         0x50524F | 0x485950 | 0x445052 => 14,
-
-//         // SER group: SER, CSH, SEP, DSN, SAC, GYS, DHA, OAS
-//         0x534552 | 0x435348 | 0x534550 | 0x44534E | 0x534143 | 0x475953 | 0x444841 | 0x4F4153 => 15,
-
-//         // THR group: THR, TPO, CRO, DTH, BMT, CRF
-//         0x544852 | 0x54504F | 0x43524F | 0x445448 | 0x424D54 | 0x435246 => 16,
-
-//         // TRP group: TRP, DTR, TRQ, TOX, 0AF
-//         0x545250 | 0x445452 | 0x545251 | 0x544F58 | 0x304146 => 17,
-
-//         // TYR group: TYR, PTR, TYS, TPQ, DTY, OMY
-//         0x545952 | 0x505452 | 0x545953 | 0x545051 | 0x445459 | 0x4F4D59 => 18,
-
-//         // VAL group: VAL, DVA, MVA, FVA
-//         0x56414C | 0x445641 | 0x4D5641 | 0x465641 => 19,
-
-//         // Default case for unknown amino acids
-//         _ => 255,
-//     }
-// }
-
-
 mod tests {
     use super::*;
     #[test]
@@ -189,31 +112,6 @@ mod tests {
             assert_eq!(map_aa_to_u8(b"UNK"), 255);
         }
         println!("Time elapsed: {:?}", start.elapsed());
-        // let start = std::time::Instant::now();
-        // for i in 0..1000 {
-        //     assert_eq!(old_map_aa_to_u8(b"ALA"), 0);
-        //     assert_eq!(old_map_aa_to_u8(b"ARG"), 1);
-        //     assert_eq!(old_map_aa_to_u8(b"ASN"), 2);
-        //     assert_eq!(old_map_aa_to_u8(b"ASP"), 3);
-        //     assert_eq!(old_map_aa_to_u8(b"CYS"), 4);
-        //     assert_eq!(old_map_aa_to_u8(b"GLN"), 5);
-        //     assert_eq!(old_map_aa_to_u8(b"GLU"), 6);
-        //     assert_eq!(old_map_aa_to_u8(b"GLY"), 7);
-        //     assert_eq!(old_map_aa_to_u8(b"HIS"), 8);
-        //     assert_eq!(old_map_aa_to_u8(b"ILE"), 9);
-        //     assert_eq!(old_map_aa_to_u8(b"LEU"), 10);
-        //     assert_eq!(old_map_aa_to_u8(b"LYS"), 11);
-        //     assert_eq!(old_map_aa_to_u8(b"MET"), 12);
-        //     assert_eq!(old_map_aa_to_u8(b"PHE"), 13);
-        //     assert_eq!(old_map_aa_to_u8(b"PRO"), 14);
-        //     assert_eq!(old_map_aa_to_u8(b"SER"), 15);
-        //     assert_eq!(old_map_aa_to_u8(b"THR"), 16);
-        //     assert_eq!(old_map_aa_to_u8(b"TRP"), 17);
-        //     assert_eq!(old_map_aa_to_u8(b"TYR"), 18);
-        //     assert_eq!(old_map_aa_to_u8(b"VAL"), 19);
-        //     assert_eq!(old_map_aa_to_u8(b"UNK"), 255);
-        // }
-        // println!("Time elapsed: {:?}", start.elapsed());
     }
 }
 

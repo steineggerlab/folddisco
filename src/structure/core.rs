@@ -209,7 +209,7 @@ impl CompactStructure {
             cb_vector2: (cb_vec_x, cb_vec_y, cb_vec_z),
         }
     }
-
+    #[inline(always)]
     pub fn get_index(&self, chain: &u8, res_serial: &u64) -> Option<usize> {
         for i in 0..self.num_residues {
             if self.chain_per_residue[i] == *chain && self.residue_serial[i] == *res_serial {
@@ -218,7 +218,7 @@ impl CompactStructure {
         }
         None
     }
-    
+    #[inline(always)]
     pub fn get_ca(&self, idx: usize) -> Option<Coordinate> {
         let (x, y, z) = self.ca_vector.get(idx);
 
@@ -228,7 +228,7 @@ impl CompactStructure {
             None
         }
     }
-
+    #[inline(always)]
     pub fn get_cb(&self, idx: usize) -> Option<Coordinate> {
         let (x, y, z) = self.cb_vector.get(idx);
 
@@ -238,7 +238,7 @@ impl CompactStructure {
             None
         }
     }
-
+    #[inline(always)]
     pub fn get_n(&self, idx: usize) -> Option<Coordinate> {
         let (x, y, z) = self.n_vector.get(idx);
 
@@ -248,7 +248,7 @@ impl CompactStructure {
             None
         }
     }
-
+    #[inline(always)]
     pub fn get_ca_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -261,7 +261,7 @@ impl CompactStructure {
             None
         }
     }
-
+    #[inline(always)]
     pub fn get_cb_distance(&self, idx1: usize, idx2: usize) -> Option<f32> {
         let cb1 = self.get_cb(idx1);
         let cb2 = self.get_cb(idx2);
@@ -274,7 +274,7 @@ impl CompactStructure {
             None
         }
     }
-    
+    #[inline(always)]
     pub fn get_ca_cb_angle(&self, idx1: usize, idx2: usize, return_radian: bool) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -292,18 +292,18 @@ impl CompactStructure {
             None
         }
     }
-    
+    #[inline(always)]
     pub fn get_res_name(&self, idx: usize) -> &[u8; 3] {
         if idx >= self.num_residues {
             return b"UNK";
         }
         &self.residue_name[idx]
     }
-
+    #[inline(always)]
     pub fn get_res_serial(&self, idx1: usize, idx2: usize) -> (u64, u64) {
         (self.residue_serial[idx1], self.residue_serial[idx2])
     }
-
+    #[inline(always)]
     pub fn get_ppf(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<[f32; 4]> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -320,7 +320,7 @@ impl CompactStructure {
             None
         }
     }
-
+    #[inline(always)]
     pub fn get_trrosetta_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -345,7 +345,7 @@ impl CompactStructure {
             None
         }
     }
-
+    #[inline(always)]
     pub fn get_trrosetta_feature2(&self, idx1: usize, idx2: usize) -> Option<[f32; 7]> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -372,6 +372,7 @@ impl CompactStructure {
         }
     }
 
+    #[inline(always)]
     pub fn get_pdb_tr_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -401,15 +402,15 @@ impl CompactStructure {
     
     
     
-    
+    #[inline(always)]
     pub fn get_bfactor(&self, idx: usize) -> f32 {
         self.b_factors[idx]
     }
-    
+    #[inline(always)]
     pub fn get_plddt(&self, idx: usize) -> f32 {
         self.get_bfactor(idx)
     }
-    
+    #[inline(always)]
     pub fn get_avg_bfactor(&self) -> f32 {
         let mut sum = 0.0;
         for i in 0..self.num_residues {
@@ -417,11 +418,11 @@ impl CompactStructure {
         }
         sum / self.num_residues as f32
     }
-    
+    #[inline(always)]
     pub fn get_avg_plddt(&self) -> f32 {
         self.get_avg_bfactor()
     }
-    
+    #[inline(always)]
     pub fn get_list_amino_acids_and_distances(&self, i: usize, j: usize) -> Option<(u8, u8, f32)> {
         // Return i, j, aa_i, aa_j, distance
         let aa_i = map_aa_to_u8(self.get_res_name(i));

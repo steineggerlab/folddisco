@@ -47,6 +47,7 @@ pub enum AppArgs {
         plddt_cutoff: f32,
         node_count: usize,
         header: bool,
+        id_type: String,
         verbose: bool,
         help: bool,
     },

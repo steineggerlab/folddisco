@@ -149,7 +149,7 @@ pub fn count_query_idmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     offset_table: &SimpleHashMap,
     value_vec: &[u16],
-    lookup: &'a (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
+    lookup: &'a Vec<(String, usize, usize, f32)>
 ) -> DashMap<usize, QueryResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
 
@@ -162,12 +162,12 @@ pub fn count_query_idmode<'a>(
             let hash_count = offset.1;
 
             for &value in single_queried_values.iter() {
-                let id = &lookup.0[value as usize];
-                let nid = lookup.1[value as usize];
-                let nres = lookup.2[value as usize];
-                let plddt = lookup.3[value as usize];
+                let id = &lookup[value as usize].0;
+                let nid = lookup[value as usize].1;
+                let nres = lookup[value as usize].2;
+                let plddt = lookup[value as usize].3;
 
-                let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
+                let idf = (lookup.len() as f32 / hash_count as f32).log2();
                 let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
                 let mut is_new: bool = false;
                 let entry = query_count_map.entry(nid);
@@ -212,7 +212,7 @@ pub fn count_query_idmode<'a>(
 pub fn count_query_bigmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     big_index: &FolddiscoIndex,
-    lookup: &'a (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>)
+    lookup: &'a Vec<(String, usize, usize, f32)>
 ) -> DashMap<usize, QueryResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
 
@@ -224,17 +224,17 @@ pub fn count_query_bigmode<'a>(
         let hash_count = single_queried_values.len();
 
         for &value in single_queried_values.iter() {
-            if value >= lookup.0.len() {
-                println!("Error: {} >= {}", value, lookup.0.len());
+            if value >= lookup.len() {
+                println!("Error: {} >= {}", value, lookup.len());
                 println!("Error query: {:?}", query);
                 continue;
             }
-            let id = &lookup.0[value];
-            let nid = lookup.1[value];
-            let nres = lookup.2[value];
-            let plddt = lookup.3[value];
+            let id = &lookup[value].0;
+            let nid = lookup[value].1;
+            let nres = lookup[value].2;
+            let plddt = lookup[value].3;
 
-            let idf = (lookup.0.len() as f32 / hash_count as f32).log2();
+            let idf = (lookup.len() as f32 / hash_count as f32).log2();
             let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
             let mut is_new: bool = false;
             let entry = query_count_map.entry(nid);

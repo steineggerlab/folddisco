@@ -31,8 +31,8 @@ pub fn benchmark(env: AppArgs) {
             // let result = read_one_column_of_tsv(&result_path, 0);
             let result = read_one_column_of_tsv_as_vec(&result_path, 0);
             let answer = read_one_column_of_tsv(&answer_path, 0);
-            let lookup = load_lookup_from_file(&lookup_path).0;
-            let lookup = lookup.into_iter().collect::<HashSet<_>>();
+            let lookup = load_lookup_from_file(&lookup_path);
+            let lookup = lookup.into_iter().map(|(id, _, _, _)| id).collect::<HashSet<_>>();
             let config = read_index_config_from_file(&config_path);
 
             let result = HashSet::from_iter(result);

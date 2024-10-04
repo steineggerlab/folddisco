@@ -152,8 +152,8 @@ pub fn query_pdb(env: AppArgs) {
                     load_lookup_from_file(&lookup_path)
                 };
                 (offset_table, offset_mmap, lookup, config, value_path)
-            }).collect::<Vec<(SimpleHashMap, Mmap, (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>), IndexConfig, String)>>();
-
+            }).collect::<Vec<(SimpleHashMap, Mmap, Vec<(String, usize, usize, f32)>, IndexConfig, String)>>();
+            
             // Load foldcomp db 
             #[cfg(feature = "foldcomp")]
             let config = &loaded_index_vec[0].3;

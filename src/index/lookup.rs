@@ -8,6 +8,10 @@ use std::io::{Write, BufRead};
 use std::fs::File;
 use std::io::BufWriter;
 
+use memmap2::Mmap;
+use rayon::iter::ParallelIterator;
+use rayon::str::ParallelString;
+
 use crate::utils::log::{log_msg, FAIL};
 
 pub fn save_lookup_to_file(
@@ -43,22 +47,36 @@ pub fn save_lookup_to_file(
     }
 }
 
-pub fn load_lookup_from_file(path: &str) -> (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>) {
-    let mut path_vec: Vec<String> = Vec::new();
-    let mut numeric_id_vec: Vec<usize> = Vec::new();
-    let mut integer_vec: Vec<usize> = Vec::new();
-    let mut float_vec: Vec<f32> = Vec::new();
+// pub fn load_lookup_from_file(path: &str) -> (Vec<String>, Vec<usize>, Vec<usize>, Vec<f32>) {
+//     let mut path_vec: Vec<String> = Vec::new();
+//     let mut numeric_id_vec: Vec<usize> = Vec::new();
+//     let mut integer_vec: Vec<usize> = Vec::new();
+//     let mut float_vec: Vec<f32> = Vec::new();
+//     let file = std::fs::File::open(path).expect(&log_msg(FAIL, "Unable to open the lookup file"));
+//     let reader = std::io::BufReader::new(file);
+//     for line in reader.lines() {
+//         let line = line.expect(&log_msg(FAIL, "Unable to read the lookup file"));
+//         let line_vec: Vec<&str> = line.split("\t").collect();
+//         numeric_id_vec.push(line_vec[0].parse::<usize>().unwrap());
+//         path_vec.push(line_vec[1].to_string());
+//         integer_vec.push(line_vec[2].parse::<usize>().unwrap());
+//         float_vec.push(line_vec[3].parse::<f32>().unwrap());
+//     }
+//     (path_vec, numeric_id_vec, integer_vec, float_vec)
+// }
+pub fn load_lookup_from_file(path: &str) -> Vec<(String, usize, usize, f32)> {
     let file = std::fs::File::open(path).expect(&log_msg(FAIL, "Unable to open the lookup file"));
-    let reader = std::io::BufReader::new(file);
-    for line in reader.lines() {
-        let line = line.expect(&log_msg(FAIL, "Unable to read the lookup file"));
-        let line_vec: Vec<&str> = line.split("\t").collect();
-        numeric_id_vec.push(line_vec[0].parse::<usize>().unwrap());
-        path_vec.push(line_vec[1].to_string());
-        integer_vec.push(line_vec[2].parse::<usize>().unwrap());
-        float_vec.push(line_vec[3].parse::<f32>().unwrap());
-    }
-    (path_vec, numeric_id_vec, integer_vec, float_vec)
+    let mmap = unsafe { Mmap::map(&file).expect(&log_msg(FAIL, "Unable to mmap the lookup file")) };
+    let content = unsafe { std::str::from_utf8_unchecked(&mmap) };
+    let loaded_lookup = content.par_lines().map(|line| {
+        let mut split = line.split_whitespace();
+        let id = split.next().unwrap().parse::<usize>().unwrap();
+        let name = split.next().unwrap().to_string();
+        let nres = split.next().unwrap().parse::<usize>().unwrap();
+        let plddt = split.next().unwrap().parse::<f32>().unwrap();
+        (name, id, nres, plddt)
+    }).collect::<Vec<_>>();
+    loaded_lookup
 }
 
 
@@ -74,18 +92,18 @@ mod tests {
         let nres_vec = Some(vec![100, 200, 5000]);
         let plddt_vec = Some(vec![50.0, 60.0, 70.0]);
 
+        let expected_lookup = vec![
+            ("path1.pdb".to_string(), 0, 100, 50.0),
+            ("path2.pdb".to_string(), 1, 200, 60.0),
+            ("path3.pdb".to_string(), 2, 5000, 70.0)
+        ];
         // Save the data to a file
         save_lookup_to_file(path, &path_vec, &numeric_id_vec, nres_vec.as_ref(), plddt_vec.as_ref());
 
         // Load the data from the file
-        let (loaded_path_vec, loaded_numeric_id_vec,
-             loaded_optional_vec, loaded_float_vec ) = load_lookup_from_file(path);
-
+        let loaded_lookup = load_lookup_from_file(path);
         // Check that the loaded data is the same as the original data
-        assert_eq!(path_vec, loaded_path_vec);
-        assert_eq!(numeric_id_vec, loaded_numeric_id_vec);
-        assert_eq!(nres_vec.unwrap(), loaded_optional_vec);
-        assert_eq!(plddt_vec.unwrap(), loaded_float_vec);
+        assert_eq!(loaded_lookup, expected_lookup);
 
         // Clean up the test file
         // std::fs::remove_file(path).unwrap();

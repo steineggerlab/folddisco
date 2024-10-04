@@ -123,6 +123,83 @@ pub fn parse_path_by_id_type(path: &str, id_type: &IdType) -> String {
     }
 }
 
+
+pub fn parse_path_by_id_type_with_string(path: &str, id_type: &IdType, string: &mut String) {
+    // TODO: 2024-04-04 15:07:54 Fill in this function to ease benchmarking
+    string.clear();
+    let afdb_regex = regex::Regex::new(r"AF-.+-model_v\d").unwrap();
+    match id_type {
+        IdType::Pdb => {
+            // Get the basename of the path
+            let path = Path::new(path);
+            let file_name = path.file_stem().unwrap();
+            // Remove extension
+            let file_name = file_name.to_str().unwrap();
+            // Remove extension, If startswith "pdb" remove "pdb" from the start
+            if file_name.starts_with("pdb") {
+                // &file_name[3..]
+                string.push_str(&file_name[3..]);
+            } else {
+                // file_name
+                string.push_str(file_name);
+            }
+        }
+        IdType::Afdb => {
+            let path = Path::new(path);
+            let file_name = path.file_stem().unwrap().to_str().unwrap();
+            // Find the matching pattern
+            let afdb_id = afdb_regex.find(file_name);
+            if afdb_id.is_none() {
+                // return file_name;
+                string.push_str(file_name);
+            } else {
+                // &file_name[afdb_id.unwrap().start()..afdb_id.unwrap().end()]
+                string.push_str(&file_name[afdb_id.unwrap().start()..afdb_id.unwrap().end()]);
+            }
+        }
+        IdType::UniProt => {
+            let path = Path::new(path);
+            let file_name = path.file_stem().unwrap().to_str().unwrap();
+            // Find the matching pattern
+            let afdb_id = afdb_regex.find(file_name);
+            if afdb_id.is_none() {
+                // return file_name;
+                string.push_str(file_name);
+            } 
+            let afdb_id = file_name[afdb_id.unwrap().start()..afdb_id.unwrap().end()].to_string();
+            let afdb_id = afdb_id.split("-").collect::<Vec<_>>();
+            // afdb_id[1]
+            string.push_str(afdb_id[1]);
+        }
+        IdType::BasenameWithoutExt => {
+            let path = Path::new(path);
+            let file_name = path.file_stem().unwrap().to_str().unwrap();
+            // file_name
+            string.push_str(file_name);
+        }
+        IdType::BasenameWithExt => {
+            let path = Path::new(path);
+            let file_name = path.file_name().unwrap().to_str().unwrap();
+            // file_name
+            string.push_str(file_name);
+        }
+        IdType::AbsPath => {
+            let path = fs::canonicalize(path).unwrap();
+            // path.to_str().unwrap()
+            string.push_str(path.to_str().unwrap());
+        }
+        IdType::RelPath => {
+            // path
+            string.push_str(path);
+        }
+        IdType::Other => {
+            // path
+            string.push_str(path);
+        }
+    }
+}
+
+
 pub fn parse_path_vec_by_id_type(path_vec: &Vec<String>, id_type: IdType) -> Vec<String> {
     let mut parsed_path_vec = Vec::with_capacity(path_vec.len());
     for path in path_vec {

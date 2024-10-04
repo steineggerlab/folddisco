@@ -37,7 +37,7 @@ impl FolddiscoIndex {
         }
     }
 
-    #[inline(always)]
+    
     pub fn count_single_entry(&self, hash: u32, id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
@@ -121,7 +121,7 @@ impl FolddiscoIndex {
         }
     }
 
-    #[inline(always)]
+    
     pub fn add_single_entry(&self, hash: u32, id: usize, bit_container: &mut Vec<u8>) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };

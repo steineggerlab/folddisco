@@ -1,7 +1,3 @@
-
-use std::collections::HashMap;
-use lazy_static::lazy_static;
-
 // Constants
 // 1. for cb_dist
 pub const MIN_DIST: f32 = 2.0;

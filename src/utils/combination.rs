@@ -1,3 +1,4 @@
+
 pub struct CombinationIterator {
     n: usize,
     i: usize,
@@ -65,6 +66,7 @@ mod tests {
             println!("{} {}", i, j);
         });
     }
+
 }
 
 #[derive(Hash, PartialEq, Eq)]

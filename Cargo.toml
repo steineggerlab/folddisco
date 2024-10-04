@@ -31,7 +31,6 @@ toml = "0.8.12"
 regex = "1.10.4"
 petgraph = "0.6.4"
 libc = "0.2.155"
-lazy_static = "1.5.0"
 dashmap = { version = "6.1.0", features = ["rayon"] }
 
 

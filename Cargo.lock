@@ -195,7 +195,6 @@ dependencies = [
  "cmake",
  "dashmap",
  "flate2",
- "lazy_static",
  "libc",
  "memmap2",
  "peak_alloc",

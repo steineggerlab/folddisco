@@ -13,6 +13,8 @@ use crate::controller::feature::get_single_feature;
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::fcz::FoldcompDbReader;
 
+use super::feature;
+
 pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
     let mut output: HashSet<(u32, u32)> = HashSet::new();
     let mut feature = vec![0.0; 9];
@@ -106,55 +108,6 @@ pub fn res_vec_as_string(res_vec: &Vec<((u8, u8), (u64, u64))>) -> String {
 }
 
 
-// pub fn prefilter_aa_pair(compact: &CompactStructure, hash: &GeometricHash) -> Vec<(usize, usize)> {
-//     let mut output: Vec<(usize, usize)> = Vec::new();
-//     let comb = CombinationIterator::new(compact.num_residues);
-//     let aa_index = hash.hash_type().amino_acid_index();
-//     if aa_index.is_none() {
-//         return output;
-//     }
-//     let aa_index = aa_index.unwrap();
-//     let feature = hash.reverse_hash_default();
-//     let aa1 = map_u8_to_aa(feature[aa_index[0]] as u8).as_bytes();
-//     let aa2 = map_u8_to_aa(feature[aa_index[1]] as u8).as_bytes();
-//     comb.for_each(|(i, j)| {
-//         if compact.residue_name[i] == aa1 && compact.residue_name[j] == aa2 {
-//             output.push((i, j));
-//         }
-//     });
-//     output
-// }
-
-pub fn prefilter_aa_pair(
-    compact: &CompactStructure,
-    hash: &GeometricHash,
-) -> CombinationVecIterator {
-    
-    let aa_index = match hash.hash_type().amino_acid_index() {
-        Some(index) => index,
-        None => return CombinationVecIterator::new((0..compact.num_residues).collect(), (0..compact.num_residues).collect()),
-    };
-    let mut feature = vec![0.0; 9];
-    hash.reverse_hash_default(&mut feature);
-    let aa1 = map_u8_to_aa(feature[aa_index[0]] as u8).as_bytes();
-    let aa2 = map_u8_to_aa(feature[aa_index[1]] as u8).as_bytes();
-
-    // Pre-filter the residue names
-    let filtered_indices_aa1: Vec<usize> = compact.residue_name
-        .iter()
-        .enumerate()
-        .filter_map(|(i, &res)| if res == aa1 { Some(i) } else { None })
-        .collect();
-
-    let filtered_indices_aa2: Vec<usize> = compact.residue_name
-        .iter()
-        .enumerate()
-        .filter_map(|(j, &res)| if res == aa2 { Some(j) } else { None })
-        .collect();
-
-    CombinationVecIterator::new(filtered_indices_aa1, filtered_indices_aa2)
-}
-
 pub fn retrieve_with_prefilter(
     compact: &CompactStructure,
     // hash: &GeometricHash, 
@@ -236,6 +189,49 @@ pub fn retrieve_with_prefilter(
 }
 
 
+pub fn retrieve_whole_structure(
+    compact: &CompactStructure,
+    hash_set: &HashSet<GeometricHash>,
+    nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
+    query_aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
+) -> (Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>) {
+    let mut output: Vec<(usize, usize, GeometricHash)> = Vec::new();
+    let mut candidate_pairs: Vec<(usize, (usize, usize))> = Vec::new();
+    let hash = hash_set.iter().next().cloned().unwrap();
+    let mut feature = vec![0.0; 9];
+    let comb = CombinationIterator::new(compact.num_residues);
+    comb.for_each(|(i, j)| {
+        let is_feature = get_single_feature(i, j, compact, hash.hash_type(), dist_cutoff, &mut feature);
+        if is_feature {
+            // Check distance & if it is within the threshold, add to candidate_pairs
+            let aa1 = map_aa_to_u8(&compact.residue_name[i]);
+            let aa2 = map_aa_to_u8(&compact.residue_name[j]);
+            if query_aa_dist_map.contains_key(&(aa1, aa2)) {
+                let dists = query_aa_dist_map.get(&(aa1, aa2)).unwrap();
+                let curr_dist = compact.get_ca_distance(i, j);
+                // If curr_dist is Some and within the threshold, add to candidate_pairs
+                if curr_dist.is_some() {
+                    let curr_dist = curr_dist.unwrap();
+                    for (dist, qi) in dists {
+                        if (curr_dist - dist).abs() < 1.0 {
+                            candidate_pairs.push((*qi, (i, j)));
+                        }
+                    }
+                }
+            }
+            let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
+                GeometricHash::perfect_hash_default(&feature, hash.hash_type())
+            } else {
+                GeometricHash::perfect_hash(&feature, hash.hash_type(), nbin_dist, nbin_angle)
+            };
+            if hash_set.contains(&curr_hash) {
+                output.push((i, j, curr_hash));
+            }
+        }
+    });
+    (output, candidate_pairs)
+}
+
 pub fn get_chain_and_res_ind(compact: &CompactStructure, i: usize) -> (u8, u64) {
     (compact.chain_per_residue[i], compact.residue_serial[i])
 }
@@ -260,19 +256,12 @@ pub fn retrieval_wrapper_for_foldcompdb(
     // Iterate over query vector and retrieve indices
     // Parallel
     let query_set: HashSet<GeometricHash> = HashSet::from_iter(query_vector.clone());
-    let mut prefilter_set = query_vector.par_iter().map(|hash| {
-        prefilter_aa_pair(&compact, hash)
-    }).collect::<HashSet<CombinationVecIterator>>();
-    
-    let (indices_found , candidate_pairs) = prefilter_set.par_drain().map(|aa_filter| {
-        retrieve_with_prefilter(&compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map)
-    }).collect::<Vec<(Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>)>>().into_iter().fold(
-        (Vec::new(), Vec::new()), |(mut indices_found, mut candidate_pairs), (indices, candidates)| {
-            indices_found.extend(indices);
-            candidate_pairs.extend(candidates);
-            (indices_found, candidate_pairs)
-        }
+    let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
+    let aa_filter = CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2);
+    let (indices_found , candidate_pairs) = retrieve_with_prefilter(
+        &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map
     );
+    
     // Convert candidate_pairs to hashmap
     // let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
     //     HashMap::new(), |mut map, (qi, pair)| {
@@ -330,10 +319,10 @@ pub fn retrieval_wrapper_for_foldcompdb(
         // Sort component to match retrieved indices
         let mut res_vec: Vec<String> = Vec::new();
         let mut res_vec_from_hash: Vec<String> = Vec::new();
-
+        let mut count_map: HashMap<usize, usize> = HashMap::new();
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
-            let mut count_map: HashMap<usize, usize> = HashMap::new();
+            count_map.clear();
             if query_indices.contains(&i) {
                 let index = query_indices.iter().position(|&x| x == i).unwrap();
                 let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_indices[index]);
@@ -434,30 +423,13 @@ pub fn retrieval_wrapper(
     // Iterate over query vector and retrieve indices
     // Parallel
     let query_set: HashSet<GeometricHash> = HashSet::from_iter(query_vector.clone());
-    let mut prefilter_set = query_vector.par_iter().map(|hash| {
-        prefilter_aa_pair(&compact, hash)
-    }).collect::<HashSet<CombinationVecIterator>>();
-    
-    let (indices_found , candidate_pairs) = prefilter_set.par_drain().map(|aa_filter| {
-        retrieve_with_prefilter(&compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map)
-    }).collect::<Vec<(Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>)>>().into_iter().fold(
-        (Vec::new(), Vec::new()), |(mut indices_found, mut candidate_pairs), (indices, candidates)| {
-            indices_found.extend(indices);
-            candidate_pairs.extend(candidates);
-            (indices_found, candidate_pairs)
-        }
+
+    let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
+    let aa_filter = CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2);
+    let (indices_found , candidate_pairs) = retrieve_with_prefilter(
+        &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map
     );
-    // Convert candidate_pairs to hashmap
-    // let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
-    //     HashMap::new(), |mut map, (qi, pair)| {
-    //         if !map.contains_key(&qi) {
-    //             map.insert(qi, vec![pair]);
-    //         } else {
-    //             map.get_mut(&qi).unwrap().push(pair);
-    //         }
-    //         map
-    //     }
-    // );
+
     let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
             if !map.contains_key(&qi) {
@@ -470,10 +442,6 @@ pub fn retrieval_wrapper(
             map
         }
     );
-    // let indices_found = measure_time!(query_vector.par_iter().map(|hash| {
-    //     let prefiltered = prefilter_aa_pair(&compact, hash);
-    //     retrieve_with_prefilter(&compact, hash, prefiltered, _nbin_dist, _nbin_angle)
-    // }).collect::<Vec<Vec<(usize, usize)>>>());
     
     // Make a graph and find connected components with the same node count
     // NOTE: Naive implementation to find matching components. Need to be improved to handle partial matches
@@ -504,10 +472,10 @@ pub fn retrieval_wrapper(
         // Sort component to match retrieved indices
         let mut res_vec: Vec<String> = Vec::new();
         let mut res_vec_from_hash: Vec<String> = Vec::new();
-
+        let mut count_map: HashMap<usize, usize> = HashMap::new();
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
-            let mut count_map: HashMap<usize, usize> = HashMap::new();
+            count_map.clear();
             if query_indices.contains(&i) {
                 let index = query_indices.iter().position(|&x| x == i).unwrap();
                 let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_indices[index]);
@@ -589,6 +557,44 @@ pub fn retrieval_wrapper(
         ((a, b), (c, d))
     }).unzip();
     (result_from_hash, result)
+}
+
+pub fn prefilter_amino_acid(query_set: &HashSet<GeometricHash>, _hash_type: HashType, compact: &CompactStructure) -> (BTreeSet<usize>, BTreeSet<usize>) {
+    let mut observed_aa1: HashSet<u8> = HashSet::with_capacity(20);
+    let mut observed_aa2: HashSet<u8> = HashSet::with_capacity(20);
+    let mut index_vec1 = BTreeSet::new();
+    let mut index_vec2 = BTreeSet::new();
+    let mut feature_holder = vec![0.0; 9];
+    query_set.iter().for_each(|hash| {
+        hash.reverse_hash_default(&mut feature_holder);
+        let aa1 = feature_holder[_hash_type.amino_acid_index().unwrap()[0]] as u8;
+        let aa2 = feature_holder[_hash_type.amino_acid_index().unwrap()[1]] as u8;
+        if !observed_aa1.contains(&aa1) {
+            observed_aa1.insert(aa1);
+            compact.residue_name.iter().enumerate().filter_map(|(i, &res)| {
+                if res == map_u8_to_aa(aa1).as_bytes() {
+                    Some(i)
+                } else {
+                    None
+                }
+            }).for_each(|i| {
+                index_vec1.insert(i);
+            });
+        }
+        if !observed_aa2.contains(&aa2) {
+            observed_aa2.insert(aa2);
+            compact.residue_name.iter().enumerate().filter_map(|(i, &res)| {
+                if res == map_u8_to_aa(aa2).as_bytes() {
+                    Some(i)
+                } else {
+                    None
+                }
+            }).for_each(|i| {
+                index_vec2.insert(i);
+            });
+        }
+    });
+    (index_vec1, index_vec2)
 }
 
 pub fn map_query_and_retrieved_residues(

@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 
 pub struct CombinationIterator {
     n: usize,
@@ -91,6 +93,14 @@ impl CombinationVecIterator {
             true
         } else {
             false
+        }
+    }
+    pub fn new_from_btreesets(vec1: &BTreeSet<usize>, vec2: &BTreeSet<usize>) -> Self {
+        Self {
+            vec1: vec1.iter().cloned().collect(),
+            vec2: vec2.iter().cloned().collect(),
+            index1: 0,
+            index2: 0,
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-use std::{collections::{HashMap, HashSet}, fs::File};
+use std::{collections::{BTreeSet, HashMap, HashSet}, fs::File};
 use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelDrainFull, ParallelIterator};
 
@@ -274,12 +274,24 @@ pub fn retrieval_wrapper_for_foldcompdb(
         }
     );
     // Convert candidate_pairs to hashmap
-    let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
+    // let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
+    //     HashMap::new(), |mut map, (qi, pair)| {
+    //         if !map.contains_key(&qi) {
+    //             map.insert(qi, vec![pair]);
+    //         } else {
+    //             map.get_mut(&qi).unwrap().push(pair);
+    //         }
+    //         map
+    //     }
+    // );
+    let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
             if !map.contains_key(&qi) {
-                map.insert(qi, vec![pair]);
+                let mut set = BTreeSet::new();
+                set.insert(pair);
+                map.insert(qi, set);
             } else {
-                map.get_mut(&qi).unwrap().push(pair);
+                map.get_mut(&qi).unwrap().insert(pair);
             }
             map
         }
@@ -348,8 +360,6 @@ pub fn retrieval_wrapper_for_foldcompdb(
                 res_vec_from_hash.push("_".to_string());
                 if candidate_pair_map.contains_key(&i) {
                     let mut pairs = candidate_pair_map.get(&i).unwrap().clone();
-                    pairs.sort_by(|a, b| a.0.cmp(&b.0));
-                    pairs.dedup();
                     for (j, k) in pairs {
                         // If retrieved_indices contains k, add j to mapping
                         if retrieved_indices.contains(&k) {
@@ -438,12 +448,24 @@ pub fn retrieval_wrapper(
         }
     );
     // Convert candidate_pairs to hashmap
-    let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
+    // let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
+    //     HashMap::new(), |mut map, (qi, pair)| {
+    //         if !map.contains_key(&qi) {
+    //             map.insert(qi, vec![pair]);
+    //         } else {
+    //             map.get_mut(&qi).unwrap().push(pair);
+    //         }
+    //         map
+    //     }
+    // );
+    let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
             if !map.contains_key(&qi) {
-                map.insert(qi, vec![pair]);
+                let mut set = BTreeSet::new();
+                set.insert(pair);
+                map.insert(qi, set);
             } else {
-                map.get_mut(&qi).unwrap().push(pair);
+                map.get_mut(&qi).unwrap().insert(pair);
             }
             map
         }
@@ -512,8 +534,8 @@ pub fn retrieval_wrapper(
                 res_vec_from_hash.push("_".to_string());
                 if candidate_pair_map.contains_key(&i) {
                     let mut pairs = candidate_pair_map.get(&i).unwrap().clone();
-                    pairs.sort_by(|a, b| a.0.cmp(&b.0));
-                    pairs.dedup();
+                    // pairs.sort_by(|a, b| a.0.cmp(&b.0));
+                    // pairs.dedup();
                     for (j, k) in pairs {
                         // If retrieved_indices contains k, add j to mapping
                         if retrieved_indices.contains(&k) {

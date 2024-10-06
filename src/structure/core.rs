@@ -63,9 +63,6 @@ pub struct CompactStructure {
     pub n_vector: CarbonCoordinateVector,
     pub ca_vector: CarbonCoordinateVector,
     pub cb_vector: CarbonCoordinateVector,
-    pub n_vector2: (Vec<f32>, Vec<f32>, Vec<f32>),
-    pub ca_vector2: (Vec<f32>, Vec<f32>, Vec<f32>),
-    pub cb_vector2: (Vec<f32>, Vec<f32>, Vec<f32>),
     pub b_factors: Vec<f32>,
 }
 
@@ -204,9 +201,6 @@ impl CompactStructure {
             ca_vector: ca_vec,
             cb_vector: cb_vec,
             b_factors: b_factors,
-            n_vector2: (n_vec_x, n_vec_y, n_vec_z),
-            ca_vector2: (ca_vec_x, ca_vec_y, ca_vec_z),
-            cb_vector2: (cb_vec_x, cb_vec_y, cb_vec_z),
         }
     }
     #[inline(always)]

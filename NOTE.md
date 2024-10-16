@@ -2,35 +2,24 @@
 
 ## TODOs
 DEV
-- [ ] TODO: IMPORTANT: Remove unnecessary allocations inside feature calculation
-- [ ] TODO: IMPORTANT: Pre-terminate feature calculation when the distance is too far
-- [ ] TODO: Test which parallelization is better for calculation
-  - [ ] 2. par_iter
-- [ ] DONE: discretizer - inlining
-
-- [ ] TODO: read lookups (foldcomp, folddisco) parallelly: mmap + rayon
-
+- [x] DONE: Remove unnecessary allocations inside feature calculation
+- [x] DONE: Pre-terminate feature calculation when the distance is too far
+- [x] DONE: discretizer - inlining
+- [x] DONE: read lookups (foldcomp, folddisco) parallelly: mmap + rayon
 - [x] DONE: Edit github action to test foldcomp features in the CI
-  - [ ] TODO: Pass the tests
+  - [x] DONE: Removed windows testing
 - [x] DONE: handle cases where lookup is not start from 0 to N. 
-
-- [ ] TODO: When foldcomp is enabled in feature, normal directory handling is not working well. need check.
-- [ ] TODO: remove Grid mode
+- [x] DONE: When foldcomp is enabled in feature, normal directory handling is not working well. need check.
+- [x] DONE: remove Grid mode
 
 QUERYING
 - [ ] ISSUE: WARNING: slows down when there are too many combinations of amino acid pairs
 - [x] DONE: rescue residues based on the distance
 
-
-QUERYING
-- [ ] Collect test query info / commands in QUERY.md
-
 QUERYING
 - [ ] TODO: Rename features --> default goes to PDBTrRosetta
 - [ ] TODO: Restore tests for retrieve.rs & combination.rs
 - [ ] TODO: Print only top N result (--top)
-- [ ] TODO: Add ID-handling to 
-- [ ] Set default options; PDBTrRosetta, 16, 4, ID, relpath
 - [ ] Write rustdoc
 - [ ] Check verbosity flag works
 
@@ -48,24 +37,15 @@ BENCHMARK
 SCORING
 - [ ] MASTER
 
-IMPORTANT: BENCHMARK 
-  - [ ] TODO: Pyscomotif in two options
-
-
-INDEXING
-- [x] DONE: Add an option to save indices with different schemes
-  - [ ] 3. ID + position
-
 ## TODOs 
 BENCHMARK
-- [ ] Build an index of Swissprot & PDB
-- [ ] Check if the query from other lab works or not
+- [x] DONE: Build an index of Swissprot & PDB
+- [x] DONE: Check if the query from other lab works or not
 - [ ] Read MASTER, PDB realtime motif, pyscomotif on how they benchmarked
 
 DEV
 - [ ] TODO: expose necessary functions with prelude
-- [ ] TODO: Setup output format --> easy to parse (tsv or other)
-- [ ] CLI: polish grid related parameters
+- [x] DONE: Setup output format --> easy to parse (tsv or other)
 - [ ] CLI::index: Delete unncessary parameters
 - [ ] CLI: polish logging
 
@@ -74,33 +54,24 @@ QUERYING
 - [ ] TODO: FEATURE: multiple queries
 
 BIG THINGS
-- [ ] IMPORTANT: confirm if sin & cos representation is working 
-
-
+- [x] DONE: IMPORTANT: confirm if sin & cos representation is working 
 
 INDEX
-- [ ] IMPORTANT: Reduce memory usage with delta encoding (Make this as an option). DELTA ENCODING!!!
+- [x] DONE: IMPORTANT: Reduce memory usage with delta encoding (Make this as an option). DELTA ENCODING!!!
 - [ ] IMPORTANT: Concat multiple index tables
 
 BENCHMARK
-- [ ] TODO: Benchmarking -- IMPORTANT: build CLI for this
-- [ ] Benchmarking -- set benchmarking dataset based on PDB's approach
+- [x] DONE: Benchmarking -- IMPORTANT: build CLI for this
+- [x] Benchmarking -- set benchmarking dataset based on PDB's approach
 - [ ] TODO: Gather data
 
 IDEAS
-- [ ] IDEA: Sukhwan: How powerful is amino acid pair? revival of aa_pair
-- [ ] Longer motifs?
 - [ ] IDEA: MINOR: residue matching strategy 
-- [ ] IDEA: Naming of the project
-- [ ] IndexTable with allocation (Priority: Middle)
 
 DEV
-- [ ] TODO:Polish logging
-- [ ] Print original query
 - [ ] TODO: expose necessary functions with prelude
 - [ ] working examples
 - [ ] TODO: Write rustdoc
-- NOTE: Push only working code to the repository
 
 TEST
 - [ ] Check all structs and methods are working within tests

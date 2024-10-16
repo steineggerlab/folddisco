@@ -48,9 +48,9 @@ Options:
     -s, --score <SCORE_CUTOFF>       Score cutoff (default 0.0)
     -n, --num-res <NUM_RES_CUTOFF>   Number of residues cutoff (default 3000)
     -l, --plddt <PLDDT_CUTOFF>       PLDDT cutoff (default 0.0)
+    -o, --output <OUTPUT_PATH>       Output file path (default stdout)
     -h, --help                       Print this help menu
     --header                         Print header in output
-    --id <ID_TYPE>                     ID type to use (pdb, uniprot, afdb, relpath, abspath, default=relpath)
     --node <NODE_COUNT>              Number of nodes to retrieve (default 2)
 ";
 // TODO: need to think about the column name

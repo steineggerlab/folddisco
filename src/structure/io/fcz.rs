@@ -13,6 +13,7 @@ use rayon::prelude::*;
 use std::fs::File;
 use std::mem::ManuallyDrop;
 
+use crate::measure_time;
 use crate::structure::atom::Atom;
 use crate::structure::core::Structure;
 use crate::structure::io::StructureFileFormat;
@@ -39,13 +40,13 @@ impl Drop for FoldcompDbReader {
 
 impl FoldcompDbReader {
     pub fn new(path: &str) -> Self {
-        let (db_mmap, db) = read_foldcomp_db(path).expect("Error reading foldcomp db file.");
-        let lookup = read_foldcomp_db_lookup(path).expect("Error reading foldcomp db lookup file.");
-        let index = read_foldcomp_db_index(path).expect("Error reading foldcomp db index file.");
+        let (db_mmap, db) = measure_time!(read_foldcomp_db(path).expect("Error reading foldcomp db file."));
+        let lookup = measure_time!(read_foldcomp_db_lookup(path).expect("Error reading foldcomp db lookup file."));
+        let index = measure_time!(read_foldcomp_db_index(path).expect("Error reading foldcomp db index file."));
         let path_string_to_return = path.to_string();
         
         let mut lookup = lookup;
-        lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        measure_time!(lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1)));
         
         FoldcompDbReader {
             path: path_string_to_return,

@@ -169,7 +169,11 @@ pub fn query_pdb(env: AppArgs) {
                 StructureFileFormat::FCZDB => {
                     if retrieve {
                         let foldcomp_db_path = config.foldcomp_db.clone().unwrap();
-                        measure_time!(FoldcompDbReader::new(foldcomp_db_path.as_str()))
+                        if verbose {
+                            measure_time!(FoldcompDbReader::new(foldcomp_db_path.as_str()))
+                        } else {
+                            FoldcompDbReader::new(foldcomp_db_path.as_str())
+                        }
                     } else {
                         FoldcompDbReader::empty()
                     }
@@ -296,9 +300,13 @@ pub fn query_pdb(env: AppArgs) {
                                 } else {
                                     load_big_index(index_prefix)
                                 };
-                                let query_count_map = measure_time!(count_query_bigmode(
+                                let query_count_map = if verbose { measure_time!(count_query_bigmode(
                                     &pdb_query, &pdb_query_map, &big_index, &lookup
-                                ));
+                                )) } else {
+                                    count_query_bigmode(
+                                        &pdb_query, &pdb_query_map, &big_index, &lookup
+                                    )
+                                };
                                 
                                 let mut match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()

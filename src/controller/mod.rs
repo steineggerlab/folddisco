@@ -16,7 +16,7 @@ pub mod mode;
 
 use std::cell::UnsafeCell;
 use std::io::Write;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use feature::get_geometric_hash_as_u32_from_structure;
 use mode::IndexMode;
 // External imports
@@ -24,17 +24,16 @@ use rayon::prelude::*;
 
 use crate::index::indextable::FolddiscoIndex;
 // Internal imports
-use crate::{measure_time, PDBReader};
-use crate::geometry::core::{GeometricHash, HashType};
-use crate::index::alloc::IndexBuilder;
+use crate::PDBReader;
+use crate::geometry::core::HashType;
 use crate::utils::log::{ print_log_msg, log_msg, FAIL, WARN, INFO };
 
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::fcz::FoldcompDbReader;
 
 const DEFAULT_NUM_THREADS: usize = 4;
-const DEFAULT_HASH_TYPE: HashType = HashType::PDBTrRosetta;
-const DEFAULT_MAX_RESIDUE: usize = 50000;
+// const DEFAULT_HASH_TYPE: HashType = HashType::PDBTrRosetta;
+const DEFAULT_MAX_RESIDUE: usize = 65535;
 const DEFAULT_DIST_CUTOFF: f32 = 20.0;
 
 unsafe impl Send for FoldDisco {}

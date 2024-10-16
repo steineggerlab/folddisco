@@ -4,7 +4,7 @@
 // id\tpath\tinteger\tfloat
 // id\tpath\tn_res\tplddt
 
-use std::io::{Write, BufRead};
+use std::io::Write;
 use std::fs::File;
 use std::io::BufWriter;
 

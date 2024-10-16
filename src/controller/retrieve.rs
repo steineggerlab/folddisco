@@ -1,7 +1,7 @@
 // 
 use std::{collections::{BTreeSet, HashMap, HashSet}, fs::File};
 use petgraph::Graph;
-use rayon::iter::{IntoParallelRefIterator, ParallelDrainFull, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::utils::convert::{map_aa_to_u8, map_u8_to_aa}; 
 use crate::prelude::*; 
@@ -13,7 +13,6 @@ use crate::controller::feature::get_single_feature;
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::fcz::FoldcompDbReader;
 
-use super::feature;
 
 pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
     let mut output: HashSet<(u32, u32)> = HashSet::new();
@@ -348,7 +347,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
             } else {
                 res_vec_from_hash.push("_".to_string());
                 if candidate_pair_map.contains_key(&i) {
-                    let mut pairs = candidate_pair_map.get(&i).unwrap().clone();
+                    let pairs = candidate_pair_map.get(&i).unwrap().clone();
                     for (j, k) in pairs {
                         // If retrieved_indices contains k, add j to mapping
                         if retrieved_indices.contains(&k) {
@@ -501,7 +500,7 @@ pub fn retrieval_wrapper(
             } else {
                 res_vec_from_hash.push("_".to_string());
                 if candidate_pair_map.contains_key(&i) {
-                    let mut pairs = candidate_pair_map.get(&i).unwrap().clone();
+                    let pairs = candidate_pair_map.get(&i).unwrap().clone();
                     // pairs.sort_by(|a, b| a.0.cmp(&b.0));
                     // pairs.dedup();
                     for (j, k) in pairs {

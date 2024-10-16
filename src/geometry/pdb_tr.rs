@@ -186,8 +186,8 @@ mod tests {
         ];
         let start = std::time::Instant::now();
         for _ in 0..10000 {
-            let hash = HashValue::perfect_hash_default(&raw_feature);
-            let hash2 = HashValue::perfect_hash_default(&raw_feature2);
+            let _ = HashValue::perfect_hash_default(&raw_feature);
+            let _ = HashValue::perfect_hash_default(&raw_feature2);
         }
         let duration = start.elapsed();
         println!("Time elapsed in perfect_hash_default() is: {:?}", duration);

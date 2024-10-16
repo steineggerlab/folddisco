@@ -11,7 +11,6 @@ use rayon::prelude::ParallelSliceMut;
 use rayon::prelude::ParallelString;
 use rayon::prelude::*;
 use std::fs::File;
-use std::io::BufRead;
 use std::mem::ManuallyDrop;
 
 use crate::structure::atom::Atom;

@@ -64,7 +64,7 @@ impl HashValue {
         let h_cb_dist = discretize_value(cb_dist, MIN_DIST, MAX_DIST, nbin_dist);
         
         // Convert angles to sin and cos
-        let angles = [omega, theta1, theta2, phi1, phi2];
+        // let angles = [omega, theta1, theta2, phi1, phi2];
         let sin_cos_angles = [
             (omega.sin(), omega.cos()), (theta1.sin(), theta1.cos()),
             (theta2.sin(), theta2.cos()), (phi1.sin(), phi1.cos()),

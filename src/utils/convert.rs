@@ -80,11 +80,12 @@ pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
 }
 
 mod tests {
-    use super::*;
+
     #[test]
     fn test_map_aa_to_u8() {
+        use super::map_aa_to_u8;
         let start = std::time::Instant::now();
-        for i in 0..1000 {
+        for _ in 0..1000 {
             assert_eq!(map_aa_to_u8(b"ALA"), 0);
             assert_eq!(map_aa_to_u8(b"ARG"), 1);
             assert_eq!(map_aa_to_u8(b"ASN"), 2);

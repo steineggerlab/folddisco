@@ -54,7 +54,7 @@ Options:
     --node <NODE_COUNT>              Number of nodes to retrieve (default 2)
 ";
 // TODO: need to think about the column name
-pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tnres\tplddt\tmatching_residues\tresidues_rescued\tquery_residues\tquery_file\tindex_path";
+pub const QUERY_RESULT_HEADER: &str = "id\tpath\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tnres\tplddt\tmatching_residues\tresidues_rescued\tquery_residues\tquery_file\tindex_path";
 
 pub const DEFAULT_NODE_COUNT: usize = 2;
 
@@ -383,8 +383,7 @@ pub fn query_pdb(env: AppArgs) {
                     let mut id_container = String::new();
                     for (_k, v) in queried_from_indices.iter_mut() {
                         parse_path_by_id_type_with_string(v.id, &id_type, &mut id_container);
-                        v.id = Box::leak(id_container.clone().into_boxed_str());
-                        writer.write_all(format!("{:?}\t{}\t{}\t{}\n", v, query_string, pdb_path, index_path.clone().unwrap()).as_bytes()).expect(
+                        writer.write_all(format!("{}\t{:?}\t{}\t{}\t{}\n", id_container, v, query_string, pdb_path, index_path.clone().unwrap()).as_bytes()).expect(
                             &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
                         );
                     }
@@ -395,8 +394,7 @@ pub fn query_pdb(env: AppArgs) {
                     let mut id_container = String::new();
                     for (_k, v) in queried_from_indices.iter_mut() {
                         parse_path_by_id_type_with_string(v.id, &id_type, &mut id_container);
-                        v.id = Box::leak(id_container.clone().into_boxed_str());
-                        println!("{:?}\t{}\t{}\t{}", v, query_string, pdb_path, index_path.clone().unwrap());
+                        println!("{}\t{:?}\t{}\t{}\t{}", id_container, v, query_string, pdb_path, index_path.clone().unwrap());
                     }
                 }
             }); // queries

@@ -15,7 +15,7 @@ use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig};
 use crate::controller::map::SimpleHashMap;
-use crate::controller::mode::{IdType, IndexMode};
+use crate::controller::mode::IndexMode;
 use crate::cli::*;
 use crate::controller::io::{read_compact_structure, read_u16_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
@@ -75,7 +75,7 @@ pub fn query_pdb(env: AppArgs) {
             plddt_cutoff,
             node_count,
             header,
-            id_type,
+            output,
             verbose,
             help,
         } => {
@@ -90,7 +90,12 @@ pub fn query_pdb(env: AppArgs) {
             }
             // Print query information
             if verbose {
-                print_log_msg(INFO, &format!("Querying {}:{} to {}", &pdb_path, &query_string, &index_path.clone().unwrap()));
+                // If pdb_path is empty
+                if pdb_path.is_empty() {
+                    print_log_msg(INFO, &format!("Querying {} to {}", &query_string, &index_path.clone().unwrap()));
+                } else {
+                    print_log_msg(INFO, &format!("Querying {}:{} to {}", &pdb_path, &query_string, &index_path.clone().unwrap()));
+                }
                 // NOTE: If needed, print filter information
             }
             // Get index paths
@@ -108,7 +113,6 @@ pub fn query_pdb(env: AppArgs) {
                     big_index = true;
                 }
             }
-            let id_type = IdType::get_with_str(id_type.as_str());
             // Set thread pool
             let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
             
@@ -129,7 +133,7 @@ pub fn query_pdb(env: AppArgs) {
                 }
                 queries
             } else {
-                vec![(pdb_path.clone(), query_string.clone(), String::new())]
+                vec![(pdb_path.clone(), query_string.clone(), output)]
             };
             let dist_thresholds = parse_threshold_string(dist_threshold.clone());
             let angle_thresholds = parse_threshold_string(angle_threshold.clone());
@@ -165,7 +169,7 @@ pub fn query_pdb(env: AppArgs) {
                 StructureFileFormat::FCZDB => {
                     if retrieve {
                         let foldcomp_db_path = config.foldcomp_db.clone().unwrap();
-                        FoldcompDbReader::new(foldcomp_db_path.as_str())
+                        measure_time!(FoldcompDbReader::new(foldcomp_db_path.as_str()))
                     } else {
                         FoldcompDbReader::empty()
                     }
@@ -496,7 +500,6 @@ mod tests {
         let plddt_cutoff = 0.0;
         let node_count = 2;
         let header = false;
-        let idtype = "relpath".to_string();
         let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
@@ -513,7 +516,7 @@ mod tests {
             plddt_cutoff,
             node_count,
             header,
-            id_type: idtype,
+            output: String::from(""),
             verbose,
             help,
         };
@@ -538,7 +541,6 @@ mod tests {
             let plddt_cutoff = 0.0;
             let node_count = 2;
             let header = false;
-            let idtype = "relpath".to_string();
             let verbose = false;
             let env = AppArgs::Query {
                 pdb_path,
@@ -555,7 +557,7 @@ mod tests {
                 plddt_cutoff,
                 node_count,
                 header,
-                id_type: idtype,
+                output: String::from(""),
                 verbose,
                 help,
             };
@@ -579,7 +581,6 @@ mod tests {
         let plddt_cutoff = 0.0;
         let node_count = 2;
         let header = true;
-        let idtype = "uniprot".to_string();
         let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
@@ -596,7 +597,7 @@ mod tests {
             plddt_cutoff,
             node_count,
             header,
-            id_type: idtype,
+            output: String::from(""),
             verbose,
             help,
         };

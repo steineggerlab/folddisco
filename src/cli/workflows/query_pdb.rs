@@ -222,9 +222,9 @@ pub fn query_pdb(env: AppArgs) {
                                     read_u16_vector(&value_path).expect(&log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path)))
                                 };
                                 let query_count_map = if verbose { measure_time!(count_query_idmode(
-                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
+                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup, &id_type
                                 ))} else {
-                                    count_query_idmode(&pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup)
+                                    count_query_idmode(&pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup, &id_type)
                                 };
                                 let mut match_count_filter = get_match_count_filter(
                                     match_cutoff.clone(), pdb_query.len(), query_residues.len()
@@ -293,7 +293,7 @@ pub fn query_pdb(env: AppArgs) {
                                     load_big_index(index_prefix)
                                 };
                                 let query_count_map = measure_time!(count_query_bigmode(
-                                    &pdb_query, &pdb_query_map, &big_index, &lookup
+                                    &pdb_query, &pdb_query_map, &big_index, &lookup, &id_type
                                 ));
                                 
                                 let mut match_count_filter = get_match_count_filter(
@@ -383,7 +383,6 @@ pub fn query_pdb(env: AppArgs) {
                     // let mut id_container = String::new();
                     for (_k, v) in queried_from_indices.iter_mut() {
                         // parse_path_by_id_type_with_string(v.id, &id_type, &mut id_container);
-                        v.id = parse_path_into_given_id_type(v.id, &id_type);
                         writer.write_all(format!("{:?}\t{}\t{}\t{}\n", v, query_string, pdb_path, index_path.clone().unwrap()).as_bytes()).expect(
                             &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
                         );
@@ -395,7 +394,6 @@ pub fn query_pdb(env: AppArgs) {
                     // let mut id_container = String::new();
                     for (_k, v) in queried_from_indices.iter_mut() {
                         // parse_path_by_id_type_with_string(v.id, &id_type, &mut id_container);
-                        v.id = parse_path_into_given_id_type(v.id, &id_type);
                         println!("{:?}\t{}\t{}\t{}", v, query_string, pdb_path, index_path.clone().unwrap());
                     }
                 }

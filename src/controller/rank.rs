@@ -10,9 +10,11 @@ use crate::prelude::GeometricHash;
 
 use super::io::get_values_with_offset_u16;
 use super::map::SimpleHashMap;
+use super::mode::{parse_path_into_given_id_type, IdType};
 
 pub struct QueryResult<'a> {
     pub id: &'a str,
+    pub parsed_id: &'a str,
     pub nid: usize,
     pub total_match_count: usize,
     pub node_count: usize,
@@ -30,7 +32,7 @@ pub struct QueryResult<'a> {
 
 impl<'a> QueryResult<'a> {
     pub fn new(
-        id: &'a str, nid: usize, total_match_count: usize, node_count: usize, edge_count: usize,
+        id: &'a str, parsed_id: &'a str, nid: usize, total_match_count: usize, node_count: usize, edge_count: usize,
         exact_match_count: usize, overflow_count: usize, idf: f32, nres: usize, plddt: f32,
         edge: &(usize, usize), 
     ) -> Self {
@@ -41,6 +43,7 @@ impl<'a> QueryResult<'a> {
         edge_set.insert(*edge);
         Self {
             id,
+            parsed_id,
             nid,
             total_match_count,
             node_count,
@@ -149,7 +152,8 @@ pub fn count_query_idmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     offset_table: &SimpleHashMap,
     value_vec: &[u16],
-    lookup: &'a Vec<(String, usize, usize, f32)>
+    lookup: &'a Vec<(String, usize, usize, f32)>,
+    id_type: &IdType,
 ) -> DashMap<usize, QueryResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
 
@@ -163,6 +167,7 @@ pub fn count_query_idmode<'a>(
 
             for &value in single_queried_values.iter() {
                 let id = &lookup[value as usize].0;
+                let parsed_id = parse_path_into_given_id_type(id, id_type);
                 let nid = lookup[value as usize].1;
                 let nres = lookup[value as usize].2;
                 let plddt = lookup[value as usize].3;
@@ -178,7 +183,7 @@ pub fn count_query_idmode<'a>(
                     let total_match_count = 1usize;
                     is_new = true;
                     QueryResult::new(
-                        id, nid, total_match_count, 2, 1, exact_match_count,
+                        id, parsed_id,nid, total_match_count, 2, 1, exact_match_count,
                         overflow_count, idf + nres_norm, nres, plddt, &edge
                     )
                 });
@@ -212,7 +217,8 @@ pub fn count_query_idmode<'a>(
 pub fn count_query_bigmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     big_index: &FolddiscoIndex,
-    lookup: &'a Vec<(String, usize, usize, f32)>
+    lookup: &'a Vec<(String, usize, usize, f32)>,
+    idtype: &IdType,
 ) -> DashMap<usize, QueryResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
 
@@ -230,6 +236,7 @@ pub fn count_query_bigmode<'a>(
                 continue;
             }
             let id = &lookup[value].0;
+            let parsed_id = parse_path_into_given_id_type(id, idtype);
             let nid = lookup[value].1;
             let nres = lookup[value].2;
             let plddt = lookup[value].3;
@@ -245,7 +252,7 @@ pub fn count_query_bigmode<'a>(
                 let total_match_count = 1usize;
                 is_new = true;
                 QueryResult::new(
-                    id, nid, total_match_count, 2, 1, exact_match_count,
+                    id, parsed_id, nid, total_match_count, 2, 1, exact_match_count,
                     overflow_count, idf + nres_norm, nres, plddt, &edge
                 )
             });

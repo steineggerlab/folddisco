@@ -15,7 +15,7 @@ use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig};
 use crate::controller::map::SimpleHashMap;
-use crate::controller::mode::{parse_path_by_id_type, parse_path_by_id_type_with_string, IdType, IndexMode};
+use crate::controller::mode::{parse_path_by_id_type, parse_path_by_id_type_with_string, parse_path_into_given_id_type, IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::{read_compact_structure, read_u16_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
@@ -383,6 +383,7 @@ pub fn query_pdb(env: AppArgs) {
                     // let mut id_container = String::new();
                     for (_k, v) in queried_from_indices.iter_mut() {
                         // parse_path_by_id_type_with_string(v.id, &id_type, &mut id_container);
+                        v.id = parse_path_into_given_id_type(v.id, &id_type);
                         writer.write_all(format!("{:?}\t{}\t{}\t{}\n", v, query_string, pdb_path, index_path.clone().unwrap()).as_bytes()).expect(
                             &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
                         );
@@ -394,6 +395,7 @@ pub fn query_pdb(env: AppArgs) {
                     // let mut id_container = String::new();
                     for (_k, v) in queried_from_indices.iter_mut() {
                         // parse_path_by_id_type_with_string(v.id, &id_type, &mut id_container);
+                        v.id = parse_path_into_given_id_type(v.id, &id_type);
                         println!("{:?}\t{}\t{}\t{}", v, query_string, pdb_path, index_path.clone().unwrap());
                     }
                 }

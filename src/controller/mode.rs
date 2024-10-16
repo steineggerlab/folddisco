@@ -199,6 +199,59 @@ pub fn parse_path_by_id_type_with_string(path: &str, id_type: &IdType, string: &
     }
 }
 
+#[inline]
+pub fn parse_path_into_given_id_type<'a>(path: &'a str, id_type: &IdType) -> &'a str {
+    let afdb_regex = regex::Regex::new(r"AF-.+-model_v\d").unwrap();
+    
+    match id_type {
+        IdType::Pdb => {
+            // Split by `/` and get the last element (basename)
+            let file_name = path.rsplit('/').next().unwrap_or(path);
+            // Remove extension if any
+            let file_name = file_name.split('.').next().unwrap_or(file_name);
+            // If starts with "pdb", remove "pdb" from the start
+            if file_name.starts_with("pdb") {
+                &file_name[3..]
+            } else {
+                file_name
+            }
+        }
+        IdType::Afdb => {
+            let file_name = path.rsplit('/').next().unwrap_or(path).split('.').next().unwrap_or(path);
+            if let Some(afdb_id) = afdb_regex.find(file_name) {
+                &file_name[afdb_id.start()..afdb_id.end()]
+            } else {
+                file_name
+            }
+        }
+        IdType::UniProt => {
+            let file_name = path.rsplit('/').next().unwrap_or(path).split('.').next().unwrap_or(path);
+            if let Some(afdb_id) = afdb_regex.find(file_name) {
+                let afdb_id = &file_name[afdb_id.start()..afdb_id.end()];
+                afdb_id.split('-').nth(1).unwrap_or(file_name)
+            } else {
+                file_name
+            }
+        }
+        IdType::BasenameWithoutExt => {
+            path.rsplit('/').next().unwrap_or(path).split('.').next().unwrap_or(path)
+        }
+        IdType::BasenameWithExt => {
+            path.rsplit('/').next().unwrap_or(path)
+        }
+        IdType::AbsPath => {
+            // Assuming path is absolute, return as-is
+            path
+        }
+        IdType::RelPath | IdType::Other => {
+            // Simply return the path for relative or other cases
+            path
+        }
+    }
+}
+
+
+
 
 pub fn parse_path_vec_by_id_type(path_vec: &Vec<String>, id_type: IdType) -> Vec<String> {
     let mut parsed_path_vec = Vec::with_capacity(path_vec.len());

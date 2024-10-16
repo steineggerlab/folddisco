@@ -15,7 +15,7 @@ use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig};
 use crate::controller::map::SimpleHashMap;
-use crate::controller::mode::{parse_path_by_id_type, parse_path_by_id_type_with_string, parse_path_into_given_id_type, IdType, IndexMode};
+use crate::controller::mode::{IdType, IndexMode};
 use crate::cli::*;
 use crate::controller::io::{read_compact_structure, read_u16_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};

@@ -75,6 +75,7 @@ pub fn query_pdb(env: AppArgs) {
             plddt_cutoff,
             node_count,
             header,
+            serial_query,
             output,
             verbose,
             help,
@@ -214,11 +215,11 @@ pub fn query_pdb(env: AppArgs) {
                         let mode = config.mode;
                         let dist_cutoff = config.grid_width;
                         let (pdb_query_map, query_indices, aa_dist_map ) = if verbose { measure_time!(make_query_map(
-                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds,  &aa_substitutions, dist_cutoff,
+                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds,  &aa_substitutions, dist_cutoff, serial_query,
                         )) } else {
                             make_query_map(
                                 &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, 
-                                &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff
+                                &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
                             )
                         };
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
@@ -432,7 +433,7 @@ pub fn parse_multiple_queries(
         // Make query with pdb
         let (query_residues, aa_substitions) = parse_query_string(&query_string, structure.chains[0]);
         let (pdb_query_map, _query_indices, _) =  measure_time!(make_query_map(
-            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitions, 20.0
+            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitions, 20.0, false
         ));
         let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();
         query_map_vec.push((pdb_query_map, pdb_query, query_residues, pdb_path.clone(), output_path.clone()));
@@ -509,6 +510,7 @@ mod tests {
         let node_count = 2;
         let header = false;
         let verbose = true;
+        let serial_query = false;
         let env = AppArgs::Query {
             pdb_path,
             query_string,
@@ -524,6 +526,7 @@ mod tests {
             plddt_cutoff,
             node_count,
             header,
+            serial_query,
             output: String::from(""),
             verbose,
             help,
@@ -549,6 +552,7 @@ mod tests {
             let plddt_cutoff = 0.0;
             let node_count = 2;
             let header = false;
+            let serial_query = false;
             let verbose = false;
             let env = AppArgs::Query {
                 pdb_path,
@@ -565,6 +569,7 @@ mod tests {
                 plddt_cutoff,
                 node_count,
                 header,
+                serial_query,
                 output: String::from(""),
                 verbose,
                 help,
@@ -589,6 +594,7 @@ mod tests {
         let plddt_cutoff = 0.0;
         let node_count = 2;
         let header = true;
+        let serial_query = false;
         let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
@@ -605,6 +611,7 @@ mod tests {
             plddt_cutoff,
             node_count,
             header,
+            serial_query,
             output: String::from(""),
             verbose,
             help,

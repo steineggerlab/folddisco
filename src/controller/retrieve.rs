@@ -674,7 +674,7 @@ mod tests {
             &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds.clone(), angle_thresholds.clone(), &aa_substitutions, dist_cutoff
         );
         let (query_map, query_indices, aa_dist_map ) = make_query_map(
-            &path, &query_residues, hash_type, nbin_dist, nbin_angle, &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff
+            &path, &query_residues, hash_type, nbin_dist, nbin_angle, &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, false
         );
         let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
         let compact = pdb_loaded.read_structure().expect("Error reading structure");

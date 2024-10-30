@@ -59,6 +59,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
             node_count: args.value_from_str("--node").unwrap_or(2),
             header: args.contains("--header"),
+            serial_query: args.contains("--serial-query"),
             output: args.value_from_str(["-o", "--output"]).unwrap_or("".into()),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),

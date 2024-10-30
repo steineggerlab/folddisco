@@ -153,7 +153,7 @@ pub fn parse_threshold_string(threshold_string: Option<String>) -> Vec<f32> {
 pub fn make_query_map(
     path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
     nbin_dist: usize, nbin_angle: usize, dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
-    amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32,
+    amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32, serial_query: bool,
 ) -> (HashMap<GeometricHash, ((usize, usize), bool)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
 
     let (compact, _) = read_compact_structure(path).expect("Failed to read compact structure");
@@ -179,7 +179,7 @@ pub fn make_query_map(
     let mut substitution_map: HashMap<usize, Vec<u8>> = HashMap::new();
     
     for (i, (chain, ri)) in query_residues.iter().enumerate() {
-        let index = compact.get_index(&chain, &ri);
+        let index = if serial_query { Some(*ri as usize) } else { compact.get_index(&chain, &ri) };
         if let Some(index) = index {
             // convert u8 array to string
             let _residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
@@ -517,7 +517,7 @@ mod tests {
         let angle_thresholds: Vec<f32> = vec![5.0,10.0,15.0];
         let hash_type = HashType::PDBMotifSinCos;
         let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
-            &path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds, &vec![None, None, None], 20.0,
+            &path, &query_residues, hash_type, 8, 3, &dist_thresholds, &angle_thresholds, &vec![None, None, None], 20.0, false
         );
         println!("{:?}", hash_collection);
         println!("{}", hash_collection.len());

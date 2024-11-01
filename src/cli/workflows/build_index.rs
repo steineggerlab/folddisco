@@ -204,7 +204,7 @@ pub fn build_index(env: AppArgs) {
                     IndexMode::Big => {}
                 }
                 let lookup_path = format!("{}.lookup", index_path);
-                let id_vec = parse_path_vec_by_id_type(&fold_disco.path_vec, id_type.clone());
+                let id_vec = parse_path_vec_by_id_type(&fold_disco.path_vec, &id_type);
                 measure_time!(save_lookup_to_file(
                     &lookup_path, &id_vec, &fold_disco.numeric_id_vec,
                     Some(&fold_disco.nres_vec), Some(&fold_disco.plddt_vec)

@@ -1,4 +1,5 @@
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -200,12 +201,20 @@ pub fn parse_path_by_id_type_with_string(path: &str, id_type: &IdType, string: &
 }
 
 
-pub fn parse_path_vec_by_id_type(path_vec: &Vec<String>, id_type: IdType) -> Vec<String> {
+pub fn parse_path_vec_by_id_type(path_vec: &Vec<String>, id_type: &IdType) -> Vec<String> {
     let mut parsed_path_vec = Vec::with_capacity(path_vec.len());
     for path in path_vec {
-        parsed_path_vec.push(parse_path_by_id_type(&path, &id_type));
+        parsed_path_vec.push(parse_path_by_id_type(&path, id_type));
     }
     parsed_path_vec
+}
+
+pub fn parse_path_set_by_id_type(path_set: &HashSet<String>, id_type: &IdType) -> HashSet<String> {
+    let mut parsed_path_set = HashSet::with_capacity(path_set.len());
+    for path in path_set {
+        parsed_path_set.insert(parse_path_by_id_type(&path, id_type));
+    }
+    parsed_path_set
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

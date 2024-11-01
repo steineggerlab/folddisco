@@ -59,7 +59,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
             node_count: args.value_from_str("--node").unwrap_or(2),
             header: args.contains("--header"),
-            serial_query: args.contains("--serial-query"),
+            serial_query: args.contains("--serial"),
             output: args.value_from_str(["-o", "--output"]).unwrap_or("".into()),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
@@ -69,6 +69,8 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             answer: args.opt_value_from_str(["-a", "--answer"])?,
             index: args.opt_value_from_str(["-i", "--index"])?,
             format: args.value_from_str(["-f", "--format"]).unwrap_or("tsv".into()),
+            fp: args.opt_value_from_str("--fp")?,
+            id_type: args.value_from_str("--id").unwrap_or("filename".into()),
         }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,

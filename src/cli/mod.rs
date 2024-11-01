@@ -57,6 +57,8 @@ pub enum AppArgs {
         answer: Option<String>,
         index: Option<String>,
         format: String,
+        fp: Option<f64>,
+        id_type: String,
     },
     Test {
         index_path: String,

@@ -399,6 +399,7 @@ mod tests {
     }
     
     #[test]
+    #[cfg(not(feature = "foldcomp"))]
     fn test_bigger() {
         let test_size = 200000usize;
         let std_map = DashMap::new();

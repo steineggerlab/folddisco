@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::io::BufRead;
 
 use crate::cli::*;
-use crate::controller::mode::{parse_path_set_by_id_type, parse_path_vec_by_id_type, IdType};
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
 
@@ -40,22 +39,42 @@ pub fn benchmark(env: AppArgs) {
             let result = result.into_iter().map(|id| {
                 let id = id.split('/').last().unwrap();
                 // remove extension. Split by '.' and get the all elements except the last one
-                let id = id.split('.').collect::<Vec<_>>()[..id.split('.').count()-1].join(".");
-                id
+                let id_split = id.split('.').collect::<Vec<_>>();
+                // If last element in pdb, cif, fcz, ent pdb.gz, cif.gz, fcz.gz, ent.gz; return except last element
+                if id_split.last().unwrap() == &"pdb" || id_split.last().unwrap() == &"cif" || id_split.last().unwrap() == &"fcz" || id_split.last().unwrap() == &"ent" {
+                    id_split[..id_split.len()-1].join(".")
+                } else if id_split.last().unwrap() == &".gz" {
+                    id_split[..id_split.len()-2].join(".")
+                } else {
+                    id_split.join(".")
+                }
             }).collect::<Vec<_>>();
             let answer = answer.into_iter().map(|id| {
                 let id = id.split('/').last().unwrap();
                 // remove extension. Split by '.' and get the all elements except the last one
-                let id = id.split('.').collect::<Vec<_>>()[..id.split('.').count()-1].join(".");
-                id
+                let id_split = id.split('.').collect::<Vec<_>>();
+                // If last element in pdb, cif, fcz, ent pdb.gz, cif.gz, fcz.gz, ent.gz; return except last element
+                if id_split.last().unwrap() == &"pdb" || id_split.last().unwrap() == &"cif" || id_split.last().unwrap() == &"fcz" || id_split.last().unwrap() == &"ent" {
+                    id_split[..id_split.len()-1].join(".")
+                } else if id_split.last().unwrap() == &".gz" {
+                    id_split[..id_split.len()-2].join(".")
+                } else {
+                    id_split.join(".")
+                }
             }).collect::<HashSet<_>>();
             let lookup = lookup.into_iter().map(|id| {
                 let id = id.split('/').last().unwrap();
                 // remove extension. Split by '.' and get the all elements except the last one
-                let id = id.split('.').collect::<Vec<_>>()[..id.split('.').count()-1].join(".");
-                id
+                let id_split = id.split('.').collect::<Vec<_>>();
+                // If last element in pdb, cif, fcz, ent pdb.gz, cif.gz, fcz.gz, ent.gz; return except last element
+                if id_split.last().unwrap() == &"pdb" || id_split.last().unwrap() == &"cif" || id_split.last().unwrap() == &"fcz" || id_split.last().unwrap() == &"ent" {
+                    id_split[..id_split.len()-1].join(".")
+                } else if id_split.last().unwrap() == &".gz" {
+                    id_split[..id_split.len()-2].join(".")
+                } else {
+                    id_split.join(".")
+                }
             }).collect::<HashSet<_>>();
-
             let config = read_index_config_from_file(&config_path);
             let result_set = HashSet::from_iter(result.iter().cloned());
             let metric = if let Some(fp) = fp {

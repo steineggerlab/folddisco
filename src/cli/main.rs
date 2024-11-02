@@ -70,7 +70,6 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             index: args.opt_value_from_str(["-i", "--index"])?,
             format: args.value_from_str(["-f", "--format"]).unwrap_or("tsv".into()),
             fp: args.opt_value_from_str("--fp")?,
-            id_type: args.value_from_str("--id").unwrap_or("filename".into()),
         }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,

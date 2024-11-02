@@ -19,7 +19,6 @@ pub fn benchmark(env: AppArgs) {
             index,
             format,
             fp,
-            id_type,
         } => {
             if result.is_none() || answer.is_none() || index.is_none() {
                 print_log_msg(FAIL, "Result, answer, and index files must be provided");
@@ -31,7 +30,6 @@ pub fn benchmark(env: AppArgs) {
             let lookup_path = format!("{}.lookup", index_path);
             let config_path = format!("{}.type", index_path);
             let format = format.as_str();
-            let id_type = IdType::get_with_str(&id_type);
             
             // let result = read_one_column_of_tsv(&result_path, 0);
             let result = read_one_column_of_tsv_as_vec(&result_path, 0);
@@ -39,9 +37,24 @@ pub fn benchmark(env: AppArgs) {
             let lookup = load_lookup_from_file(&lookup_path);
             let lookup = lookup.into_iter().map(|(id, _, _, _)| id).collect::<HashSet<_>>();
             // Parse path by id type
-            let result = parse_path_vec_by_id_type(&result, &id_type);
-            let answer = parse_path_set_by_id_type(&answer, &id_type);
-            let lookup = parse_path_set_by_id_type(&lookup, &id_type);
+            let result = result.into_iter().map(|id| {
+                let id = id.split('/').last().unwrap();
+                // remove extension. Split by '.' and get the all elements except the last one
+                let id = id.split('.').collect::<Vec<_>>()[..id.split('.').count()-1].join(".");
+                id
+            }).collect::<Vec<_>>();
+            let answer = answer.into_iter().map(|id| {
+                let id = id.split('/').last().unwrap();
+                // remove extension. Split by '.' and get the all elements except the last one
+                let id = id.split('.').collect::<Vec<_>>()[..id.split('.').count()-1].join(".");
+                id
+            }).collect::<HashSet<_>>();
+            let lookup = lookup.into_iter().map(|id| {
+                let id = id.split('/').last().unwrap();
+                // remove extension. Split by '.' and get the all elements except the last one
+                let id = id.split('.').collect::<Vec<_>>()[..id.split('.').count()-1].join(".");
+                id
+            }).collect::<HashSet<_>>();
 
             let config = read_index_config_from_file(&config_path);
             let result_set = HashSet::from_iter(result.iter().cloned());
@@ -153,14 +166,12 @@ mod tests {
         let index = Some("analysis/h_sapiens/d16a4/index_id".to_string());
         let format = "tsv";
         let fp = None;
-        let id_type = String::from("filename");
         let env = AppArgs::Benchmark {
             result,
             answer,
             index,
             format: format.to_string(),
             fp,
-            id_type
         };
         benchmark(env);
     }

@@ -66,6 +66,7 @@ impl IdType {
     }
 }
 
+#[inline]
 pub fn parse_path_by_id_type(path: &str, id_type: &IdType) -> String {
     // TODO: 2024-04-04 15:07:54 Fill in this function to ease benchmarking
     let afdb_regex = regex::Regex::new(r"AF-.+-model_v\d").unwrap();
@@ -124,7 +125,7 @@ pub fn parse_path_by_id_type(path: &str, id_type: &IdType) -> String {
     }
 }
 
-
+#[inline]
 pub fn parse_path_by_id_type_with_string(path: &str, id_type: &IdType, string: &mut String) {
     // TODO: 2024-04-04 15:07:54 Fill in this function to ease benchmarking
     string.clear();

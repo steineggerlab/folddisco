@@ -58,7 +58,6 @@ pub enum AppArgs {
         index: Option<String>,
         format: String,
         fp: Option<f64>,
-        id_type: String,
     },
     Test {
         index_path: String,

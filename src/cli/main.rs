@@ -68,8 +68,10 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             result: args.opt_value_from_str(["-r", "--result"])?,
             answer: args.opt_value_from_str(["-a", "--answer"])?,
             index: args.opt_value_from_str(["-i", "--index"])?,
+            input: args.opt_value_from_str("--input")?,
             format: args.value_from_str(["-f", "--format"]).unwrap_or("tsv".into()),
             fp: args.opt_value_from_str("--fp")?,
+            threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
         }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,

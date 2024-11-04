@@ -56,8 +56,10 @@ pub enum AppArgs {
         result: Option<String>,
         answer: Option<String>,
         index: Option<String>,
+        input: Option<String>,
         format: String,
         fp: Option<f64>,
+        threads: usize,
     },
     Test {
         index_path: String,

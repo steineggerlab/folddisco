@@ -67,6 +67,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
         Some("benchmark") => Ok(AppArgs::Benchmark {
             result: args.opt_value_from_str(["-r", "--result"])?,
             answer: args.opt_value_from_str(["-a", "--answer"])?,
+            neutral: args.opt_value_from_str(["-n", "--neutral"])?,
             index: args.opt_value_from_str(["-i", "--index"])?,
             input: args.opt_value_from_str("--input")?,
             format: args.value_from_str(["-f", "--format"]).unwrap_or("tsv".into()),

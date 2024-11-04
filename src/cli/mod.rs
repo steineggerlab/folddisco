@@ -55,6 +55,7 @@ pub enum AppArgs {
     Benchmark {
         result: Option<String>,
         answer: Option<String>,
+        neutral: Option<String>,
         index: Option<String>,
         input: Option<String>,
         format: String,

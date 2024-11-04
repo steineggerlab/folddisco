@@ -8,7 +8,7 @@ use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
 
 use crate::cli::config::read_index_config_from_file;
-use crate::utils::benchmark::measure_up_to_k_fp;
+use crate::utils::benchmark::{compare_target_answer_neutral_set, measure_up_to_k_fp, measure_up_to_k_fp_with_neutral};
 
 // usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f tsv
 // usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f default
@@ -17,6 +17,7 @@ pub fn benchmark(env: AppArgs) {
         AppArgs::Benchmark {
             result,
             answer,
+            neutral,
             index,
             input,
             format,
@@ -31,7 +32,11 @@ pub fn benchmark(env: AppArgs) {
             }
             // If input is given, read from file
             let input_vector = if input.is_none() {
-                vec![(result.unwrap(), answer.unwrap())]
+                if neutral.is_some() {
+                    vec![(result.unwrap(), answer.unwrap(), neutral)]
+                } else {
+                    vec![(result.unwrap(), answer.unwrap(), None)]
+                }
             } else {
                 let input = input.unwrap();
                 let file = std::fs::File::open(&input).expect(
@@ -41,7 +46,15 @@ pub fn benchmark(env: AppArgs) {
                 reader.lines().map(|line| {
                     let line = line.expect(&log_msg(FAIL, "Failed to read line"));
                     let row = line.split('\t').collect::<Vec<_>>();
-                    (row[0].to_string(), row[1].to_string())
+                    if row.len() == 2 {
+                        (row[0].to_string(), row[1].to_string(), None)
+                    } else if row.len() >= 3 {
+                        (row[0].to_string(), row[1].to_string(), Some(row[2].to_string()))
+                    } else {
+                        print_log_msg(FAIL, "Invalid input format");
+                        std::process::exit(1);
+                    }
+                    // (row[0].to_string(), row[1].to_string())
                 }).collect::<Vec<_>>()
             };
             
@@ -59,7 +72,7 @@ pub fn benchmark(env: AppArgs) {
             parse_path_set_as_set(&raw_lookup, &mut lookup);
             let config = read_index_config_from_file(&config_path);
 
-            input_vector.par_iter().for_each(|(result_path, answer_path)| {
+            input_vector.par_iter().for_each(|(result_path, answer_path, neutral)| {
                 // Parse path by id type
                 let raw_result = read_one_column_of_tsv_as_vec(&result_path, 0);
                 let mut result = Vec::with_capacity(raw_result.len());
@@ -70,12 +83,23 @@ pub fn benchmark(env: AppArgs) {
                 parse_path_set_as_set(&raw_answer, &mut answer);
 
                 let result_set = HashSet::from_iter(result.iter().cloned());
-                let metric = if let Some(fp) = fp {
-                    measure_up_to_k_fp(&result, &answer, &lookup, fp)
+                let metric = if let Some(neutral) = neutral {
+                    let raw_neutral = read_one_column_of_tsv_as_set(neutral, 0);
+                    let mut neutral = HashSet::with_capacity(raw_neutral.len());
+                    parse_path_set_as_set(&raw_neutral, &mut neutral);
+                    if let Some(fp) = fp {
+                        measure_up_to_k_fp_with_neutral(&result, &answer, &neutral, &lookup, fp)
+                    } else {
+                        compare_target_answer_neutral_set(&result_set, &answer, &neutral, &lookup)
+                    }
                 } else {
-                    compare_target_answer_set(&result_set, &answer, &lookup)
+                    if let Some(fp) = fp {
+                        measure_up_to_k_fp(&result, &answer, &lookup, fp)
+                    } else {
+                        compare_target_answer_set(&result_set, &answer, &lookup)
+                    }
                 };
-                
+
                 match format {
                     "tsv" => {
                         // lookup, result, answer, lookup_len, result_len, answer_len,
@@ -202,6 +226,7 @@ mod tests {
     fn test_benchmark() {
         let result = Some("data/zinc_folddisco.tsv".to_string());
         let answer = Some("data/zinc_answer.tsv".to_string());
+        let neutral = None;
         let index = Some("analysis/h_sapiens/d16a4/index_id".to_string());
         let input = None;
         let format = "tsv";
@@ -210,6 +235,7 @@ mod tests {
         let env = AppArgs::Benchmark {
             result,
             answer,
+            neutral,
             index,
             input,
             format: format.to_string(),

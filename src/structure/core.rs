@@ -95,7 +95,8 @@ impl CompactStructure {
         let mut n: Option<Coordinate> = None;
         let mut ca: Option<Coordinate> = None;
         let mut cb: Option<Coordinate> = None;
-
+        let mut c: Option<Coordinate> = None;
+        
         let mut gly_n: Option<Coordinate> = None;
         let mut gly_c: Option<Coordinate> = None;
         
@@ -143,6 +144,12 @@ impl CompactStructure {
                             cb_vec_x.push(cb.x);
                             cb_vec_y.push(cb.y);
                             cb_vec_z.push(cb.z);
+                        } else if let Some(c) = &c {
+                            let cb = approx_cb(&ca, &n, c);
+                            cb_vec.push(&cb);
+                            cb_vec_x.push(cb.x);
+                            cb_vec_y.push(cb.y);
+                            cb_vec_z.push(cb.z);
                         } else {
                             cb_vec.push_none();
                         }
@@ -173,6 +180,8 @@ impl CompactStructure {
                 ca = Some(model.get_coordinates(idx));
             } else if model.is_cb(idx) {
                 cb = Some(model.get_coordinates(idx));
+            } else if model.is_c(idx) {
+                c = Some(model.get_coordinates(idx));
             } else if model.is_n(idx) && &model.get_res_name(idx) != b"GLY" {
                 n = Some(model.get_coordinates(idx));
             } else if &model.get_res_name(idx) == b"GLY" {

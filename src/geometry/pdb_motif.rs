@@ -94,6 +94,12 @@ impl HashValue {
     pub fn as_u64(&self) -> u64 {
         self.0 as u64
     }
+    
+    pub fn is_symmetric(&self) -> bool {
+        let res1 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
+        let res2 = ((self.0 >> 15) & BITMASK32_5BIT) as f32;
+        res1 == res2
+    }
 }
 
 impl fmt::Debug for HashValue {

@@ -431,6 +431,18 @@ impl GeometricHash {
         }
     }
     
+    pub fn is_symmetric(&self) -> bool {
+        match self {
+            GeometricHash::PDBMotif(hash) => hash.is_symmetric(),
+            GeometricHash::PDBMotifSinCos(hash) => hash.is_symmetric(),
+            GeometricHash::TrRosetta(hash) => hash.is_symmetric(),
+            GeometricHash::PDBTrRosetta(hash) => hash.is_symmetric(),
+            GeometricHash::PointPairFeature(hash) => hash.is_symmetric(),
+            GeometricHash::TertiaryInteraction(hash) => hash.is_symmetric(),
+            // append new hash type here
+        }
+    }
+    
     pub fn downcast_pdb_motif(&self) -> super::pdb_motif::HashValue {
         match self {
             GeometricHash::PDBMotif(hash) => hash.clone(),

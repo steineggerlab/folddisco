@@ -121,6 +121,11 @@ impl HashValue {
         HashType::PointPairFeature
     }
 
+    pub fn is_symmetric(&self) -> bool {
+        let values = self.reverse_hash_default();
+        (values[0] == values[1]) && (values[3] == values[4])
+    }
+    
 }
 
 impl fmt::Debug for HashValue {

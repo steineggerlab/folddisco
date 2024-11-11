@@ -255,23 +255,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
     // Iterate over query vector and retrieve indices
     // Parallel
     let query_set: HashSet<GeometricHash> = HashSet::from_iter(query_vector.clone());
-
-    let mut query_symmetry_map = HashMap::with_capacity(query_set.len());
-    let mut feature = vec![0.0; 9];
-    query_set.iter().for_each(|hash| {
-        hash.reverse_hash(_nbin_dist, _nbin_angle, &mut feature);
-        let aa1 = feature[_hash_type.amino_acid_index().unwrap()[0]] as u8;
-        let aa2 = feature[_hash_type.amino_acid_index().unwrap()[1]] as u8;
-        if aa1 != aa2 {
-            query_symmetry_map.insert(hash.clone(), false);
-        } else {
-            if feature[5] == feature[6] {
-                query_symmetry_map.insert(hash.clone(), true);
-            } else {
-                query_symmetry_map.insert(hash.clone(), false);
-            }
-        }
-    });
+    let query_symmetry_map = get_hash_symmetry_map(&query_set);
 
     let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
     let aa_filter = CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2);
@@ -279,18 +263,6 @@ pub fn retrieval_wrapper_for_foldcompdb(
         &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map
     );
 
-    
-    // Convert candidate_pairs to hashmap
-    // let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
-    //     HashMap::new(), |mut map, (qi, pair)| {
-    //         if !map.contains_key(&qi) {
-    //             map.insert(qi, vec![pair]);
-    //         } else {
-    //             map.get_mut(&qi).unwrap().push(pair);
-    //         }
-    //         map
-    //     }
-    // );
     let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
             if !map.contains_key(&qi) {
@@ -303,10 +275,6 @@ pub fn retrieval_wrapper_for_foldcompdb(
             map
         }
     );
-    // let indices_found = measure_time!(query_vector.par_iter().map(|hash| {
-    //     let prefiltered = prefilter_aa_pair(&compact, hash);
-    //     retrieve_with_prefilter(&compact, hash, prefiltered, _nbin_dist, _nbin_angle)
-    // }).collect::<Vec<Vec<(usize, usize)>>>());
     
     // Make a graph and find connected components with the same node count
     // NOTE: Naive implementation to find matching components. Need to be improved to handle partial matches
@@ -441,23 +409,7 @@ pub fn retrieval_wrapper(
     // Iterate over query vector and retrieve indices
     // Parallel
     let query_set: HashSet<GeometricHash> = HashSet::from_iter(query_vector.clone());
-
-    let mut query_symmetry_map = HashMap::with_capacity(query_set.len());
-    let mut feature = vec![0.0; 9];
-    query_set.iter().for_each(|hash| {
-        hash.reverse_hash(_nbin_dist, _nbin_angle, &mut feature);
-        let aa1 = feature[_hash_type.amino_acid_index().unwrap()[0]] as u8;
-        let aa2 = feature[_hash_type.amino_acid_index().unwrap()[1]] as u8;
-        if aa1 != aa2 {
-            query_symmetry_map.insert(hash.clone(), false);
-        } else {
-            if feature[5] == feature[6] {
-                query_symmetry_map.insert(hash.clone(), true);
-            } else {
-                query_symmetry_map.insert(hash.clone(), false);
-            }
-        }
-    });
+    let query_symmetry_map = get_hash_symmetry_map(&query_set);
     
     let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
     let aa_filter = CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2);
@@ -592,6 +544,15 @@ pub fn retrieval_wrapper(
         ((a, b), (c, d))
     }).unzip();
     (result_from_hash, result)
+}
+
+fn get_hash_symmetry_map(query_set: &HashSet<GeometricHash>) -> HashMap<GeometricHash, bool> {
+    let mut query_symmetry_map = HashMap::with_capacity(query_set.len());
+    query_set.iter().for_each(|hash| {
+        let symmetry = hash.is_symmetric();
+        query_symmetry_map.insert(hash.clone(), symmetry);
+    });
+    query_symmetry_map
 }
 
 pub fn prefilter_amino_acid(query_set: &HashSet<GeometricHash>, _hash_type: HashType, compact: &CompactStructure) -> (BTreeSet<usize>, BTreeSet<usize>) {

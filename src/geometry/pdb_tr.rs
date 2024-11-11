@@ -144,6 +144,12 @@ impl HashValue {
     pub fn as_u64(&self) -> u64 {
         self.0 as u64
     }
+    
+    pub fn is_symmetric(&self) -> bool {
+        let values = self.reverse_hash_default();
+        // Residue pair is symmetric and phi is symmetric
+        (values[0] == values[1]) && (values[5] == values[6])
+    }
 }
 
 impl fmt::Debug for HashValue {

@@ -141,6 +141,13 @@ impl HashValue {
     pub fn as_u64(&self) -> u64 {
         self.0 as u64
     }
+    
+    pub fn is_symmetric(&self) -> bool {
+        // NOT sure same phi_14 and phi_23 is necessary to be symmetric
+        // phi12, 34; phi15, 35; phi25, 45
+        // TODO: Check if this is correct
+        false
+    }
 }
 
 impl fmt::Debug for HashValue {

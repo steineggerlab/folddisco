@@ -167,7 +167,7 @@ pub fn read_foldcomp_db_lookup(db_path: &str) -> Result<Vec<(usize, String)>, &'
     let mmap = unsafe { Mmap::map(&lookup_file).unwrap() };
     let content = unsafe { std::str::from_utf8_unchecked(&mmap) };
     let output = content.par_lines().map(|line| {
-        let mut split = line.split_whitespace();
+        let mut split = line.split("\t");
         let id = split.next().unwrap().parse::<usize>().unwrap();
         let name = split.next().unwrap().to_string();
         (id, name)
@@ -186,7 +186,7 @@ pub fn read_foldcomp_db_index(db_path: &str) -> Result<Vec<(usize, usize, usize)
     let mmap = unsafe { Mmap::map(&index_file).unwrap() };
     let content = unsafe { std::str::from_utf8_unchecked(&mmap) };
     let output = content.par_lines().map(|line| {
-        let mut split = line.split_whitespace();
+        let mut split = line.split("\t");
         let id = split.next().unwrap().parse::<usize>().unwrap();
         let start = split.next().unwrap().parse::<usize>().unwrap();
         let length = split.next().unwrap().parse::<usize>().unwrap();

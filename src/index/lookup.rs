@@ -69,7 +69,7 @@ pub fn load_lookup_from_file(path: &str) -> Vec<(String, usize, usize, f32)> {
     let mmap = unsafe { Mmap::map(&file).expect(&log_msg(FAIL, "Unable to mmap the lookup file")) };
     let content = unsafe { std::str::from_utf8_unchecked(&mmap) };
     let loaded_lookup = content.par_lines().map(|line| {
-        let mut split = line.split_whitespace();
+        let mut split = line.split("\t");
         let id = split.next().unwrap().parse::<usize>().unwrap();
         let name = split.next().unwrap().to_string();
         let nres = split.next().unwrap().parse::<usize>().unwrap();

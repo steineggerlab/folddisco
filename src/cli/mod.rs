@@ -37,15 +37,22 @@ pub enum AppArgs {
         index_path: Option<String>,
         retrieve: bool,
         // Match thresholds
-        amino_acid: u8,
         dist_threshold: Option<String>,
         angle_threshold: Option<String>,
-        // Cutoffs
+        // Cutoffs - WARNING: need to be changed
         match_cutoff: Option<String>,
         score_cutoff: f32,
         num_res_cutoff: usize,
         plddt_cutoff: f32,
         node_count: usize,
+        // top N filtering
+        top_n: usize,
+        // sorting mode
+        sort_by_rmsd: bool,
+        sort_by_score: bool,
+        // output mode
+        output_per_structure: bool,
+        output_per_match: bool,
         header: bool,
         serial_query: bool,
         output: String,

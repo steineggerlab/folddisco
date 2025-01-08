@@ -50,7 +50,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             index_path: args.opt_value_from_str(["-i", "--index"])?,
             retrieve: args.contains(["-r", "--retrieve"]),
-            amino_acid: args.value_from_str("--amino-acid").unwrap_or(0),
+            // Filtering parameters
             dist_threshold: args.opt_value_from_str(["-d", "--distance"])?,
             angle_threshold: args.opt_value_from_str(["-a", "--angle"])?,
             match_cutoff: args.opt_value_from_str(["-m", "--match"])?, 
@@ -58,6 +58,13 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
             node_count: args.value_from_str("--node").unwrap_or(2),
+            top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
+            // Sorting mode
+            sort_by_rmsd: args.contains("--sort-by-rmsd"),
+            sort_by_score: args.contains("--sort-by-score"),
+            // Output mode
+            output_per_structure: args.contains("--per-structure"),
+            output_per_match: args.contains("--per-match"),
             header: args.contains("--header"),
             serial_query: args.contains("--serial"),
             output: args.value_from_str(["-o", "--output"]).unwrap_or("".into()),

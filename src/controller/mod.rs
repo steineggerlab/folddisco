@@ -10,7 +10,7 @@ pub mod filter;
 pub mod graph;
 pub mod io;
 pub mod query;
-pub mod query_result;
+pub mod result;
 pub mod retrieve;
 pub mod count_query;
 pub mod map;

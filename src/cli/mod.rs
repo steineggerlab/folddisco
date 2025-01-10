@@ -35,18 +35,31 @@ pub enum AppArgs {
         query_string: String,
         threads: usize,
         index_path: Option<String>,
-        retrieve: bool,
+        skip_match: bool, // Changed from retrieve to skip_match. Now mathcing is default
         // Match thresholds
         dist_threshold: Option<String>,
         angle_threshold: Option<String>,
-        // Cutoffs - WARNING: need to be changed
-        match_cutoff: Option<String>,
-        score_cutoff: f32,
+        ca_dist_threshold: f32,
+        // filtering parameters
+        // These are for filtering StructQueryResult only
+        total_match_count: usize, 
+        covered_node_count: usize,
+        covered_node_ratio: f32,
+        covered_edge_count: usize,
+        covered_edge_ratio: f32,
+        max_matching_node_count: usize,
+        max_matching_node_ratio: f32,
         num_res_cutoff: usize,
         plddt_cutoff: f32,
-        node_count: usize,
+        // These are for filtering both StructQueryResult and MatchQueryResult
+        idf_score_cutoff: f32,
+        // These are for filtering MatchQueryResult only
+        connected_node_count: usize,
+        connected_node_ratio: f32,
+        rmsd_cutoff: f32,
         // top N filtering
         top_n: usize,
+        web_mode: bool,
         // sorting mode
         sort_by_rmsd: bool,
         sort_by_score: bool,

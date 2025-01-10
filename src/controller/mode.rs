@@ -253,6 +253,43 @@ impl IndexMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueryMode {
+    PerMatchDefault, // Default mode, print per match, residue matching, sort by rmsd.
+    SkipMatch, // No residue matching, just sort by score only. print per structure.
+    Web, // Web mode. Top N matches applied.
+    PerStructureSortByScore,
+    PerStructureSortByRmsd,
+    PerMatchSortByScore, // This needs per match score calculation
+    ContradictoryPrintError,
+    ContradictorySortError,
+}
+
+impl QueryMode {
+    pub fn from_flags(
+        skip_match: bool, is_web: bool,
+        per_structure: bool, per_match: bool,
+        sort_by_rmsd: bool, sort_by_score: bool, 
+    ) -> Self {
+        match (skip_match, is_web, per_structure, per_match, sort_by_rmsd, sort_by_score) {
+            // Cannot print per match and per structure at the same time -> error
+            (_, _, true, true, _, _) => Self::ContradictoryPrintError, // 16
+            // Cannot print sort by rmsd and sort by score at the same time -> error
+            (_, _, _, _, true, true) => Self::ContradictorySortError, // (64 - 16) / 4 = 12
+            // Skip match
+            (_, true, _, _, _, _) => Self::Web, // (64 - 28) / 2 = 18
+            (true, _, _, _, _, _) => Self::SkipMatch, // (64 - 46) / 2 = 9
+            // Checking remaining cases
+            (false, false, false, _, _, false) => Self::PerMatchDefault, 
+            (false, false, false, _, false, true) => Self::PerMatchSortByScore, 
+            (false, false, true, false, _, false) => Self::PerStructureSortByRmsd, 
+            (false, false, true, false, false, true) => Self::PerStructureSortByScore,
+        }
+    }
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;

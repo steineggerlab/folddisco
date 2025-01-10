@@ -10,14 +10,14 @@ use crate::prelude::GeometricHash;
 
 use super::io::get_values_with_offset_u16;
 use super::map::SimpleHashMap;
-use super::query_result::StructureQueryResult;
+use super::result::StructureResult;
 
 pub fn count_query_idmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     offset_table: &SimpleHashMap,
     value_vec: &[u16],
     lookup: &'a Vec<(String, usize, usize, f32)>
-) -> DashMap<usize, StructureQueryResult<'a>> {
+) -> DashMap<usize, StructureResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
 
     queries.par_iter().for_each(|query| {  // Use parallel iterator
@@ -41,7 +41,7 @@ pub fn count_query_idmode<'a>(
                 let mut ref_mut = entry.or_insert_with(|| {
                     let total_match_count = 1usize;
                     is_new = true;
-                    StructureQueryResult::new(
+                    StructureResult::new(
                         id, nid, total_match_count, 2, 1, idf + nres_norm, nres, plddt, &edge
                     )
                 });
@@ -73,7 +73,7 @@ pub fn count_query_bigmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     big_index: &FolddiscoIndex,
     lookup: &'a Vec<(String, usize, usize, f32)>
-) -> DashMap<usize, StructureQueryResult<'a>> {
+) -> DashMap<usize, StructureResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
 
     queries.par_iter().for_each(|query| {  // Use parallel iterator
@@ -101,7 +101,7 @@ pub fn count_query_bigmode<'a>(
             let mut ref_mut = entry.or_insert_with(|| {
                 let total_match_count = 1usize;
                 is_new = true;
-                StructureQueryResult::new(
+                StructureResult::new(
                     id, nid, total_match_count, 2, 1, 
                     idf + nres_norm, nres, plddt, &edge
                 )

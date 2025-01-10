@@ -49,16 +49,26 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             query_string: args.value_from_str(["-q", "--query"]).unwrap_or("".into()),
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             index_path: args.opt_value_from_str(["-i", "--index"])?,
-            retrieve: args.contains(["-r", "--retrieve"]),
+            skip_match: args.contains("--skip-match"),
             // Filtering parameters
             dist_threshold: args.opt_value_from_str(["-d", "--distance"])?,
             angle_threshold: args.opt_value_from_str(["-a", "--angle"])?,
-            match_cutoff: args.opt_value_from_str(["-m", "--match"])?, 
-            score_cutoff: args.value_from_str(["-s", "--score"]).unwrap_or(0.0),
+            ca_dist_threshold: args.value_from_str("--ca-distance").unwrap_or(1.0),
+            total_match_count: args.value_from_str("--total-match").unwrap_or(0),
+            covered_node_count: args.value_from_str("--covered-node").unwrap_or(0),
+            covered_node_ratio: args.value_from_str("--covered-node-ratio").unwrap_or(0.0),
+            covered_edge_count: args.value_from_str("--covered-edge").unwrap_or(0),
+            covered_edge_ratio: args.value_from_str("--covered-edge-ratio").unwrap_or(0.0),
+            max_matching_node_count: args.value_from_str("--max-matching-node").unwrap_or(0),
+            max_matching_node_ratio: args.value_from_str("--max-matching-node-ratio").unwrap_or(0.0),
+            idf_score_cutoff: args.value_from_str("--score").unwrap_or(0.0),
+            connected_node_count: args.value_from_str("--connected-node").unwrap_or(0),
+            connected_node_ratio: args.value_from_str("--connected-node-ratio").unwrap_or(0.0),
             num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
-            node_count: args.value_from_str("--node").unwrap_or(2),
+            rmsd_cutoff: args.value_from_str("--rmsd").unwrap_or(0.0),
             top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
+            web_mode: args.contains("--web"), // Web mode for output
             // Sorting mode
             sort_by_rmsd: args.contains("--sort-by-rmsd"),
             sort_by_score: args.contains("--sort-by-score"),
@@ -93,8 +103,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
 }
 
 fn main() {
-    // Init
-    print_logo();
+
 
     let parsed_args = parse_arg().unwrap_or_else(|e| {
         eprintln!("Error: {}", e);
@@ -102,10 +111,12 @@ fn main() {
     });
     match parsed_args {
         AppArgs::Global { help: _ } => {
+            print_logo();
             eprintln!("{}", HELP);
         }
         AppArgs::Index { help, .. } => {
             if help {
+                print_logo();
                 eprintln!("{}", workflows::build_index::HELP_INDEX);
             } else {
                 build_index::build_index(parsed_args);
@@ -113,6 +124,7 @@ fn main() {
         }
         AppArgs::Query { help, .. } => {
             if help {
+                print_logo();
                 eprintln!("{}", workflows::query_pdb::HELP_QUERY);
             } else {
                 query_pdb::query_pdb(parsed_args);

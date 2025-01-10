@@ -63,15 +63,13 @@ pub fn build_index(env: AppArgs) {
             verbose,
             help,
         } => {
+            if verbose { print_logo(); }
             // Check if arguments are valid
             if pdb_container.is_none() {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(1);
             }
-            if help {
-                eprintln!("{}", HELP_INDEX);
-                std::process::exit(0);
-            }
+            // help is handled in the main function
             let pdb_container_clone = pdb_container.clone();
             #[cfg(feature = "foldcomp")]
             let pdb_container_name: &'static str = Box::leak(pdb_container.clone().unwrap().into_boxed_str());

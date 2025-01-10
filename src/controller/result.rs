@@ -16,7 +16,7 @@ use super::ResidueMatch;
 pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tresidues_rescued\tquery_residues";
 pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tavg_idf\trmsd\tmatching_residues\tquery_residues";
 
-pub struct StructureQueryResult<'a> {
+pub struct StructureResult<'a> {
     pub id: &'a str,
     pub nid: usize,
     pub total_match_count: usize,
@@ -33,7 +33,7 @@ pub struct StructureQueryResult<'a> {
     pub min_rmsd_with_max_match: f32,
 }
 
-impl<'a> StructureQueryResult<'a> {
+impl<'a> StructureResult<'a> {
     pub fn new(
         id: &'a str, nid: usize, total_match_count: usize, node_count: usize, edge_count: usize,
         idf: f32, nres: usize, plddt: f32, edge: &(usize, usize), 
@@ -61,11 +61,11 @@ impl<'a> StructureQueryResult<'a> {
         }
     }
     
-    pub fn into_match_query_results(&self) -> Vec<MatchQueryResult> {
-        self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd))| {
+    pub fn into_match_query_results(&self) -> Vec<MatchResult> {
+        self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd))| {
             // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
             let avg_idf = self.idf / self.matching_residues_processed.len() as f32;
-            MatchQueryResult::new(
+            MatchResult::new(
                 self.id, i, avg_idf, residues.clone(), *rmsd
             )
         }).collect()
@@ -73,8 +73,8 @@ impl<'a> StructureQueryResult<'a> {
 }
 
 pub fn convert_structure_query_result_to_match_query_results<'a>(
-    results: &'a [(usize, StructureQueryResult<'a>)]
-) -> Vec<(usize, MatchQueryResult<'a>)> {
+    results: &'a [(usize, StructureResult<'a>)]
+) -> Vec<(usize, MatchResult<'a>)> {
     results
         .iter()
         .flat_map(|(k, v)| {
@@ -85,7 +85,7 @@ pub fn convert_structure_query_result_to_match_query_results<'a>(
         .collect()
 }
 
-impl<'a> fmt::Display for StructureQueryResult<'a> {
+impl<'a> fmt::Display for StructureResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
             "NA".to_string()
@@ -111,7 +111,7 @@ impl<'a> fmt::Display for StructureQueryResult<'a> {
     }
 }
 
-impl<'a> fmt::Debug for StructureQueryResult<'a> {
+impl<'a> fmt::Debug for StructureResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
             "NA".to_string()
@@ -135,7 +135,7 @@ impl<'a> fmt::Debug for StructureQueryResult<'a> {
     }
 }
 // write_fmt
-impl<'a> StructureQueryResult<'a> {
+impl<'a> StructureResult<'a> {
     pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
             "NA".to_string()
@@ -159,7 +159,7 @@ impl<'a> StructureQueryResult<'a> {
     }
 }
 
-pub struct MatchQueryResult<'a> {
+pub struct MatchResult<'a> {
     pub id: &'a str,
     pub nid: usize,
     pub node_count: usize,
@@ -168,7 +168,7 @@ pub struct MatchQueryResult<'a> {
     pub rmsd: f32,
 }
 
-impl<'a> MatchQueryResult<'a> {
+impl<'a> MatchResult<'a> {
     pub fn new(
         id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32
     ) -> Self {
@@ -190,7 +190,7 @@ impl<'a> MatchQueryResult<'a> {
     }
 }
 
-impl<'a> fmt::Display for MatchQueryResult<'a> {
+impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
@@ -205,7 +205,7 @@ impl<'a> fmt::Display for MatchQueryResult<'a> {
     }
 }
 
-impl<'a> fmt::Debug for MatchQueryResult<'a> {
+impl<'a> fmt::Debug for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
@@ -221,7 +221,7 @@ impl<'a> fmt::Debug for MatchQueryResult<'a> {
 }
 
 // write_fmt
-impl<'a> MatchQueryResult<'a> {
+impl<'a> MatchResult<'a> {
     pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
@@ -237,7 +237,7 @@ impl<'a> MatchQueryResult<'a> {
 }
 
 pub fn sort_and_print_structure_query_result(
-    results: &mut Vec<(usize, StructureQueryResult)>, top_n: usize, do_sort_by_rmsd: bool, 
+    results: &mut Vec<(usize, StructureResult)>, do_sort_by_rmsd: bool, 
     output_path: &str, query_string: &str, header: bool, verbose: bool,
 ) {
     if do_sort_by_rmsd {
@@ -291,7 +291,7 @@ pub fn sort_and_print_structure_query_result(
 }
 
 pub fn sort_and_print_match_query_result(
-    results: &mut Vec<(usize, MatchQueryResult)>, top_n: usize, 
+    results: &mut Vec<(usize, MatchResult)>, top_n: usize, 
     output_path: &str, query_string: &str, header: bool, verbose: bool,
     // do_sort_by_rmsd: bool, WARNING: not implemented yetf
 ) {
@@ -350,3 +350,5 @@ pub fn sort_and_print_match_query_result(
         }
     }
 }
+
+// TODO: Need testing

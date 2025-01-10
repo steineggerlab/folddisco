@@ -241,7 +241,7 @@ fn qcp(coords1: &[[f32; 3]], coords2: &[[f32; 3]], natoms: usize) -> (f32, [[f32
     let mut mx_eigenv = e0; // starting guess (x in eqs above)
     let eval_prec = 1e-11; // convergence criterion
     let mut _converged = false;
-    let iteration = 20;
+    let iteration = 50; // 5 is known to be enough according to BioPython but following the original
     for _ in 0..iteration {
         let oldg = mx_eigenv;
 

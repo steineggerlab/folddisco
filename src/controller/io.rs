@@ -365,13 +365,4 @@ mod tests {
         let (_mmap, vec) = read_usize_vector("test_usize_vector_io.value").unwrap();
         assert_eq!(vec, &[1, 2, 3, 4, 5]);
     }
-    
-    // #[test]
-    // fn test_load_offset_map() {
-    //     let offset_map = measure_time!(read_offset_map("index2.offset", HashType::Default32bit).unwrap());
-    //     println!("{:?}", *offset_map.get(&GeometricHash::from_u32(1581533403, HashType::Default32bit)).unwrap());
-    //     let offset_map = measure_time!(read_offset_map_single("index2.offset", HashType::Default32bit).unwrap());
-    //     println!("{:?}", *offset_map.get(&GeometricHash::from_u32(1581533403, HashType::Default32bit)).unwrap());
-    // }
-    
 }

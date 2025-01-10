@@ -284,7 +284,7 @@ pub fn query_pdb(env: AppArgs) {
                                 };
 
                                 let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
-                                    structure_filter.filter(v)
+                                    structure_filter.filter_before_matching(v)
                                 }).collect();
                                 if verbose {
                                     print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
@@ -367,7 +367,7 @@ pub fn query_pdb(env: AppArgs) {
                                     }
                                     
                                     // Filter query_count_vec with reasonable retrieval results
-                                    query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
+                                    query_count_vec.retain(|(_, v)| structure_filter.filter_after_matching(v));
                                     drop(value_mmap);
                                     return query_count_vec;
                                 }
@@ -390,7 +390,7 @@ pub fn query_pdb(env: AppArgs) {
                                     )
                                 };
                                 let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
-                                    structure_filter.filter(v)
+                                    structure_filter.filter_before_matching(v)
                                 }).collect();
 
                                 if verbose {
@@ -496,24 +496,20 @@ pub fn query_pdb(env: AppArgs) {
                 );
                 match query_mode {
                     QueryMode::PerMatchDefault | QueryMode::PerMatchSortByScore => {
-                        let match_results = convert_structure_query_result_to_match_query_results(
+                        let mut match_results = convert_structure_query_result_to_match_query_results(
                             &queried_from_indices
                         );
-                        let mut match_results = match_results.into_par_iter().filter(|(_, v)| {
-                            match_filter.filter(v)
-                        }).collect::<Vec<_>>();
+                        match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
                             &mut match_results, top_n, 
                             &output_path, &query_string, header, verbose
                         );
                     }
                     QueryMode::Web => {
-                        let match_results = convert_structure_query_result_to_match_query_results(
+                        let mut match_results = convert_structure_query_result_to_match_query_results(
                             &queried_from_indices
                         );
-                        let mut match_results = match_results.into_par_iter().filter(|(_, v)| {
-                            match_filter.filter(v)
-                        }).collect::<Vec<_>>();
+                        match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
                             &mut match_results, MAX_NUM_LINES_FOR_WEB,
                             &output_path, &query_string, header, verbose

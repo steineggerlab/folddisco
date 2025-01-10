@@ -87,7 +87,7 @@ impl StructureFilter {
     
     // Filter single query result
     #[inline]
-    pub fn filter(&self, result: &StructureResult) -> bool {
+    pub fn filter_before_matching(&self, result: &StructureResult) -> bool {
         let mut pass = true;
         if self.total_match_count > 0 {
             pass = pass && result.total_match_count >= self.total_match_count;
@@ -115,6 +115,13 @@ impl StructureFilter {
         if self.plddt > 0.0 {
             pass = pass && result.plddt >= self.plddt;
         }
+        //
+        pass
+    }
+
+    #[inline]
+    pub fn filter_after_matching(&self, result: &StructureResult) -> bool {
+        let mut pass = true;
         if self.max_matching_node_count > 0 {
             pass = pass && result.max_matching_node_count >= self.max_matching_node_count;
         }
@@ -127,7 +134,7 @@ impl StructureFilter {
         //
         pass
     }
-
+    
 }
 
 pub struct MatchFilter {

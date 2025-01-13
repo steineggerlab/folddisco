@@ -382,64 +382,118 @@ pub fn make_query_map(
 }
 
 
-pub fn parse_query_string(query_string: &str, default_chain: u8) -> (Vec<(u8, u64)>, Vec<Option<Vec<u8>>>) {
-    let mut query_residues: Vec<(u8, u64)> = Vec::new();
-    let mut amino_acid_substitutions: Vec<Option<Vec<u8>>> = Vec::new();
+// pub fn parse_query_string(query_string: &str, default_chain: u8) -> (Vec<(u8, u64)>, Vec<Option<Vec<u8>>>) {
+//     let mut query_residues: Vec<(u8, u64)> = Vec::new();
+//     let mut amino_acid_substitutions: Vec<Option<Vec<u8>>> = Vec::new();
+//     if query_string.is_empty() {
+//         return (query_residues, amino_acid_substitutions);
+//     }
+//     let mut default_chain = default_chain;
+//     // If default chain is not alphabetic, just use A as default
+//     if !default_chain.is_ascii_alphabetic() {
+//         default_chain = b'A';
+//     }
+
+//     let mut chain = b' ';
+//     let mut residue = String::new();
+//     let mut residue_substitution: Option<Vec<u8>> = None;
+//     for c in query_string.chars() {
+//         if is_aa_group_char(c) {
+//             if residue.is_empty() {
+//                 chain = c as u8;
+//             } else {
+//                 let curr_sub_aa = map_one_letter_to_u8_vec(c);
+//                 if residue_substitution.is_some() {
+//                     residue_substitution.as_mut().unwrap().extend(curr_sub_aa);
+//                 } // If None, it's a problem. Don't consider the case. 
+//             }
+//         } else if c.is_ascii_digit() {
+//             residue.push(c);
+//         } else if c == ':' {
+//             residue_substitution = Some(Vec::new());
+//         } else if c == ',' {
+//             let res_u64 = residue.parse::<u64>().expect(
+//                 &log_msg(FAIL,  "Failed to parse residue")
+//             );
+//             if chain == b' ' {
+//                 chain = default_chain;
+//             }
+//             query_residues.push((chain, res_u64));
+//             amino_acid_substitutions.push(residue_substitution);
+//             // Reset
+//             chain = b' ';
+//             residue.clear();
+//             residue_substitution = None;
+//         } else if c == ' ' {
+//             continue;
+//         } else {
+//             panic!("Invalid character in query string");
+//         }
+//     }
+//     // Push the last residue
+//     if chain == b' ' {
+//         chain = b'A';
+//     }
+//     let res_u64 = residue.parse::<u64>().expect("Failed to parse residue");
+//     query_residues.push((chain, res_u64));
+//     amino_acid_substitutions.push(residue_substitution);
+//     assert_eq!(query_residues.len(), amino_acid_substitutions.len());
+//     (query_residues, amino_acid_substitutions)
+// }
+
+pub fn parse_query_string(query_string: &str, mut default_chain: u8) -> (Vec<(u8, u64)>, Vec<Option<Vec<u8>>>) {
+    let mut query_residues = Vec::new();
+    let mut amino_acid_substitutions = Vec::new();
+
     if query_string.is_empty() {
         return (query_residues, amino_acid_substitutions);
     }
-    let mut default_chain = default_chain;
-    // If default chain is not alphabetic, just use A as default
     if !default_chain.is_ascii_alphabetic() {
         default_chain = b'A';
     }
-
-    let mut chain = b' ';
-    let mut residue = String::new();
-    let mut residue_substitution: Option<Vec<u8>> = None;
-    for c in query_string.chars() {
-        if is_aa_group_char(c) {
-            if residue.is_empty() {
-                chain = c as u8;
+    // Remove whitespace
+    let query_string = query_string.replace(" ", "");
+    for segment in query_string.split(',') {
+        let (chain, rest) = if let Some(first) = segment.chars().next() {
+            if is_aa_group_char(first) {
+                (first as u8, &segment[1..])
             } else {
-                let curr_sub_aa = map_one_letter_to_u8_vec(c);
-                if residue_substitution.is_some() {
-                    residue_substitution.as_mut().unwrap().extend(curr_sub_aa);
-                } // If None, it's a problem. Don't consider the case. 
+                (default_chain, segment)
             }
-        } else if c.is_ascii_digit() {
-            residue.push(c);
-        } else if c == ':' {
-            residue_substitution = Some(Vec::new());
-        } else if c == ',' {
-            let res_u64 = residue.parse::<u64>().expect(
-                &log_msg(FAIL,  "Failed to parse residue")
-            );
-            if chain == b' ' {
-                chain = default_chain;
-            }
-            query_residues.push((chain, res_u64));
-            amino_acid_substitutions.push(residue_substitution);
-            // Reset
-            chain = b' ';
-            residue.clear();
-            residue_substitution = None;
-        } else if c == ' ' {
-            continue;
         } else {
-            panic!("Invalid character in query string");
+            (default_chain, segment)
+        };
+
+        let (range_part, subst_part) = match rest.split_once(':') {
+            Some((r, s)) => {
+                let sub_vec = s
+                    .chars()
+                    .filter(|c| is_aa_group_char(*c))
+                    .flat_map(|c| map_one_letter_to_u8_vec(c))
+                    .collect::<Vec<_>>();
+                (r, Some(sub_vec))
+            }
+            None => (rest, None),
+        };
+
+        if range_part.contains('-') {
+            let (start_str, end_str) = range_part.split_once('-').expect("Invalid range");
+            let start = start_str.parse::<u64>().expect("Invalid start residue");
+            let end = end_str.parse::<u64>().expect("Invalid end residue");
+            for r in start..=end {
+                query_residues.push((chain, r));
+                amino_acid_substitutions.push(subst_part.clone());
+            }
+        } else {
+            let residue_num = range_part.parse::<u64>().expect("Invalid residue");
+            query_residues.push((chain, residue_num));
+            amino_acid_substitutions.push(subst_part);
         }
     }
-    // Push the last residue
-    if chain == b' ' {
-        chain = b'A';
-    }
-    let res_u64 = residue.parse::<u64>().expect("Failed to parse residue");
-    query_residues.push((chain, res_u64));
-    amino_acid_substitutions.push(residue_substitution);
-    assert_eq!(query_residues.len(), amino_acid_substitutions.len());
+
     (query_residues, amino_acid_substitutions)
 }
+
 
 pub fn get_offset_value_lookup_type(index_path: String) -> (String, String, String, String) {
     let offset_path = format!("{}.offset", index_path.clone());
@@ -555,13 +609,23 @@ mod tests {
 
     #[test]
     fn test_parse_query_string_with_aa_substitution() {
-        let query_string = "A250:R,B232:K,C269:Q";
+        let query_string = "A250:R,B232:K,C269:QK";
         let query_residues = parse_query_string(query_string, b'A');
         // R = 1, K = 11, Q = 5
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'B', 232), (b'C', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5])]));
-        let query_string = "250:R,232:K,269:Q";
+        assert_eq!(query_residues, (vec![(b'A', 250), (b'B', 232), (b'C', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]));
+        let query_string = "250:R,232:K,269:QK";
         let query_residues = parse_query_string(query_string, b'A');
         // R = 1, K = 11, Q = 5
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5])]));
+        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]));
+    }
+    #[test]
+    fn test_parse_query_string_with_range() {
+        let query_string = "A250-252,B232-234,C269:Q";
+        let query_residues = parse_query_string(query_string, b'A');
+        assert_eq!(query_residues, (vec![
+            (b'A', 250), (b'A', 251), (b'A', 252), 
+            (b'B', 232), (b'B', 233), (b'B', 234), 
+            (b'C', 269),
+        ], vec![None, None, None, None, None, None, Some(vec![5])]));
     }
 }

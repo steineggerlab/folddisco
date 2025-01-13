@@ -3,16 +3,20 @@
 Folddisco is a bioinformatics tool for indexing and searching
 for discontinous motifs in protein structures.
 
+TODO: Write novel features of folddisco
+
 ## Command
 ### Installation
 ```bash
 # Default
 cargo install --features foldcomp --path .
+# Build from source
+cargo build --release --features foldcomp # folddisco binary is located in target/release/
 ```
 
 ### Indexing
 ```bash
-# default for small databases
+# Default for small databases
 folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> 
 # For large databases (number of structures > 65536). This will generate a 8GB fixed-size offset file
 folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -m big
@@ -32,6 +36,10 @@ You can also download pre-built index files
 - [E. coli proteome](https://foldcomp.steineggerlab.workers.dev/e_coli_folddisco.tar.gz)
 
 ### Querying
+- [ ] TODO: --retrieve flag has been removed. Update the documentation --> --skip-match
+- [ ] TODO: Add information on --per-structure; per-match. --sort-by-rmsd 
+- [ ] TODO: Add column information for the output file with example
+- [ ] TODO: Add example in example directory
 ```bash
 # default
 folddisco query -i <INDEX> -p <QUERY_PDB> -q <QUERY_RESIDUES> -r -t <THREADS>

@@ -23,6 +23,7 @@ pub fn benchmark(env: AppArgs) {
             format,
             fp,
             threads,
+            afdb_to_uniprot,
         } => {
             if input.is_none() {
                 if result.is_none() || answer.is_none() || index.is_none() {
@@ -69,24 +70,24 @@ pub fn benchmark(env: AppArgs) {
             let raw_lookup = load_lookup_from_file(&lookup_path);
             let raw_lookup = raw_lookup.into_iter().map(|(id, _, _, _)| id).collect::<HashSet<_>>();
             let mut lookup = HashSet::with_capacity(raw_lookup.len());
-            parse_path_set_as_set(&raw_lookup, &mut lookup);
+            parse_path_set_as_set(&raw_lookup, &mut lookup, afdb_to_uniprot);
             let config = read_index_config_from_file(&config_path);
 
             input_vector.par_iter().for_each(|(result_path, answer_path, neutral)| {
                 // Parse path by id type
                 let raw_result = read_one_column_of_tsv_as_vec(&result_path, 0);
                 let mut result = Vec::with_capacity(raw_result.len());
-                parse_path_vector_as_vec(&raw_result, &mut result);
+                parse_path_vector_as_vec(&raw_result, &mut result, afdb_to_uniprot);
 
                 let raw_answer = read_one_column_of_tsv_as_set(&answer_path, 0);
                 let mut answer = HashSet::with_capacity(raw_answer.len());
-                parse_path_set_as_set(&raw_answer, &mut answer);
+                parse_path_set_as_set(&raw_answer, &mut answer, afdb_to_uniprot);
 
                 let result_set = HashSet::from_iter(result.iter().cloned());
                 let metric = if let Some(neutral) = neutral {
                     let raw_neutral = read_one_column_of_tsv_as_set(neutral, 0);
                     let mut neutral = HashSet::with_capacity(raw_neutral.len());
-                    parse_path_set_as_set(&raw_neutral, &mut neutral);
+                    parse_path_set_as_set(&raw_neutral, &mut neutral, afdb_to_uniprot);
                     if let Some(fp) = fp {
                         measure_up_to_k_fp_with_neutral(&result, &answer, &neutral, &lookup, fp)
                     } else {
@@ -205,15 +206,33 @@ fn parse_path(path: &str) -> &str {
     }
 }
 
-fn parse_path_vector_as_vec<'a>(path_vector: &'a Vec<String>, parsed_vector: &mut Vec<&'a str>) {
+fn parse_path_vector_as_vec<'a>(path_vector: &'a Vec<String>, parsed_vector: &mut Vec<&'a str>, afdb_to_uniprot: bool) {
     // parallel
     for path in path_vector {
-        parsed_vector.push(parse_path(path));
+        if afdb_to_uniprot {
+            let split = parse_path(path).split("-").collect::<Vec<_>>();
+            if split.len() >= 2 {
+                parsed_vector.push(split[1]);
+            } else {
+                parsed_vector.push(path);
+            }
+        } else {
+            parsed_vector.push(path);
+        }
     }
 }
-fn parse_path_set_as_set<'a>(path_set: &'a HashSet<String>, parsed_set: &mut HashSet<&'a str>) {
+fn parse_path_set_as_set<'a>(path_set: &'a HashSet<String>, parsed_set: &mut HashSet<&'a str>, afdb_to_uniprot: bool) {
     for path in path_set {
-        parsed_set.insert(parse_path(path));
+        if afdb_to_uniprot {
+            let split = parse_path(path).split("-").collect::<Vec<_>>();
+            if split.len() >= 2 {
+                parsed_set.insert(split[1]);
+            } else {
+                parsed_set.insert(path);
+            }
+        } else {
+            parsed_set.insert(path);
+        }
     }
 }
 
@@ -241,6 +260,7 @@ mod tests {
             format: format.to_string(),
             fp,
             threads,
+            afdb_to_uniprot: false,
         };
         benchmark(env);
     }

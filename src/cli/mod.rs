@@ -81,6 +81,7 @@ pub enum AppArgs {
         format: String,
         fp: Option<f64>,
         threads: usize,
+        afdb_to_uniprot: bool,
     },
     Test {
         index_path: String,

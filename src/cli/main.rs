@@ -90,6 +90,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             format: args.value_from_str(["-f", "--format"]).unwrap_or("tsv".into()),
             fp: args.opt_value_from_str("--fp")?,
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            afdb_to_uniprot: args.contains("--afdb-to-uniprot"),
         }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,

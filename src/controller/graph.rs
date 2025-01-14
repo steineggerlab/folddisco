@@ -4,30 +4,11 @@
 // Current naive implementation:
 // Find both strong and weakly connected components with same node count as query graph
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use petgraph::graph::DiGraph;
 use crate::geometry::core::GeometricHash;
 
-
-// pub fn create_index_graph(
-//     ind_vec: &Vec<Vec<(usize, usize)>>, hash_vec: &Vec<GeometricHash>
-// ) -> DiGraph<usize, GeometricHash> {
-//     let mut graph = DiGraph::<usize, GeometricHash>::new();
-//     let mut node_indices = HashMap::new();
-
-//     for (inner_vec, hash) in ind_vec.iter().zip(hash_vec.iter()) {
-//         if inner_vec.is_empty() {
-//             continue;
-//         }
-//         inner_vec.iter().for_each(|(i, j)| {
-//             let node_index_i = *node_indices.entry(*i).or_insert_with(|| graph.add_node(*i));
-//             let node_index_j = *node_indices.entry(*j).or_insert_with(|| graph.add_node(*j));
-//             graph.add_edge(node_index_i, node_index_j, hash.clone());
-//         });
-//     }
-//     graph
-// }
 
 pub fn create_index_graph(ind_vec: &Vec<(usize, usize, GeometricHash)>) -> DiGraph<usize, GeometricHash> {
     let mut graph = DiGraph::<usize, GeometricHash>::new();
@@ -40,9 +21,6 @@ pub fn create_index_graph(ind_vec: &Vec<(usize, usize, GeometricHash)>) -> DiGra
     }
     graph
 }
-
-
-
 
 
 pub fn connected_components_with_given_node_count(

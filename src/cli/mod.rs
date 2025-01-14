@@ -60,6 +60,9 @@ pub enum AppArgs {
         // top N filtering
         top_n: usize,
         web_mode: bool,
+        //.Query sampling
+        sampling_count: Option<usize>,
+        sampling_ratio: Option<f32>,
         // sorting mode
         sort_by_rmsd: bool,
         sort_by_score: bool,

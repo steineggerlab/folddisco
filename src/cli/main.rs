@@ -69,6 +69,9 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             rmsd_cutoff: args.value_from_str("--rmsd").unwrap_or(0.0),
             top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
             web_mode: args.contains("--web"), // Web mode for output
+            // Query filtering
+            sampling_count: args.opt_value_from_str("--sampling-count")?,
+            sampling_ratio: args.opt_value_from_str("--sampling-ratio")?,
             // Sorting mode
             sort_by_rmsd: args.contains("--sort-by-rmsd"),
             sort_by_score: args.contains("--sort-by-score"),

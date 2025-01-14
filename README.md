@@ -40,6 +40,7 @@ You can also download pre-built index files
 - [ ] TODO: Add information on --per-structure; per-match. --sort-by-rmsd 
 - [ ] TODO: Add column information for the output file with example
 - [ ] TODO: Add example in example directory
+- [ ] TODO: Explain amino-acid substitution grammar
 ```bash
 # default
 folddisco query -i <INDEX> -p <QUERY_PDB> -q <QUERY_RESIDUES> -r -t <THREADS>

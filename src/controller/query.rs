@@ -3,21 +3,16 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-use std::collections::{HashMap, HashSet};
-
-use petgraph::algo::{min_spanning_tree, MinSpanningTree};
-use petgraph::data::Element;
-use petgraph::graph::DiGraph;
+use std::collections::HashMap;
 
 use crate::geometry::core::{GeometricHash, HashType};
-use crate::index::indextable::FolddiscoIndex;
 use crate::utils::convert::{is_aa_group_char, map_one_letter_to_u8_vec};
 use crate::prelude::{print_log_msg, PDBReader, INFO};
 use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
 use super::feature::get_single_feature;
 use super::io::read_compact_structure;
-use super::map::SimpleHashMap;
+
 
 // Query is expected to be given as a path, and a list of tuples of chain and residue index
 pub fn make_query(
@@ -438,65 +433,6 @@ pub fn parse_query_string(query_string: &str, mut default_chain: u8) -> (Vec<(u8
     }
 
     (query_residues, amino_acid_substitutions)
-}
-
-
-pub fn subset_query_graph_mst(
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    big_index: Option<&FolddiscoIndex>,
-    small_index: Option<&SimpleHashMap>,
-) -> HashSet<GeometricHash> {
-    // Make a graph from the query_map
-    // Node: usize, Edge: usize queried from the index with GeometricHash
-    let mut rarity_graph = DiGraph::<usize, usize>::new();
-    let mut hash_graph = DiGraph::<usize, GeometricHash>::new();
-    // Build the graph
-    match (big_index, small_index) {
-        (Some(big_index), None ) => {
-            for (hash, ((i, j), _)) in query_map.iter() {
-                let edge_value = big_index.get_entries(hash.as_u32()).len();
-                let node_index_i = rarity_graph.add_node(*i);
-                let node_index_j = rarity_graph.add_node(*j);
-                rarity_graph.add_edge(node_index_i, node_index_j, edge_value);
-                let node_index_i = hash_graph.add_node(*i);
-                let node_index_j = hash_graph.add_node(*j);
-                hash_graph.add_edge(node_index_i, node_index_j, *hash);
-            }
-        },
-        (None, Some(small_index)) => {
-            for (hash, ((i, j), _)) in query_map.iter() {
-                if let Some(offset) = small_index.get(hash) {
-                    let edge_value = offset.1;
-                    let node_index_i = rarity_graph.add_node(*i);
-                    let node_index_j = rarity_graph.add_node(*j);
-                    rarity_graph.add_edge(node_index_i, node_index_j, edge_value);
-                    let node_index_i = hash_graph.add_node(*i);
-                    let node_index_j = hash_graph.add_node(*j);
-                    hash_graph.add_edge(node_index_i, node_index_j, *hash);
-                }
-            }
-        },
-        _ => panic!("Either big_index or small_index must be provided")
-    }
-    // Find the minimum spanning tree
-    let mst: MinSpanningTree<&petgraph::Graph<usize, usize>> = min_spanning_tree(&rarity_graph);
-    // Get node pairs from the mst
-    let mut output = HashSet::new();
-    for element in mst.into_iter() {
-            match element {
-                Element::Edge { source, target, weight } => {
-                    // Find node index in the hash_graph that corresponds to the source and target
-                    let source_node = hash_graph.node_indices().find(|&node| hash_graph[node] == source).unwrap();
-                    let target_node = hash_graph.node_indices().find(|&node| hash_graph[node] == target).unwrap();
-                    if let Some(hash_edge) = hash_graph.find_edge(source_node, target_node) {
-                        let hash = hash_graph.edge_weight(hash_edge).unwrap();
-                        output.insert(*hash);
-                    }
-                }
-                _ => continue,
-            }
-        }
-    output
 }
 
 

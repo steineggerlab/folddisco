@@ -10,20 +10,17 @@ use crate::prelude::GeometricHash;
 
 use super::io::get_values_with_offset_u16;
 use super::map::SimpleHashMap;
-use super::query::subset_query_graph_mst;
 use super::result::StructureResult;
 
 pub fn count_query_idmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    offset_table: &SimpleHashMap,
-    value_vec: &[u16],
-    lookup: &'a Vec<(String, usize, usize, f32)>
+    offset_table: &SimpleHashMap, value_vec: &[u16], lookup: &'a Vec<(String, usize, usize, f32)>, 
+    sampling_ratio: Option<f32>, sampling_count: Option<usize>,
 ) -> DashMap<usize, StructureResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
-
-    let mst_filtered_query = subset_query_graph_mst(query_map, None, Some(offset_table));
-    mst_filtered_query.par_iter().for_each(|query| {  // Use parallel iterator
-    // queries.par_iter().for_each(|query| {  // Use parallel iterator
+    // Sampling query
+    let queries_to_iter = sample_query_idmode(queries, offset_table, value_vec, sampling_ratio, sampling_count);
+    queries_to_iter.par_iter().for_each(|query| {  // Use parallel iterator
         if let Some(offset) = offset_table.get(query) {
             let single_queried_values = get_values_with_offset_u16(value_vec, offset.0, offset.1);
             let edge_info = query_map.get(query).unwrap();
@@ -74,21 +71,14 @@ pub fn count_query_idmode<'a>(
 
 pub fn count_query_bigmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    big_index: &FolddiscoIndex,
-    lookup: &'a Vec<(String, usize, usize, f32)>
+    big_index: &FolddiscoIndex, lookup: &'a Vec<(String, usize, usize, f32)>, 
+    sampling_ratio: Option<f32>, sampling_count: Option<usize>,
 ) -> DashMap<usize, StructureResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
-    // let mut pruned_queries = queries.par_iter().map(|query| {
-    //     let single_queried_values = big_index.get_entries(query.as_u32());
-    //     let hash_count = single_queried_values.len();
-    //     (query, hash_count)
-    // }).collect::<Vec<_>>();
-    // pruned_queries.sort_by(|a, b| a.1.cmp(&b.1));
-    // pruned_queries.truncate(pruned_queries.len() / 2);
-    // pruned_queries.par_iter().for_each(|(query, _)| {  // Use parallel iterator
-    let mst_filtered_query = subset_query_graph_mst(query_map, Some(big_index), None);
-    mst_filtered_query.par_iter().for_each(|query| {  // Use parallel iterator
-    // queries.par_iter().for_each(|query| {  // Use parallel iterator
+    
+    let queries_to_iter = sample_query_bigmode(queries, big_index, sampling_ratio, sampling_count);
+
+    queries_to_iter.par_iter().for_each(|query| {  // Use parallel iterator
         let single_queried_values = big_index.get_entries(query.as_u32());
         let edge_info = query_map.get(query).unwrap();
         let edge = edge_info.0;
@@ -138,4 +128,71 @@ pub fn count_query_bigmode<'a>(
         }
     });
     query_count_map
+}
+
+fn sample_query_idmode(
+    queries: &Vec<GeometricHash>, offset_table: &SimpleHashMap, value_vec: &[u16],
+    sampling_ratio: Option<f32>, sampling_count: Option<usize>,
+) -> Vec<GeometricHash> {
+    match (sampling_ratio, sampling_count) {
+        (None, None) => queries.clone(),
+        (Some(sampling_ratio), None) => {
+            let mut sampled_queries = queries.par_iter().map(|query| {
+                if let Some(offset) = offset_table.get(query) {
+                    let hash_count = offset.1;
+                    (query, hash_count)
+                } else {
+                    (query, 0)
+                }
+            }).filter(|(_, hash_count)| *hash_count > 0).collect::<Vec<_>>();
+            sampled_queries.sort_by(|a, b| a.1.cmp(&b.1));
+            sampled_queries.truncate((sampling_ratio * sampled_queries.len() as f32).ceil() as usize);
+            sampled_queries.into_iter().map(|(query, _)| *query).collect()
+        },
+        (None, Some(sampling_count)) => {
+            let mut sampled_queries = queries.par_iter().map(|query| {
+                if let Some(offset) = offset_table.get(query) {
+                    let hash_count = offset.1;
+                    (query, hash_count)
+                } else {
+                    (query, 0)
+                }
+            }).filter(|(_, hash_count)| *hash_count > 0).collect::<Vec<_>>();
+            sampled_queries.sort_by(|a, b| a.1.cmp(&b.1));
+            sampled_queries.truncate(sampling_count);
+            sampled_queries.into_iter().map(|(query, _)| *query).collect()
+        },
+        (Some(_), Some(_)) => queries.clone(),
+    }
+}
+
+
+fn sample_query_bigmode(
+    queries: &Vec<GeometricHash>, big_index: &FolddiscoIndex, 
+    sampling_ratio: Option<f32>, sampling_count: Option<usize>,
+) -> Vec<GeometricHash> {
+    match (sampling_ratio, sampling_count) {
+        (None, None) => queries.clone(),
+        (Some(sampling_ratio), None) => {
+            let mut sampled_queries = queries.par_iter().map(|query| {
+                let single_queried_values = big_index.get_entries(query.as_u32());
+                let hash_count = single_queried_values.len();
+                (query, hash_count)
+            }).collect::<Vec<_>>();
+            sampled_queries.sort_by(|a, b| a.1.cmp(&b.1));
+            sampled_queries.truncate((sampling_ratio * sampled_queries.len() as f32).ceil() as usize);
+            sampled_queries.into_iter().map(|(query, _)| *query).collect()
+        },
+        (None, Some(sampling_count)) => {
+            let mut sampled_queries = queries.par_iter().map(|query| {
+                let single_queried_values = big_index.get_entries(query.as_u32());
+                let hash_count = single_queried_values.len();
+                (query, hash_count)
+            }).collect::<Vec<_>>();
+            sampled_queries.sort_by(|a, b| a.1.cmp(&b.1));
+            sampled_queries.truncate(sampling_count);
+            sampled_queries.into_iter().map(|(query, _)| *query).collect()
+        },
+        (Some(_), Some(_)) => queries.clone(),
+    }
 }

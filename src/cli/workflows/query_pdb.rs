@@ -88,6 +88,8 @@ pub fn query_pdb(env: AppArgs) {
             rmsd_cutoff,
             top_n,
             web_mode,
+            sampling_count,
+            sampling_ratio,
             sort_by_rmsd,
             sort_by_score,
             output_per_structure,
@@ -278,9 +280,12 @@ pub fn query_pdb(env: AppArgs) {
                                     read_u16_vector(&value_path).expect(&log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path)))
                                 };
                                 let query_count_map = if verbose { measure_time!(count_query_idmode(
-                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
+                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup, sampling_ratio, sampling_count
                                 ))} else {
-                                    count_query_idmode(&pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup)
+                                    count_query_idmode(
+                                        &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup,
+                                        sampling_ratio, sampling_count
+                                    )
                                 };
 
                                 let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
@@ -383,10 +388,11 @@ pub fn query_pdb(env: AppArgs) {
                                     load_big_index(index_prefix)
                                 };
                                 let query_count_map = if verbose { measure_time!(count_query_bigmode(
-                                    &pdb_query, &pdb_query_map, &big_index, &lookup
+                                    &pdb_query, &pdb_query_map, &big_index, &lookup, sampling_ratio, sampling_count
                                 )) } else {
                                     count_query_bigmode(
-                                        &pdb_query, &pdb_query_map, &big_index, &lookup
+                                        &pdb_query, &pdb_query_map, &big_index, &lookup,
+                                        sampling_ratio, sampling_count
                                     )
                                 };
                                 let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
@@ -607,6 +613,8 @@ mod tests {
             rmsd_cutoff: 1.0,
             top_n: 1000,
             web_mode: false,
+            sampling_count: None,
+            sampling_ratio: None,
             sort_by_rmsd: true,
             sort_by_score: false,
             output_per_structure: false,
@@ -651,6 +659,8 @@ mod tests {
                 rmsd_cutoff: 1.0,
                 top_n: 1000,
                 web_mode: false,
+                sampling_count: None,
+                sampling_ratio: None,
                 sort_by_rmsd: false,
                 sort_by_score: true,
                 output_per_structure: true,
@@ -695,6 +705,8 @@ mod tests {
             rmsd_cutoff: 1.0,
             top_n: 1000,
             web_mode: false,
+            sampling_count: None,
+            sampling_ratio: None,
             sort_by_rmsd: false,
             sort_by_score: true,
             output_per_structure: true,

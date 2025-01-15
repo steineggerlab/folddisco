@@ -12,8 +12,7 @@ use crate::prelude::{log_msg, print_log_msg, FAIL, INFO};
 use super::ResidueMatch;
 
 
-// TODO: need to think about the column name
-pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tresidues_rescued\tquery_residues";
+pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tquery_residues";
 pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tavg_idf\trmsd\tmatching_residues\tquery_residues";
 
 pub struct StructureResult<'a> {
@@ -61,14 +60,21 @@ impl<'a> StructureResult<'a> {
         }
     }
     
-    pub fn into_match_query_results(&self) -> Vec<MatchResult> {
-        self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd))| {
-            // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
-            let avg_idf = self.idf / self.matching_residues_processed.len() as f32;
-            MatchResult::new(
-                self.id, i, avg_idf, residues.clone(), *rmsd
-            )
-        }).collect()
+    pub fn into_match_query_results(&self, use_ca_dist: bool) -> Vec<MatchResult> {
+        match use_ca_dist {
+            true => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd))| {
+                // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
+                MatchResult::new(
+                    self.id, i, self.idf, residues.clone(), *rmsd
+                )
+            }).collect(),
+            false => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd))| {
+                // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
+                MatchResult::new(
+                    self.id, i, self.idf, residues.clone(), *rmsd
+                )
+            }).collect(),
+        }
     }
 }
 
@@ -78,7 +84,7 @@ pub fn convert_structure_query_result_to_match_query_results<'a>(
     results
         .iter()
         .flat_map(|(k, v)| {
-            v.into_match_query_results()
+            v.into_match_query_results(false)
              .into_iter()
              .map(|x| (*k, x))
         })
@@ -163,7 +169,7 @@ pub struct MatchResult<'a> {
     pub id: &'a str,
     pub nid: usize,
     pub node_count: usize,
-    pub avg_idf: f32,
+    pub idf: f32,
     pub matching_residues: Vec<ResidueMatch>,
     pub rmsd: f32,
 }
@@ -183,7 +189,7 @@ impl<'a> MatchResult<'a> {
             id,
             nid,
             node_count,
-            avg_idf,
+            idf: avg_idf,
             matching_residues,
             rmsd,
         }
@@ -194,7 +200,7 @@ impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
-            self.id, self.node_count, self.avg_idf, self.rmsd,
+            self.id, self.node_count, self.idf, self.rmsd,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
@@ -209,7 +215,7 @@ impl<'a> fmt::Debug for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
-            self.id, self.node_count, self.avg_idf, self.rmsd,
+            self.id, self.node_count, self.idf, self.rmsd,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
@@ -225,7 +231,7 @@ impl<'a> MatchResult<'a> {
     pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
-            self.id, self.node_count, self.avg_idf, self.rmsd,
+            self.id, self.node_count, self.idf, self.rmsd,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),

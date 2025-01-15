@@ -396,7 +396,9 @@ pub fn parse_query_string(query_string: &str, mut default_chain: u8) -> (Vec<(u8
     let query_string = query_string.replace(" ", "");
     for segment in query_string.split(',') {
         let (chain, rest) = if let Some(first) = segment.chars().next() {
-            if is_aa_group_char(first) {
+            // NOTE: 2025-01-15 15:55:19
+            // Current querying doesn't support chain ID with more than 1 character
+            if first.is_ascii_alphabetic() {
                 (first as u8, &segment[1..])
             } else {
                 (default_chain, segment)

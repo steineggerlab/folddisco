@@ -37,27 +37,65 @@ use crate::structure::io::fcz::FoldcompDbReader;
 use crate::structure::io::StructureFileFormat;
 
 pub const HELP_QUERY: &str = "\
-USAGE: folddisco query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
-Example: folddisco query -i index_table -t 6 1aq2.pdb A250,A232,A269
-Options:
-    -p, --pdb <PDB_PATH>             Path of PDB file to query
-    -q, --query <QUERY_STRING>       Query string
-    -i, --index <INDEX_PATH>         Path of index table to load
-    -t, --threads <THREADS>          Number of threads to use
-    -v, --verbose                    Print verbose messages
-    -r, --retrieve                   Retrieve matched residues (Need PDB files)
-    -d, --distance <DIST_THRESHOLD>  Distance threshold (default 0.0)
-    -a, --angle <ANGLE_THRESHOLD>    Angle threshold (default 0.0)
-    -m, --match <MATCH_CUTOFF>       Match cutoff (default 0.0)
-    -s, --score <SCORE_CUTOFF>       Score cutoff (default 0.0)
-    -n, --num-res <NUM_RES_CUTOFF>   Number of residues cutoff (default 3000)
-    -l, --plddt <PLDDT_CUTOFF>       PLDDT cutoff (default 0.0)
-    -o, --output <OUTPUT_PATH>       Output file path (default stdout)
-    -h, --help                       Print this help menu
-    --header                         Print header in output
-    --node <NODE_COUNT>              Number of nodes to retrieve (default 2)
-";
+usage: folddisco query -p <i:PDB> -q <QUERY> -i <i:INDEX> [OPTIONS] 
 
+input/output:
+ -p, --pdb <PATH>                 Path of PDB file to query
+ -q, --query <STR>                Query string that specifies residues or a text file containing query
+ -i, --index <PATH>               Path of index table to load [REQUIRED]
+ -o, --output <PATH>              Output file path [stdout]
+ 
+search parameters:
+ -t, --threads <INT>              Number of threads [1]
+ -d, --distance <FLOAT>           Distance threshold in Angstroms. Multiple values can be separated by comma [0.0]
+ -a, --angle <FLOAT>              Angle threshold. Multiple values can be separated by comma [0.0]
+ --ca-distance <FLOAT>            C-alpha distance threshold in matching residues [1.5]
+ --sampling-count <INT>           Number of samples to use for sampling [all]
+ --sampling-ratio <FLOAT>         Sampling ratio to use for sampling [1.0]
+ --skip-match                     Skip matching residues
+ --serial-index                   Handle residue indices serially
+
+filtering options:
+ --total-match <INT>              Total match count cutoff [0]
+ --covered-node <INT>             Covered node count cutoff [0]
+ --covered-node-ratio <FLOAT>     Covered node ratio cutoff [0.0]
+ --covered-edge <INT>             Covered edge count cutoff [0]
+ --covered-edge-ratio <FLOAT>     Covered edge ratio cutoff [0.0]
+ --max-node <INT>                 Maximum matching node count cutoff [0]
+ --max-node-ratio <FLOAT>         Maximum matching node ratio cutoff [0.0]
+ --score <FLOAT>                  Score cutoff [0.0]
+ --connected-node <INT>           Connected node count cutoff [0]
+ --connected-node-ratio <FLOAT>   Connected node ratio cutoff [0.0]
+ --num-residue <INT>              Number of residues cutoff [50000]
+ --plddt <FLOAT>                  pLDDT cutoff [0.0]
+ --top <INT>                      Limit output to top N structures [all]
+
+display options:
+ -v, --verbose                    Print verbose messages
+ -h, --help                       Print this help menu
+ --header                         Print header in output
+ --web                            Print output for web
+ --per-structure                  Print output per structure
+ --per-match                      Print output per match. Not working with --skip-match
+ --sort-by-score                  Sort output by score
+ --sort-by-rmsd                   Sort output by RMSD. Not working with --skip-match
+ 
+examples:
+# Search with default settings
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
+
+# Query file given as separate text file
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 5 --connected-node 4
+";
+// # Query with amino-acid substitutions. Alternative amino acids can be given after colon.
+
+
+// # Filtering
+// ## Based on connected node andrmsd
+
+// ## Coverage based filtering
+
+// ## Top N filtering with sorting
 
 pub const MIN_CONNECTED_COMPONENT_SIZE: usize = 2;
 pub const MAX_NUM_LINES_FOR_WEB: usize = 1000;

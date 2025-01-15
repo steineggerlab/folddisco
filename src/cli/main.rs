@@ -8,16 +8,14 @@
 // use crate::*;
 use folddisco::cli::{workflows::{build_index, benchmark, query_pdb}, *};
 const HELP: &str = "\
-USAGE: folddisco index [OPTIONS] -p <PDBS...> -i <INDEX> -y <TYPE>
-       folddisco query [OPTIONS] -p <PDB> -i <INDEX> -q <QUERY>
-       folddisco benchmark [OPTIONS] -r <RESULT> -a <ANSWER> -i <INDEX>
+usage: folddisco <command> [<args>]
 
-SUBCOMMANDS:
+subcommands:
   index     Create a new index table from multiple protein structures
   query     Query a motif from an index table
-  benchmark Benchmark the performance of FoldDisco
-OPTIONS:
-  -t, --threads <THREADS>    Number of threads to use
+  benchmark Benchmark the performance of folddisco
+
+options:
   -h, --help                 Print this help menu
 ";
 
@@ -64,8 +62,8 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             idf_score_cutoff: args.value_from_str("--score").unwrap_or(0.0),
             connected_node_count: args.value_from_str("--connected-node").unwrap_or(0),
             connected_node_ratio: args.value_from_str("--connected-node-ratio").unwrap_or(0.0),
-            num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
-            plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
+            num_res_cutoff: args.value_from_str("--num-residue").unwrap_or(50000),
+            plddt_cutoff: args.value_from_str("--plddt").unwrap_or(0.0),
             rmsd_cutoff: args.value_from_str("--rmsd").unwrap_or(0.0),
             top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
             web_mode: args.contains("--web"), // Web mode for output
@@ -79,7 +77,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             output_per_structure: args.contains("--per-structure"),
             output_per_match: args.contains("--per-match"),
             header: args.contains("--header"),
-            serial_query: args.contains("--serial"),
+            serial_query: args.contains("--serial-index"),
             output: args.value_from_str(["-o", "--output"]).unwrap_or("".into()),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
@@ -99,6 +97,10 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             index_path: args.value_from_str(["-i", "--index"])?,
             verbose: args.contains(["-v", "--verbose"]),
         }),
+        Some("version") => {
+            println!("{}", env!("CARGO_PKG_VERSION"));
+            std::process::exit(0);
+        },
         Some(_) => Err("Invalid subcommand".into()),
         None => Ok(AppArgs::Global {
             help: args.contains(["-h", "--help"]),

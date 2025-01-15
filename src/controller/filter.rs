@@ -189,7 +189,7 @@ impl MatchFilter {
             pass = pass && result.node_count as f32 / self.expected_node_count as f32 >= self.node_ratio;
         }
         if self.avg_idf > 0.0 {
-            pass = pass && result.avg_idf >= self.avg_idf;
+            pass = pass && result.idf >= self.avg_idf;
         }
         if self.rmsd > 0.0 {
             pass = pass && result.rmsd <= self.rmsd;

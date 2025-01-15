@@ -89,7 +89,7 @@ pub enum AppArgs {
     Test {
         index_path: String,
         verbose: bool,
-    }
+    },
 }
 
 pub fn print_logo() {

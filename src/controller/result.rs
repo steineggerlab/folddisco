@@ -3,7 +3,6 @@
 use std::fmt;
 use std::collections::HashSet;
 use std::io::Write;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
 
 use crate::measure_time;
@@ -13,7 +12,7 @@ use super::ResidueMatch;
 
 
 pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tquery_residues";
-pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tavg_idf\trmsd\tmatching_residues\tquery_residues";
+pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tquery_residues";
 
 pub struct StructureResult<'a> {
     pub id: &'a str,
@@ -60,15 +59,15 @@ impl<'a> StructureResult<'a> {
         }
     }
     
-    pub fn into_match_query_results(&self, use_ca_dist: bool) -> Vec<MatchResult> {
-        match use_ca_dist {
-            true => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd))| {
+    pub fn into_match_query_results(&self, skip_ca_dist: bool) -> Vec<MatchResult> {
+        match skip_ca_dist {
+            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
                     self.id, i, self.idf, residues.clone(), *rmsd
                 )
             }).collect(),
-            false => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd))| {
+            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
                     self.id, i, self.idf, residues.clone(), *rmsd
@@ -79,12 +78,12 @@ impl<'a> StructureResult<'a> {
 }
 
 pub fn convert_structure_query_result_to_match_query_results<'a>(
-    results: &'a [(usize, StructureResult<'a>)]
+    results: &'a [(usize, StructureResult<'a>)], skip_ca_dist: bool
 ) -> Vec<(usize, MatchResult<'a>)> {
     results
         .iter()
         .flat_map(|(k, v)| {
-            v.into_match_query_results(false)
+            v.into_match_query_results(skip_ca_dist)
              .into_iter()
              .map(|x| (*k, x))
         })

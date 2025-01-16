@@ -4,7 +4,7 @@
 // Current naive implementation:
 // Find both strong and weakly connected components with same node count as query graph
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use petgraph::graph::DiGraph;
 use crate::geometry::core::GeometricHash;
@@ -81,24 +81,4 @@ mod tests {
         let weak_cc = measure_time!(petgraph::algo::kosaraju_scc(&undirected_graph));
         println!("{:?}", weak_cc);
     }
-
-    // #[test]
-    // fn test_usize_graph() {
-    //     let ind_vec = vec![
-    //         vec![(57, 102), (57, 195)], 
-    //         vec![(102, 57), (102, 195)],
-    //         vec![],
-    //         vec![(195, 57), (195, 102)], // Triad
-    //         vec![(57, 106), (106, 111), (212, 215), (219, 417), (417, 219)],
-    //         vec![(219, 212), (212, 417)],
-    //         vec![],
-    //     ];
-    //     let hash_vec = vec![GeometricHash::from_u32(1, HashType::PDBTrRosetta); 7];
-    //     let graph = create_index_graph(&ind_vec, &hash_vec);
-    //     println!("{:?}", graph);
-    //     let conn = connected_components_with_given_node_count(&graph, 3);
-    //     println!("{:?}", conn);
-    // }
-    
-    
 }

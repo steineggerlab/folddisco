@@ -76,6 +76,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             // Output mode
             output_per_structure: args.contains("--per-structure"),
             output_per_match: args.contains("--per-match"),
+            skip_ca_match: args.contains("--skip-ca-match"),
             header: args.contains("--header"),
             serial_query: args.contains("--serial-index"),
             output: args.value_from_str(["-o", "--output"]).unwrap_or("".into()),

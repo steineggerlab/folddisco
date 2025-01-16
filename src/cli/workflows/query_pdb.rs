@@ -7,7 +7,7 @@
 // When querying PDB files, we need index table and query file.
 
 use std::collections::HashMap;
-use std::io::{BufRead, Write};
+use std::io::BufRead;
 use std::path::PathBuf;
 
 use memmap2::{Mmap, MmapMut};
@@ -22,7 +22,7 @@ use crate::controller::io::{read_compact_structure, read_u16_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
 use crate::controller::count_query::{count_query_bigmode, count_query_idmode};
 use crate::controller::result::{
-    convert_structure_query_result_to_match_query_results, sort_and_print_match_query_result, sort_and_print_structure_query_result, MatchResult, StructureResult
+    convert_structure_query_result_to_match_query_results, sort_and_print_match_query_result, sort_and_print_structure_query_result, StructureResult
 };
 use crate::controller::retrieve::retrieval_wrapper;
 use crate::index::indextable::load_big_index;
@@ -56,46 +56,55 @@ search parameters:
  --serial-index                   Handle residue indices serially
 
 filtering options:
- --total-match <INT>              Total match count cutoff [0]
- --covered-node <INT>             Covered node count cutoff [0]
- --covered-node-ratio <FLOAT>     Covered node ratio cutoff [0.0]
- --covered-edge <INT>             Covered edge count cutoff [0]
- --covered-edge-ratio <FLOAT>     Covered edge ratio cutoff [0.0]
- --max-node <INT>                 Maximum matching node count cutoff [0]
- --max-node-ratio <FLOAT>         Maximum matching node ratio cutoff [0.0]
- --score <FLOAT>                  Score cutoff [0.0]
- --connected-node <INT>           Connected node count cutoff [0]
- --connected-node-ratio <FLOAT>   Connected node ratio cutoff [0.0]
+ --total-match <INT>              Filter out structures with less than total match count [0]
+ --covered-node <INT>             Filter out structures not covered by given number of nodes with hashes [0]
+ --covered-node-ratio <FLOAT>     Filter out structures not covered by given ratio of nodes with hashes [0.0]
+ --covered-edge <INT>             Filter out structures not covered by given number of edges with hashes [0]
+ --covered-edge-ratio <FLOAT>     Filter out structures not covered by given ratio of edges with hashes [0.0]
+ --max-node <INT>                 Filter out structures of maximum matching node size smaller than given value [0]
+ --max-node-ratio <FLOAT>         Filter out structures of maximum matching node size smaller than given ratio [0.0]
+ --score <FLOAT>                  IDF score cutoff [0.0]
+ --connected-node <INT>           Filter out structures/matches with connected node count smaller than given value [0]
+ --connected-node-ratio <FLOAT>   Filter out structures/matches with connected node count smaller than given ratio [0.0]
  --num-residue <INT>              Number of residues cutoff [50000]
  --plddt <FLOAT>                  pLDDT cutoff [0.0]
  --top <INT>                      Limit output to top N structures [all]
 
 display options:
- -v, --verbose                    Print verbose messages
- -h, --help                       Print this help menu
  --header                         Print header in output
  --web                            Print output for web
  --per-structure                  Print output per structure
  --per-match                      Print output per match. Not working with --skip-match
  --sort-by-score                  Sort output by score
  --sort-by-rmsd                   Sort output by RMSD. Not working with --skip-match
- 
+ --skip-ca-match                  Print matching residues before C-alpha distance check
+
+general options:
+ -v, --verbose                    Print verbose messages
+ -h, --help                       Print this help menu
+
 examples:
-# Search with default settings
+# Search with default settings. This will print out matching motifs with sorting by RMSD.
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
 
+# Print top 100 structures with sorting by score
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by-score
+
 # Query file given as separate text file
-folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 5 --connected-node 4
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 5
+
+# Query with amino-acid substitutions and range. 
+# Alternative amino acids can be given after colon. Range can be given with dash.
+# This will query first 10 residues and 11th residue with subsitution to any amino acid.
+folddisco query -p query/4CHA.pdb -q 1-10,11:X -i index/h_sapiens_folddisco -t 6 --serial-index
+
+# Filtering
+## Based on connected node and rmsd
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --connected-node 0.75 --rmsd 1.0
+
+## Coverage based filtering & top N filtering without residue matching
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 3 --top 1000 --per-structure --skip-match
 ";
-// # Query with amino-acid substitutions. Alternative amino acids can be given after colon.
-
-
-// # Filtering
-// ## Based on connected node andrmsd
-
-// ## Coverage based filtering
-
-// ## Top N filtering with sorting
 
 pub const MIN_CONNECTED_COMPONENT_SIZE: usize = 2;
 pub const MAX_NUM_LINES_FOR_WEB: usize = 1000;
@@ -132,11 +141,12 @@ pub fn query_pdb(env: AppArgs) {
             sort_by_score,
             output_per_structure,
             output_per_match,
+            skip_ca_match,
             header,
             serial_query,
             output,
             verbose,
-            help,
+            help: _,
         } => {
             if verbose { print_logo(); }
             // help is already handled in main.rs
@@ -213,8 +223,9 @@ pub fn query_pdb(env: AppArgs) {
                 }
                 queries
             } else {
-                vec![(pdb_path.clone(), query_string.clone(), output)]
+                vec![(pdb_path.clone(), query_string.clone(), output.clone())]
             };
+
             let dist_thresholds = parse_threshold_string(dist_threshold.clone());
             let angle_thresholds = parse_threshold_string(angle_threshold.clone());
             
@@ -538,10 +549,11 @@ pub fn query_pdb(env: AppArgs) {
                     connected_node_count, connected_node_ratio, idf_score_cutoff,
                     rmsd_cutoff, _residue_count,
                 );
+
                 match query_mode {
                     QueryMode::PerMatchDefault | QueryMode::PerMatchSortByScore => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
-                            &queried_from_indices
+                            &queried_from_indices, skip_ca_match
                         );
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
@@ -551,7 +563,7 @@ pub fn query_pdb(env: AppArgs) {
                     }
                     QueryMode::Web => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
-                            &queried_from_indices
+                            &queried_from_indices, skip_ca_match
                         );
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
@@ -657,6 +669,7 @@ mod tests {
             sort_by_score: false,
             output_per_structure: false,
             output_per_match: true,
+            skip_ca_match: false,
             header: true,
             serial_query: false,
             output: String::from(""),
@@ -703,6 +716,7 @@ mod tests {
                 sort_by_score: true,
                 output_per_structure: true,
                 output_per_match: false,
+                skip_ca_match: false,
                 header: true,
                 serial_query: false,
                 output: String::from(""),
@@ -749,6 +763,7 @@ mod tests {
             sort_by_score: true,
             output_per_structure: true,
             output_per_match: false,
+            skip_ca_match: false,
             header: true,
             serial_query: false,
             output: String::from(""),

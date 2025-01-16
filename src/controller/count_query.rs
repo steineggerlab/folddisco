@@ -19,7 +19,7 @@ pub fn count_query_idmode<'a>(
 ) -> DashMap<usize, StructureResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
     // Sampling query
-    let queries_to_iter = sample_query_idmode(queries, offset_table, value_vec, sampling_ratio, sampling_count);
+    let queries_to_iter = sample_query_idmode(queries, offset_table, sampling_ratio, sampling_count);
     queries_to_iter.par_iter().for_each(|query| {  // Use parallel iterator
         if let Some(offset) = offset_table.get(query) {
             let single_queried_values = get_values_with_offset_u16(value_vec, offset.0, offset.1);
@@ -131,7 +131,7 @@ pub fn count_query_bigmode<'a>(
 }
 
 fn sample_query_idmode(
-    queries: &Vec<GeometricHash>, offset_table: &SimpleHashMap, value_vec: &[u16],
+    queries: &Vec<GeometricHash>, offset_table: &SimpleHashMap,
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
 ) -> Vec<GeometricHash> {
     match (sampling_ratio, sampling_count) {

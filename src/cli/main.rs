@@ -8,16 +8,14 @@
 // use crate::*;
 use folddisco::cli::{workflows::{build_index, benchmark, query_pdb}, *};
 const HELP: &str = "\
-USAGE: folddisco index [OPTIONS] -p <PDBS...> -i <INDEX> -y <TYPE>
-       folddisco query [OPTIONS] -p <PDB> -i <INDEX> -q <QUERY>
-       folddisco benchmark [OPTIONS] -r <RESULT> -a <ANSWER> -i <INDEX>
+usage: folddisco <command> [<args>]
 
-SUBCOMMANDS:
+subcommands:
   index     Create a new index table from multiple protein structures
   query     Query a motif from an index table
-  benchmark Benchmark the performance of FoldDisco
-OPTIONS:
-  -t, --threads <THREADS>    Number of threads to use
+  benchmark Benchmark the performance of folddisco
+
+options:
   -h, --help                 Print this help menu
 ";
 
@@ -49,17 +47,38 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             query_string: args.value_from_str(["-q", "--query"]).unwrap_or("".into()),
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             index_path: args.opt_value_from_str(["-i", "--index"])?,
-            retrieve: args.contains(["-r", "--retrieve"]),
-            amino_acid: args.value_from_str("--amino-acid").unwrap_or(0),
+            skip_match: args.contains("--skip-match"),
+            // Filtering parameters
             dist_threshold: args.opt_value_from_str(["-d", "--distance"])?,
             angle_threshold: args.opt_value_from_str(["-a", "--angle"])?,
-            match_cutoff: args.opt_value_from_str(["-m", "--match"])?, 
-            score_cutoff: args.value_from_str(["-s", "--score"]).unwrap_or(0.0),
-            num_res_cutoff: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
-            plddt_cutoff: args.value_from_str(["-l", "--plddt"]).unwrap_or(0.0),
-            node_count: args.value_from_str("--node").unwrap_or(2),
+            ca_dist_threshold: args.value_from_str("--ca-distance").unwrap_or(1.5),
+            total_match_count: args.value_from_str("--total-match").unwrap_or(0),
+            covered_node_count: args.value_from_str("--covered-node").unwrap_or(0),
+            covered_node_ratio: args.value_from_str("--covered-node-ratio").unwrap_or(0.0),
+            covered_edge_count: args.value_from_str("--covered-edge").unwrap_or(0),
+            covered_edge_ratio: args.value_from_str("--covered-edge-ratio").unwrap_or(0.0),
+            max_matching_node_count: args.value_from_str("--max-node").unwrap_or(0),
+            max_matching_node_ratio: args.value_from_str("--max-node-ratio").unwrap_or(0.0),
+            idf_score_cutoff: args.value_from_str("--score").unwrap_or(0.0),
+            connected_node_count: args.value_from_str("--connected-node").unwrap_or(0),
+            connected_node_ratio: args.value_from_str("--connected-node-ratio").unwrap_or(0.0),
+            num_res_cutoff: args.value_from_str("--num-residue").unwrap_or(50000),
+            plddt_cutoff: args.value_from_str("--plddt").unwrap_or(0.0),
+            rmsd_cutoff: args.value_from_str("--rmsd").unwrap_or(0.0),
+            top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
+            web_mode: args.contains("--web"), // Web mode for output
+            // Query filtering
+            sampling_count: args.opt_value_from_str("--sampling-count")?,
+            sampling_ratio: args.opt_value_from_str("--sampling-ratio")?,
+            // Sorting mode
+            sort_by_rmsd: args.contains("--sort-by-rmsd"),
+            sort_by_score: args.contains("--sort-by-score"),
+            // Output mode
+            output_per_structure: args.contains("--per-structure"),
+            output_per_match: args.contains("--per-match"),
+            skip_ca_match: args.contains("--skip-ca-match"),
             header: args.contains("--header"),
-            serial_query: args.contains("--serial"),
+            serial_query: args.contains("--serial-index"),
             output: args.value_from_str(["-o", "--output"]).unwrap_or("".into()),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),
@@ -73,11 +92,16 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             format: args.value_from_str(["-f", "--format"]).unwrap_or("tsv".into()),
             fp: args.opt_value_from_str("--fp")?,
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            afdb_to_uniprot: args.contains("--afdb-to-uniprot"),
         }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,
             verbose: args.contains(["-v", "--verbose"]),
         }),
+        Some("version") => {
+            println!("{}", env!("CARGO_PKG_VERSION"));
+            std::process::exit(0);
+        },
         Some(_) => Err("Invalid subcommand".into()),
         None => Ok(AppArgs::Global {
             help: args.contains(["-h", "--help"]),
@@ -86,8 +110,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
 }
 
 fn main() {
-    // Init
-    print_logo();
+
 
     let parsed_args = parse_arg().unwrap_or_else(|e| {
         eprintln!("Error: {}", e);
@@ -95,10 +118,12 @@ fn main() {
     });
     match parsed_args {
         AppArgs::Global { help: _ } => {
+            print_logo();
             eprintln!("{}", HELP);
         }
         AppArgs::Index { help, .. } => {
             if help {
+                print_logo();
                 eprintln!("{}", workflows::build_index::HELP_INDEX);
             } else {
                 build_index::build_index(parsed_args);
@@ -106,6 +131,7 @@ fn main() {
         }
         AppArgs::Query { help, .. } => {
             if help {
+                print_logo();
                 eprintln!("{}", workflows::query_pdb::HELP_QUERY);
             } else {
                 query_pdb::query_pdb(parsed_args);

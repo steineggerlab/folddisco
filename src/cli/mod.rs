@@ -35,17 +35,41 @@ pub enum AppArgs {
         query_string: String,
         threads: usize,
         index_path: Option<String>,
-        retrieve: bool,
+        skip_match: bool, // Changed from retrieve to skip_match. Now mathcing is default
         // Match thresholds
-        amino_acid: u8,
         dist_threshold: Option<String>,
         angle_threshold: Option<String>,
-        // Cutoffs
-        match_cutoff: Option<String>,
-        score_cutoff: f32,
+        ca_dist_threshold: f32,
+        // filtering parameters
+        // These are for filtering StructQueryResult only
+        total_match_count: usize, 
+        covered_node_count: usize,
+        covered_node_ratio: f32,
+        covered_edge_count: usize,
+        covered_edge_ratio: f32,
+        max_matching_node_count: usize,
+        max_matching_node_ratio: f32,
         num_res_cutoff: usize,
         plddt_cutoff: f32,
-        node_count: usize,
+        // These are for filtering both StructQueryResult and MatchQueryResult
+        idf_score_cutoff: f32,
+        // These are for filtering MatchQueryResult only
+        connected_node_count: usize,
+        connected_node_ratio: f32,
+        rmsd_cutoff: f32,
+        // top N filtering
+        top_n: usize,
+        web_mode: bool,
+        //.Query sampling
+        sampling_count: Option<usize>,
+        sampling_ratio: Option<f32>,
+        // sorting mode
+        sort_by_rmsd: bool,
+        sort_by_score: bool,
+        // output mode
+        output_per_structure: bool,
+        output_per_match: bool,
+        skip_ca_match: bool,
         header: bool,
         serial_query: bool,
         output: String,
@@ -61,11 +85,12 @@ pub enum AppArgs {
         format: String,
         fp: Option<f64>,
         threads: usize,
+        afdb_to_uniprot: bool,
     },
     Test {
         index_path: String,
         verbose: bool,
-    }
+    },
 }
 
 pub fn print_logo() {

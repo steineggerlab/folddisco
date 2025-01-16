@@ -196,13 +196,14 @@ pub fn map_one_letter_to_u8_vec(aa: char) -> Vec<u8> {
         'J' => vec![9, 10], // Ile, Leu
         'U' => vec![4], // Selenocysteine 
         'O' => vec![11], // Pyrrolysine
-        // Custom characters to represent groups of amino acids
-        // Positively charged: +, Negatively charged: -, Polar or hydrophilic: ^, Non-polar or hydrophobic: ~, Aromatic: @
-        '+' => vec![1, 8, 11], // Arg, His, Lys
-        '-' => vec![3, 6], // Asp, Glu
-        '^' => vec![2, 5, 15, 16, 18], // Asn, Gln, Ser, Thr, Tyr
-        '~' => vec![0, 7, 9, 10, 12, 13, 14, 19], // Ala, Gly, Ile, Leu, Met, Phe, Pro, Val
-        '@' => vec![8, 13, 17, 18], // His, Phe, Trp, Tyr
+        // Custom characters to represent groups of amino acids. Lower cases to avoid shell conflicts
+        // Positively charged: p, Negatively charged: n, Polar or hydrophilic: h, Non-polar or hydrophobic: b, Aromatic: a
+        'p' => vec![1, 8, 11], // Arg, His, Lys
+        'n' => vec![3, 6], // Asp, Glu
+        'h' => vec![2, 5, 15, 16, 18], // Asn, Gln, Ser, Thr, Tyr
+        'b' => vec![0, 4, 7, 9, 10, 12, 13, 14, 19], // Ala, Cys, Gly, Ile, Leu, Met, Phe, Pro, Val
+        'a' => vec![8, 13, 17, 18], // His, Phe, Trp, Tyr
+        'x' => vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // Both 'X' and 'x' are used for all
         _ => vec![255], // Unknown
     }
 }
@@ -213,7 +214,7 @@ pub fn is_aa_group_char(c: char) -> bool {
         true
     } else {
         match c {
-            '+' | '-' | '^' | '~' | '@' => true,
+            'p' | 'n' | 'h' | 'b' | 'a' => true,
              _ => false,
         }
     }

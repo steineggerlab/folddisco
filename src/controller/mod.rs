@@ -6,12 +6,13 @@
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
 pub mod feature;
-// pub mod filter;
+pub mod filter;
 pub mod graph;
 pub mod io;
 pub mod query;
+pub mod result;
 pub mod retrieve;
-pub mod rank;
+pub mod count_query;
 pub mod map;
 pub mod mode;
 
@@ -32,10 +33,14 @@ use crate::utils::log::{ print_log_msg, log_msg, FAIL, WARN, INFO };
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::fcz::FoldcompDbReader;
 
+// Constants
 const DEFAULT_NUM_THREADS: usize = 4;
 // const DEFAULT_HASH_TYPE: HashType = HashType::PDBTrRosetta;
 const DEFAULT_MAX_RESIDUE: usize = 65535;
 const DEFAULT_DIST_CUTOFF: f32 = 20.0;
+
+// Module specific types
+pub type ResidueMatch = Option<(u8, u64)>;
 
 unsafe impl Send for FoldDisco {}
 unsafe impl Sync for FoldDisco {}

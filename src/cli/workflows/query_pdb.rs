@@ -7,19 +7,23 @@
 // When querying PDB files, we need index table and query file.
 
 use std::collections::HashMap;
-use std::io::{BufRead, Write};
+use std::io::BufRead;
 use std::path::PathBuf;
 
 use memmap2::{Mmap, MmapMut};
 use rayon::prelude::*;
 
 use crate::cli::config::{read_index_config_from_file, IndexConfig};
+use crate::controller::filter::{MatchFilter, StructureFilter};
 use crate::controller::map::SimpleHashMap;
-use crate::controller::mode::IndexMode;
+use crate::controller::mode::{IndexMode, QueryMode};
 use crate::cli::*;
 use crate::controller::io::{read_compact_structure, read_u16_vector};
 use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
-use crate::controller::rank::{count_query_bigmode, count_query_idmode, QueryResult};
+use crate::controller::count_query::{count_query_bigmode, count_query_idmode};
+use crate::controller::result::{
+    convert_structure_query_result_to_match_query_results, sort_and_print_match_query_result, sort_and_print_structure_query_result, StructureResult
+};
 use crate::controller::retrieve::retrieval_wrapper;
 use crate::index::indextable::load_big_index;
 use crate::index::lookup::load_lookup_from_file;
@@ -33,30 +37,77 @@ use crate::structure::io::fcz::FoldcompDbReader;
 use crate::structure::io::StructureFileFormat;
 
 pub const HELP_QUERY: &str = "\
-USAGE: folddisco query [OPTIONS] <QUERY_PDB> <CHAIN1><RES1>,<CHAIN2><RES2>,<CHAIN3><RES3>...
-Example: folddisco query -i index_table -t 6 1aq2.pdb A250,A232,A269
-Options:
-    -p, --pdb <PDB_PATH>             Path of PDB file to query
-    -q, --query <QUERY_STRING>       Query string
-    -i, --index <INDEX_PATH>         Path of index table to load
-    -t, --threads <THREADS>          Number of threads to use
-    -v, --verbose                    Print verbose messages
-    -r, --retrieve                   Retrieve matched residues (Need PDB files)
-    -d, --distance <DIST_THRESHOLD>  Distance threshold (default 0.0)
-    -a, --angle <ANGLE_THRESHOLD>    Angle threshold (default 0.0)
-    -m, --match <MATCH_CUTOFF>       Match cutoff (default 0.0)
-    -s, --score <SCORE_CUTOFF>       Score cutoff (default 0.0)
-    -n, --num-res <NUM_RES_CUTOFF>   Number of residues cutoff (default 3000)
-    -l, --plddt <PLDDT_CUTOFF>       PLDDT cutoff (default 0.0)
-    -o, --output <OUTPUT_PATH>       Output file path (default stdout)
-    -h, --help                       Print this help menu
-    --header                         Print header in output
-    --node <NODE_COUNT>              Number of nodes to retrieve (default 2)
-";
-// TODO: need to think about the column name
-pub const QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\texact_match_count\toverflow_count\tnres\tplddt\tmatching_residues\tresidues_rescued\tquery_residues\tquery_file\tindex_path";
+usage: folddisco query -p <i:PDB> -q <QUERY> -i <i:INDEX> [OPTIONS] 
 
-pub const DEFAULT_NODE_COUNT: usize = 2;
+input/output:
+ -p, --pdb <PATH>                 Path of PDB file to query
+ -q, --query <STR>                Query string that specifies residues or a text file containing query
+ -i, --index <PATH>               Path of index table to load [REQUIRED]
+ -o, --output <PATH>              Output file path [stdout]
+ 
+search parameters:
+ -t, --threads <INT>              Number of threads [1]
+ -d, --distance <FLOAT>           Distance threshold in Angstroms. Multiple values can be separated by comma [0.0]
+ -a, --angle <FLOAT>              Angle threshold. Multiple values can be separated by comma [0.0]
+ --ca-distance <FLOAT>            C-alpha distance threshold in matching residues [1.5]
+ --sampling-count <INT>           Number of samples to use for sampling [all]
+ --sampling-ratio <FLOAT>         Sampling ratio to use for sampling [1.0]
+ --skip-match                     Skip matching residues
+ --serial-index                   Handle residue indices serially
+
+filtering options:
+ --total-match <INT>              Filter out structures with less than total match count [0]
+ --covered-node <INT>             Filter out structures not covered by given number of nodes with hashes [0]
+ --covered-node-ratio <FLOAT>     Filter out structures not covered by given ratio of nodes with hashes [0.0]
+ --covered-edge <INT>             Filter out structures not covered by given number of edges with hashes [0]
+ --covered-edge-ratio <FLOAT>     Filter out structures not covered by given ratio of edges with hashes [0.0]
+ --max-node <INT>                 Filter out structures of maximum matching node size smaller than given value [0]
+ --max-node-ratio <FLOAT>         Filter out structures of maximum matching node size smaller than given ratio [0.0]
+ --score <FLOAT>                  IDF score cutoff [0.0]
+ --connected-node <INT>           Filter out structures/matches with connected node count smaller than given value [0]
+ --connected-node-ratio <FLOAT>   Filter out structures/matches with connected node count smaller than given ratio [0.0]
+ --num-residue <INT>              Number of residues cutoff [50000]
+ --plddt <FLOAT>                  pLDDT cutoff [0.0]
+ --top <INT>                      Limit output to top N structures [all]
+
+display options:
+ --header                         Print header in output
+ --web                            Print output for web
+ --per-structure                  Print output per structure
+ --per-match                      Print output per match. Not working with --skip-match
+ --sort-by-score                  Sort output by score
+ --sort-by-rmsd                   Sort output by RMSD. Not working with --skip-match
+ --skip-ca-match                  Print matching residues before C-alpha distance check
+
+general options:
+ -v, --verbose                    Print verbose messages
+ -h, --help                       Print this help menu
+
+examples:
+# Search with default settings. This will print out matching motifs with sorting by RMSD.
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
+
+# Print top 100 structures with sorting by score
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by-score
+
+# Query file given as separate text file
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 5
+
+# Query with amino-acid substitutions and range. 
+# Alternative amino acids can be given after colon. Range can be given with dash.
+# This will query first 10 residues and 11th residue with subsitution to any amino acid.
+folddisco query -p query/4CHA.pdb -q 1-10,11:X -i index/h_sapiens_folddisco -t 6 --serial-index
+
+# Filtering
+## Based on connected node and rmsd
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --connected-node 0.75 --rmsd 1.0
+
+## Coverage based filtering & top N filtering without residue matching
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 3 --top 1000 --per-structure --skip-match
+";
+
+pub const MIN_CONNECTED_COMPONENT_SIZE: usize = 2;
+pub const MAX_NUM_LINES_FOR_WEB: usize = 1000;
 
 pub fn query_pdb(env: AppArgs) {
     match env {
@@ -65,30 +116,66 @@ pub fn query_pdb(env: AppArgs) {
             query_string,
             threads,
             index_path,
-            retrieve,
-            amino_acid: _, // TODO:" Implement amino acid mode"
+            skip_match,
             dist_threshold,
             angle_threshold,
-            match_cutoff,
-            score_cutoff,
+            ca_dist_threshold,
+            total_match_count,
+            covered_node_count,
+            covered_node_ratio,
+            covered_edge_count,
+            covered_edge_ratio,
+            max_matching_node_count,
+            max_matching_node_ratio,
+            idf_score_cutoff,
+            connected_node_count,
+            connected_node_ratio,
             num_res_cutoff,
             plddt_cutoff,
-            node_count,
+            rmsd_cutoff,
+            top_n,
+            web_mode,
+            sampling_count,
+            sampling_ratio,
+            sort_by_rmsd,
+            sort_by_score,
+            output_per_structure,
+            output_per_match,
+            skip_ca_match,
             header,
             serial_query,
             output,
             verbose,
-            help,
+            help: _,
         } => {
-            if help {
-                eprintln!("{}", HELP_QUERY);
-                std::process::exit(0);
-            }
+            if verbose { print_logo(); }
+            // help is already handled in main.rs
             // Check if arguments are valid
             if index_path.is_none() {
                 eprintln!("{}", HELP_QUERY);
                 std::process::exit(1);
             }
+            
+            let query_mode = QueryMode::from_flags(
+                skip_match, web_mode, output_per_structure, output_per_match,
+                sort_by_rmsd, sort_by_score
+            );
+            // Error handling
+            match query_mode {
+                QueryMode::ContradictoryPrintError => {
+                    print_log_msg(FAIL, 
+                        "Cannot print output per structure and per match at the same time. Use either --per-structure or --per-match"
+                    );
+                    std::process::exit(1);
+                }
+                QueryMode::ContradictorySortError => {
+                    print_log_msg(FAIL, 
+                        "Cannot sort result by RMSD and score at the same time. Use either --sort-by-rmsd or --sort-by-score"
+                    );
+                }
+                _ => {}
+            }
+
             // Print query information
             if verbose {
                 // If pdb_path is empty
@@ -114,6 +201,8 @@ pub fn query_pdb(env: AppArgs) {
                     big_index = true;
                 }
             }
+
+
             // Set thread pool
             let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
             
@@ -134,8 +223,9 @@ pub fn query_pdb(env: AppArgs) {
                 }
                 queries
             } else {
-                vec![(pdb_path.clone(), query_string.clone(), output)]
+                vec![(pdb_path.clone(), query_string.clone(), output.clone())]
             };
+
             let dist_thresholds = parse_threshold_string(dist_threshold.clone());
             let angle_thresholds = parse_threshold_string(angle_threshold.clone());
             
@@ -168,7 +258,7 @@ pub fn query_pdb(env: AppArgs) {
             #[cfg(feature = "foldcomp")]
             let foldcomp_db_reader = match config.input_format {
                 StructureFileFormat::FCZDB => {
-                    if retrieve {
+                    if !skip_match {
                         let foldcomp_db_path = config.foldcomp_db.clone().unwrap();
                         if verbose {
                             measure_time!(FoldcompDbReader::new(foldcomp_db_path.as_str()))
@@ -207,7 +297,7 @@ pub fn query_pdb(env: AppArgs) {
                 };
 
                 // Get query map for each query in all indices
-                let mut queried_from_indices: Vec<(usize, QueryResult)> = loaded_index_vec.par_iter().map(
+                let mut queried_from_indices: Vec<(usize, StructureResult)> = loaded_index_vec.par_iter().map(
                     |(offset_table, _offset_mmap, lookup, config, value_path)| {
                         let hash_type = config.hash_type;
                         let num_bin_dist = config.num_bin_dist;
@@ -223,6 +313,14 @@ pub fn query_pdb(env: AppArgs) {
                             )
                         };
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
+                        // Make filters out of filtering parameters
+                        let structure_filter = StructureFilter::new(
+                            total_match_count, covered_node_count, covered_node_ratio, covered_edge_count, covered_edge_ratio,
+                            idf_score_cutoff, num_res_cutoff, plddt_cutoff, 
+                            max_matching_node_count, max_matching_node_ratio, rmsd_cutoff,
+                            _residue_count, _residue_count * (_residue_count - 1)
+                        );
+
                         match mode {
                             IndexMode::Id => {
                                 let (value_mmap, value_vec) = if verbose { measure_time!(read_u16_vector(&value_path).expect(
@@ -231,66 +329,103 @@ pub fn query_pdb(env: AppArgs) {
                                     read_u16_vector(&value_path).expect(&log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path)))
                                 };
                                 let query_count_map = if verbose { measure_time!(count_query_idmode(
-                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup
+                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup, sampling_ratio, sampling_count
                                 ))} else {
-                                    count_query_idmode(&pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup)
+                                    count_query_idmode(
+                                        &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup,
+                                        sampling_ratio, sampling_count
+                                    )
                                 };
-                                let mut match_count_filter = get_match_count_filter(
-                                    match_cutoff.clone(), pdb_query.len(), query_residues.len()
-                                );
-                                if retrieve {
-                                    match_count_filter[1] = if node_count > match_count_filter[1] {node_count} else {match_count_filter[1]};
-                                    if verbose {
-                                        print_log_msg(INFO, &format!("Filtering result with residue >= {}", match_count_filter[1]));
-                                    }
-                                }
-                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
-                                    v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
-                                    v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
-                                    v.overflow_count <= match_count_filter[4] &&
-                                    v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
+
+                                let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
+                                    structure_filter.filter_before_matching(v)
                                 }).collect();
                                 if verbose {
                                     print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
                                 }
-
+                                // 
+                                if verbose {
+                                    measure_time!(query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
+                                } else {
+                                    query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap());
+                                }
+                                // Apply top N filter if top_n is not usize::MAX
+                                if top_n != usize::MAX {
+                                    if verbose {
+                                        print_log_msg(INFO, &format!("Limiting result to top {} structures", top_n));
+                                    }
+                                    query_count_vec.truncate(top_n);
+                                }
                                 // IF retrieve is true, retrieve matching residues
-                                if retrieve {
-                                    measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
-                                        #[cfg(not(feature = "foldcomp"))]
-                                        let retrieval_result = retrieval_wrapper(
-                                            &v.id, node_count, &pdb_query,
-                                            hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
-                                            &pdb_query_map, &query_structure, &query_indices,
-                                            &aa_dist_map
-                                        );
-                                        #[cfg(feature = "foldcomp")]
-                                        let retrieval_result = if using_foldcomp {
-                                            retrieval_wrapper_for_foldcompdb(
-                                                &v.id, node_count, &pdb_query,
+                                if !skip_match {
+                                    if verbose {
+                                        measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                            #[cfg(not(feature = "foldcomp"))]
+                                            let retrieval_result = retrieval_wrapper(
+                                                &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map, &foldcomp_db_reader
-                                            )
-                                        } else {
-                                            retrieval_wrapper(
-                                                &v.id, node_count, &pdb_query,
+                                                &aa_dist_map, ca_dist_threshold,
+                                            );
+                                            #[cfg(feature = "foldcomp")]
+                                            let retrieval_result = if using_foldcomp {
+                                                retrieval_wrapper_for_foldcompdb(
+                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    &pdb_query_map, &query_structure, &query_indices,
+                                                    &aa_dist_map, ca_dist_threshold, &foldcomp_db_reader
+                                                )
+                                            } else {
+                                                retrieval_wrapper(
+                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    &pdb_query_map, &query_structure, &query_indices,
+                                                    &aa_dist_map, ca_dist_threshold,
+                                                )
+                                            };
+                                            v.matching_residues = retrieval_result.0;
+                                            v.matching_residues_processed = retrieval_result.1;
+                                            v.max_matching_node_count = retrieval_result.2;
+                                            v.min_rmsd_with_max_match = retrieval_result.3;
+                                        }));
+                                    } else {
+                                        query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                            #[cfg(not(feature = "foldcomp"))]
+                                            let retrieval_result = retrieval_wrapper(
+                                                &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map
-                                            )
-                                        };
-                                        v.matching_residues = retrieval_result.0;
-                                        v.matching_residues_processed = retrieval_result.1;
-                                    }));
+                                                &aa_dist_map, ca_dist_threshold,
+                                            );
+                                            #[cfg(feature = "foldcomp")]
+                                            let retrieval_result = if using_foldcomp {
+                                                retrieval_wrapper_for_foldcompdb(
+                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    &pdb_query_map, &query_structure, &query_indices,
+                                                    &aa_dist_map, ca_dist_threshold, &foldcomp_db_reader
+                                                )
+                                            } else {
+                                                retrieval_wrapper(
+                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    &pdb_query_map, &query_structure, &query_indices,
+                                                    &aa_dist_map, ca_dist_threshold,
+                                                )
+                                            };
+                                            v.matching_residues = retrieval_result.0;
+                                            v.matching_residues_processed = retrieval_result.1;
+                                            v.max_matching_node_count = retrieval_result.2;
+                                            v.min_rmsd_with_max_match = retrieval_result.3;
+                                        });
+                                    }
+                                    
                                     // Filter query_count_vec with reasonable retrieval results
-                                    query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
+                                    query_count_vec.retain(|(_, v)| structure_filter.filter_after_matching(v));
                                     drop(value_mmap);
-                                    drop(match_count_filter);
                                     return query_count_vec;
                                 }
                                 drop(value_mmap);
-                                drop(match_count_filter);
                                 query_count_vec
                             },
                             IndexMode::Big => {
@@ -302,69 +437,105 @@ pub fn query_pdb(env: AppArgs) {
                                     load_big_index(index_prefix)
                                 };
                                 let query_count_map = if verbose { measure_time!(count_query_bigmode(
-                                    &pdb_query, &pdb_query_map, &big_index, &lookup
+                                    &pdb_query, &pdb_query_map, &big_index, &lookup, sampling_ratio, sampling_count
                                 )) } else {
                                     count_query_bigmode(
-                                        &pdb_query, &pdb_query_map, &big_index, &lookup
+                                        &pdb_query, &pdb_query_map, &big_index, &lookup,
+                                        sampling_ratio, sampling_count
                                     )
                                 };
-                                
-                                let mut match_count_filter = get_match_count_filter(
-                                    match_cutoff.clone(), pdb_query.len(), query_residues.len()
-                                );
-                                if retrieve {
-                                    match_count_filter[1] = if node_count > match_count_filter[1] {node_count} else {match_count_filter[1]};
-                                    if verbose {
-                                        print_log_msg(INFO, &format!("Filtering result with residue >= {}", match_count_filter[1]));
-                                    }
-                                }
-                                let mut query_count_vec: Vec<(usize, QueryResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
-                                    v.total_match_count >= match_count_filter[0] && v.node_count >= match_count_filter[1] && 
-                                    v.edge_count >= match_count_filter[2] && v.exact_match_count >= match_count_filter[3] &&
-                                    v.overflow_count <= match_count_filter[4] && 
-                                    v.idf >= score_cutoff && v.nres <= num_res_cutoff && v.plddt >= plddt_cutoff 
+                                let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
+                                    structure_filter.filter_before_matching(v)
                                 }).collect();
+
                                 if verbose {
                                     print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
                                 }
 
+                                // 
+                                if verbose {
+                                    measure_time!(query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
+                                } else {
+                                    query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap());
+                                }
+                                // Apply top N filter if top_n is not usize::MAX
+                                if top_n != usize::MAX {
+                                    if verbose {
+                                        print_log_msg(INFO, &format!("Limiting result to top {} structures", top_n));
+                                    }
+                                    query_count_vec.truncate(top_n);
+                                }
+                                
                                 // IF retrieve is true, retrieve matching residues
-                                if retrieve {
-                                    measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
-                                        #[cfg(not(feature = "foldcomp"))]
-                                        let retrieval_result = retrieval_wrapper(
-                                            &v.id, node_count, &pdb_query,
-                                            hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
-                                            &pdb_query_map, &query_structure, &query_indices,
-                                            &aa_dist_map
-                                        );
-                                        #[cfg(feature = "foldcomp")]
-                                        let retrieval_result = if using_foldcomp {
-                                            retrieval_wrapper_for_foldcompdb(
-                                                &v.id, node_count, &pdb_query,
+                                if !skip_match {
+                                    if verbose {
+                                        measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                            #[cfg(not(feature = "foldcomp"))]
+                                            let retrieval_result = retrieval_wrapper(
+                                                &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map, &foldcomp_db_reader
-                                            )
-                                        } else {
-                                            retrieval_wrapper(
-                                                &v.id, node_count, &pdb_query,
+                                                &aa_dist_map, ca_dist_threshold,
+                                            );
+                                            #[cfg(feature = "foldcomp")]
+                                            let retrieval_result = if using_foldcomp {
+                                                retrieval_wrapper_for_foldcompdb(
+                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    &pdb_query_map, &query_structure, &query_indices,
+                                                    &aa_dist_map, ca_dist_threshold, &foldcomp_db_reader
+                                                )
+                                            } else {
+                                                retrieval_wrapper(
+                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    &pdb_query_map, &query_structure, &query_indices,
+                                                    &aa_dist_map, ca_dist_threshold,
+                                                )
+                                            };
+                                            v.matching_residues = retrieval_result.0;
+                                            v.matching_residues_processed = retrieval_result.1;
+                                            v.max_matching_node_count = retrieval_result.2;
+                                            v.min_rmsd_with_max_match = retrieval_result.3;
+                                        }));
+                                    } else {
+                                        query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                                            #[cfg(not(feature = "foldcomp"))]
+                                            let retrieval_result = retrieval_wrapper(
+                                                &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map
-                                            )
-                                        };
-                                        v.matching_residues = retrieval_result.0;
-                                        v.matching_residues_processed = retrieval_result.1;
-                                    }));
+                                                &aa_dist_map, ca_dist_threshold,
+                                            );
+                                            #[cfg(feature = "foldcomp")]
+                                            let retrieval_result = if using_foldcomp {
+                                                retrieval_wrapper_for_foldcompdb(
+                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    &pdb_query_map, &query_structure, &query_indices,
+                                                    &aa_dist_map, ca_dist_threshold, &foldcomp_db_reader
+                                                )
+                                            } else {
+                                                retrieval_wrapper(
+                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    &pdb_query_map, &query_structure, &query_indices,
+                                                    &aa_dist_map, ca_dist_threshold,
+                                                )
+                                            };
+                                            v.matching_residues = retrieval_result.0;
+                                            v.matching_residues_processed = retrieval_result.1;
+                                            v.max_matching_node_count = retrieval_result.2;
+                                            v.min_rmsd_with_max_match = retrieval_result.3;
+                                        });
+                                    }
+
                                     // Filter query_count_vec with reasonable retrieval results
                                     query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
                                     drop(big_offset_mmap);
-                                    drop(match_count_filter);
                                     return query_count_vec;
                                 }
                                 drop(big_offset_mmap);
-                                drop(match_count_filter);
                                 query_count_vec
                             },
                         } // match mode
@@ -374,39 +545,45 @@ pub fn query_pdb(env: AppArgs) {
                     acc
                 });
                 drop(query_residues);
-                // Sort query_count_vec by idf
-                // TODO: Change feature to sort
-                if verbose {
-                    measure_time!(queried_from_indices.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
-                } else {
-                    queried_from_indices.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap());
-                }
-                    // If output path is not empty, write to file
-                if !output_path.is_empty() {
-                    // Create file
-                    let file = std::fs::File::create(&output_path).expect(
-                        &log_msg(FAIL, &format!("Failed to create file: {}", &output_path))
-                    );
-                    let mut writer = std::io::BufWriter::new(file);
-                    if header {
-                        writer.write_all(format!("{}\n", QUERY_RESULT_HEADER).as_bytes()).expect(
-                            &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+                let match_filter= MatchFilter::new(
+                    connected_node_count, connected_node_ratio, idf_score_cutoff,
+                    rmsd_cutoff, _residue_count,
+                );
+
+                match query_mode {
+                    QueryMode::PerMatchDefault | QueryMode::PerMatchSortByScore => {
+                        let mut match_results = convert_structure_query_result_to_match_query_results(
+                            &queried_from_indices, skip_ca_match
+                        );
+                        match_results.retain(|(_, v)| match_filter.filter(v));
+                        sort_and_print_match_query_result(
+                            &mut match_results, top_n, 
+                            &output_path, &query_string, header, verbose
                         );
                     }
-                    // let mut id_container = String::new();
-                    for (_k, v) in queried_from_indices.iter_mut() {
-                        writer.write_all(format!("{:?}\t{}\t{}\t{}\n", v, query_string, pdb_path, index_path.clone().unwrap()).as_bytes()).expect(
-                            &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+                    QueryMode::Web => {
+                        let mut match_results = convert_structure_query_result_to_match_query_results(
+                            &queried_from_indices, skip_ca_match
+                        );
+                        match_results.retain(|(_, v)| match_filter.filter(v));
+                        sort_and_print_match_query_result(
+                            &mut match_results, MAX_NUM_LINES_FOR_WEB,
+                            &output_path, &query_string, header, verbose
                         );
                     }
-                } else {
-                    if header {
-                        println!("{}", QUERY_RESULT_HEADER);
+                    QueryMode::PerStructureSortByRmsd => {
+                        sort_and_print_structure_query_result(
+                            &mut queried_from_indices,  true, &output_path, 
+                            &query_string, header, verbose
+                        );
                     }
-                    // let mut id_container = String::new();
-                    for (_k, v) in queried_from_indices.iter_mut() {
-                        println!("{:?}\t{}\t{}\t{}", v, query_string, pdb_path, index_path.clone().unwrap());
+                    QueryMode::PerStructureSortByScore | QueryMode::SkipMatch => {
+                        sort_and_print_structure_query_result(
+                            &mut queried_from_indices, false, &output_path, 
+                            &query_string, header, verbose
+                        );
                     }
+                    _ => {}
                 }
             }); // queries
         }, // AppArgs::Query
@@ -441,42 +618,6 @@ pub fn parse_multiple_queries(
     query_map_vec
 }
 
-pub fn get_match_count_filter(match_cutoff: Option<String>, query_length: usize, residue_count: usize) -> Vec<usize> {
-    let match_cutoffs = parse_threshold_string(match_cutoff.clone());
-    let mut match_count_filter: Vec<usize> = Vec::with_capacity(match_cutoffs.len());
-    for (i, &m) in match_cutoffs.iter().enumerate() {
-        if m > 1.0 {
-            match_count_filter.push(m as usize);
-        } else if m > 0.0 {
-            if i == 0 || i == 3 {// i=0: Total match count, i=3: exact match count
-                match_count_filter.push((m * query_length as f32).ceil() as usize);
-            } else if i == 1 {// i=1: node match count
-                match_count_filter.push((m * residue_count as f32).ceil() as usize);
-            } else if i == 2 {// i=2: edge match count
-                let num_edges = residue_count * (residue_count - 1);
-                match_count_filter.push((m * num_edges as f32).ceil() as usize);
-            } else  {
-                match_count_filter.push(u32::MAX as usize);
-            }
-        } else {
-            if i < 4 {
-                match_count_filter.push(0);
-            } else {
-                match_count_filter.push(u32::MAX as usize);
-            }
-        }
-    }
-    // If length is less than 4, fill with 0
-    while match_count_filter.len() < 6 {
-        if match_count_filter.len() < 4 {
-            match_count_filter.push(0);
-        } else {
-            match_count_filter.push(u32::MAX as usize);
-        }
-    }
-    match_count_filter
-}
-
 pub fn res_chain_to_string(res_chain: &Vec<(u8, u64)>) -> String {
     let mut output = String::new();
     for (i, (chain, res)) in res_chain.iter().enumerate() {
@@ -498,38 +639,42 @@ mod tests {
         let query_string = String::from("B57,B102,C195");
         let threads = 1;
         let index_path = Some(String::from("data/serine_peptidases_pdbtr_small"));
-        // let index_path = Some(String::from("analysis/e_coli/test_index"));
-        let retrieve = true;
-        let dist_threshold = Some(String::from("0.5,1.0"));
-        let angle_threshold = Some(String::from("5.0,10.0"));
-        let help = false;
-        let match_cutoff = Some(String::from("0.0"));
-        let score_cutoff = 0.0;
-        let num_res_cutoff = 3000;
-        let plddt_cutoff = 0.0;
-        let node_count = 2;
-        let header = false;
-        let verbose = true;
-        let serial_query = false;
         let env = AppArgs::Query {
             pdb_path,
             query_string,
             threads,
             index_path,
-            retrieve,
-            amino_acid: 0,
-            dist_threshold,
-            angle_threshold,
-            match_cutoff,
-            score_cutoff,
-            num_res_cutoff,
-            plddt_cutoff,
-            node_count,
-            header,
-            serial_query,
+            skip_match: false,
+            dist_threshold: Some(String::from("0.5")),
+            angle_threshold: Some(String::from("5.0")),
+            ca_dist_threshold: 1.0,
+            total_match_count: 0,
+            covered_node_count: 0,
+            covered_node_ratio: 0.0,
+            covered_edge_count: 0,
+            covered_edge_ratio: 0.0,
+            max_matching_node_count: 0,
+            max_matching_node_ratio: 0.0,
+            idf_score_cutoff: 0.0,
+            connected_node_count: 0,
+            connected_node_ratio: 0.0,
+            num_res_cutoff: 3000,
+            plddt_cutoff: 0.0,
+            rmsd_cutoff: 1.0,
+            top_n: 1000,
+            web_mode: false,
+            sampling_count: None,
+            sampling_ratio: None,
+            sort_by_rmsd: true,
+            sort_by_score: false,
+            output_per_structure: false,
+            output_per_match: true,
+            skip_ca_match: false,
+            header: true,
+            serial_query: false,
             output: String::from(""),
-            verbose,
-            help,
+            verbose: true,
+            help: false,
         };
         query_pdb(env);
     }
@@ -541,38 +686,42 @@ mod tests {
             let query_string = String::from("1,2,3,4");
             let threads = 1;
             let index_path = Some(String::from("data/example_db_folddisco_db"));
-            // let index_path = Some(String::from("analysis/e_coli/test_index"));
-            let retrieve = true;
-            let dist_threshold = Some(String::from("0.5,1.0"));
-            let angle_threshold = Some(String::from("5.0,10.0"));
-            let help = false;
-            let match_cutoff = Some(String::from("0.0"));
-            let score_cutoff = 0.0;
-            let num_res_cutoff = 3000;
-            let plddt_cutoff = 0.0;
-            let node_count = 2;
-            let header = false;
-            let serial_query = false;
-            let verbose = false;
             let env = AppArgs::Query {
                 pdb_path,
                 query_string,
                 threads,
                 index_path,
-                retrieve,
-                amino_acid: 0,
-                dist_threshold,
-                angle_threshold,
-                match_cutoff,
-                score_cutoff,
-                num_res_cutoff,
-                plddt_cutoff,
-                node_count,
-                header,
-                serial_query,
+                skip_match: false,
+                dist_threshold: Some(String::from("0.5")),
+                angle_threshold: Some(String::from("5.0")),
+                ca_dist_threshold: 1.0,
+                total_match_count: 0,
+                covered_node_count: 0,
+                covered_node_ratio: 0.0,
+                covered_edge_count: 0,
+                covered_edge_ratio: 0.0,
+                idf_score_cutoff: 0.0,
+                connected_node_count: 0,
+                connected_node_ratio: 0.0,
+                max_matching_node_count: 0,
+                max_matching_node_ratio: 0.0,
+                num_res_cutoff: 3000,
+                plddt_cutoff: 0.0,
+                rmsd_cutoff: 1.0,
+                top_n: 1000,
+                web_mode: false,
+                sampling_count: None,
+                sampling_ratio: None,
+                sort_by_rmsd: false,
+                sort_by_score: true,
+                output_per_structure: true,
+                output_per_match: false,
+                skip_ca_match: false,
+                header: true,
+                serial_query: false,
                 output: String::from(""),
-                verbose,
-                help,
+                verbose: true,
+                help: false,
             };
             query_pdb(env);
         }
@@ -584,37 +733,42 @@ mod tests {
         let query_string = String::from("data/query.tsv");
         let threads = 4;
         let index_path = Some(String::from("analysis/e_coli/test"));
-        let retrieve = false;
-        let dist_threshold = Some(String::from("0.5,1.0"));
-        let angle_threshold = Some(String::from("5.0,10.0"));
-        let help = false;
-        let match_cutoff = Some(String::from("0.0,0.8,0.0,0.0"));
-        let score_cutoff = 0.0;
-        let num_res_cutoff = 3000;
-        let plddt_cutoff = 0.0;
-        let node_count = 2;
-        let header = true;
-        let serial_query = false;
-        let verbose = true;
         let env = AppArgs::Query {
             pdb_path,
             query_string,
             threads, 
             index_path,
-            retrieve,
-            amino_acid: 0,
-            dist_threshold,
-            angle_threshold,
-            match_cutoff,
-            score_cutoff,
-            num_res_cutoff,
-            plddt_cutoff,
-            node_count,
-            header,
-            serial_query,
+            skip_match: true,
+            dist_threshold: Some(String::from("0.5")),
+            angle_threshold: Some(String::from("5.0")),
+            ca_dist_threshold: 1.0,
+            total_match_count: 0,
+            covered_node_count: 0,
+            covered_node_ratio: 0.0,
+            covered_edge_count: 0,
+            covered_edge_ratio: 0.0,
+            max_matching_node_count: 0,
+            max_matching_node_ratio: 0.0,
+            idf_score_cutoff: 0.0,
+            connected_node_count: 0,
+            connected_node_ratio: 0.0,
+            num_res_cutoff: 3000,
+            plddt_cutoff: 0.0,
+            rmsd_cutoff: 1.0,
+            top_n: 1000,
+            web_mode: false,
+            sampling_count: None,
+            sampling_ratio: None,
+            sort_by_rmsd: false,
+            sort_by_score: true,
+            output_per_structure: true,
+            output_per_match: false,
+            skip_ca_match: false,
+            header: true,
+            serial_query: false,
             output: String::from(""),
-            verbose,
-            help,
+            verbose: true,
+            help: false,
         };
         query_pdb(env);
     }

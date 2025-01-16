@@ -28,21 +28,40 @@ use crate::structure::io::fcz::*;
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 pub const HELP_INDEX: &str = "\
-USAGE: folddisco index [OPTIONS]
-Options:
-    -p, --pdbs <PDB_DIR|FOLDCOMP_DB>   Directory or Foldcomp DB containing PDB files
-    -y, --type <HASH_TYPE>             Hash type to use (pdb, trrosetta, default)
-    -i, --index <INDEX_PATH>           Path to save the index table
-    -m, --mode <MODE>                  Mode to index (default=id, id: index size is dynamic; pack 65536 entries; big: fixed size index)
-    -t, --threads <THREADS>            Number of threads to use
-    -d, --distance <NBIN_DIST>         Number of distance bins (default 0, zero means default)
-    -a, --angle <NBIN_ANGLE>           Number of angle bins (default 0, zero means default)
-    -c, --chunk <CHUNK_SIZE>           Number of PDB files to index at once (default, max=65535)
-    -r, --recursive                    Index PDB files in subdirectories
-    -n, --max-residue <MAX_RES>        Maximum number of residues in a PDB file (default=3000)
-    --id <ID_TYPE>                     ID type to use (pdb, uniprot, afdb, relpath, abspath, default=relpath)
-    -v, --verbose                      Print verbose messages
-    -h, --help                         Print this help menu
+usage: folddisco index -p <i:PDB_DIR>|<i:FOLDCOMP_DB> -i <o:INDEX_PATH> [OPTIONS]
+
+input/output:
+ -p, --pdbs <PATH>                Directory or Foldcomp DB containing PDB files
+ -i, --index <PATH>               Path to save the index table
+ -r, --recursive                  Index PDB files in subdirectories recursively
+
+indexing parameters:
+ -t, --threads <INT>              Number of threads to use [1]
+ -n, --max-residue <INT>          Maximum number of residues in a PDB file [50000]
+ --id <STR>                       ID type to use (pdb, uniprot, afdb, relpath, abspath) [relpath]
+ -m, --mode <MODE>                Mode to index [id]
+    id: suitable for smaller dataset (N < 65536) with hashmap offset;
+    big: 8GB fixed-size offset table, suitable for large dataset)
+
+hashing parameters:
+ -y, --type STR                   Hash type to use (default, pdb, trrosetta, ppf, 3di) [default]
+ -d, --distance INT               Number of distance bins [default]
+ -a, --angle INT                  Number of angle bins [default]
+
+general options:
+ -v, --verbose                    Print verbose messages
+ -h, --help                       Print this help menu
+ 
+examples:
+# Default. h_sapiens directory or foldcomp database is indexed with default parameters
+folddisco index -p h_sapiens -i index/h_sapiens -t 12
+
+# Indexing big protein dataset
+folddisco index -p swissprot -i index/swissprot -t 64 -m big -v
+
+# Indexing with custom hash type and parameters
+folddisco index -p h_sapiens -i index/h_sapiens -t 12 -y default -d 16 -a 4 # Default
+folddisco index -p h_sapiens -i index/h_sapiens -t 12 -y pdb -d 8 -a 3 # PDB
 ";
 
 pub fn build_index(env: AppArgs) {
@@ -61,17 +80,15 @@ pub fn build_index(env: AppArgs) {
             recursive,
             id_type,
             verbose,
-            help,
+            help: _,
         } => {
+            if verbose { print_logo(); }
             // Check if arguments are valid
             if pdb_container.is_none() {
                 eprintln!("{}", HELP_INDEX);
                 std::process::exit(1);
             }
-            if help {
-                eprintln!("{}", HELP_INDEX);
-                std::process::exit(0);
-            }
+            // help is handled in the main function
             let pdb_container_clone = pdb_container.clone();
             #[cfg(feature = "foldcomp")]
             let pdb_container_name: &'static str = Box::leak(pdb_container.clone().unwrap().into_boxed_str());

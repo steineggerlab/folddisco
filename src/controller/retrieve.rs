@@ -9,6 +9,7 @@ use crate::structure::{coordinate::Coordinate, core::CompactStructure, qcp::QCPS
 use crate::utils::combination::{CombinationIterator, CombinationVecIterator};
 use crate::controller::graph::{connected_components_with_given_node_count, create_index_graph};
 use crate::controller::feature::get_single_feature;
+use crate::controller::ResidueMatch;
 
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::fcz::FoldcompDbReader;
@@ -22,73 +23,6 @@ pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)
         output.insert((feature[0] as u32, feature[1] as u32));
     }
     output
-}
-
-pub fn retrieve_residue_with_hash(
-    hash_set: &HashSet<GeometricHash>, _aa_filter: &HashSet<(u32, u32)>, path: &str, hash_type: HashType, nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
-) -> Option<Vec<((u8, u8), (u64, u64))>> {
-
-    let file = File::open(path).expect("File not found");
-    let pdb = PDBReader::new(file);
-    let compact = pdb.read_structure().expect("Error reading structure");
-    let compact = compact.to_compact();
-    let comb = CombinationIterator::new(compact.num_residues);
-    let mut output: Vec<((u8, u8), (u64, u64))> = Vec::new();
-    let mut feature = vec![0.0; 9];
-    comb.for_each(|(i, j)| {
-        // let aa_pair = (map_aa_to_u8(&compact.residue_name[i]) as u32, map_aa_to_u8(&compact.residue_name[j]) as u32);
-        // if !aa_filter.contains(&aa_pair) {
-        //     return;
-        // }
-        let is_feature = get_single_feature(i, j, &compact, hash_type, dist_cutoff, &mut feature);
-        if is_feature {
-            let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
-                GeometricHash::perfect_hash_default(&feature, hash_type)
-            } else {
-                GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle)
-            };
-            if hash_set.get(&curr_hash).is_some() {
-                output.push((
-                    (compact.chain_per_residue[i], compact.chain_per_residue[j]),
-                    (compact.residue_serial[i], compact.residue_serial[j])
-                ));
-            }
-        }
-    });
-
-    if output.is_empty() {
-        None
-    } else {
-        Some(output)
-    }
-}
-
-pub fn connected(res_ind_vec: &Vec<((u8, u8), (u64, u64))>, _len: usize) -> usize {
-    let mut res_set: HashMap<String, usize> = HashMap::new();
-    for (i, j) in res_ind_vec {
-        let key1 = format!("{}{}", i.0 as char, j.0);
-        let key2 = format!("{}{}", i.1 as char, j.1);
-        if !res_set.contains_key(&key1) {
-            res_set.insert(key1, 1);
-        } else {
-            let count = res_set.get_mut(&key1).unwrap();
-            *count += 1;
-        }
-        if !res_set.contains_key(&key2) {
-            res_set.insert(key2, 1);
-        } else {
-            let count = res_set.get_mut(&key2).unwrap();
-            *count += 1;
-        }
-    }
-    // Count elements that are greater than 1
-    let max = res_set.iter().filter(|(_, &v)| v > 1).count();
-    max
-}
-
-pub fn cycle(_res_ind_vec: &Vec<((u8, u8), (u64, u64))>) -> usize {
-    // Use res_ind_vec as a directed graph and count cycles
-    todo!();
 }
 
 
@@ -114,6 +48,7 @@ pub fn retrieve_with_prefilter(
     // prefilter: &Vec<(usize, usize)>, 
     prefilter: CombinationVecIterator,
     nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
+    ca_distance_cutoff: f32,
     query_aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
 ) -> (Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>) {
     let mut output: Vec<(usize, usize, GeometricHash)> = Vec::new();
@@ -135,7 +70,7 @@ pub fn retrieve_with_prefilter(
                     if curr_dist.is_some() {
                         let curr_dist = curr_dist.unwrap();
                         for (dist, qi) in dists {
-                            if (curr_dist - dist).abs() < 1.0 {
+                            if (curr_dist - dist).abs() < ca_distance_cutoff {
                                 candidate_pairs.push((*qi, (i, j)));
                             }
                         }
@@ -165,7 +100,7 @@ pub fn retrieve_with_prefilter(
                     if curr_dist.is_some() {
                         let curr_dist = curr_dist.unwrap();
                         for (dist, qi) in dists {
-                            if (curr_dist - dist).abs() < 1.5 {
+                            if (curr_dist - dist).abs() < ca_distance_cutoff{
                                 candidate_pairs.push((*qi, (i, j)));
                             }
                         }
@@ -188,49 +123,6 @@ pub fn retrieve_with_prefilter(
 }
 
 
-pub fn retrieve_whole_structure(
-    compact: &CompactStructure,
-    hash_set: &HashSet<GeometricHash>,
-    nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
-    query_aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
-) -> (Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>) {
-    let mut output: Vec<(usize, usize, GeometricHash)> = Vec::new();
-    let mut candidate_pairs: Vec<(usize, (usize, usize))> = Vec::new();
-    let hash = hash_set.iter().next().cloned().unwrap();
-    let mut feature = vec![0.0; 9];
-    let comb = CombinationIterator::new(compact.num_residues);
-    comb.for_each(|(i, j)| {
-        let is_feature = get_single_feature(i, j, compact, hash.hash_type(), dist_cutoff, &mut feature);
-        if is_feature {
-            // Check distance & if it is within the threshold, add to candidate_pairs
-            let aa1 = map_aa_to_u8(&compact.residue_name[i]);
-            let aa2 = map_aa_to_u8(&compact.residue_name[j]);
-            if query_aa_dist_map.contains_key(&(aa1, aa2)) {
-                let dists = query_aa_dist_map.get(&(aa1, aa2)).unwrap();
-                let curr_dist = compact.get_ca_distance(i, j);
-                // If curr_dist is Some and within the threshold, add to candidate_pairs
-                if curr_dist.is_some() {
-                    let curr_dist = curr_dist.unwrap();
-                    for (dist, qi) in dists {
-                        if (curr_dist - dist).abs() < 1.0 {
-                            candidate_pairs.push((*qi, (i, j)));
-                        }
-                    }
-                }
-            }
-            let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
-                GeometricHash::perfect_hash_default(&feature, hash.hash_type())
-            } else {
-                GeometricHash::perfect_hash(&feature, hash.hash_type(), nbin_dist, nbin_angle)
-            };
-            if hash_set.contains(&curr_hash) {
-                output.push((i, j, curr_hash));
-            }
-        }
-    });
-    (output, candidate_pairs)
-}
-
 pub fn get_chain_and_res_ind(compact: &CompactStructure, i: usize) -> (u8, u64) {
     (compact.chain_per_residue[i], compact.residue_serial[i])
 }
@@ -245,8 +137,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
-    foldcomp_db_reader: &FoldcompDbReader,
-) -> (Vec<(String, f32)>, Vec<(String, f32)>) {
+    ca_distance_cutoff: f32, foldcomp_db_reader: &FoldcompDbReader,
+) -> (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>, usize, f32) {
     
     let compact = foldcomp_db_reader.read_single_structure(path).expect("Error reading structure from foldcomp db");
     let compact = compact.to_compact();
@@ -260,7 +152,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
     let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
     let aa_filter = CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2);
     let (indices_found , candidate_pairs) = retrieve_with_prefilter(
-        &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map
+        &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, ca_distance_cutoff, aa_dist_map
     );
 
     let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
@@ -282,7 +174,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     // Parallel
-    let output: Vec<(String, f32, String, f32)>  = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, Vec<ResidueMatch>, f32)>  = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -303,8 +195,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
         let mut query_indices_scanned: Vec<usize> = Vec::new();
         let mut retrieved_indices_scanned: Vec<usize> = Vec::new();
         // Sort component to match retrieved indices
-        let mut res_vec: Vec<String> = Vec::new();
-        let mut res_vec_from_hash: Vec<String> = Vec::new();
+        let mut res_vec: Vec<ResidueMatch> = Vec::new();
+        let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::new();
         let mut count_map: HashMap<usize, usize> = HashMap::new();
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
@@ -312,16 +204,16 @@ pub fn retrieval_wrapper_for_foldcompdb(
             if query_indices.contains(&i) {
                 let index = query_indices.iter().position(|&x| x == i).unwrap();
                 let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_indices[index]);
-                res_vec_from_hash.push(res_index_to_char(chain, res_ind));
+                res_vec_from_hash.push(Some((chain, res_ind)));
                 if !retrieved_indices_scanned.contains(&retrieved_indices[index]) {
-                    res_vec.push(res_index_to_char(chain, res_ind));
+                    res_vec.push(Some((chain, res_ind)));
                     query_indices_scanned.push(i);
                     retrieved_indices_scanned.push(retrieved_indices[index]);
                 } else {
                     // Substitute res_vec
                     let prev_index = retrieved_indices_scanned.iter().position(|&x| x == retrieved_indices[index]).unwrap();
-                    res_vec[prev_index] = "_".to_string();
-                    res_vec.push(res_index_to_char(chain, res_ind));
+                    res_vec[prev_index] = None;
+                    res_vec.push(Some((chain, res_ind)));
                     // Delete previous indices in query_indices_scanned and retrieved_indices_scanned
                     query_indices_scanned.remove(prev_index);
                     retrieved_indices_scanned.remove(prev_index);
@@ -332,7 +224,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
                 // query_indices_scanned.push(i);
                 // retrieved_indices_scanned.push(retrieved_indices[index]);
             } else {
-                res_vec_from_hash.push("_".to_string());
+                res_vec_from_hash.push(None);
                 if candidate_pair_map.contains_key(&i) {
                     let pairs = candidate_pair_map.get(&i).unwrap().clone();
                     for (j, k) in pairs {
@@ -351,14 +243,14 @@ pub fn retrieval_wrapper_for_foldcompdb(
                     let max = count_map.iter().max_by(|a, b| a.1.cmp(b.1)).unwrap();
                     if *max.1 > 1 && !retrieved_indices_scanned.contains(max.0) {
                         let (chain, res_ind) = get_chain_and_res_ind(&compact, *max.0);
-                        res_vec.push(res_index_to_char(chain, res_ind));
+                        res_vec.push(Some((chain, res_ind)));
                         query_indices_scanned.push(i);
                         retrieved_indices_scanned.push(*max.0);
                     } else {
-                        res_vec.push("_".to_string());
+                        res_vec.push(None);
                     }
                 } else {
-                    res_vec.push("_".to_string());
+                    res_vec.push(None);
                 }
             }
         });
@@ -367,13 +259,11 @@ pub fn retrieval_wrapper_for_foldcompdb(
         //     res_vec.push(res_index_to_char(chain, res_ind));
         // });
 
-        let res_string_from_hash = res_vec_from_hash.join(",");
         let rmsd_from_hash = rmsd_for_matched(
             query_structure, &compact, &query_indices, &retrieved_indices
         );
         
-        let res_string = res_vec.join(",");
-        let rmsd = if res_string == res_string_from_hash {
+        let rmsd = if res_vec == res_vec_from_hash {
             rmsd_from_hash
         } else {
             rmsd_for_matched(
@@ -381,26 +271,42 @@ pub fn retrieval_wrapper_for_foldcompdb(
             )
         };
         
-        (res_string_from_hash, rmsd_from_hash, res_string, rmsd)
+        (res_vec_from_hash, rmsd_from_hash, res_vec, rmsd)
     }).collect();
-    // Split Vec<(String, f32, String, f32)> into Vec<(String, f32)> and Vec<(String, f32)>
-    let (result_from_hash, result): (Vec<(String, f32)>, Vec<(String, f32)>) = output.into_iter().map(|(a, b, c, d)| {
+    // Split 
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>) = output.into_iter().map(|(a, b, c, d)| {
         ((a, b), (c, d))
     }).unzip();
-    (result_from_hash, result)
+    // In result, find the maximum matching node count and minimum RMSD with max match
+    let mut max_matching_node_count = 0;
+    let mut min_rmsd_with_max_match = 0.0;
+    result.iter().for_each(|(res_vec, rmsd)| {
+        // Count number of Some in res_vec
+        let count = res_vec.iter().filter(|&x| x.is_some()).count();
+        if count > max_matching_node_count {
+            max_matching_node_count = count;
+            min_rmsd_with_max_match = *rmsd;
+        } else if count == max_matching_node_count && *rmsd < min_rmsd_with_max_match {
+            min_rmsd_with_max_match = *rmsd;
+        }
+    });
+    (result_from_hash, result, max_matching_node_count, min_rmsd_with_max_match)
 }
 
 
 
 
 // Returns a vector of 1) chain+residue index as String and 2) RMSD value as f32
+// 2025-01-08 10:51:23 
+// Return a vector of ResidueMatch and RMSD values
 pub fn retrieval_wrapper(
     path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
     _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize, dist_cutoff: f32,
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
-) -> (Vec<(String, f32)>, Vec<(String, f32)>) {
+    ca_distance_cutoff: f32,
+) -> (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>, usize, f32) {
     // Load structure to retrieve motif
     let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
     let compact = pdb_loaded.read_structure().expect("Error reading structure");
@@ -414,7 +320,8 @@ pub fn retrieval_wrapper(
     let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
     let aa_filter = CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2);
     let (indices_found , candidate_pairs) = retrieve_with_prefilter(
-        &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, dist_cutoff, aa_dist_map
+        &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, 
+        dist_cutoff, ca_distance_cutoff, aa_dist_map
     );
 
     let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
@@ -436,7 +343,7 @@ pub fn retrieval_wrapper(
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     // Parallel
-    let output: Vec<(String, f32, String, f32)>  = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, Vec<ResidueMatch>, f32)>  = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -457,8 +364,8 @@ pub fn retrieval_wrapper(
         let mut query_indices_scanned: Vec<usize> = Vec::new();
         let mut retrieved_indices_scanned: Vec<usize> = Vec::new();
         // Sort component to match retrieved indices
-        let mut res_vec: Vec<String> = Vec::new();
-        let mut res_vec_from_hash: Vec<String> = Vec::new();
+        let mut res_vec: Vec<ResidueMatch> = Vec::new();
+        let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::new();
         let mut count_map: HashMap<usize, usize> = HashMap::new();
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
@@ -466,16 +373,16 @@ pub fn retrieval_wrapper(
             if query_indices.contains(&i) {
                 let index = query_indices.iter().position(|&x| x == i).unwrap();
                 let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_indices[index]);
-                res_vec_from_hash.push(res_index_to_char(chain, res_ind));
+                res_vec_from_hash.push(Some((chain, res_ind)));
                 if !retrieved_indices_scanned.contains(&retrieved_indices[index]) {
-                    res_vec.push(res_index_to_char(chain, res_ind));
+                    res_vec.push(Some((chain, res_ind)));
                     query_indices_scanned.push(i);
                     retrieved_indices_scanned.push(retrieved_indices[index]);
                 } else {
                     // Substitute res_vec
                     let prev_index = retrieved_indices_scanned.iter().position(|&x| x == retrieved_indices[index]).unwrap();
-                    res_vec[prev_index] = "_".to_string();
-                    res_vec.push(res_index_to_char(chain, res_ind));
+                    res_vec[prev_index] = None;
+                    res_vec.push(Some((chain, res_ind)));
                     // Delete previous indices in query_indices_scanned and retrieved_indices_scanned
                     query_indices_scanned.remove(prev_index);
                     retrieved_indices_scanned.remove(prev_index);
@@ -486,7 +393,7 @@ pub fn retrieval_wrapper(
                 // query_indices_scanned.push(i);
                 // retrieved_indices_scanned.push(retrieved_indices[index]);
             } else {
-                res_vec_from_hash.push("_".to_string());
+                res_vec_from_hash.push(None);
                 if candidate_pair_map.contains_key(&i) {
                     let pairs = candidate_pair_map.get(&i).unwrap().clone();
                     // pairs.sort_by(|a, b| a.0.cmp(&b.0));
@@ -507,14 +414,14 @@ pub fn retrieval_wrapper(
                     let max = count_map.iter().max_by(|a, b| a.1.cmp(b.1)).unwrap();
                     if *max.1 > 1 && !retrieved_indices_scanned.contains(max.0) {
                         let (chain, res_ind) = get_chain_and_res_ind(&compact, *max.0);
-                        res_vec.push(res_index_to_char(chain, res_ind));
+                        res_vec.push(Some((chain, res_ind)));
                         query_indices_scanned.push(i);
                         retrieved_indices_scanned.push(*max.0);
                     } else {
-                        res_vec.push("_".to_string());
+                        res_vec.push(None);
                     }
                 } else {
-                    res_vec.push("_".to_string());
+                    res_vec.push(None);
                 }
             }
         });
@@ -523,13 +430,11 @@ pub fn retrieval_wrapper(
         //     res_vec.push(res_index_to_char(chain, res_ind));
         // });
 
-        let res_string_from_hash = res_vec_from_hash.join(",");
         let rmsd_from_hash = rmsd_for_matched(
             query_structure, &compact, &query_indices, &retrieved_indices
         );
         
-        let res_string = res_vec.join(",");
-        let rmsd = if res_string == res_string_from_hash {
+        let rmsd = if res_vec == res_vec_from_hash {
             rmsd_from_hash
         } else {
             rmsd_for_matched(
@@ -537,13 +442,26 @@ pub fn retrieval_wrapper(
             )
         };
         
-        (res_string_from_hash, rmsd_from_hash, res_string, rmsd)
+        (res_vec_from_hash, rmsd_from_hash, res_vec, rmsd)
     }).collect();
-    // Split Vec<(String, f32, String, f32)> into Vec<(String, f32)> and Vec<(String, f32)>
-    let (result_from_hash, result): (Vec<(String, f32)>, Vec<(String, f32)>) = output.into_iter().map(|(a, b, c, d)| {
+    // Split 
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>) = output.into_iter().map(|(a, b, c, d)| {
         ((a, b), (c, d))
     }).unzip();
-    (result_from_hash, result)
+    // In result, find the maximum matching node count and minimum RMSD with max match
+    let mut max_matching_node_count = 0;
+    let mut min_rmsd_with_max_match = 0.0;
+    result.iter().for_each(|(res_vec, rmsd)| {
+        // Count number of Some in res_vec
+        let count = res_vec.iter().filter(|&x| x.is_some()).count();
+        if count > max_matching_node_count {
+            max_matching_node_count = count;
+            min_rmsd_with_max_match = *rmsd;
+        } else if count == max_matching_node_count && *rmsd < min_rmsd_with_max_match {
+            min_rmsd_with_max_match = *rmsd;
+        }
+    });
+    (result_from_hash, result, max_matching_node_count, min_rmsd_with_max_match)
 }
 
 fn get_hash_symmetry_map(query_set: &HashSet<GeometricHash>) -> HashMap<GeometricHash, bool> {
@@ -653,12 +571,6 @@ pub fn map_query_and_retrieved_residues(
             return;
         }
     });
-    // Sort both indices 
-    // let mut zipped: Vec<(usize, usize)> = query_indices.iter().zip(retrieved_indices.iter()).map(|(&a, &b)| (a, b)).collect();
-    // // Sort by query indices and next by retrieved indices
-    // zipped.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
-    // query_indices = zipped.iter().map(|(a, _)| *a).collect(); ㄴ
-    // retrieved_indices = zipped.iter().map(|(_, b)| *b).collect();   
     (query_indices, retrieved_indices)
 }
 
@@ -710,43 +622,9 @@ mod tests {
         let compact = compact.to_compact();
         let new_path = String::from("data/serine_peptidases_filtered/1azw.pdb");
         let output = measure_time!(retrieval_wrapper(
-            &new_path, query_residues.len(), &queries, hash_type, nbin_dist, nbin_angle, dist_cutoff, &query_map, &compact, &query_indices, &aa_dist_map
+            &new_path, query_residues.len(), &queries, hash_type, nbin_dist, nbin_angle, dist_cutoff, &query_map, &compact, &query_indices, &aa_dist_map, 1.0,
         ));
         println!("{:?}", output);
     }
-    
-    
-    #[test]
-    fn test_retrieve_residue_with_hash() {
-        let path = String::from("data/serine_peptidases_filtered/4cha.pdb");
-        let query_string = "B57,B102,C195";
-        // let path = String::from("analysis/1g91.pdb");
-        // let query_string = "A30,A32,A35";
-        let (query_residues, aa_substitions) = parse_query_string(query_string, b'A');
-        let hash_type = HashType::PDBMotifSinCos;
-        let nbin_dist = 16;
-        let nbin_angle = 4;
-        let exact_match = false;
-        let dist_thresholds: Vec<f32> = vec![0.5,1.0];
-        let angle_thresholds: Vec<f32> = vec![5.0, 10.0];
-        let dist_cutoff = 20.0;
-        let queries = make_query(
-            &path, &query_residues, hash_type, nbin_dist, nbin_angle, exact_match, dist_thresholds, angle_thresholds, &aa_substitions, dist_cutoff
-        );
-        let hash_set: HashSet<GeometricHash> = queries.iter().cloned().collect();
-    
-        let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
-        let compact = pdb_loaded.read_structure().expect("Error reading structure");
-        let compact = compact.to_compact();
-        // print num residues
-        println!("Num residues: {}", compact.num_residues);
-        let aa_filter = hash_vec_to_aa_pairs(&queries);
-        println!("{:?}", aa_filter);
-        let retrieved = measure_time!(retrieve_residue_with_hash(
-            &hash_set, &aa_filter, &path, hash_type, nbin_dist, nbin_angle, dist_cutoff
-        ));
-        println!("RETRIEVED: {:?}", retrieved);
-        let connected = connected(&retrieved.unwrap(), query_residues.len());
-        println!("CONNECTED_COMPONENTS: {:?}", connected);
-    }
+
 }

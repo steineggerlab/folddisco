@@ -563,7 +563,7 @@ mod tests {
     }
     #[test]
     fn test_parse_query_string_with_range() {
-        let query_string = "A250-252,B232-234,C269:";
+        let query_string = "A250-252,B232-234,C269:Q";
         let query_residues = parse_query_string(query_string, b'A');
         assert_eq!(query_residues, (vec![
             (b'A', 250), (b'A', 251), (b'A', 252), 

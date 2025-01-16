@@ -81,13 +81,16 @@ folddisco query -p query/1LAP.pdb -q 250,255,273,332,334 -i index/h_sapiens_fold
 folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 5
 
 # Querying a whole structure
-folddisco query -i index/e_coli_folddisco -p query/2N6N.pdb --skip-match -t 6
+folddisco query -i index/h_sapiens_folddisco -p query/1G2F.pdb -t 6 --skip-match
+# For a long query, low `--sampling-ratio` can be used to speed up the search
+folddisco query -i index/h_sapiens_folddisco -p query/1G2F.pdb -t 6  --skip-match --sampling-ratio 0.3
 
 # Using a query file with distance and angle thresholds
 folddisco query -i index/h_sapiens_folddisco -q query/knottin.txt -d 0.5 -a 5 --skip-match -t 6
 
 # Query with amino-acid substitutions and range. 
 # Alternative amino acids can be given after colon. 
+# X: substitute to any amino acid, p: positive-charged, n: negative-charged, h: hydrophilic, b: hydrophobic, a: aromatic
 # Here's enolase query with 3 substitutions; Allow His at 164, Asp & Asn at 247, and His at 297.
 folddisco query -p query/2MNR.pdb -q 164:H,195,221,247:ND,297:H -i index/e_coli_folddisco -d 0.5 -a 5 --top 10 --header --per-structure
 # Range can be given with dash. This will query first 10 residues and 11th residue with subsitution to any amino acid.

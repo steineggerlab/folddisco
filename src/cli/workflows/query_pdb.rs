@@ -50,8 +50,8 @@ search parameters:
  -d, --distance <FLOAT>           Distance threshold in Angstroms. Multiple values can be separated by comma [0.0]
  -a, --angle <FLOAT>              Angle threshold. Multiple values can be separated by comma [0.0]
  --ca-distance <FLOAT>            C-alpha distance threshold in matching residues [1.5]
- --sampling-count <INT>           Number of samples to use for sampling [all]
- --sampling-ratio <FLOAT>         Sampling ratio to use for sampling [1.0]
+ --sampling-count <INT>           Number of sampled hashes to search [all]
+ --sampling-ratio <FLOAT>         Sampling ratio for hashes used in searching. For long queries, smaller ratio is recommended [1.0]
  --skip-match                     Skip matching residues
  --serial-index                   Handle residue indices serially
 

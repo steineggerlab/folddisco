@@ -214,10 +214,10 @@ fn parse_path_vector_as_vec<'a>(path_vector: &'a Vec<String>, parsed_vector: &mu
             if split.len() >= 2 {
                 parsed_vector.push(split[1]);
             } else {
-                parsed_vector.push(path);
+                parsed_vector.push(parse_path(path));
             }
         } else {
-            parsed_vector.push(path);
+            parsed_vector.push(parse_path(path));
         }
     }
 }
@@ -228,10 +228,10 @@ fn parse_path_set_as_set<'a>(path_set: &'a HashSet<String>, parsed_set: &mut Has
             if split.len() >= 2 {
                 parsed_set.insert(split[1]);
             } else {
-                parsed_set.insert(path);
+                parsed_set.insert(parse_path(path));
             }
         } else {
-            parsed_set.insert(path);
+            parsed_set.insert(parse_path(path));
         }
     }
 }

@@ -584,7 +584,12 @@ pub fn query_pdb(env: AppArgs) {
                     }
                     _ => {}
                 }
+                drop(queried_from_indices);
+                drop(query_structure);
             }); // queries
+            drop(loaded_index_vec);
+            drop(big_offset_mmap);
+            drop(big_index);
         }, // AppArgs::Query
         _ => {
             eprintln!("{}", HELP_QUERY);

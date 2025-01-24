@@ -77,8 +77,10 @@ pub enum AppArgs {
         help: bool,
     },
     Benchmark {
+        // Required tabular files
         result: Option<String>,
         answer: Option<String>,
+        // Optional tabular files: Neutral list is not considered as false positive
         neutral: Option<String>,
         index: Option<String>,
         input: Option<String>,
@@ -86,6 +88,14 @@ pub enum AppArgs {
         fp: Option<f64>,
         threads: usize,
         afdb_to_uniprot: bool,
+        // Column index for each file. Default is 0
+        column_result: usize,
+        column_answer: usize,
+        column_neutral: usize,
+        // Use header for each file. Default is false
+        header_result: bool,
+        header_answer: bool,
+        header_neutral: bool,
     },
     Test {
         index_path: String,

@@ -12,6 +12,19 @@ use crate::utils::benchmark::{compare_target_answer_neutral_set, measure_up_to_k
 
 // usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f tsv
 // usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f default
+// 2025-01-24 17:57:19
+// TODO list
+// 1. DONE: [ ] consider sep character based on extension (csv -> ',', tsv -> '\t')
+// 2. DONE: [ ] id column index for all input files; result, answer, neutral
+// 3. TODO: [ ] header option for all input files; result, answer, neutral; Default: false
+// 4. TODO: [ ] add documentation.
+
+// EXAMPLE pyScoMotif result
+// ,matched_motif,similar_motif_found,RMSD,n_mutations,PDB_ID,header_description
+// 0,A49L A143V A77C A103F A136R,A49L A143V A77C A103F A136R,0.002,0,d1iapa_,
+// ,matched_motif,similar_motif_found,RMSD,n_mutations,PDB_ID,header_description
+// 0,A360L A397N A365G A363E A400I A391R A402G A388G A413K,A360L A397N A365G A363E A400I A391R A402G A388G A413K,0.005,0,d6c3ma3,
+
 pub fn benchmark(env: AppArgs) {
     match env {
         AppArgs::Benchmark {
@@ -24,6 +37,12 @@ pub fn benchmark(env: AppArgs) {
             fp,
             threads,
             afdb_to_uniprot,
+            column_result,
+            column_answer,
+            column_neutral,
+            header_result,
+            header_answer,
+            header_neutral,
         } => {
             if input.is_none() {
                 if result.is_none() || answer.is_none() || index.is_none() {
@@ -75,17 +94,17 @@ pub fn benchmark(env: AppArgs) {
 
             input_vector.par_iter().for_each(|(result_path, answer_path, neutral)| {
                 // Parse path by id type
-                let raw_result = read_one_column_of_tsv_as_vec(&result_path, 0);
+                let raw_result = read_one_column_as_vec(&result_path, column_result, header_result);
                 let mut result = Vec::with_capacity(raw_result.len());
                 parse_path_vector_as_vec(&raw_result, &mut result, afdb_to_uniprot);
 
-                let raw_answer = read_one_column_of_tsv_as_set(&answer_path, 0);
+                let raw_answer = read_one_column_as_set(&answer_path, column_answer, header_answer);
                 let mut answer = HashSet::with_capacity(raw_answer.len());
                 parse_path_set_as_set(&raw_answer, &mut answer, afdb_to_uniprot);
 
                 let result_set = HashSet::from_iter(result.iter().cloned());
                 let metric = if let Some(neutral) = neutral {
-                    let raw_neutral = read_one_column_of_tsv_as_set(neutral, 0);
+                    let raw_neutral = read_one_column_as_set(neutral, column_neutral, header_neutral);
                     let mut neutral = HashSet::with_capacity(raw_neutral.len());
                     parse_path_set_as_set(&raw_neutral, &mut neutral, afdb_to_uniprot);
                     if let Some(fp) = fp {
@@ -162,34 +181,54 @@ pub fn benchmark(env: AppArgs) {
     }
 }
 
-fn read_one_column_of_tsv_as_set(file: &str, col_index: usize) -> HashSet<String> {
+fn read_one_column_as_set(file: &str, col_index: usize, header: bool) -> HashSet<String> {
     let mut set = HashSet::new();
+    // Check the extencion of the file
+    let sep = get_sep_character_from_filename(file);
     // Open file and get specific column
     let file = std::fs::File::open(file).expect(
         &log_msg(FAIL, &format!("Failed to open tsv file: {}", file))
     );
     let reader = std::io::BufReader::new(file);
-    reader.lines().for_each(|line| {
+    let lines = reader.lines().skip(if header { 1 } else { 0 });
+    for line in lines {
         let line = line.expect(&log_msg(FAIL, "Failed to read line"));
-        let row = line.split('\t').collect::<Vec<_>>();
+        let row = line.split(sep).collect::<Vec<_>>();
         set.insert(row[col_index].to_string());
-    });
+    }
     set
 }
 
-fn read_one_column_of_tsv_as_vec(file: &str, col_index: usize) -> Vec<String> {
+fn read_one_column_as_vec(file: &str, col_index: usize, header: bool) -> Vec<String> {
     let mut vec = Vec::new();
+    let sep = get_sep_character_from_filename(file);
     // Open file and get specific column
     let file = std::fs::File::open(file).expect(
         &log_msg(FAIL, &format!("Failed to open tsv file: {}", file))
     );
     let reader = std::io::BufReader::new(file);
-    reader.lines().for_each(|line| {
+    
+    // If header is true, skip first line
+    let lines = reader.lines().skip(if header { 1 } else { 0 });
+    for line in lines {
         let line = line.expect(&log_msg(FAIL, "Failed to read line"));
-        let row = line.split('\t').collect::<Vec<_>>();
+        let row = line.split(sep).collect::<Vec<_>>();
         vec.push(row[col_index].to_string());
-    });
+    }
     vec
+}
+
+#[inline]
+fn get_sep_character_from_filename(file: &str) -> char {
+    let ext = file.split('.').last().unwrap();
+    match ext {
+        "csv" => ',',
+        "tsv" | "txt" => '\t',
+        _ => {
+            print_log_msg(WARN, "Unexpected file extension. Using tab as separator");
+            '\t'
+        }
+    }
 }
 
 #[inline]
@@ -243,24 +282,22 @@ mod tests {
     #[test]
     #[ignore]
     fn test_benchmark() {
-        let result = Some("data/zinc_folddisco.tsv".to_string());
-        let answer = Some("data/zinc_answer.tsv".to_string());
-        let neutral = None;
-        let index = Some("analysis/h_sapiens/d16a4/index_id".to_string());
-        let input = None;
-        let format = "tsv";
-        let fp = None;
-        let threads = 1;
         let env = AppArgs::Benchmark {
-            result,
-            answer,
-            neutral,
-            index,
-            input,
-            format: format.to_string(),
-            fp,
-            threads,
+            result: Some("data/zinc_folddisco.tsv".to_string()),
+            answer: Some("data/zinc_answer.tsv".to_string()),
+            neutral: None,
+            index: Some("analysis/h_sapiens/d16a4/index_id".to_string()),
+            input: None,
+            format: "tsv".to_string(),
+            fp: None,
+            threads: 1,
             afdb_to_uniprot: false,
+            column_result: 0,
+            column_answer: 0,
+            column_neutral: 0,
+            header_result: false,
+            header_answer: false,
+            header_neutral: false,
         };
         benchmark(env);
     }

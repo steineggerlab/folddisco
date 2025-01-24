@@ -93,6 +93,12 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             fp: args.opt_value_from_str("--fp")?,
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             afdb_to_uniprot: args.contains("--afdb-to-uniprot"),
+            column_result: args.value_from_str("--column-result").unwrap_or(0),
+            column_answer: args.value_from_str("--column-answer").unwrap_or(0),
+            column_neutral: args.value_from_str("--column-neutral").unwrap_or(0),
+            header_result: args.contains("--header-result"),
+            header_answer: args.contains("--header-answer"),
+            header_neutral: args.contains("--header-neutral"),
         }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,

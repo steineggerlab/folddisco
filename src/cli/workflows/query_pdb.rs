@@ -25,7 +25,7 @@ use crate::controller::result::{
     convert_structure_query_result_to_match_query_results, sort_and_print_match_query_result, sort_and_print_structure_query_result, StructureResult
 };
 use crate::controller::retrieve::retrieval_wrapper;
-use crate::index::indextable::load_big_index;
+use crate::index::indextable::{load_big_index, FolddiscoIndex};
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
 
@@ -192,16 +192,23 @@ pub fn query_pdb(env: AppArgs) {
                 print_log_msg(INFO, &format!("Found {} index file(s). Querying with {} threads", index_paths.len(), threads));
             }
             
-            let mut big_index = false;
+            let mut use_big_index = false;
             if index_paths.len() == 1 {
                 // Check index mode is Big
                 let (_, _, _, hash_type_path) = get_offset_value_lookup_type(index_paths[0].clone());
                 let config = read_index_config_from_file(&hash_type_path);
                 if config.mode == IndexMode::Big {
-                    big_index = true;
+                    use_big_index = true;
                 }
             }
-
+            // Load big index here
+            
+            let index_prefix = index_paths[0].clone();
+            let (big_index, big_offset_mmap) = if use_big_index {
+                load_big_index(&index_prefix)
+            } else {
+                (FolddiscoIndex::new(0, "".to_string()), MmapMut::map_anon(0).unwrap().make_read_only().unwrap())
+            };
 
             // Set thread pool
             let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
@@ -232,9 +239,9 @@ pub fn query_pdb(env: AppArgs) {
             let loaded_index_vec = index_paths.into_par_iter().map(|index_path| {
                 let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
                 let config = read_index_config_from_file(&hash_type_path);
-                let (offset_table, offset_mmap) = if verbose && !big_index { measure_time!(
+                let (offset_table, offset_mmap) = if verbose && !use_big_index { measure_time!(
                     SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
-                ) } else if !big_index {
+                ) } else if !use_big_index {
                     SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
                 } else {
                     let anon_mmap: Mmap = MmapMut::map_anon(0).unwrap().make_read_only().unwrap();
@@ -429,13 +436,7 @@ pub fn query_pdb(env: AppArgs) {
                                 query_count_vec
                             },
                             IndexMode::Big => {
-                                // Get index prefix from value path. index_prefix is just without .value
-                                let index_prefix = value_path.rsplitn(2, '.').collect::<Vec<&str>>()[1];
-                                let (big_index, big_offset_mmap) = if verbose {
-                                    load_big_index(index_prefix)
-                                } else {
-                                    load_big_index(index_prefix)
-                                };
+
                                 let query_count_map = if verbose { measure_time!(count_query_bigmode(
                                     &pdb_query, &pdb_query_map, &big_index, &lookup, sampling_ratio, sampling_count
                                 )) } else {
@@ -532,10 +533,8 @@ pub fn query_pdb(env: AppArgs) {
 
                                     // Filter query_count_vec with reasonable retrieval results
                                     query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
-                                    drop(big_offset_mmap);
                                     return query_count_vec;
                                 }
-                                drop(big_offset_mmap);
                                 query_count_vec
                             },
                         } // match mode
@@ -585,7 +584,12 @@ pub fn query_pdb(env: AppArgs) {
                     }
                     _ => {}
                 }
+                drop(queried_from_indices);
+                drop(query_structure);
             }); // queries
+            drop(loaded_index_vec);
+            drop(big_offset_mmap);
+            drop(big_index);
         }, // AppArgs::Query
         _ => {
             eprintln!("{}", HELP_QUERY);

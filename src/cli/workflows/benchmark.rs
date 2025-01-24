@@ -201,6 +201,7 @@ fn read_one_column_as_set(file: &str, col_index: usize, header: bool) -> HashSet
 
 fn read_one_column_as_vec(file: &str, col_index: usize, header: bool) -> Vec<String> {
     let mut vec = Vec::new();
+    let mut seen = HashSet::new();
     let sep = get_sep_character_from_filename(file);
     // Open file and get specific column
     let file = std::fs::File::open(file).expect(
@@ -213,7 +214,11 @@ fn read_one_column_as_vec(file: &str, col_index: usize, header: bool) -> Vec<Str
     for line in lines {
         let line = line.expect(&log_msg(FAIL, "Failed to read line"));
         let row = line.split(sep).collect::<Vec<_>>();
-        vec.push(row[col_index].to_string());
+        let value = row[col_index].to_string();
+        if !seen.contains(&value) {
+            vec.push(value.clone());
+            seen.insert(value);
+        }
     }
     vec
 }

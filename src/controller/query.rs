@@ -367,43 +367,23 @@ mod tests {
     
     #[test]
     fn test_make_query_map() {
-        let path_1 = String::from("analysis/AF-Q8N680-F1-model_v4.pdb");
-        let query_residues_1 = vec![
-            (b'A', 365), (b'A', 381), (b'A', 385)
-        ];
-        let path_2= String::from("query/1G2F.pdb");
-        let query_residues_2 = vec![
+        let path= String::from("query/1G2F.pdb");
+        let query_residues = vec![
             (b'F', 207), (b'F', 225), (b'F', 229)
         ];
         // let path = String::from("data/serine_peptidases_filtered/1aq2.pdb");
         // let query_residues = vec![
         //     (b'A', 250), (b'A', 232), (b'A', 269)
         // ];
-        // let path = String::from("data/serine_peptidases_filtered/4cha.pdb");
-        // let query_residues = vec![
-        //     (b'B', 57), (b'B', 102), (b'C', 195)
-        // ];
-        // let dist_thresholds: Vec<f32> = vec![0.5];
-        // let angle_thresholds: Vec<f32> = vec![5.0,10.0,15.0];
-        let dist_thresholds: Vec<f32> = vec![0.5];
-        let angle_thresholds: Vec<f32> = vec![5.0];
         let hash_type = HashType::PDBTrRosetta;
         let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
-            &path_1, &query_residues_1, hash_type, 8, 3, &None,
+            &path, &query_residues, hash_type, 8, 3, &None,
             &vec![0.0], &vec![0.0], &vec![None, None, None], 20.0, false
         );
-        let hash_key_1 = hash_collection.keys().cloned().collect::<Vec<GeometricHash>>();
-        println!("{:?}", hash_collection.keys());
+        let hash_key = hash_collection.keys().cloned().collect::<Vec<GeometricHash>>();
         println!("{}", hash_collection.len());
         println!("{:?}", _observed_dist_map);
-        let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
-            &path_2, &query_residues_2, hash_type, 8, 3, &None,
-            &dist_thresholds, &angle_thresholds, &vec![None, None, None], 20.0, false
-        );
-        let hash_key_2 = hash_collection.keys().cloned().collect::<Vec<GeometricHash>>();
-        println!("{:?}", hash_collection.keys());
-        println!("{}", hash_collection.len());
-        println!("{:?}", _observed_dist_map);
+        println!("{:?}", hash_key);
         // Print the count where value.1 is true
         let mut count = 0;
         hash_collection.iter().for_each(|item| {
@@ -413,16 +393,6 @@ mod tests {
         });
         println!("Exact: {}", count);
         println!("Not exact: {}", hash_collection.len() - count);
-        
-        // Find intersection
-        let mut intersection_vec = Vec::new();
-        for hash_key in hash_key_1.iter() {
-            if hash_key_2.contains(hash_key) {
-                intersection_vec.push(hash_key);
-            }
-        }
-        println!("Intersection: {}", intersection_vec.len());
-        println!("{:?}", intersection_vec);
     }
 
     #[test]

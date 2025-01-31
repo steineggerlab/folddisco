@@ -16,13 +16,15 @@ pub struct IndexConfig {
     pub max_residue: usize,
     pub input_format: StructureFileFormat,
     pub foldcomp_db: Option<String>,
+    pub multiple_bin: Option<Vec<(usize, usize)>>,
 }
 
 impl IndexConfig {
     pub fn new(
         hash_type: HashType, num_bin_dist: usize, num_bin_angle: usize,
         mode: IndexMode, grid_width: f32, chunk_size: usize, max_residue: usize,
-        input_format: StructureFileFormat, foldcomp_db: Option<String>
+        input_format: StructureFileFormat, foldcomp_db: Option<String>,
+        multiple_bin: Option<Vec<(usize, usize)>>,
     ) -> Self {
         Self {
             hash_type,
@@ -34,6 +36,7 @@ impl IndexConfig {
             max_residue,
             input_format,
             foldcomp_db,
+            multiple_bin,
         }
     }
     pub fn from_toml(toml: &toml::Value) -> Self {
@@ -47,6 +50,12 @@ impl IndexConfig {
         let max_residue = toml["max_residue"].as_integer().unwrap() as usize;
         let input_format = StructureFileFormat::get_with_string(toml["input_format"].as_str().unwrap());
         let foldcomp_db = toml.get("foldcomp_db").map(|x| x.as_str().unwrap().to_string());
+        let multiple_bin = toml.get("multiple_bin").map(|x| {
+            x.as_array().unwrap().iter().map(|y| {
+                let bin = y.as_array().unwrap();
+                (bin[0].as_integer().unwrap() as usize, bin[1].as_integer().unwrap() as usize)
+            }).collect()
+        });
         Self {
             hash_type: HashType::get_with_str(hash_type),
             num_bin_dist,
@@ -57,6 +66,7 @@ impl IndexConfig {
             max_residue,
             input_format,
             foldcomp_db,
+            multiple_bin,
         }
     }
     pub fn to_toml(&self) -> toml::Value {
@@ -71,6 +81,13 @@ impl IndexConfig {
         map.insert("input_format".to_string(), toml::Value::String(self.input_format.to_string()));
         if let Some(foldcomp_db) = &self.foldcomp_db {
             map.insert("foldcomp_db".to_string(), toml::Value::String(foldcomp_db.clone()));
+        }
+        if let Some(multiple_bin) = &self.multiple_bin {
+            map.insert("multiple_bin".to_string(), toml::Value::Array(
+                multiple_bin.iter().map(|x| {
+                    toml::Value::Array(vec![toml::Value::Integer(x.0 as i64), toml::Value::Integer(x.1 as i64)])
+                }).collect()
+            ));
         }
         toml::Value::Table(map)
     }
@@ -227,7 +244,7 @@ mod tests {
             IndexConfig::new(
                 HashType::PDBTrRosetta, 10, 10,
                 IndexMode::Id, 30.0, 65535, 4000,
-                StructureFileFormat::PDB, None
+                StructureFileFormat::PDB, None, None
             )
         );
         let query_config = Some(
@@ -245,7 +262,8 @@ mod tests {
         let index_config = IndexConfig::new(
             HashType::PDBTrRosetta, 10, 10,
             IndexMode::Big, 30.0, 65535, 4000,
-            StructureFileFormat::FCZDB, Some("data/foldcomp_db".to_string())
+            StructureFileFormat::FCZDB, Some("data/foldcomp_db".to_string()),
+            Some(vec![(16, 4), (8, 3)])
         );
         write_index_config_to_file(path, index_config.clone());
         let index_config_read = read_index_config_from_file(path);

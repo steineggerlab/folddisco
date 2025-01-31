@@ -55,6 +55,7 @@ pub struct FoldDisco {
     pub num_threads: usize,
     pub num_bin_dist: usize,
     pub num_bin_angle: usize,
+    pub multiple_bins: Option<Vec<(usize, usize)>>,
     pub output_path: String,
     pub max_residue: usize,
     pub dist_cutoff: f32,
@@ -82,6 +83,7 @@ impl FoldDisco {
             num_threads: DEFAULT_NUM_THREADS,
             num_bin_dist: 0,
             num_bin_angle: 0,
+            multiple_bins: None,
             output_path: String::new(),
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: DEFAULT_DIST_CUTOFF,
@@ -99,7 +101,7 @@ impl FoldDisco {
     pub fn new(
         path_vec: Vec<String>, hash_type: HashType, num_threads: usize,
         num_bin_dist: usize, num_bin_angle: usize, output_path: String,
-        dist_cutoff: f32, index_mode: IndexMode
+        dist_cutoff: f32, index_mode: IndexMode, multiple_bins: Option<Vec<(usize, usize)>>,
     ) -> FoldDisco {
         let length = path_vec.len();
         let total_hashes = match index_mode {
@@ -116,6 +118,7 @@ impl FoldDisco {
             num_threads: num_threads,
             num_bin_dist: num_bin_dist,
             num_bin_angle: num_bin_angle,
+            multiple_bins: multiple_bins,
             output_path: output_path.clone(),
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: dist_cutoff,
@@ -134,7 +137,8 @@ impl FoldDisco {
     pub fn new_with_foldcomp_db(
         path_vec: Vec<String>, hash_type: HashType, num_threads: usize,
         num_bin_dist: usize, num_bin_angle: usize, output_path: String,
-        dist_cutoff: f32, index_mode: IndexMode, foldcomp_db_path: &'static str
+        dist_cutoff: f32, index_mode: IndexMode, foldcomp_db_path: &'static str,
+        multiple_bins: Option<Vec<(usize, usize)>>,
     ) -> FoldDisco {
         let length = path_vec.len();
         let total_hashes = match index_mode {
@@ -153,6 +157,7 @@ impl FoldDisco {
             num_threads: num_threads,
             num_bin_dist: num_bin_dist,
             num_bin_angle: num_bin_angle,
+            multiple_bins: multiple_bins,
             output_path: output_path.clone(),
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: dist_cutoff,
@@ -270,7 +275,7 @@ impl FoldDisco {
                     let mut hash_vec = get_geometric_hash_as_u32_from_structure(
                         &compact, self.hash_type,
                         self.num_bin_dist, self.num_bin_angle,
-                        self.dist_cutoff,
+                        self.dist_cutoff, &self.multiple_bins,
                     );
                     // Drop intermediate variables
                     drop(compact);
@@ -376,7 +381,7 @@ impl FoldDisco {
                         let mut hash_vec = get_geometric_hash_as_u32_from_structure(
                             &compact, self.hash_type, 
                             self.num_bin_dist, self.num_bin_angle,
-                            self.dist_cutoff,
+                            self.dist_cutoff, &self.multiple_bins,
                         );
                         // Drop intermediate variables
                         drop(compact);
@@ -476,7 +481,7 @@ impl FoldDisco {
                         // Directly write num_residues and avg_plddt to the vectors
                         let mut hash_vec = get_geometric_hash_as_u32_from_structure(
                             &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle,
-                            self.dist_cutoff,
+                            self.dist_cutoff, &self.multiple_bins,
                         );
                         // Drop intermediate variables
                         drop(compact);

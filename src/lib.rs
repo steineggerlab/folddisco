@@ -44,7 +44,7 @@ pub mod prelude {
 
     pub use crate::controller::FoldDisco;
     pub use crate::controller::io::{read_offset_map, save_offset_map, write_usize_vector};
-    pub use crate::controller::query::{make_query, parse_query_string};
+    pub use crate::controller::query::{make_query_map, parse_query_string};
 
     pub use crate::geometry::core::{GeometricHash, HashType};
     

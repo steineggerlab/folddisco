@@ -6,7 +6,6 @@
 // This file contains the workflow for querying PDB files
 // When querying PDB files, we need index table and query file.
 
-use std::collections::HashMap;
 use std::io::BufRead;
 use std::path::PathBuf;
 
@@ -311,11 +310,15 @@ pub fn query_pdb(env: AppArgs) {
                         let num_bin_angle = config.num_bin_angle;
                         let mode = config.mode;
                         let dist_cutoff = config.grid_width;
-                        let (pdb_query_map, query_indices, aa_dist_map ) = if verbose { measure_time!(make_query_map(
-                            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds,  &aa_substitutions, dist_cutoff, serial_query,
-                        )) } else {
+                        let multiple_bin = &config.multiple_bin;
+                        let (pdb_query_map, query_indices, aa_dist_map ) = if verbose { 
+                            measure_time!(make_query_map(
+                                &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
+                                &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
+                            ))
+                        } else {
                             make_query_map(
-                                &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, 
+                                &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
                                 &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
                             )
                         };
@@ -370,7 +373,7 @@ pub fn query_pdb(env: AppArgs) {
                                             #[cfg(not(feature = "foldcomp"))]
                                             let retrieval_result = retrieval_wrapper(
                                                 &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, ca_dist_threshold,
                                             );
@@ -378,14 +381,14 @@ pub fn query_pdb(env: AppArgs) {
                                             let retrieval_result = if using_foldcomp {
                                                 retrieval_wrapper_for_foldcompdb(
                                                     &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold, &foldcomp_db_reader
                                                 )
                                             } else {
                                                 retrieval_wrapper(
                                                     &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold,
                                                 )
@@ -400,7 +403,7 @@ pub fn query_pdb(env: AppArgs) {
                                             #[cfg(not(feature = "foldcomp"))]
                                             let retrieval_result = retrieval_wrapper(
                                                 &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, ca_dist_threshold,
                                             );
@@ -408,14 +411,14 @@ pub fn query_pdb(env: AppArgs) {
                                             let retrieval_result = if using_foldcomp {
                                                 retrieval_wrapper_for_foldcompdb(
                                                     &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold, &foldcomp_db_reader
                                                 )
                                             } else {
                                                 retrieval_wrapper(
                                                     &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold,
                                                 )
@@ -474,7 +477,7 @@ pub fn query_pdb(env: AppArgs) {
                                             #[cfg(not(feature = "foldcomp"))]
                                             let retrieval_result = retrieval_wrapper(
                                                 &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, ca_dist_threshold,
                                             );
@@ -482,14 +485,14 @@ pub fn query_pdb(env: AppArgs) {
                                             let retrieval_result = if using_foldcomp {
                                                 retrieval_wrapper_for_foldcompdb(
                                                     &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold, &foldcomp_db_reader
                                                 )
                                             } else {
                                                 retrieval_wrapper(
                                                     &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold,
                                                 )
@@ -504,7 +507,7 @@ pub fn query_pdb(env: AppArgs) {
                                             #[cfg(not(feature = "foldcomp"))]
                                             let retrieval_result = retrieval_wrapper(
                                                 &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, ca_dist_threshold,
                                             );
@@ -512,14 +515,14 @@ pub fn query_pdb(env: AppArgs) {
                                             let retrieval_result = if using_foldcomp {
                                                 retrieval_wrapper_for_foldcompdb(
                                                     &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold, &foldcomp_db_reader
                                                 )
                                             } else {
                                                 retrieval_wrapper(
                                                     &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, dist_cutoff,
+                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold,
                                                 )
@@ -596,30 +599,6 @@ pub fn query_pdb(env: AppArgs) {
             std::process::exit(1);
         }
     }
-}
-
-pub fn parse_multiple_queries(
-    queries: &Vec<(String, String, String)>,
-    hash_type: HashType, num_bin_dist: usize, num_bin_angle: usize, 
-    dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
-) -> Vec<(HashMap<GeometricHash, ((usize, usize), bool)>, Vec<GeometricHash>, Vec<(u8, u64)>, String, String)> {
-    let mut query_map_vec = Vec::new();
-    for (pdb_path, query_string, output_path) in queries {
-        let pdb_loaded = PDBReader::from_file(&pdb_path).expect(
-            &log_msg(FAIL, &format!("Failed to read PDB file: {}", &pdb_path))
-        );
-        let structure = pdb_loaded.read_structure().expect(
-            &log_msg(FAIL, &format!("Failed to read the structure from {}", &pdb_path))
-        );
-        // Make query with pdb
-        let (query_residues, aa_substitions) = parse_query_string(&query_string, structure.chains[0]);
-        let (pdb_query_map, _query_indices, _) =  measure_time!(make_query_map(
-            &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, &dist_thresholds, &angle_thresholds, &aa_substitions, 20.0, false
-        ));
-        let pdb_query: Vec<GeometricHash> = pdb_query_map.keys().cloned().collect();
-        query_map_vec.push((pdb_query_map, pdb_query, query_residues, pdb_path.clone(), output_path.clone()));
-    }
-    query_map_vec
 }
 
 pub fn res_chain_to_string(res_chain: &Vec<(u8, u64)>) -> String {

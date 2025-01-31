@@ -22,6 +22,7 @@ pub enum AppArgs {
         num_threads: usize,
         num_bin_dist: usize,
         num_bin_angle: usize,
+        multiple_bins: Option<String>,
         grid_width: f32,
         chunk_size: usize,
         max_residue: usize,

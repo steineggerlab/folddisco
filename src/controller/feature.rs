@@ -171,7 +171,9 @@ pub fn get_single_feature(
 }
 
 pub fn get_geometric_hash_as_u32_from_structure(
-    structure: &CompactStructure, hash_type: HashType, nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32
+    structure: &CompactStructure, hash_type: HashType, 
+    nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
+    multiple_bins: &Option<Vec<(usize, usize)>>,
 ) -> Vec<u32> {
     let res_bound = CombinationIterator::new(structure.num_residues);
     let mut hash_vec = Vec::with_capacity(res_bound.len());
@@ -182,12 +184,19 @@ pub fn get_geometric_hash_as_u32_from_structure(
         }
         let has_feature = get_single_feature(i, j, structure, hash_type, dist_cutoff, &mut feature);
         if has_feature {
-            if nbin_dist == 0 || nbin_angle == 0 {
-                let hash = GeometricHash::perfect_hash_default_as_u32(&feature, hash_type);
-                hash_vec.push(hash);
+            if let Some(multiple_bins) = multiple_bins {
+                for (nbin_dist, nbin_angle) in multiple_bins.iter() {
+                    let hash = GeometricHash::perfect_hash_as_u32(&feature, hash_type, *nbin_dist, *nbin_angle);
+                    hash_vec.push(hash);
+                }
             } else {
-                let hash = GeometricHash::perfect_hash_as_u32(&feature, hash_type, nbin_dist, nbin_angle);
-                hash_vec.push(hash);
+                if nbin_dist == 0 || nbin_angle == 0 {
+                    let hash = GeometricHash::perfect_hash_default_as_u32(&feature, hash_type);
+                    hash_vec.push(hash);
+                } else {
+                    let hash = GeometricHash::perfect_hash_as_u32(&feature, hash_type, nbin_dist, nbin_angle);
+                    hash_vec.push(hash);
+                }
             }
         }
     });

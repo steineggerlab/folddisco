@@ -348,7 +348,7 @@ mod tests {
                 num_threads: 8,
                 num_bin_dist: 16,
                 num_bin_angle: 4,
-                multiple_bins: Some("16,4;8,3".to_string()),
+                multiple_bins: Some("16-4,8-3".to_string()),
                 grid_width: 20.0,
                 chunk_size: 65536,
                 max_residue: 50000,

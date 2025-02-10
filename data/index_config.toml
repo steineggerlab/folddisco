@@ -5,5 +5,6 @@ hash_type = "PDBTrRosetta"
 input_format = "FCZDB"
 max_residue = 4000
 mode = "big"
+multiple_bin = [[16, 4], [8, 3]]
 num_bin_angle = 10
 num_bin_dist = 10

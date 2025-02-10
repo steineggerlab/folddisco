@@ -21,6 +21,7 @@ path = "src/cli/main.rs"
 [dependencies]
 rand = "0.8.5"
 pico-args = { version = "0.5.0", features = ["combined-flags"], path = "lib/pico-args" }
+pdbtbx-cif = { version = "0.12.0", path = "lib/pdbtbx-cif" }
 rayon = "1.8.0"
 byteorder = "1.5.0"
 memmap2 = "0.9.0"

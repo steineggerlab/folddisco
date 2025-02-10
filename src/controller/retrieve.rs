@@ -1,5 +1,5 @@
 // 
-use std::{collections::{BTreeSet, HashMap, HashSet}, fs::File};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -10,9 +10,11 @@ use crate::utils::combination::{CombinationIterator, CombinationVecIterator};
 use crate::controller::graph::{connected_components_with_given_node_count, create_index_graph};
 use crate::controller::feature::get_single_feature;
 use crate::controller::ResidueMatch;
+use crate::controller::io::read_structure_from_path;
 
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::fcz::FoldcompDbReader;
+
 
 
 pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
@@ -319,8 +321,7 @@ pub fn retrieval_wrapper(
     ca_distance_cutoff: f32,
 ) -> (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>, usize, f32) {
     // Load structure to retrieve motif
-    let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
-    let compact = pdb_loaded.read_structure().expect("Error reading structure");
+    let compact = read_structure_from_path(&path).expect("Error reading structure from path");
     let compact = compact.to_compact();
     // let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();
     // Iterate over query vector and retrieve indices
@@ -619,8 +620,7 @@ mod tests {
             &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, false
         );
         let queries: Vec<GeometricHash> = query_map.keys().cloned().collect();
-        let pdb_loaded = PDBReader::new(File::open(&path).expect("File not found"));
-        let compact = pdb_loaded.read_structure().expect("Error reading structure");
+        let compact = read_structure_from_path(&path).expect("Error reading structure from path");
         let compact = compact.to_compact();
         let new_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
         let output = measure_time!(retrieval_wrapper(

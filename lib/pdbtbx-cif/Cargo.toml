@@ -1,0 +1,13 @@
+[package]
+name = "pdbtbx-cif"
+version = "0.12.0"
+authors = ["Douwe Schulte <d.schulte@uu.nl>", "Hyunbin Kim <khb7840@gmail.com>"]
+license = "MIT"
+edition = "2021"
+description = "A library to open/edit/save (crystallographic) Protein Data Bank (PDB) and mmCIF files. Modified by Hyunbin Kim."
+repository = "https://github.com/douweschulte/pdbtbx"
+readme = "README.md"
+keywords = ["pdb", "crystal", "protein", "mmcif", "bio"]
+categories = ["parser-implementations", "science"]
+include = ["src/**/*", "LICENSE", "README.md"]
+rust-version = "1.64"

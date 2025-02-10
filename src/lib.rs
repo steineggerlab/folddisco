@@ -13,6 +13,7 @@ pub mod utils;
 
 /* re-export: pub use */
 pub use structure::io::pdb::Reader as PDBReader;
+pub use structure::io::cif::Reader as CIFReader;
 
 // Declare a new trait that supports required traits
 pub trait HashableSync: Clone + Copy + Hash + Sync + Send + Eq + PartialEq + Ord + Debug + 'static {

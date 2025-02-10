@@ -11,7 +11,7 @@ use crate::prelude::{log_msg, print_log_msg, FAIL, INFO};
 use super::ResidueMatch;
 
 
-pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tquery_residues";
+pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues";
 pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tquery_residues";
 
 pub struct StructureResult<'a> {

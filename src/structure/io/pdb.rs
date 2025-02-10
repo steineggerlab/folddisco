@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn test_loading_works() {
         let dir = "data/io_test";
-        let pdb_paths = load_path(dir, true);
+        let pdb_paths = load_path(dir, false);
         for pdb_path in pdb_paths {
             let file = File::open(&pdb_path).unwrap();
             let reader = Reader::new(file);

@@ -1,11 +1,7 @@
 use crate::structure::atom::Atom;
 
 pub fn parse_line(line: &String) -> Result<Atom, &str> {
-    // Check line length is enough to index b_factor
-    match line.len() {
-        67..=80 => {}
-        _ => return Err("Line length is not 80 characters long"),
-    }
+    // Not failing due to line length
     // Parse line
     let x = line[30..38].trim().parse::<f32>();
     let y = line[38..46].trim().parse::<f32>();
@@ -15,7 +11,12 @@ pub fn parse_line(line: &String) -> Result<Atom, &str> {
     let chain = line[21..22].as_bytes()[0];
     let res_name = parse_residue(&line[17..20]);
     let res_serial = line[22..26].trim().parse::<u64>();
-    let b_factor = line[60..66].trim().parse::<f32>();
+    // If line contains 60..66, parse b_factor
+    let b_factor = if line.len() >= 66 {
+        line[60..66].trim().parse::<f32>()
+    } else {
+        Ok(1.0)
+    };
     // let occupancy = &line[54..60]; // NOT USING occupancy yet
 
     // Check if all the parsing was successful
@@ -123,18 +124,6 @@ mod parser_tests {
         assert_eq!(atom.y, 2.993);
         assert_eq!(atom.z, -33.448);
         assert_eq!(atom.b_factor, 6.00);
-    }
-
-    #[test]
-    fn test_parse_line_fail_length() {
-        // Short line
-        let line = "ATOM      1  N   ALA A   1      10.000  10.000  10.000  1".to_string();
-        let atom = parse_line(&line);
-        assert!(atom.is_err());
-        // Long line
-        let line = "ATOM      1  N   ALA A   1               10.000  10.000  10.000  1.00  0.00           N  1".to_string();
-        let atom = parse_line(&line);
-        assert!(atom.is_err());
     }
 
     #[test]

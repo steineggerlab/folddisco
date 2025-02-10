@@ -3,6 +3,7 @@
 use std::fmt;
 pub mod parser;
 pub mod pdb;
+pub mod cif;
 
 #[cfg(feature = "foldcomp")]
 pub mod fcz;

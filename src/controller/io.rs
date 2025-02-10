@@ -9,8 +9,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write, Error};
 use memmap2::Mmap;
 use crate::prelude::{log_msg, GeometricHash, HashType, FAIL};
-use crate::structure::core::CompactStructure;
-use crate::PDBReader;
+use crate::structure::core::{CompactStructure, Structure};
+use crate::{CIFReader, PDBReader};
 use std::mem::size_of;
 
 #[cfg(feature="foldcomp")]
@@ -307,22 +307,14 @@ pub fn read_compact_structure(path: &str) -> Result<(CompactStructure, bool), ()
 
     
     #[cfg(not(feature="foldcomp"))]
-    let compact_structure = {
-        let pdb_file = PDBReader::from_file(&path).expect(
-            &log_msg(FAIL, &format!("Failed to read PDB file: {}", &path))
-        );
-        pdb_file.read_structure().expect(
-            &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &path))
-        ).to_compact()
-    };
+    let compact_structure = read_structure_from_path(path).expect(
+        &log_msg(FAIL, &format!("Failed to read structure from file: {}", &path))
+    ).to_compact();
     
     #[cfg(feature="foldcomp")]
     let compact_structure = if !use_foldcomp {
-        let pdb_file = PDBReader::from_file(&path).expect(
-            &log_msg(FAIL, &format!("Failed to read PDB file: {}", &path))
-        );
-        pdb_file.read_structure().expect(
-            &log_msg(FAIL, &format!("Failed to read structure from PDB file: {}", &path))
+        read_structure_from_path(path).expect(
+            &log_msg(FAIL, &format!("Failed to read structure from file: {}", &path))
         ).to_compact()
     } else {
         let mut split = path.split(':');
@@ -337,6 +329,51 @@ pub fn read_compact_structure(path: &str) -> Result<(CompactStructure, bool), ()
         }
     };
     Ok((compact_structure, use_foldcomp))
+}
+
+
+pub fn read_structure_from_path(path: &str) -> Option<Structure> {
+    if path.ends_with(".gz") {
+        if path.ends_with(".pdb.gz") || path.ends_with(".ent.gz") {
+            let reader = PDBReader::from_file(path).expect(
+                log_msg(FAIL, "Failed to read PDB file").as_str()
+            );
+            let structure = reader.read_structure_from_gz().expect(
+                log_msg(FAIL, "Failed to read structure").as_str()
+            );
+            Some(structure)
+        } else if path.ends_with(".cif.gz") {
+            let reader = CIFReader::from_file(path).expect(
+                log_msg(FAIL, "Failed to read CIF file").as_str()
+            );
+            let structure = reader.read_structure_from_gz().expect(
+                log_msg(FAIL, "Failed to read structure").as_str()
+            );
+            Some(structure)
+        } else {
+            None
+        }
+    } else {
+        if path.ends_with(".pdb") || path.ends_with(".ent") {
+            let reader = PDBReader::from_file(path).expect(
+                log_msg(FAIL, "Failed to read PDB file").as_str()
+            );
+            let structure = reader.read_structure().expect(
+                log_msg(FAIL, "Failed to read structure").as_str()
+            );
+            Some(structure)
+        } else if path.ends_with(".cif") {
+            let reader = CIFReader::from_file(path).expect(
+                log_msg(FAIL, "Failed to read CIF file").as_str()
+            );
+            let structure = reader.read_structure().expect(
+                log_msg(FAIL, "Failed to read structure").as_str()
+            );
+            Some(structure)
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]

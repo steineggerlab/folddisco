@@ -71,6 +71,8 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             // Query filtering
             sampling_count: args.opt_value_from_str("--sampling-count")?,
             sampling_ratio: args.opt_value_from_str("--sampling-ratio")?,
+            freq_filter: args.opt_value_from_str("--freq-filter")?,
+            length_penalty: args.opt_value_from_str("--length-penalty")?,
             // Sorting mode
             sort_by_rmsd: args.contains("--sort-by-rmsd"),
             sort_by_score: args.contains("--sort-by-score"),

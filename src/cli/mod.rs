@@ -64,6 +64,8 @@ pub enum AppArgs {
         //.Query sampling
         sampling_count: Option<usize>,
         sampling_ratio: Option<f32>,
+        freq_filter: Option<f32>,
+        length_penalty: Option<f32>,
         // sorting mode
         sort_by_rmsd: bool,
         sort_by_score: bool,

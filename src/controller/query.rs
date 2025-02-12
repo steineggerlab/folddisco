@@ -369,16 +369,17 @@ mod tests {
     fn test_make_query_map() {
         let path= String::from("query/1G2F.pdb");
         let query_residues = vec![
-            (b'F', 207), (b'F', 225), (b'F', 229)
+            (b'F', 207), (b'F', 212), (b'F', 225)
         ];
+        let amino_acid_substitutions = vec![None; query_residues.len()];
         // let path = String::from("data/serine_peptidases_filtered/1aq2.pdb");
         // let query_residues = vec![
         //     (b'A', 250), (b'A', 232), (b'A', 269)
         // ];
         let hash_type = HashType::PDBTrRosetta;
         let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
-            &path, &query_residues, hash_type, 8, 3, &None,
-            &vec![0.0], &vec![0.0], &vec![None, None, None], 20.0, false
+            &path, &query_residues, hash_type, 16, 4, &None,
+            &vec![0.0], &vec![0.0], &amino_acid_substitutions, 20.0, false
         );
         let hash_key = hash_collection.keys().cloned().collect::<Vec<GeometricHash>>();
         println!("{}", hash_collection.len());

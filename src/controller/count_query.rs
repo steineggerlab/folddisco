@@ -66,9 +66,10 @@ pub fn count_query_idmode<'a>(
                     if !has_edge {
                         result.edge_set.insert(edge);
                         result.edge_count += 1;
-                        result.idf += idf; // Score is only added if the edge is new
                     }
                     result.total_match_count += 1;
+                    result.idf += idf;
+
                 }
             }
         }
@@ -143,9 +144,9 @@ pub fn count_query_bigmode<'a>(
                 if !has_edge {
                     result.edge_set.insert(edge);
                     result.edge_count += 1;
-                    result.idf += idf; 
                 }
                 result.total_match_count += 1;
+                result.idf += idf; 
             }
         }
     });

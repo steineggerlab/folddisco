@@ -18,10 +18,13 @@ use crate::controller::map::SimpleHashMap;
 use crate::controller::mode::{IndexMode, QueryMode};
 use crate::cli::*;
 use crate::controller::io::{read_compact_structure, read_u16_vector};
-use crate::controller::query::{check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string};
+use crate::controller::query::{
+    check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string
+};
 use crate::controller::count_query::{count_query_bigmode, count_query_idmode};
 use crate::controller::result::{
-    convert_structure_query_result_to_match_query_results, sort_and_print_match_query_result, sort_and_print_structure_query_result, StructureResult
+    convert_structure_query_result_to_match_query_results, 
+    sort_and_print_match_query_result, sort_and_print_structure_query_result, StructureResult
 };
 use crate::controller::retrieve::retrieval_wrapper;
 use crate::index::indextable::{load_big_index, FolddiscoIndex};
@@ -51,6 +54,8 @@ search parameters:
  --ca-distance <FLOAT>            C-alpha distance threshold in matching residues [1.5]
  --sampling-count <INT>           Number of sampled hashes to search [all]
  --sampling-ratio <FLOAT>         Sampling ratio for hashes used in searching. For long queries, smaller ratio is recommended [1.0]
+ --freq-filter <FLOAT>            Skip queries with hash frequency higher than given ratio [0.0]
+ --length-penalty <FLOAT>         Length penalty for searching. Zero means no penalty and higher value gives more penalty to longer structures [0.5]
  --skip-match                     Skip matching residues
  --serial-index                   Handle residue indices serially
 
@@ -136,6 +141,8 @@ pub fn query_pdb(env: AppArgs) {
             web_mode,
             sampling_count,
             sampling_ratio,
+            freq_filter,
+            length_penalty,
             sort_by_rmsd,
             sort_by_score,
             output_per_structure,
@@ -339,11 +346,12 @@ pub fn query_pdb(env: AppArgs) {
                                     read_u16_vector(&value_path).expect(&log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path)))
                                 };
                                 let query_count_map = if verbose { measure_time!(count_query_idmode(
-                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup, sampling_ratio, sampling_count
+                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup, 
+                                    sampling_ratio, sampling_count, freq_filter, length_penalty
                                 ))} else {
                                     count_query_idmode(
                                         &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup,
-                                        sampling_ratio, sampling_count
+                                        sampling_ratio, sampling_count, freq_filter, length_penalty
                                     )
                                 };
 
@@ -441,11 +449,12 @@ pub fn query_pdb(env: AppArgs) {
                             IndexMode::Big => {
 
                                 let query_count_map = if verbose { measure_time!(count_query_bigmode(
-                                    &pdb_query, &pdb_query_map, &big_index, &lookup, sampling_ratio, sampling_count
+                                    &pdb_query, &pdb_query_map, &big_index, &lookup, 
+                                    sampling_ratio, sampling_count, freq_filter, length_penalty
                                 )) } else {
                                     count_query_bigmode(
                                         &pdb_query, &pdb_query_map, &big_index, &lookup,
-                                        sampling_ratio, sampling_count
+                                        sampling_ratio, sampling_count, freq_filter, length_penalty
                                     )
                                 };
                                 let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
@@ -648,6 +657,8 @@ mod tests {
             web_mode: false,
             sampling_count: None,
             sampling_ratio: None,
+            freq_filter: None,
+            length_penalty: None,
             sort_by_rmsd: true,
             sort_by_score: false,
             output_per_structure: false,
@@ -695,6 +706,8 @@ mod tests {
                 web_mode: false,
                 sampling_count: None,
                 sampling_ratio: None,
+                freq_filter: None,
+                length_penalty: None,
                 sort_by_rmsd: false,
                 sort_by_score: true,
                 output_per_structure: true,
@@ -742,6 +755,8 @@ mod tests {
             web_mode: false,
             sampling_count: None,
             sampling_ratio: None,
+            freq_filter: None,
+            length_penalty: None,
             sort_by_rmsd: false,
             sort_by_score: true,
             output_per_structure: true,

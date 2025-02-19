@@ -16,6 +16,7 @@ pub fn count_query_idmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     offset_table: &SimpleHashMap, value_vec: &[u16], lookup: &'a Vec<(String, usize, usize, f32)>, 
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
+    freq_filter: Option<f32>, length_penalty_power: Option<f32>,
 ) -> DashMap<usize, StructureResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
     // Sampling query
@@ -23,9 +24,15 @@ pub fn count_query_idmode<'a>(
     queries_to_iter.par_iter().for_each(|query| {  // Use parallel iterator
         if let Some(offset) = offset_table.get(query) {
             let single_queried_values = get_values_with_offset_u16(value_vec, offset.0, offset.1);
+            let hash_count = offset.1;            
+            if let Some(freq_filter) = freq_filter {
+                if hash_count as f32 / lookup.len() as f32 > freq_filter {
+                    // If the hash count is too low, skip the query
+                    return;
+                }
+            }
             let edge_info = query_map.get(query).unwrap();
             let edge = edge_info.0;
-            let hash_count = offset.1;
 
             for &value in single_queried_values.iter() {
                 let id = &lookup[value as usize].0;
@@ -34,7 +41,7 @@ pub fn count_query_idmode<'a>(
                 let plddt = lookup[value as usize].3;
 
                 let idf = (lookup.len() as f32 / hash_count as f32).log2();
-                let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
+
                 let mut is_new: bool = false;
                 let entry = query_count_map.entry(nid);
                 // Not consuming the entry, so we can modify it
@@ -42,7 +49,8 @@ pub fn count_query_idmode<'a>(
                     let total_match_count = 1usize;
                     is_new = true;
                     StructureResult::new(
-                        id, nid, total_match_count, 2, 1, idf + nres_norm, nres, plddt, &edge
+                        id, nid, total_match_count, 2, 1, 
+                        idf, nres, plddt, &edge
                     )
                 });
                 
@@ -60,12 +68,21 @@ pub fn count_query_idmode<'a>(
                         result.edge_count += 1;
                     }
                     result.total_match_count += 1;
-                    result.idf += idf + nres_norm;
+                    result.idf += idf;
+
                 }
             }
         }
     });
-
+    
+    let length_penalty_power = length_penalty_power.unwrap_or(0.5);
+    // Normalize idf by nres
+    query_count_map.par_iter_mut().for_each(|mut entry| {
+        let result = entry.value_mut();
+        let length_penalty = (result.nres as f32).powf(-1.0 * length_penalty_power);
+        result.idf *= length_penalty;
+    });
+    
     query_count_map
 }
 
@@ -73,6 +90,7 @@ pub fn count_query_bigmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     big_index: &FolddiscoIndex, lookup: &'a Vec<(String, usize, usize, f32)>, 
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
+    freq_filter: Option<f32>, length_penalty_power: Option<f32>,
 ) -> DashMap<usize, StructureResult<'a>> {
     let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
     
@@ -80,9 +98,15 @@ pub fn count_query_bigmode<'a>(
 
     queries_to_iter.par_iter().for_each(|query| {  // Use parallel iterator
         let single_queried_values = big_index.get_entries(query.as_u32());
+        let hash_count = single_queried_values.len();
+        if let Some(freq_filter) = freq_filter {
+            if hash_count as f32 / lookup.len() as f32 > freq_filter {
+                // If the hash count is too low, skip the query
+                return;
+            }
+        }        
         let edge_info = query_map.get(query).unwrap();
         let edge = edge_info.0;
-        let hash_count = single_queried_values.len();
 
         for &value in single_queried_values.iter() {
             if value >= lookup.len() {
@@ -96,7 +120,6 @@ pub fn count_query_bigmode<'a>(
             let plddt = lookup[value].3;
 
             let idf = (lookup.len() as f32 / hash_count as f32).log2();
-            let nres_norm = (nres as f32).log2() * -1.0 + 12.0;
             let mut is_new: bool = false;
             let entry = query_count_map.entry(nid);
             // Not consuming the entry, so we can modify it
@@ -105,7 +128,7 @@ pub fn count_query_bigmode<'a>(
                 is_new = true;
                 StructureResult::new(
                     id, nid, total_match_count, 2, 1, 
-                    idf + nres_norm, nres, plddt, &edge
+                    idf, nres, plddt, &edge
                 )
             });
                 
@@ -123,10 +146,19 @@ pub fn count_query_bigmode<'a>(
                     result.edge_count += 1;
                 }
                 result.total_match_count += 1;
-                result.idf += idf + nres_norm;
+                result.idf += idf; 
             }
         }
     });
+    
+    let length_penalty_power = length_penalty_power.unwrap_or(0.5);
+    // Normalize idf by nres
+    query_count_map.par_iter_mut().for_each(|mut entry| {
+        let result = entry.value_mut();
+        let length_penalty = (result.nres as f32).powf(-1.0 * length_penalty_power);
+        result.idf *= length_penalty;
+    });
+    
     query_count_map
 }
 

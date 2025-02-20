@@ -89,7 +89,7 @@ impl FoldDisco {
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: DEFAULT_DIST_CUTOFF,
             index_mode: IndexMode::Id,
-            fold_disco_index: FolddiscoIndex::new(0usize, String::new()),
+            fold_disco_index: FolddiscoIndex::new(0usize, String::new(), false),
             foldcomp_db_path: String::new(),
             #[cfg(not(feature = "foldcomp"))]
             foldcomp_db_reader: false,
@@ -103,6 +103,7 @@ impl FoldDisco {
         path_vec: Vec<String>, hash_type: HashType, num_threads: usize,
         num_bin_dist: usize, num_bin_angle: usize, output_path: String,
         dist_cutoff: f32, index_mode: IndexMode, multiple_bins: Option<Vec<(usize, usize)>>,
+        mmap_on_disk: bool,
     ) -> FoldDisco {
         let length = path_vec.len();
         let total_hashes = match index_mode {
@@ -124,7 +125,7 @@ impl FoldDisco {
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: dist_cutoff,
             index_mode: index_mode,
-            fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone()),
+            fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone(), mmap_on_disk),
             foldcomp_db_path: String::new(),
             #[cfg(not(feature = "foldcomp"))]
             foldcomp_db_reader: false,
@@ -140,6 +141,7 @@ impl FoldDisco {
         num_bin_dist: usize, num_bin_angle: usize, output_path: String,
         dist_cutoff: f32, index_mode: IndexMode, foldcomp_db_path: &'static str,
         multiple_bins: Option<Vec<(usize, usize)>>,
+        mmap_on_disk: bool,
     ) -> FoldDisco {
         let length = path_vec.len();
         let total_hashes = match index_mode {
@@ -163,7 +165,7 @@ impl FoldDisco {
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: dist_cutoff,
             index_mode: index_mode,
-            fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone()),
+            fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone(), mmap_on_disk),
             foldcomp_db_path: foldcomp_db_path.to_string(),
             foldcomp_db_reader: foldcomp_db_reader,
             is_foldcomp_enabled: true,

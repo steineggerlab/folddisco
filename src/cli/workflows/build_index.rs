@@ -81,6 +81,7 @@ pub fn build_index(env: AppArgs) {
             grid_width,
             chunk_size,
             recursive,
+            mmap_on_disk,
             id_type,
             verbose,
             help: _,
@@ -172,6 +173,7 @@ pub fn build_index(env: AppArgs) {
                     pdb_path_vec.to_vec(), hash_type, num_threads, 
                     num_bin_dist, num_bin_angle, index_path.clone(), 
                     grid_width, index_mode, multiple_bins.clone(),
+                    mmap_on_disk,
                 );
                 #[cfg(feature = "foldcomp")]
                 let mut folddisco = if PathBuf::from(&pdb_container_name).is_dir() {
@@ -179,13 +181,14 @@ pub fn build_index(env: AppArgs) {
                         pdb_path_vec.to_vec(), hash_type, num_threads, 
                         num_bin_dist, num_bin_angle, index_path.clone(), 
                         grid_width, index_mode, multiple_bins.clone(),
+                        mmap_on_disk,
                     )
                 } else {
                     FoldDisco::new_with_foldcomp_db(
                         pdb_path_vec.to_vec(), hash_type, num_threads, 
                         num_bin_dist, num_bin_angle, index_path.clone(), 
                         grid_width, index_mode, pdb_container_name,
-                        multiple_bins.clone(),
+                        multiple_bins.clone(), mmap_on_disk,
                     )
                 };
                 
@@ -330,6 +333,7 @@ mod tests {
             chunk_size: 65536,
             max_residue: 3000,
             recursive: true,
+            mmap_on_disk: false,
             id_type: "relpath".to_string(),
             verbose: true,
             help: false,
@@ -353,6 +357,7 @@ mod tests {
                 chunk_size: 65536,
                 max_residue: 50000,
                 recursive: true,
+                mmap_on_disk: false,
                 id_type: "relpath".to_string(),
                 verbose: true,
                 help: false,

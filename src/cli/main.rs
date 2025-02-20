@@ -39,6 +39,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(65536),
             max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             recursive: args.contains(["-r", "--recursive"]),
+            mmap_on_disk: args.contains("--mmap-on-disk"),
             id_type: args.value_from_str("--id").unwrap_or("relpath".into()),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),

@@ -87,37 +87,3 @@ impl Torsion {
     }
     // TODO: implement get_torsion_angle (phi)
 }
-
-#[cfg(tests)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_calc_torsion_angle() {
-        let a = Coordinate {
-            x: 24.969,
-            y: 13.428,
-            z: 30.692,
-        };
-        let b = Coordinate {
-            x: 24.044,
-            y: 12.661,
-            z: 29.808,
-        };
-        let c = Coordinate {
-            x: 22.785,
-            y: 13.482,
-            z: 29.543,
-        };
-        let d = Coordinate {
-            x: 21.951,
-            y: 13.670,
-            z: 30.431,
-        };
-
-        let actual_torsion = -71.21515;
-        let test_torsion = calc_torsion_angle(&a, &b, &c, &d);
-
-        println!("actual_torsion: {:?}", actual_torsion);
-        println!("test_torsion: {:?}", test_torsion);
-    }
-}

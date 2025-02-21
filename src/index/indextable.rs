@@ -16,12 +16,13 @@ pub struct FolddiscoIndex {
     total_hashes: usize,
     entries: UnsafeCell<MmapMut>,
     index_path: String,
+    mmap_on_disk: bool,
 }
 
 unsafe impl Sync for FolddiscoIndex {}
 
 impl FolddiscoIndex {
-    pub fn new(total_hashes: usize, path: String) -> Self {
+    pub fn new(total_hashes: usize, path: String, mmap_on_disk: bool) -> Self {
         let offsets = vec![0usize; total_hashes + 1];
         let last_id = vec![usize::MAX; total_hashes];
         let entries = MmapMut::map_anon(1024).unwrap();
@@ -34,6 +35,7 @@ impl FolddiscoIndex {
             total_hashes,
             entries: UnsafeCell::new(entries),
             index_path: path,
+            mmap_on_disk,
         }
     }
 
@@ -166,16 +168,23 @@ impl FolddiscoIndex {
             offsets[i] = total_entries;
             total_entries += current_entry_size;
         }
-        let index_path = format!("{}.value", self.index_path);
-        let index_file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(index_path)
-            .unwrap();
-        index_file.set_len(total_entries as u64).unwrap();
-        let mmap = unsafe { MmapMut::map_mut(&index_file).unwrap() };
-        *entries = mmap;
+        if self.mmap_on_disk {
+            // Allocate a memory map for total_entries on disk. SSD is recommended
+            let index_path = format!("{}.value", self.index_path);
+            let index_file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(index_path)
+                .unwrap();
+            index_file.set_len(total_entries as u64).unwrap();
+            let mmap = unsafe { MmapMut::map_mut(&index_file).unwrap() };
+            *entries = mmap;
+        } else {
+           // Allocate an anonymous memory map for total_entries in memory
+            let mmap = MmapMut::map_anon(total_entries).unwrap();
+            *entries = mmap;
+        }
         offsets[self.total_hashes] = total_entries;
 
         for id in last_id.iter_mut() {
@@ -185,11 +194,29 @@ impl FolddiscoIndex {
 
     pub fn finish_index(&self) {
         let offsets = unsafe { &mut *self.offsets.get() };
-
+        let entries = unsafe { &*self.entries.get() };
         for i in (1..=self.total_hashes).rev() {
             offsets[i] = offsets[i - 1];
         }
         offsets[0] = 0;
+
+        if !self.mmap_on_disk {
+            // Copy the data to a file
+            let index_path = format!("{}.value", self.index_path);
+            let index_file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(index_path)
+                .unwrap();
+            let total_entries = offsets[self.total_hashes];
+            index_file.set_len(total_entries as u64).unwrap();
+            
+            // Map the file and copy the data
+            let mut file_mmap = unsafe { memmap2::MmapMut::map_mut(&index_file).unwrap() };
+            file_mmap.copy_from_slice(&entries[..total_entries]);
+            file_mmap.flush().unwrap();
+        }
     }
 
     pub fn get_raw_entries(&self, hash: usize) -> &[u8] {
@@ -253,28 +280,9 @@ pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
         total_hashes: total_hashes,
         entries: UnsafeCell::new(entries_mmap),
         index_path,
+        mmap_on_disk: true,
     }, offset_mmap )
 }
-
-
-// fn split_by_seven_bits(mut id: usize) -> Vec<u8> {
-//     let mut result = vec![];
-//     while id > 0 {
-//         let byte = (id & 0x7F) as u8;
-//         id >>= 7;
-//         if id > 0 {
-//             result.push(byte | 0x80); // Set continuation bit
-//         } else {
-//             result.push(byte); // Last byte, no continuation
-//         }
-//     }
-
-//     if result.is_empty() {
-//         result.push(0); // Ensure at least one byte for id = 0
-//     }
-
-//     result
-// }
 
 #[inline(always)]
 fn split_by_seven_bits(mut id: usize, bit_container: &mut Vec<u8>) -> usize {
@@ -353,7 +361,8 @@ mod tests {
     #[test]
     fn test_folddisco_index() {
         let total_hashes = 10;
-        let index = FolddiscoIndex::new(total_hashes, "test.index".to_string());
+        let start = std::time::Instant::now();
+        let index = FolddiscoIndex::new(total_hashes, "test.index".to_string(), false);
 
         let hashes1: Vec<u32> = (0u32..7).collect();
         let id1 = 0usize;
@@ -377,7 +386,8 @@ mod tests {
         index.add_entries(&hashes2, id2, &mut bit_container);
         
         index.finish_index();
-
+        let elapsed = start.elapsed();
+        println!("Indexing time: {:?}", elapsed);
         // Print offsets
         let offsets = unsafe { &*index.offsets.get() };
         for i in 0..total_hashes+1 {

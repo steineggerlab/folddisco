@@ -27,6 +27,7 @@ pub enum AppArgs {
         chunk_size: usize,
         max_residue: usize,
         recursive: bool,
+        mmap_on_disk: bool,
         id_type: String,
         verbose: bool,
         help: bool,

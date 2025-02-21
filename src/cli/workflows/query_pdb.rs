@@ -213,7 +213,8 @@ pub fn query_pdb(env: AppArgs) {
             let (big_index, big_offset_mmap) = if use_big_index {
                 load_big_index(&index_prefix)
             } else {
-                (FolddiscoIndex::new(0, "".to_string()), MmapMut::map_anon(0).unwrap().make_read_only().unwrap())
+                (FolddiscoIndex::new(0, "".to_string(), false),
+                 MmapMut::map_anon(0).unwrap().make_read_only().unwrap())
             };
 
             // Set thread pool

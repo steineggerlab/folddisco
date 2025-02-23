@@ -241,10 +241,16 @@ pub fn make_query_map(
             );
 
             // Apply substitutions
-            apply_substitutions(
-                indices[i], indices[j], &mut feature_near, hash_type.amino_acid_index().as_ref().unwrap(),
-                nbin_dist, nbin_angle, multiple_bin, &substitution_map, &mut hash_collection, hash_type
-            );
+            if let Some(aa_indices) = hash_type.amino_acid_index() {
+                apply_substitutions(
+                    indices[i], indices[j], &mut feature_near, aa_indices.as_ref(),
+                    nbin_dist, nbin_angle, multiple_bin, &substitution_map, &mut hash_collection, hash_type
+                );
+            }
+            // apply_substitutions(
+            //     indices[i], indices[j], &mut feature_near, hash_type.amino_acid_index().as_ref().unwrap(),
+            //     nbin_dist, nbin_angle, multiple_bin, &substitution_map, &mut hash_collection, hash_type
+            // );
 
             if let Some(dist_indices) = &dist_indices {
                 expand_and_insert(

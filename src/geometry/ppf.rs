@@ -13,7 +13,7 @@ use crate::utils::convert::*;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    
+    #[inline]
     pub fn perfect_hash(ppf: &Vec<f32>, nbin_dist: usize, nbin_sincos: usize) -> u32 {
         let nbin_dist = if nbin_dist > 16 { 
             16.0

@@ -3,7 +3,7 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-use crate::utils::convert::map_aa_to_u8;
+use crate::utils::convert::{map_aa_to_u8, map_aa_to_u8_group};
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::utils::combination::CombinationIterator;
@@ -163,6 +163,31 @@ pub fn get_single_feature(
                 return true;
             }
         },
+        HashType::Hybrid => {
+            if i == 0 || j == 0 || i == structure.num_residues - 1 || j == structure.num_residues - 1 {
+                return false;
+            }
+            let res1 = structure.get_res_name(i);
+            let res2 = structure.get_res_name(j);
+            let res1_group = map_aa_to_u8_group(res1) as f32;
+            let res2_group = map_aa_to_u8_group(res2) as f32;
+
+            let feature = structure.get_hybrid_feature(i, j, dist_cutoff);
+            if let Some(feature) = feature {
+                feature_container[0] = res1_group;
+                feature_container[1] = res2_group;
+                feature_container[2] = feature.0;
+                feature_container[3] = feature.1;
+                feature_container[4] = feature.2;
+                feature_container[5] = feature.3;
+                feature_container[6] = feature.4;
+                feature_container[7] = feature.5;
+                feature_container[8] = feature.6;
+                return true;
+            } else {
+                return false;
+            }
+        },
         // append new hash type here
         _ => {
             return false;
@@ -216,7 +241,7 @@ impl HashType {
 
     pub fn dist_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBTrRosetta  => Some(vec![2, 3]),
+            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBTrRosetta | HashType::Hybrid  => Some(vec![2, 3]),
             HashType::TrRosetta | HashType::PointPairFeature => Some(vec![2]),
             HashType::TertiaryInteraction => Some(vec![7]),
             _ => None
@@ -230,6 +255,7 @@ impl HashType {
             HashType::PointPairFeature => Some(vec![3, 4, 5]),
             HashType::PDBTrRosetta => Some(vec![4, 5, 6]), 
             HashType::TertiaryInteraction => Some(vec![0, 1, 2, 3, 4, 5, 6]),
+            HashType::Hybrid => Some(vec![4, 5, 6, 7, 8]),
             _ => None
         }
     }

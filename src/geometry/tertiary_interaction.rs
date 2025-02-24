@@ -17,7 +17,7 @@ use crate::utils::convert::*;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    
+    #[inline]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         // Added one more quantization for distance
         let nbin_dist = if nbin_dist > 16 {

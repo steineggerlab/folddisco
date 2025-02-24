@@ -168,7 +168,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
         let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
         CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2)
     } else {
-        CombinationVecIterator::new((0..compact.num_residues).collect(), (0..compact.num_residues).collect())
+        CombinationVecIterator::new(vec![], vec![])
     };
     
     // let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
@@ -177,7 +177,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
         &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle, multiple_bin,
         dist_cutoff, ca_distance_cutoff, aa_dist_map
     );
-
+    
     let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
             if !map.contains_key(&qi) {
@@ -336,8 +336,16 @@ pub fn retrieval_wrapper(
     let query_set: HashSet<GeometricHash> = HashSet::from_iter(query_vector.clone());
     let query_symmetry_map = get_hash_symmetry_map(&query_set);
     
-    let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
-    let aa_filter = CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2);
+    // let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
+
+    let aa_filter = if _hash_type.amino_acid_index().is_some() {
+        let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
+        CombinationVecIterator::new_from_btreesets(&index_set1, &index_set2)
+    } else {
+        CombinationVecIterator::new(vec![], vec![])
+    };
+
+
     let (indices_found , candidate_pairs) = retrieve_with_prefilter(
         &compact, &query_set, aa_filter, _nbin_dist, _nbin_angle,
         multiple_bin, dist_cutoff, ca_distance_cutoff, aa_dist_map

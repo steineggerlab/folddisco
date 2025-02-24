@@ -79,6 +79,58 @@ pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
     }
 }
 
+
+#[inline(always)]
+pub fn map_aa_to_u8_group(aa: &[u8; 3]) -> u8 {
+    // Applied to handle the case of non-standard amino acids
+    // 0: Small & Aliphatic Amino Acids; 1: Hydrophobic (Nonpolar) Amino Acids; 2: Polar (Hydrophilic) Amino Acids; 3: Charged Amino Acids
+    // 1. Small & Aliphatic Amino Acids
+    //     G, A, S, C, P
+    //     (Glycine, Alanine, Serine, Cysteine, Proline)
+    //     Small and flexible (Gly, Ala), sometimes reactive (Cys), or structurally rigid (Pro).
+    // 2. Hydrophobic (Nonpolar) Amino Acids
+    //     V, L, I, M, F, W
+    //     (Valine, Leucine, Isoleucine, Methionine, Phenylalanine, Tryptophan)
+    //     Typically buried in the protein core; important for stability.    
+    // 3. Polar (Hydrophilic) Amino Acids
+    //     T, N, Q, Y
+    //     (Threonine, Asparagine, Glutamine, Tyrosine)
+    //     Can participate in hydrogen bonding; often found on the protein surface.    
+    // 4. Charged Amino Acids
+    //     Basic: K, R, H (Lysine, Arginine, Histidine)
+    //     Acidic: D, E (Aspartic Acid, Glutamic Acid)
+    //     Charged residues are usually on the protein surface and form ionic interactions.
+    // reference: gemmi/blob/master/src/resinfo.cpp (https://github.com/project-gemmi/gemmi)
+    match aa {
+        b"ALA" | b"ABA" | b"ORN" | b"DAL" | b"AIB" | b"ALC" | b"MDO" | b"MAA" | b"DAB" => 0, // ALA, A, total 9
+        b"ARG" | b"DAR" | b"CIR" | b"AGM" => 3, // ARG, R, total 4
+        b"ASN" | b"DSG" | b"MEN" | b"SNN" => 2, // ASN, N, total 4
+        b"ASP" | b"0TD" | b"DAS" | b"IAS" | b"PHD" | b"BFD" | b"ASX" => 3, // ASP, D, total 7, ASX is included here
+        b"CYS" | b"CSO" | b"CSD" | b"CME" | b"OCS" | b"CAS" | b"CSX" | b"CSS" | 
+        b"YCM" | b"DCY" | b"SMC" | b"SCH" | b"SCY" | b"CAF" | b"SNC" | b"SEC" => 0, // CYS, C, total 16, SEC is included here
+        b"GLN" | b"DGN" | b"CRQ" | b"MEQ" => 2, // GLN, Q, total 4
+        b"GLU" | b"PCA" | b"DGL" | b"CGU" | b"FGA" | b"B3E" | b"GLX" => 3, // GLU, E, total 7, GLX is included here
+        b"GLY" | b"CR2" | b"SAR" | b"GHP" | b"GL3" => 0, // GLY, G, total 5
+        b"HIS" | b"HIC" | b"DHI" | b"NEP" | b"CR8" | b"MHS" => 3, // HIS, H, total 6
+        b"ILE" | b"DIL" => 1, // ILE, I, total 2
+        b"LEU" | b"DLE" | b"NLE" | b"MLE" | b"MK8"=> 1, // LEU, L, total 5
+        b"LYS" | b"KCX" | b"LLP" | b"MLY" | b"M3L" | b"ALY" | b"MLZ" | b"DLY" | 
+        b"KPI" | b"PYL" => 3, // LYS, K, total 10, PYL is included here
+        b"MET" | b"MSE" | b"FME" | b"NRQ" | b"CXM" | b"SME" | b"MHO" | b"MED" => 1, // MET, M, total 8
+        b"PHE" | b"DPN" | b"PHI" | b"MEA" | b"PHL" => 1, // PHE, F, total 5
+        b"PRO" | b"HYP" | b"DPR" => 0, // PRO, P, total 3
+        b"SER" | b"CSH" | b"SEP" | b"DSN" | b"SAC" | b"GYS" | b"DHA" | b"OAS" => 0, // SER, S, total 8
+        b"THR" | b"TPO" | b"CRO" | b"DTH" | b"BMT" | b"CRF" => 2, // THR, T, total 6
+        b"TRP" | b"DTR" | b"TRQ" | b"TOX" | b"0AF" => 1, // TRP, W, total 5
+        b"TYR" | b"PTR" | b"TYS" | b"TPQ" | b"DTY" | b"OMY" => 2,
+        b"VAL" | b"DVA" | b"MVA" | b"FVA" => 1,
+        _ => 255,
+    }
+}
+
+
+
+
 mod tests {
 
     #[test]

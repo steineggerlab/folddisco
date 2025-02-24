@@ -14,6 +14,7 @@ pub enum HashType {
     PDBTrRosetta,
     PointPairFeature,
     TertiaryInteraction,
+    Hybrid,
     // append new hash type here
     Other,
 }
@@ -28,6 +29,7 @@ impl HashType {
             3 => HashType::PDBTrRosetta,
             4 => HashType::PointPairFeature,
             5 => HashType::TertiaryInteraction,
+            6 => HashType::Hybrid,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -41,6 +43,7 @@ impl HashType {
             "3" | "PDBTrRosetta" | "pdbtr" | "default" | "folddisco" => HashType::PDBTrRosetta,
             "4" | "PointPairFeature" | "ppf" => HashType::PointPairFeature,
             "5" | "TertiaryInteraction" | "tertiary" | "3di" => HashType::TertiaryInteraction,
+            "6" | "Hybrid" | "hybrid" => HashType::Hybrid,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -54,6 +57,7 @@ impl HashType {
             HashType::PDBTrRosetta => "PDBTrRosetta".to_string(),
             HashType::PointPairFeature => "PointPairFeature".to_string(),
             HashType::TertiaryInteraction => "TertiaryInteraction".to_string(),
+            HashType::Hybrid => "Hybrid".to_string(),
             // append new hash type here
             HashType::Other => "Other".to_string(),
         }
@@ -72,6 +76,7 @@ impl HashType {
             HashType::PDBTrRosetta => 30usize,
             HashType::PointPairFeature => 32usize,
             HashType::TertiaryInteraction => 29usize,
+            HashType::Hybrid => 32usize,
             // append new hash type here
             HashType::Other => 32usize,
         }
@@ -95,6 +100,7 @@ impl HashType {
                 "PDBTrRosetta" => HashType::PDBTrRosetta,
                 "PointPairFeature" => HashType::PointPairFeature,
                 "TertiaryInteraction" => HashType::TertiaryInteraction,
+                "Hybrid" => HashType::Hybrid,
                 // append new hash type here
                 _ => HashType::Other,
             };
@@ -116,6 +122,7 @@ mod tests {
             HashType::PDBTrRosetta,
             HashType::PointPairFeature,
             HashType::TertiaryInteraction,
+            HashType::Hybrid,
             // append new hash type here
         ];
         for hash_type in hash_type_vec {
@@ -134,6 +141,7 @@ pub enum GeometricHash {
     PDBTrRosetta(super::pdb_tr::HashValue),
     PointPairFeature(super::ppf::HashValue),
     TertiaryInteraction(super::tertiary_interaction::HashValue),
+    Hybrid(super::hybrid::HashValue),
     // append new hash type here
 }
 
@@ -148,6 +156,7 @@ impl GeometricHash {
             HashType::PDBTrRosetta => super::pdb_tr::HashValue::perfect_hash_default(feature),
             HashType::PointPairFeature => super::ppf::HashValue::perfect_hash_default(feature),
             HashType::TertiaryInteraction => super::tertiary_interaction::HashValue::perfect_hash_default(feature),
+            HashType::Hybrid => super::hybrid::HashValue::perfect_hash_default(feature),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -173,6 +182,9 @@ impl GeometricHash {
                 feature, nbin_dist, nbin_angle
             ),
             HashType::TertiaryInteraction => super::tertiary_interaction::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            HashType::Hybrid => super::hybrid::HashValue::perfect_hash(
                 feature, nbin_dist, nbin_angle
             ),
             // append new hash type here
@@ -210,6 +222,11 @@ impl GeometricHash {
             HashType::TertiaryInteraction => GeometricHash::TertiaryInteraction(
                 super::tertiary_interaction::HashValue(
                     super::tertiary_interaction::HashValue::perfect_hash_default(feature)
+                )
+            ),
+            HashType::Hybrid => GeometricHash::Hybrid(
+                super::hybrid::HashValue(
+                    super::hybrid::HashValue::perfect_hash_default(feature)
                 )
             ),
             // append new hash type here
@@ -251,6 +268,11 @@ impl GeometricHash {
                     super::tertiary_interaction::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
                 )
             ),
+            HashType::Hybrid => GeometricHash::Hybrid(
+                super::hybrid::HashValue(
+                    super::hybrid::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -289,6 +311,12 @@ impl GeometricHash {
                 }
             },
             GeometricHash::TertiaryInteraction(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::Hybrid(hash) => {
                 let reversed = hash.reverse_hash_default();
                 for i in 0..reversed.len() {
                     output[i] = reversed[i];
@@ -338,6 +366,12 @@ impl GeometricHash {
                     output[i] = reversed[i];
                 }
             },
+            GeometricHash::Hybrid(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
             // append new hash type here
             // _ => panic!("Invalid hash type"),
         }
@@ -352,6 +386,7 @@ impl GeometricHash {
             GeometricHash::PointPairFeature(hash) => hash.hash_type(),
             GeometricHash::PDBTrRosetta(hash) => hash.hash_type(),
             GeometricHash::TertiaryInteraction(hash) => hash.hash_type(),
+            GeometricHash::Hybrid(hash) => hash.hash_type(),
             // append new hash type here
             // _ => panic!("Invalid hash type"),
         }
@@ -378,6 +413,9 @@ impl GeometricHash {
             HashType::TertiaryInteraction => GeometricHash::TertiaryInteraction(
                 super::tertiary_interaction::HashValue::from_u32(hashvalue)
             ),
+            HashType::Hybrid => GeometricHash::Hybrid(
+                super::hybrid::HashValue::from_u32(hashvalue)
+            ),
             // append new hash type here if it is encoded as u32
             _ => panic!("Invalid hash type"),
         }
@@ -403,6 +441,9 @@ impl GeometricHash {
             HashType::TertiaryInteraction => GeometricHash::TertiaryInteraction(
                 super::tertiary_interaction::HashValue::from_u64(hashvalue)
             ),
+            HashType::Hybrid => GeometricHash::Hybrid(
+                super::hybrid::HashValue::from_u64(hashvalue)
+            ),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -416,6 +457,7 @@ impl GeometricHash {
             GeometricHash::PDBTrRosetta(hash) => hash.as_u32(),
             GeometricHash::PointPairFeature(hash) => hash.as_u32(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u32(),
+            GeometricHash::Hybrid(hash) => hash.as_u32(),
             // append new hash type here
         }
     }
@@ -427,6 +469,7 @@ impl GeometricHash {
             GeometricHash::PDBTrRosetta(hash) => hash.as_u64(),
             GeometricHash::PointPairFeature(hash) => hash.as_u64(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u64(),
+            GeometricHash::Hybrid(hash) => hash.as_u64(),
             // append new hash type here
         }
     }
@@ -439,6 +482,7 @@ impl GeometricHash {
             GeometricHash::PDBTrRosetta(hash) => hash.is_symmetric(),
             GeometricHash::PointPairFeature(hash) => hash.is_symmetric(),
             GeometricHash::TertiaryInteraction(hash) => hash.is_symmetric(),
+            GeometricHash::Hybrid(hash) => hash.is_symmetric(),
             // append new hash type here
         }
     }
@@ -479,6 +523,12 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
+    pub fn downcast_hybrid(&self) -> super::hybrid::HashValue {
+        match self {
+            GeometricHash::Hybrid(hash) => hash.clone(),
+            _ => panic!("Invalid hash type"),
+        }
+    }
     // append the downcast method for new hash type here
 
 }
@@ -503,6 +553,9 @@ impl fmt::Debug for GeometricHash {
             },
             GeometricHash::TertiaryInteraction(hash) => {
                 write!(f, "TertiaryInteraction({:?})", hash)
+            },
+            GeometricHash::Hybrid(hash) => {
+                write!(f, "Hybrid({:?})", hash)
             },
             // append new hash type here
             // _ => panic!("Invalid hash type"),
@@ -530,6 +583,9 @@ impl fmt::Display for GeometricHash {
             },
             GeometricHash::TertiaryInteraction(hash) => {
                 write!(f, "TertiaryInteraction\t{:?}", hash)
+            },
+            GeometricHash::Hybrid(hash) => {
+                write!(f, "Hybrid\t{:?}", hash)
             },
             // append new hash type here
             // _ => panic!("Invalid hash type"),

@@ -51,7 +51,7 @@ impl HashValue {
     pub fn hash_type(&self) -> super::core::HashType {
         HashType::TrRosetta
     }
-    
+    #[inline]
     fn _perfect_hash(
         res1: u32, res2: u32, cb_dist: f32, omega: f32, theta1: f32, theta2: f32,
         phi1: f32, phi2: f32, nbin_dist: f32, nbin_angle: f32

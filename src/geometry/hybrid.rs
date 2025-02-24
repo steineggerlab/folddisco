@@ -13,8 +13,8 @@ use crate::utils::convert::*;
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
-pub const PDBTR_NBIN_DIST: f32 = 16.0;
-pub const PDBTR_NBIN_SIN_COS: f32 = 4.0;
+pub const HYBRID_NBIN_DIST: f32 = 16.0;
+pub const HYBRID_NBIN_SIN_COS: f32 = 4.0;
 
 impl HashValue {
     #[inline]
@@ -22,19 +22,19 @@ impl HashValue {
         let nbin_dist = if nbin_dist > 16 {
             16.0
         } else if nbin_dist == 0 {
-            PDBTR_NBIN_DIST
+            HYBRID_NBIN_DIST
         } else {
             nbin_dist as f32
         };
         let nbin_angle = if nbin_angle > 4 {
             4.0
         } else if nbin_angle == 0 {
-            PDBTR_NBIN_SIN_COS
+            HYBRID_NBIN_SIN_COS
         } else {
             nbin_angle as f32
         };
-        let res1 = feature[0] as u32;
-        let res2 = feature[1] as u32;
+        let res1_group = feature[0] as u32;
+        let res2_group = feature[1] as u32;
         let ca_dist = discretize_value(
             feature[2], MIN_DIST, MAX_DIST, nbin_dist
         );
@@ -67,66 +67,103 @@ impl HashValue {
         let cos_phi2 = discretize_value(
             cos_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         );
-
-        let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
-            | cb_dist << 12 | sin_ca_cb_angle << 10 | cos_ca_cb_angle << 8
-            | sin_phi1 << 6 | cos_phi1 << 4 | sin_phi2 << 2 | cos_phi2;
+        
+        let sin_bb_phi1 = feature[7].sin();
+        let cos_bb_phi1 = feature[7].cos();
+        let sin_bb_phi2 = feature[8].sin();
+        let cos_bb_phi2 = feature[8].cos();
+        let sin_bb_phi1 = discretize_value(
+            sin_bb_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        let cos_bb_phi1 = discretize_value(
+            cos_bb_phi1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        let sin_bb_phi2 = discretize_value(
+            sin_bb_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        let cos_bb_phi2 = discretize_value(
+            cos_bb_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
+        );
+        
+        let hashvalue = res1_group << 30 | res2_group << 28 | ca_dist << 24
+            | cb_dist << 20 | sin_ca_cb_angle << 18 | cos_ca_cb_angle << 16
+            | sin_phi1 << 14 | cos_phi1 << 12 | sin_phi2 << 10 | cos_phi2 << 8 
+            | sin_bb_phi1 << 6 | cos_bb_phi1 << 4 | sin_bb_phi2 << 2 | cos_bb_phi2;
         hashvalue
     }
     
     pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
-        HashValue::perfect_hash(feature, PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
+        HashValue::perfect_hash(feature, HYBRID_NBIN_DIST as usize, HYBRID_NBIN_SIN_COS as usize)
     }
     
-    pub fn reverse_hash_default(&self) -> [f32; 7] {
-        self.reverse_hash(PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
+    pub fn reverse_hash_default(&self) -> [f32; 9] {
+        self.reverse_hash(HYBRID_NBIN_DIST as usize, HYBRID_NBIN_SIN_COS as usize)
     }
     
-    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 7] {
-        let res1 = ((self.0 >> 25) & BITMASK32_5BIT)as f32;
-        let res2 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
+    pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 9] {
+        let res1_group = ((self.0 >> 30) & BITMASK32_2BIT)as f32;
+        let res2_group = ((self.0 >> 28) & BITMASK32_2BIT) as f32;
         let ca_dist = continuize_value(
-            (self.0 >> 16) & BITMASK32_4BIT as u32, 
+            (self.0 >> 24) & BITMASK32_4BIT as u32, 
             MIN_DIST, MAX_DIST, nbin_dist as f32
         );
         let cb_dist = continuize_value(
-            (self.0 >> 12) & BITMASK32_4BIT as u32,
+            (self.0 >> 20) & BITMASK32_4BIT as u32,
             MIN_DIST, MAX_DIST, nbin_dist as f32
         );
         let sin_ca_cb_angle = continuize_value(
-            (self.0 >> 10) & BITMASK32_2BIT as u32,
+            (self.0 >> 18) & BITMASK32_2BIT as u32,
             MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
         );
         let cos_ca_cb_angle = continuize_value(
-            (self.0 >> 8) & BITMASK32_2BIT as u32,
+            (self.0 >> 16) & BITMASK32_2BIT as u32,
             MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
         );
         let sin_phi1 = continuize_value(
-            (self.0 >> 6) & BITMASK32_2BIT as u32,
+            (self.0 >> 14) & BITMASK32_2BIT as u32,
             MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
         );
         let cos_phi1 = continuize_value(
-            (self.0 >> 4) & BITMASK32_2BIT as u32,
+            (self.0 >> 12) & BITMASK32_2BIT as u32,
             MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
         );
         let sin_phi2 = continuize_value(
-            (self.0 >> 2) & BITMASK32_2BIT as u32,
+            (self.0 >> 10) & BITMASK32_2BIT as u32,
             MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
         );
         let cos_phi2 = continuize_value(
+            (self.0 >> 8) & BITMASK32_2BIT as u32,
+            MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
+        );
+        let sin_bb_phi1 = continuize_value(
+            (self.0 >> 6) & BITMASK32_2BIT as u32,
+            MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
+        );
+        let cos_bb_phi1 = continuize_value(
+            (self.0 >> 4) & BITMASK32_2BIT as u32,
+            MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
+        );
+        let sin_bb_phi2 = continuize_value(
+            (self.0 >> 2) & BITMASK32_2BIT as u32,
+            MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
+        );
+        let cos_bb_phi2 = continuize_value(
             self.0 & BITMASK32_2BIT as u32,
             MIN_SIN_COS, MAX_SIN_COS, nbin_angle as f32
         );
+        
 
         let ca_cb_angle = sin_ca_cb_angle.atan2(cos_ca_cb_angle).to_degrees();
         let phi1 = sin_phi1.atan2(cos_phi1).to_degrees();
         let phi2 = sin_phi2.atan2(cos_phi2).to_degrees();
+        let bb_phi1 = sin_bb_phi1.atan2(cos_bb_phi1).to_degrees();
+        let bb_phi2 = sin_bb_phi2.atan2(cos_bb_phi2).to_degrees();
         
-        [res1, res2, ca_dist, cb_dist, ca_cb_angle, phi1, phi2]
+        [res1_group, res2_group, ca_dist, cb_dist, ca_cb_angle, phi1, phi2, bb_phi1, bb_phi2]
     }
     
     pub fn hash_type(&self) -> HashType {
-        HashType::PDBTrRosetta
+        HashType::Hybrid
     }
     
     pub fn from_u32(hashvalue: u32) -> Self {
@@ -170,25 +207,27 @@ impl fmt::Display for HashValue {
 mod tests {
     use super::*;
     use crate::geometry::core::GeometricHash;
-    use crate::utils::convert::map_aa_to_u8;
+    use crate::utils::convert::map_aa_to_u8_group;
     #[test]
     fn test_geometrichash_works() {
         // Test perfect hash
         let raw_feature = (
-            b"PHE", b"VAL", 14.0_f32, 15.9_f32, 116.0_f32, 80.0_f32, -100.0_f32
+            b"PHE", b"VAL", 14.0_f32, 15.9_f32, 116.0_f32, 80.0_f32, -100.0_f32, 40.0_f32, 30.0_f32
         );
         let raw_feature2 = (
-            b"VAL", b"PHE", 15.9_f32, 14.0_f32, 116.0_f32, 80.0_f32, -100.0_f32
+            b"VAL", b"PHE", 15.9_f32, 14.0_f32, 116.0_f32, 80.0_f32, -100.0_f32, -120.0_f32, -30.0_f32
         );
         let raw_feature = vec![
-            map_aa_to_u8(raw_feature.0) as f32, map_aa_to_u8(raw_feature.1) as f32,
+            map_aa_to_u8_group(raw_feature.0) as f32, map_aa_to_u8_group(raw_feature.1) as f32,
             raw_feature.2, raw_feature.3, raw_feature.4.to_radians(),
-            raw_feature.5.to_radians(), raw_feature.6.to_radians()
+            raw_feature.5.to_radians(), raw_feature.6.to_radians(),
+            raw_feature.7.to_radians(), raw_feature.8.to_radians()
         ];
         let raw_feature2 = vec![
-            map_aa_to_u8(raw_feature2.0) as f32, map_aa_to_u8(raw_feature2.1) as f32,
+            map_aa_to_u8_group(raw_feature2.0) as f32, map_aa_to_u8_group(raw_feature2.1) as f32,
             raw_feature2.2, raw_feature2.3, raw_feature2.4.to_radians(),
-            raw_feature2.5.to_radians(), raw_feature2.6.to_radians()
+            raw_feature2.5.to_radians(), raw_feature2.6.to_radians(),
+            raw_feature2.7.to_radians(), raw_feature2.8.to_radians()
         ];
         let start = std::time::Instant::now();
         for _ in 0..10000 {
@@ -198,9 +237,9 @@ mod tests {
         let duration = start.elapsed();
         println!("Time elapsed in perfect_hash_default() is: {:?}", duration);
         let hash = HashValue::perfect_hash_default(&raw_feature);
-        let hash = GeometricHash::PDBTrRosetta(HashValue::from_u32(hash));
+        let hash = GeometricHash::from_u32(hash, HashType::Hybrid);
         match hash {
-            GeometricHash::PDBTrRosetta(hash) => {
+            GeometricHash::Hybrid(hash) => {
                 println!("{:?}", hash);
             },
             _ => panic!("Invalid hash type"),

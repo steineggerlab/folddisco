@@ -23,7 +23,7 @@ const BITMASK32_5BIT: u32 = 0x0000001F;
 pub struct HashValue(pub u32);
 
 impl HashValue {
-    
+    #[inline]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
         let nbin_dist = if nbin_dist > 32 { 
             32.0

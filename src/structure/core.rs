@@ -402,8 +402,42 @@ impl CompactStructure {
         }
     }
     
+    pub fn get_hybrid_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32, f32, f32)> {
+        let ca1 = self.get_ca(idx1);
+        let ca2 = self.get_ca(idx2);
+        let cb1 = self.get_cb(idx1);
+        let cb2 = self.get_cb(idx2);
+        let n1 = self.get_n(idx1);
+        let n2 = self.get_n(idx2);
+
+        let ca1_pre = self.get_ca(idx1 - 1);
+        let ca1_next = self.get_ca(idx1 + 1);
+        let ca2_pre = self.get_ca(idx2 - 1);
+        let ca2_next = self.get_ca(idx2 + 1);
+        if let (Some(ca1), Some(ca2), Some(cb1), Some(cb2), Some(n1), Some(n2), Some(ca1_pre), Some(ca1_next), Some(ca2_pre), Some(ca2_next) ) =
+            (ca1, ca2, cb1, cb2, n1, n2, ca1_pre, ca1_next, ca2_pre, ca2_next)
+        {
+
+            let ca_dist = ca1.calc_distance(&ca2);
+            if ca_dist > dist_cutoff {
+                return None;
+            }
+            let cb_dist = cb1.calc_distance(&cb2);
+            // let ca_cb_angle = self.get_ca_cb_angle(idx1, idx2, true).unwrap();
+            let ca_cb_angle = ca1.calc_angle(&cb1, &ca2, &cb2, true);
+            let theta1 = calc_torsion_radian(&n1, &ca1, &cb1, &cb2);
+            let theta2 = calc_torsion_radian(&cb1, &cb2, &ca2, &n2);
+            let phi1 = calc_torsion_radian(&ca1_pre, &n1, &ca1, &ca1_next);
+            let phi2 = calc_torsion_radian(&ca2_pre, &n2, &ca2, &ca2_next);
+            
+            Some((ca_dist, cb_dist, ca_cb_angle, theta1, theta2, phi1, phi2))
+            // Some(feature)
+        } else {
+            None
+        }
+    }
     
-    
+
     #[inline(always)]
     pub fn get_bfactor(&self, idx: usize) -> f32 {
         self.b_factors[idx]

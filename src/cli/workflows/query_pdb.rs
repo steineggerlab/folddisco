@@ -82,6 +82,7 @@ display options:
  --sort-by-score                  Sort output by score
  --sort-by-rmsd                   Sort output by RMSD. Not working with --skip-match
  --skip-ca-match                  Print matching residues before C-alpha distance check
+ --superpose                      Print U, T, CA of matching residues
 
 general options:
  -v, --verbose                    Print verbose messages
@@ -147,6 +148,7 @@ pub fn query_pdb(env: AppArgs) {
             sort_by_score,
             output_per_structure,
             output_per_match,
+            output_with_superpose,
             skip_ca_match,
             header,
             serial_query,
@@ -570,7 +572,7 @@ pub fn query_pdb(env: AppArgs) {
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
                             &mut match_results, top_n, 
-                            &output_path, &query_string, header, verbose
+                            &output_path, &query_string, output_with_superpose, header, verbose
                         );
                     }
                     QueryMode::Web => {
@@ -578,9 +580,10 @@ pub fn query_pdb(env: AppArgs) {
                             &queried_from_indices, skip_ca_match
                         );
                         match_results.retain(|(_, v)| match_filter.filter(v));
+                        // If web, set superpose to true.
                         sort_and_print_match_query_result(
                             &mut match_results, MAX_NUM_LINES_FOR_WEB,
-                            &output_path, &query_string, header, verbose
+                            &output_path, &query_string, true, header, verbose
                         );
                     }
                     QueryMode::PerStructureSortByRmsd => {
@@ -664,6 +667,7 @@ mod tests {
             sort_by_score: false,
             output_per_structure: false,
             output_per_match: true,
+            output_with_superpose: false,
             skip_ca_match: false,
             header: true,
             serial_query: false,
@@ -713,6 +717,7 @@ mod tests {
                 sort_by_score: true,
                 output_per_structure: true,
                 output_per_match: false,
+                output_with_superpose: true,
                 skip_ca_match: false,
                 header: true,
                 serial_query: false,
@@ -762,6 +767,7 @@ mod tests {
             sort_by_score: true,
             output_per_structure: true,
             output_per_match: false,
+            output_with_superpose: true,
             skip_ca_match: false,
             header: true,
             serial_query: false,

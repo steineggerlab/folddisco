@@ -7,12 +7,14 @@ use rayon::slice::ParallelSliceMut;
 
 use crate::measure_time;
 use crate::prelude::{log_msg, print_log_msg, FAIL, INFO};
+use crate::structure::coordinate::Coordinate;
 
 use super::ResidueMatch;
 
 
 pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues";
 pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tquery_residues";
+pub const MATCH_QUERY_RESULT_SUPERPOSE_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tu_vector\tt_vector\ttarget_ca_coords\tquery_residues";
 
 pub struct StructureResult<'a> {
     pub id: &'a str,
@@ -25,8 +27,8 @@ pub struct StructureResult<'a> {
     pub plddt: f32,
     pub node_set: HashSet<usize>,
     pub edge_set: HashSet<(usize, usize)>,
-    pub matching_residues: Vec<(Vec<ResidueMatch>, f32)>, // Match with connected components
-    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32)>, // Match with c-alpha distances
+    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with connected components
+    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with c-alpha distances
     pub max_matching_node_count: usize,
     pub min_rmsd_with_max_match: f32,
 }
@@ -61,16 +63,18 @@ impl<'a> StructureResult<'a> {
     
     pub fn into_match_query_results(&self, skip_ca_dist: bool) -> Vec<MatchResult> {
         match skip_ca_dist {
-            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd))| {
+            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
-                    self.id, i, self.idf, residues.clone(), *rmsd
+                    self.id, i, self.idf, residues.clone(), *rmsd,
+                    *u_matrix, *t_matrix, matching_coordinates.clone()
                 )
             }).collect(),
-            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd))| {
+            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
-                    self.id, i, self.idf, residues.clone(), *rmsd
+                    self.id, i, self.idf, residues.clone(), *rmsd,
+                    *u_matrix, *t_matrix, matching_coordinates.clone()
                 )
             }).collect(),
         }
@@ -98,7 +102,7 @@ impl<'a> fmt::Display for StructureResult<'a> {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
                 // Join with comma
-                |(x, y)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         // Convert u8 to char
                         Some((a, b)) => format!("{}{}", *a as char, b),
@@ -123,7 +127,7 @@ impl<'a> fmt::Debug for StructureResult<'a> {
         } else {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
-                |(x, y)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
@@ -147,7 +151,7 @@ impl<'a> StructureResult<'a> {
         } else {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
-                |(x, y)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
@@ -171,11 +175,15 @@ pub struct MatchResult<'a> {
     pub idf: f32,
     pub matching_residues: Vec<ResidueMatch>,
     pub rmsd: f32,
+    pub u_matrix: [[f32; 3]; 3],
+    pub t_matrix: [f32; 3],
+    pub matching_coordinates: Vec<Coordinate>,
 }
 
 impl<'a> MatchResult<'a> {
     pub fn new(
-        id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32
+        id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
+        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>,
     ) -> Self {
         //
         let node_count = matching_residues.iter().map(|x| {
@@ -191,6 +199,43 @@ impl<'a> MatchResult<'a> {
             idf: avg_idf,
             matching_residues,
             rmsd,
+            u_matrix,
+            t_matrix,
+            matching_coordinates,
+        }
+    }
+    
+    pub fn to_string(&self, superpose: bool) -> String {
+        let matching_residues = self.matching_residues.iter().map(|x| {
+            match x {
+                Some((a, b)) => format!("{}{}", *a as char, b),
+                None => "_".to_string()
+            }
+        }).collect::<Vec<String>>().join(",");
+        if superpose {
+            // print u_matrix by flattening it
+            let u_string = self.u_matrix.iter().flat_map(
+                |x| x.iter()).map(|&val| format!("{:.4}", val)
+            ).collect::<Vec<String>>().join(",");
+            // print t_matrix by flattening it
+            let t_string = self.t_matrix.iter().map(|&val| format!("{:.4}", val)
+            ).collect::<Vec<String>>().join(",");
+            // c-alpha coordinates. print x, y, z by concatenating with comma
+            let matching_coordinates = self.matching_coordinates.iter().map(|x| {
+                format!("{:.4},{:.4},{:.4}", x.x, x.y, x.z)
+            }).collect::<Vec<String>>().join(",");
+            // Return
+            format!(
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}",
+                self.id, self.node_count, self.idf, self.rmsd,
+                matching_residues, u_string, t_string, matching_coordinates
+            )
+        } else {
+            format!(
+                "{}\t{}\t{:.4}\t{:.4}\t{}", 
+                self.id, self.node_count, self.idf, self.rmsd,
+                matching_residues
+            )
         }
     }
 }
@@ -206,6 +251,7 @@ impl<'a> fmt::Display for MatchResult<'a> {
                     None => "_".to_string()
                 }
             }).collect::<Vec<String>>().join(",")
+
         )
     }
 }
@@ -297,7 +343,7 @@ pub fn sort_and_print_structure_query_result(
 
 pub fn sort_and_print_match_query_result(
     results: &mut Vec<(usize, MatchResult)>, top_n: usize, 
-    output_path: &str, query_string: &str, header: bool, verbose: bool,
+    output_path: &str, query_string: &str, superpose: bool, header: bool, verbose: bool,
     // do_sort_by_rmsd: bool, WARNING: not implemented yetf
 ) {
     // Sort query_count_vec by rmsd
@@ -336,12 +382,19 @@ pub fn sort_and_print_match_query_result(
         );
         let mut writer = std::io::BufWriter::new(file);
         if header {
-            writer.write_all(format!("{}\n", MATCH_QUERY_RESULT_HEADER).as_bytes()).expect(
-                &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
-            );
+            // Print header based on superpose
+            if superpose {
+                writer.write_all(format!("{}\n", MATCH_QUERY_RESULT_SUPERPOSE_HEADER).as_bytes()).expect(
+                    &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+                );
+            } else {
+                writer.write_all(format!("{}\n", MATCH_QUERY_RESULT_HEADER).as_bytes()).expect(
+                    &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+                );
+            }
         }
         for (_k, v) in results.iter() {
-            writer.write_all(format!("{:?}\t{}\n", v, query_string).as_bytes()).expect(
+            writer.write_all(format!("{}\t{}\n", v.to_string(superpose), query_string).as_bytes()).expect(
                 &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
             );
         }
@@ -351,7 +404,7 @@ pub fn sort_and_print_match_query_result(
         }
         // let mut id_container = String::new();
         for (_k, v) in results.iter() {
-            println!("{:?}\t{}", v, query_string);
+            println!("{}\t{}", v.to_string(superpose), query_string);
         }
     }
 }

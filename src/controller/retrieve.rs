@@ -154,7 +154,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
     ca_distance_cutoff: f32, foldcomp_db_reader: &FoldcompDbReader,
-) -> (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>, usize, f32) {
+) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
+      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
     let compact = foldcomp_db_reader.read_single_structure(path).expect("Error reading structure from foldcomp db");
     let compact = compact.to_compact();
 
@@ -197,7 +198,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     // Parallel
-    let output: Vec<(Vec<ResidueMatch>, f32, Vec<ResidueMatch>, f32)>  = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, 
+                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -278,28 +280,30 @@ pub fn retrieval_wrapper_for_foldcompdb(
             }
         });
 
-        let rmsd_from_hash = rmsd_for_matched(
+        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
             query_structure, &compact, &query_indices, &retrieved_indices
         );
         
-        let rmsd = if res_vec == res_vec_from_hash {
-            rmsd_from_hash
+        let (rmsd, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
+            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
         } else {
-            rmsd_for_matched(
+            rmsd_with_calpha_and_rottran(
                 query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned
             )
         };
         
-        (res_vec_from_hash, rmsd_from_hash, res_vec, rmsd)
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, 
+         res_vec, rmsd, u_mat, t_mat, ca_coords)
     }).collect();
     // Split 
-    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>) = output.into_iter().map(|(a, b, c, d)| {
-        ((a, b), (c, d))
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
+        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j)| {
+        ((a, b, c, d, e), (f, g, h, i, j))
     }).unzip();
     // In result, find the maximum matching node count and minimum RMSD with max match
     let mut max_matching_node_count = 0;
     let mut min_rmsd_with_max_match = 0.0;
-    result.iter().for_each(|(res_vec, rmsd)| {
+    result.iter().for_each(|(res_vec, rmsd, _, _, _)| {
         // Count number of Some in res_vec
         let count = res_vec.iter().filter(|&x| x.is_some()).count();
         if count > max_matching_node_count {
@@ -315,9 +319,11 @@ pub fn retrieval_wrapper_for_foldcompdb(
 
 
 
-// Returns a vector of 1) chain+residue index as String and 2) RMSD value as f32
-// 2025-01-08 10:51:23 
-// Return a vector of ResidueMatch and RMSD values
+// Returns a vector of 
+// 1) chain+residue index as String
+// 2) RMSD value as f32
+// TODO: Add U, T matrix and C-alpha coordinates
+// 3) U, T matrix and C-alpha coordinates
 pub fn retrieval_wrapper(
     path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
     _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize, 
@@ -326,7 +332,8 @@ pub fn retrieval_wrapper(
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
     ca_distance_cutoff: f32,
-) -> (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>, usize, f32) {
+) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
+      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
     // Load structure to retrieve motif
     let compact = read_structure_from_path(&path).expect("Error reading structure from path");
     let compact = compact.to_compact();
@@ -370,7 +377,9 @@ pub fn retrieval_wrapper(
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     // Parallel
-    let output: Vec<(Vec<ResidueMatch>, f32, Vec<ResidueMatch>, f32)>  = connected.par_iter().map(|component| {
+// Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>
+    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, 
+                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -450,28 +459,30 @@ pub fn retrieval_wrapper(
             }
         });
 
-        let rmsd_from_hash = rmsd_for_matched(
+        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
             query_structure, &compact, &query_indices, &retrieved_indices
         );
         
-        let rmsd = if res_vec == res_vec_from_hash {
-            rmsd_from_hash
+        let (rmsd, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
+            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
         } else {
-            rmsd_for_matched(
+            rmsd_with_calpha_and_rottran(
                 query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned
             )
         };
         
-        (res_vec_from_hash, rmsd_from_hash, res_vec, rmsd)
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, 
+         res_vec, rmsd, u_mat, t_mat, ca_coords)
     }).collect();
     // Split 
-    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32)>, Vec<(Vec<ResidueMatch>, f32)>) = output.into_iter().map(|(a, b, c, d)| {
-        ((a, b), (c, d))
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
+        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j)| {
+        ((a, b, c, d, e), (f, g, h, i, j))
     }).unzip();
     // In result, find the maximum matching node count and minimum RMSD with max match
     let mut max_matching_node_count = 0;
     let mut min_rmsd_with_max_match = 0.0;
-    result.iter().for_each(|(res_vec, rmsd)| {
+    result.iter().for_each(|(res_vec, rmsd, _, _, _)| {
         // Count number of Some in res_vec
         let count = res_vec.iter().filter(|&x| x.is_some()).count();
         if count > max_matching_node_count {
@@ -607,10 +618,33 @@ pub fn rmsd_for_matched(
     let coord_vec2: Vec<Coordinate> = index2.iter().map(
         |&i| (compact2.ca_vector.get_coord(i).unwrap(), compact2.cb_vector.get_coord(i).unwrap())
     ).flat_map(|(a, b)| vec![a, b]).collect();
-
+    
     qcp.set_atoms(&coord_vec1, &coord_vec2);
     qcp.run();
     qcp.get_rms()
+}
+
+pub fn rmsd_with_calpha_and_rottran(
+    compact1: &CompactStructure, compact2: &CompactStructure, 
+    index1: &Vec<usize>, index2: &Vec<usize>
+) -> (f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>) {
+    let mut qcp = QCPSuperimposer::new();
+    
+    let coord_vec1: Vec<Coordinate> = index1.iter().map(
+        |&i| (compact1.ca_vector.get_coord(i).unwrap(), compact1.cb_vector.get_coord(i).unwrap())
+    ).flat_map(|(a, b)| vec![a, b]).collect();
+    
+    let coord_vec2: Vec<Coordinate> = index2.iter().map(
+        |&i| (compact2.ca_vector.get_coord(i).unwrap(), compact2.cb_vector.get_coord(i).unwrap())
+    ).flat_map(|(a, b)| vec![a, b]).collect();
+
+    let target_calpha: Vec<Coordinate> = index2.iter().map(
+        |&i| compact2.ca_vector.get_coord(i).unwrap()
+    ).collect();
+    
+    qcp.set_atoms(&coord_vec1, &coord_vec2);
+    qcp.run();
+    (qcp.get_rms(), qcp.rot.unwrap(), qcp.tran.unwrap(), target_calpha)
 }
 
 #[cfg(test)]

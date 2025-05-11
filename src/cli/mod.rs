@@ -73,6 +73,7 @@ pub enum AppArgs {
         // output mode
         output_per_structure: bool,
         output_per_match: bool,
+        output_with_superpose: bool,
         skip_ca_match: bool,
         header: bool,
         serial_query: bool,

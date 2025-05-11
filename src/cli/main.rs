@@ -80,6 +80,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             // Output mode
             output_per_structure: args.contains("--per-structure"),
             output_per_match: args.contains("--per-match"),
+            output_with_superpose: args.contains("--superpose"), // Print target CA, U, T
             skip_ca_match: args.contains("--skip-ca-match"),
             header: args.contains("--header"),
             serial_query: args.contains("--serial-index"),

@@ -22,3 +22,109 @@ jobs:
         run: cargo test -v
       - name: Test foldcomp feature
         run: cargo test --features foldcomp -v
+      - name: Build
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt install crossbuild-essential-arm64
+            rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu
+            export FOLDCOMP_STD_LINK=static
+            export FOLDCOMP_LIB_DIR="$(dirname "$(g++ -print-file-name=libstdc++.a)")"
+            export RUSTFLAGS='-C target-feature=+crt-static'
+            cargo build --features foldcomp --release --target x86_64-unknown-linux-gnu
+            export CC=aarch64-linux-gnu-gcc
+            export CXX=aarch64-linux-gnu-g++
+            export FOLDCOMP_LIB_DIR=/usr/lib/gcc-cross/aarch64-linux-gnu/11
+            export FOLDCOMP_LIB_DIR="$(dirname "$(aarch64-linux-gnu-g++ -print-file-name=libstdc++.a)")"
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_AR=aarch64-linux-gnu-ar
+            cargo build --features foldcomp --release --target aarch64-unknown-linux-gnu
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            rustup target add x86_64-apple-darwin aarch64-apple-darwin
+            cargo build --features foldcomp --release --target x86_64-apple-darwin
+            cargo build --features foldcomp --release --target aarch64-apple-darwin
+            mkdir -p target/release
+            lipo \
+              -create \
+              -arch arm64 "target/aarch64-apple-darwin/release/folddisco" \
+              -arch x86_64 "target/x86_64-apple-darwin/release/folddisco" \
+              -output "target/release/folddisco"
+          fi
+      - name: Upload x86_64 Linux binary
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: folddisco-linux-x86_64
+          path: target/x86_64-unknown-linux-gnu/release/folddisco
+      - name: Upload aarch64 Linux binary
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: folddisco-linux-aarch64
+          path: target/aarch64-unknown-linux-gnu/release/folddisco
+      - name: Upload macOS universal binary
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: folddisco-universal-macos
+          path: target/release/folddisco
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: tests_on_multi_os
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v2
+      - name: Prepare dist dir
+        run: mkdir dist
+      - name: Download x86_64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: folddisco-linux-x86_64
+          path: dist/x86_64/folddisco/bin/
+      - name: Archive x86_64
+        run: |
+          cp LICENSE.md README.md dist/x86_64/folddisco/
+          chmod +x dist/x86_64/folddisco/bin/folddisco
+          tar -C dist/x86_64 -czf folddisco-linux-x86_64.tar.gz folddisco
+      - name: Download aarch64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: folddisco-linux-aarch64
+          path: dist/aarch64/folddisco/bin/
+      - name: Archive aarch64
+        run: |
+          cp LICENSE.md README.md dist/aarch64/folddisco/
+          chmod +x dist/aarch64/folddisco/bin/folddisco
+          tar -C dist/aarch64 -czf folddisco-linux-arm64.tar.gz folddisco
+      - name: Download macOS universal artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: folddisco-universal-macos
+          path: dist/macos/folddisco/bin/
+      - name: Archive macOS
+        run: |
+          cp LICENSE.md README.md dist/macos/folddisco/
+          chmod +x dist/macos/folddisco/bin/folddisco
+          tar -C dist/macos -czf folddisco-macos-universal.tar.gz folddisco
+      - name: Import deploy key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
+      - name: Sign all tarballs
+        run: |
+          for f in *.tar.gz; do
+            ssh-keygen -Y sign -f ~/.ssh/id_rsa -n file "$f"
+          done
+      - name: Upload to remote server
+        run: |
+          args=()
+          for f in *.tar.gz; do
+            args+=(-F file[]=@"$f" -F signature[]=@"$f.sig")
+          done
+          curl --retry 5 --retry-all-errors -X POST \
+            "${args[@]}" \
+            -F identifier="folddisco" \
+            -F directory="${{ github.sha }}" \
+              https://mmseqs.com/upload

@@ -39,8 +39,8 @@ pub enum AppArgs {
         index_path: Option<String>,
         skip_match: bool, // Changed from retrieve to skip_match. Now mathcing is default
         // Match thresholds
-        dist_threshold: Option<String>,
-        angle_threshold: Option<String>,
+        dist_threshold: String,
+        angle_threshold: String,
         ca_dist_threshold: f32,
         // filtering parameters
         // These are for filtering StructQueryResult only

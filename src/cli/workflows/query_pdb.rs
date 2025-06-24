@@ -242,9 +242,9 @@ pub fn query_pdb(env: AppArgs) {
                 vec![(pdb_path.clone(), query_string.clone(), output.clone())]
             };
 
-            let dist_thresholds = parse_threshold_string(dist_threshold.clone());
-            let angle_thresholds = parse_threshold_string(angle_threshold.clone());
-            
+            let dist_thresholds = parse_threshold_string(Some(dist_threshold.clone()));
+            let angle_thresholds = parse_threshold_string(Some(angle_threshold.clone()));
+    
             let loaded_index_vec = index_paths.into_par_iter().map(|index_path| {
                 let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
                 let config = read_index_config_from_file(&hash_type_path);
@@ -641,8 +641,8 @@ mod tests {
             threads,
             index_path,
             skip_match: false,
-            dist_threshold: Some(String::from("0.5")),
-            angle_threshold: Some(String::from("5.0")),
+            dist_threshold: String::from("0.5"),
+            angle_threshold: String::from("5.0"),
             ca_dist_threshold: 1.0,
             total_match_count: 0,
             covered_node_count: 0,
@@ -691,8 +691,8 @@ mod tests {
                 threads,
                 index_path,
                 skip_match: false,
-                dist_threshold: Some(String::from("0.5")),
-                angle_threshold: Some(String::from("5.0")),
+                dist_threshold: String::from("0.5"),
+                angle_threshold: String::from("5.0"),
                 ca_dist_threshold: 1.0,
                 total_match_count: 0,
                 covered_node_count: 0,
@@ -741,8 +741,8 @@ mod tests {
             threads, 
             index_path,
             skip_match: true,
-            dist_threshold: Some(String::from("0.5")),
-            angle_threshold: Some(String::from("5.0")),
+            dist_threshold: String::from("0.5"),
+            angle_threshold: String::from("5.0"),
             ca_dist_threshold: 1.0,
             total_match_count: 0,
             covered_node_count: 0,

@@ -326,12 +326,15 @@ fn get_three_char_array(
                 1 => Ok(Some([t.as_bytes()[0], b' ', b' '])),
                 2 => Ok(Some([t.as_bytes()[0], t.as_bytes()[1], b' '])),
                 3 => Ok(Some([t.as_bytes()[0], t.as_bytes()[1], t.as_bytes()[2]])),
-                _ => Err(PDBError::new(
-                    ErrorLevel::InvalidatingError,
-                    "Invalid residue name",
-                    "Invalid residue name",
-                    _context.clone(),
-                )),
+                // _ => Err(PDBError::new(
+                //     ErrorLevel::InvalidatingError,
+                //     "Invalid residue name",
+                //     "Invalid residue name",
+                //     _context.clone(),
+                // )), 
+                // 2025-06-24 16:29:00 For now, not allowing residue names longer than 3 characters
+                // If more than 3 characters, we will return empty residue name
+                _ => Ok(Some([b' ', b' ', b' '])), // Default to empty residue name
             }
         },
         _ => Ok(None),

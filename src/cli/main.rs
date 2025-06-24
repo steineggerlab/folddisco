@@ -51,8 +51,8 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             index_path: args.opt_value_from_str(["-i", "--index"])?,
             skip_match: args.contains("--skip-match"),
             // Filtering parameters
-            dist_threshold: args.opt_value_from_str(["-d", "--distance"])?,
-            angle_threshold: args.opt_value_from_str(["-a", "--angle"])?,
+            dist_threshold: args.value_from_str(["-d", "--distance"]).unwrap_or("0.5".into()),
+            angle_threshold: args.value_from_str(["-a", "--angle"]).unwrap_or("5".into()),
             ca_dist_threshold: args.value_from_str("--ca-distance").unwrap_or(1.5),
             total_match_count: args.value_from_str("--total-match").unwrap_or(0),
             covered_node_count: args.value_from_str("--covered-node").unwrap_or(0),

@@ -565,14 +565,26 @@ pub fn query_pdb(env: AppArgs) {
                 );
 
                 match query_mode {
-                    QueryMode::PerMatchDefault | QueryMode::PerMatchSortByScore => {
+                    QueryMode::PerMatchDefault => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
                             &queried_from_indices, skip_ca_match
                         );
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
                             &mut match_results, top_n, 
-                            &output_path, &query_string, output_with_superpose, header, verbose
+                            &output_path, &query_string, output_with_superpose, header, verbose,
+                            true,
+                        );
+                    }
+                    QueryMode::PerMatchSortByScore => {
+                        let mut match_results = convert_structure_query_result_to_match_query_results(
+                            &queried_from_indices, skip_ca_match
+                        );
+                        match_results.retain(|(_, v)| match_filter.filter(v));
+                        sort_and_print_match_query_result(
+                            &mut match_results, top_n, 
+                            &output_path, &query_string, output_with_superpose, header, verbose,
+                            false,
                         );
                     }
                     QueryMode::Web => {
@@ -583,7 +595,8 @@ pub fn query_pdb(env: AppArgs) {
                         // If web, set superpose to true.
                         sort_and_print_match_query_result(
                             &mut match_results, MAX_NUM_LINES_FOR_WEB,
-                            &output_path, &query_string, true, header, verbose
+                            &output_path, &query_string, true, header, verbose,
+                            true,
                         );
                     }
                     QueryMode::PerStructureSortByRmsd => {

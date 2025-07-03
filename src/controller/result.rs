@@ -350,7 +350,7 @@ pub fn sort_and_print_structure_query_result(
 pub fn sort_and_print_match_query_result(
     results: &mut Vec<(usize, MatchResult)>, top_n: usize, 
     output_path: &str, query_string: &str, superpose: bool, header: bool, verbose: bool,
-    // do_sort_by_rmsd: bool, WARNING: not implemented yetf
+    do_sort_by_rmsd: bool,
 ) {
     // Sort query_count_vec by rmsd
     if verbose {
@@ -359,7 +359,12 @@ pub fn sort_and_print_match_query_result(
             if a.1.node_count != b.1.node_count {
                 b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
             } else {
-                a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
+                if do_sort_by_rmsd {
+                    b.1.rmsd.partial_cmp(&a.1.rmsd).unwrap()
+                } else {
+                    // If not sorting by rmsd, sort by idf
+                    b.1.idf.partial_cmp(&a.1.idf).unwrap()
+                }
             }
         }));
     } else {
@@ -368,7 +373,12 @@ pub fn sort_and_print_match_query_result(
             if a.1.node_count != b.1.node_count {
                 b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
             } else {
-                a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
+                if do_sort_by_rmsd {
+                    b.1.rmsd.partial_cmp(&a.1.rmsd).unwrap()
+                } else {
+                    // If not sorting by rmsd, sort by idf
+                    b.1.idf.partial_cmp(&a.1.idf).unwrap()
+                }
             }
         });
     }

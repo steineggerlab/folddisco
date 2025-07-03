@@ -84,7 +84,7 @@ pub fn load_lookup_from_file(path: &str) -> Vec<(String, usize, usize, f32, usiz
         let name = split.next().unwrap().to_string();
         let nres = split.next().unwrap().parse::<usize>().unwrap();
         let plddt = split.next().unwrap().parse::<f32>().unwrap();
-        let db_key = split.next().unwrap().parse::<usize>().unwrap_or(id); // Use id as db_key if not present.
+        let db_key = split.next().unwrap_or(&id.to_string()).parse::<usize>().unwrap();
         (name, id, nres, plddt, db_key)
     }).collect::<Vec<_>>();
     loaded_lookup

@@ -19,6 +19,7 @@ pub const MATCH_QUERY_RESULT_SUPERPOSE_HEADER: &str = "id\tnode_count\tidf_score
 pub struct StructureResult<'a> {
     pub id: &'a str,
     pub nid: usize,
+    pub db_key: usize, // Database key for the structure
     pub total_match_count: usize,
     pub node_count: usize,
     pub edge_count: usize,
@@ -36,7 +37,7 @@ pub struct StructureResult<'a> {
 impl<'a> StructureResult<'a> {
     pub fn new(
         id: &'a str, nid: usize, total_match_count: usize, node_count: usize, edge_count: usize,
-        idf: f32, nres: usize, plddt: f32, edge: &(usize, usize), 
+        idf: f32, nres: usize, plddt: f32, edge: &(usize, usize), db_key: usize
     ) -> Self {
         let mut node_set = HashSet::new();
         node_set.insert(edge.0);
@@ -46,6 +47,7 @@ impl<'a> StructureResult<'a> {
         Self {
             id,
             nid,
+            db_key,
             total_match_count,
             node_count,
             edge_count,
@@ -67,14 +69,14 @@ impl<'a> StructureResult<'a> {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
                     self.id, i, self.idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone()
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key
                 )
             }).collect(),
             true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
                     self.id, i, self.idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone()
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key
                 )
             }).collect(),
         }
@@ -112,10 +114,10 @@ impl<'a> fmt::Display for StructureResult<'a> {
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}", 
-            self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
+            self.id, self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.max_matching_node_count, self.min_rmsd_with_max_match,
-            self.nres, self.plddt, matching_residues_processed_with_score
+            self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )
     }
 }
@@ -136,10 +138,10 @@ impl<'a> fmt::Debug for StructureResult<'a> {
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.max_matching_node_count, self.min_rmsd_with_max_match,
-            self.nres, self.plddt, matching_residues_processed_with_score
+            self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )
     }
 }
@@ -160,10 +162,10 @@ impl<'a> StructureResult<'a> {
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.max_matching_node_count, self.min_rmsd_with_max_match,
-            self.nres, self.plddt, matching_residues_processed_with_score
+            self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )
     }
 }
@@ -171,6 +173,7 @@ impl<'a> StructureResult<'a> {
 pub struct MatchResult<'a> {
     pub id: &'a str,
     pub nid: usize,
+    pub db_key: usize, // Database key for the structure
     pub node_count: usize,
     pub idf: f32,
     pub matching_residues: Vec<ResidueMatch>,
@@ -183,7 +186,7 @@ pub struct MatchResult<'a> {
 impl<'a> MatchResult<'a> {
     pub fn new(
         id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
-        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>,
+        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize
     ) -> Self {
         //
         let node_count = matching_residues.iter().map(|x| {
@@ -195,6 +198,7 @@ impl<'a> MatchResult<'a> {
         Self {
             id,
             nid,
+            db_key,
             node_count,
             idf: avg_idf,
             matching_residues,
@@ -226,15 +230,15 @@ impl<'a> MatchResult<'a> {
             }).collect::<Vec<String>>().join(",");
             // Return
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}",
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}",
                 self.id, self.node_count, self.idf, self.rmsd,
-                matching_residues, u_string, t_string, matching_coordinates
+                matching_residues, u_string, t_string, matching_coordinates, self.db_key
             )
         } else {
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}", 
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}", 
                 self.id, self.node_count, self.idf, self.rmsd,
-                matching_residues
+                matching_residues, self.db_key
             )
         }
     }
@@ -243,15 +247,15 @@ impl<'a> MatchResult<'a> {
 impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
+            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}",
             self.id, self.node_count, self.idf, self.rmsd,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
                     None => "_".to_string()
                 }
-            }).collect::<Vec<String>>().join(",")
-
+            }).collect::<Vec<String>>().join(","),
+            self.db_key
         )
     }
 }
@@ -259,14 +263,15 @@ impl<'a> fmt::Display for MatchResult<'a> {
 impl<'a> fmt::Debug for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
+            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}",
             self.id, self.node_count, self.idf, self.rmsd,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
                     None => "_".to_string()
                 }
-            }).collect::<Vec<String>>().join(",")
+            }).collect::<Vec<String>>().join(","),
+            self.db_key
         )
     }
 }
@@ -275,14 +280,15 @@ impl<'a> fmt::Debug for MatchResult<'a> {
 impl<'a> MatchResult<'a> {
     pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{}", 
+            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}",
             self.id, self.node_count, self.idf, self.rmsd,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
                     None => "_".to_string()
                 }
-            }).collect::<Vec<String>>().join(",")
+            }).collect::<Vec<String>>().join(","),
+            self.db_key
         )
     }
 }

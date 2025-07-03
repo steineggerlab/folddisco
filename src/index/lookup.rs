@@ -16,7 +16,8 @@ use crate::utils::log::{log_msg, FAIL};
 
 pub fn save_lookup_to_file(
     path: &str, path_vec: &Vec<String>, numeric_id_vec: &Vec<usize>, 
-    optional_int_vec: Option<&Vec<usize>>, optional_float_vec: Option<&Vec<f32>>
+    optional_int_vec: Option<&Vec<usize>>, optional_float_vec: Option<&Vec<f32>>,
+    numeric_db_key_vec: Option<&Vec<usize>>,
 ) {
     assert_eq!(path_vec.len(), numeric_id_vec.len());
     if optional_int_vec.is_some() {
@@ -25,22 +26,31 @@ pub fn save_lookup_to_file(
     if optional_float_vec.is_some() {
         assert_eq!(path_vec.len(), optional_float_vec.unwrap().len());
     }
+    if numeric_db_key_vec.is_some() {
+        assert_eq!(path_vec.len(), numeric_db_key_vec.unwrap().len());
+    }
     
     // Save the vector of file names to a file
     let mut file = BufWriter::new(File::create(path).expect(&log_msg(FAIL, "Unable to create the lookup file")));
     for i in 0..path_vec.len() {
+        let mut numeric_db_key = numeric_id_vec[i];
+        if numeric_db_key_vec.is_some() {
+            // Set numeric_db_key as db_key_vec
+            numeric_db_key = numeric_db_key_vec.unwrap()[i];
+        }
+
         let line = match (optional_int_vec, optional_float_vec) {
             (Some(int_vec), Some(float_vec)) => {
-                format!("{}\t{}\t{}\t{}\n", numeric_id_vec[i], path_vec[i], int_vec[i], float_vec[i])
+                format!("{}\t{}\t{}\t{}\t{}\n", numeric_id_vec[i], path_vec[i], int_vec[i], float_vec[i], numeric_db_key)
             },
             (Some(int_vec), None) => {
-                format!("{}\t{}\t{}\t{}\n", numeric_id_vec[i], path_vec[i], int_vec[i], 0.0)
+                format!("{}\t{}\t{}\t{}\t{}\n", numeric_id_vec[i], path_vec[i], int_vec[i], 0.0, numeric_db_key)
             },
             (None, Some(float_vec)) => {
-                format!("{}\t{}\t{}\t{}\n", numeric_id_vec[i], path_vec[i], 0, float_vec[i])
+                format!("{}\t{}\t{}\t{}\t{}\n", numeric_id_vec[i], path_vec[i], 0, float_vec[i], numeric_db_key)
             },
             (None, None) => {
-                format!("{}\t{}\t{}\t{}\n", numeric_id_vec[i], path_vec[i], 0, 0.0)
+                format!("{}\t{}\t{}\t{}\t{}\n", numeric_id_vec[i], path_vec[i], 0, 0.0, numeric_db_key)
             }
         };
         file.write_all(line.as_bytes()).expect(&log_msg(FAIL, "Unable to write the lookup file"));
@@ -64,7 +74,7 @@ pub fn save_lookup_to_file(
 //     }
 //     (path_vec, numeric_id_vec, integer_vec, float_vec)
 // }
-pub fn load_lookup_from_file(path: &str) -> Vec<(String, usize, usize, f32)> {
+pub fn load_lookup_from_file(path: &str) -> Vec<(String, usize, usize, f32, usize)> {
     let file = std::fs::File::open(path).expect(&log_msg(FAIL, "Unable to open the lookup file"));
     let mmap = unsafe { Mmap::map(&file).expect(&log_msg(FAIL, "Unable to mmap the lookup file")) };
     let content = unsafe { std::str::from_utf8_unchecked(&mmap) };
@@ -74,7 +84,8 @@ pub fn load_lookup_from_file(path: &str) -> Vec<(String, usize, usize, f32)> {
         let name = split.next().unwrap().to_string();
         let nres = split.next().unwrap().parse::<usize>().unwrap();
         let plddt = split.next().unwrap().parse::<f32>().unwrap();
-        (name, id, nres, plddt)
+        let db_key = split.next().unwrap().parse::<usize>().unwrap_or(id); // Use id as db_key if not present.
+        (name, id, nres, plddt, db_key)
     }).collect::<Vec<_>>();
     loaded_lookup
 }
@@ -91,14 +102,14 @@ mod tests {
         let numeric_id_vec = vec![0, 1, 2];
         let nres_vec = Some(vec![100, 200, 5000]);
         let plddt_vec = Some(vec![50.0, 60.0, 70.0]);
-
+        let numeric_db_key_vec = Some(vec![100, 110, 200]);
         let expected_lookup = vec![
-            ("path1.pdb".to_string(), 0, 100, 50.0),
-            ("path2.pdb".to_string(), 1, 200, 60.0),
-            ("path3.pdb".to_string(), 2, 5000, 70.0)
+            ("path1.pdb".to_string(), 0, 100, 50.0, 100),
+            ("path2.pdb".to_string(), 1, 200, 60.0, 110),
+            ("path3.pdb".to_string(), 2, 5000, 70.0, 200)
         ];
         // Save the data to a file
-        save_lookup_to_file(path, &path_vec, &numeric_id_vec, nres_vec.as_ref(), plddt_vec.as_ref());
+        save_lookup_to_file(path, &path_vec, &numeric_id_vec, nres_vec.as_ref(), plddt_vec.as_ref(), numeric_db_key_vec.as_ref());
 
         // Load the data from the file
         let loaded_lookup = load_lookup_from_file(path);

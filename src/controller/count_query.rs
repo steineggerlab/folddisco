@@ -14,7 +14,7 @@ use super::result::StructureResult;
 
 pub fn count_query_idmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    offset_table: &SimpleHashMap, value_vec: &[u16], lookup: &'a Vec<(String, usize, usize, f32)>, 
+    offset_table: &SimpleHashMap, value_vec: &[u16], lookup: &'a Vec<(String, usize, usize, f32, usize)>, 
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
     freq_filter: Option<f32>, length_penalty_power: Option<f32>,
 ) -> DashMap<usize, StructureResult<'a>> {
@@ -39,6 +39,7 @@ pub fn count_query_idmode<'a>(
                 let nid = lookup[value as usize].1;
                 let nres = lookup[value as usize].2;
                 let plddt = lookup[value as usize].3;
+                let db_key = lookup[value as usize].4;
 
                 let idf = (lookup.len() as f32 / hash_count as f32).log2();
 
@@ -50,7 +51,7 @@ pub fn count_query_idmode<'a>(
                     is_new = true;
                     StructureResult::new(
                         id, nid, total_match_count, 2, 1, 
-                        idf, nres, plddt, &edge
+                        idf, nres, plddt, &edge, db_key
                     )
                 });
                 
@@ -88,7 +89,7 @@ pub fn count_query_idmode<'a>(
 
 pub fn count_query_bigmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    big_index: &FolddiscoIndex, lookup: &'a Vec<(String, usize, usize, f32)>, 
+    big_index: &FolddiscoIndex, lookup: &'a Vec<(String, usize, usize, f32, usize)>, 
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
     freq_filter: Option<f32>, length_penalty_power: Option<f32>,
 ) -> DashMap<usize, StructureResult<'a>> {
@@ -118,6 +119,7 @@ pub fn count_query_bigmode<'a>(
             let nid = lookup[value].1;
             let nres = lookup[value].2;
             let plddt = lookup[value].3;
+            let db_key = lookup[value].4;
 
             let idf = (lookup.len() as f32 / hash_count as f32).log2();
             let mut is_new: bool = false;
@@ -128,7 +130,7 @@ pub fn count_query_bigmode<'a>(
                 is_new = true;
                 StructureResult::new(
                     id, nid, total_match_count, 2, 1, 
-                    idf, nres, plddt, &edge
+                    idf, nres, plddt, &edge, db_key
                 )
             });
                 

@@ -259,15 +259,22 @@ pub fn build_index(env: AppArgs) {
                 }
                 let lookup_path = format!("{}.lookup", index_path);
                 let id_vec = parse_path_vec_by_id_type(&folddisco.path_vec, &id_type);
+                // Check if db_key_vec is empty or not
+                let key_vec_input = if folddisco.numeric_db_key_vec.is_empty() {
+                    None
+                } else {
+                    Some(&folddisco.numeric_db_key_vec)
+                };
                 if verbose {
                     measure_time!(save_lookup_to_file(
                         &lookup_path, &id_vec, &folddisco.numeric_id_vec,
-                        Some(&folddisco.nres_vec), Some(&folddisco.plddt_vec)
+                        Some(&folddisco.nres_vec), Some(&folddisco.plddt_vec), key_vec_input
                     ));
                 } else {
                     save_lookup_to_file(
                         &lookup_path, &id_vec, &folddisco.numeric_id_vec,
-                        Some(&folddisco.nres_vec), Some(&folddisco.plddt_vec)
+                        Some(&folddisco.nres_vec), Some(&folddisco.plddt_vec),
+                        key_vec_input
                     );
                 }
 

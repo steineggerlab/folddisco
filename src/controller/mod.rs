@@ -49,6 +49,7 @@ unsafe impl Sync for FoldDisco {}
 pub struct FoldDisco {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
+    pub numeric_db_key_vec: Vec<usize>,
     pub nres_vec: Vec<usize>,
     pub plddt_vec: Vec<f32>,
     pub hash_id_vec: Vec<(u32, usize)>,
@@ -77,6 +78,7 @@ impl FoldDisco {
         FoldDisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::with_capacity(length),
+            numeric_db_key_vec: Vec::new(),
             nres_vec: Vec::with_capacity(length),
             plddt_vec: Vec::with_capacity(length),
             hash_id_vec: Vec::new(),
@@ -113,6 +115,7 @@ impl FoldDisco {
         FoldDisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::with_capacity(length),
+            numeric_db_key_vec: Vec::new(),
             nres_vec: Vec::with_capacity(length),
             plddt_vec: Vec::with_capacity(length),
             hash_id_vec: Vec::new(),
@@ -153,6 +156,7 @@ impl FoldDisco {
         FoldDisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::with_capacity(length),
+            numeric_db_key_vec: foldcomp_db_reader.get_db_key_vector(),
             nres_vec: Vec::with_capacity(length),
             plddt_vec: Vec::with_capacity(length),
             hash_id_vec: Vec::new(),

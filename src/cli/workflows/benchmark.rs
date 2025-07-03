@@ -87,7 +87,7 @@ pub fn benchmark(env: AppArgs) {
             let config_path = format!("{}.type", index_path);
             let format = format.as_str();
             let raw_lookup = load_lookup_from_file(&lookup_path);
-            let raw_lookup = raw_lookup.into_iter().map(|(id, _, _, _)| id).collect::<HashSet<_>>();
+            let raw_lookup = raw_lookup.into_iter().map(|(id, _, _, _, _)| id).collect::<HashSet<_>>();
             let mut lookup = HashSet::with_capacity(raw_lookup.len());
             parse_path_set_as_set(&raw_lookup, &mut lookup, afdb_to_uniprot);
             let config = read_index_config_from_file(&config_path);

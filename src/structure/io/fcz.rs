@@ -44,6 +44,7 @@ impl FoldcompDbReader {
         let index = read_foldcomp_db_index(path).expect("Error reading foldcomp db index file.");
         let path_string_to_return = path.to_string();
         
+        // Sort lookup by name
         let mut lookup = lookup;
         lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
         
@@ -122,6 +123,11 @@ impl FoldcompDbReader {
     
     pub fn sort_lookup_by_name(&mut self) {
         self.lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
+    }
+    
+    pub fn get_db_key_vector(&self) -> Vec<usize> {
+        // Get the first elements of the tuples from the index vector
+        self.index.iter().map(|(id, _, _)| *id).collect()
     }
 }
 

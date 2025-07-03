@@ -336,18 +336,18 @@ pub fn read_structure_from_path(path: &str) -> Option<Structure> {
     if path.ends_with(".gz") {
         if path.ends_with(".pdb.gz") || path.ends_with(".ent.gz") {
             let reader = PDBReader::from_file(path).expect(
-                log_msg(FAIL, "Failed to read PDB file").as_str()
+                &log_msg(FAIL, format!("Failed to read PDB file: {}", path).as_str())
             );
             let structure = reader.read_structure_from_gz().expect(
-                log_msg(FAIL, "Failed to read structure").as_str()
+                &log_msg(FAIL, format!("Failed to read structure from PDB file: {}", path).as_str())
             );
             Some(structure)
         } else if path.ends_with(".cif.gz") {
             let reader = CIFReader::from_file(path).expect(
-                log_msg(FAIL, "Failed to read CIF file").as_str()
+                &log_msg(FAIL, format!("Failed to read CIF file: {}", path).as_str())
             );
             let structure = reader.read_structure_from_gz().expect(
-                log_msg(FAIL, "Failed to read structure").as_str()
+                &log_msg(FAIL, format!("Failed to read structure from CIF file: {}", path).as_str())
             );
             Some(structure)
         } else {
@@ -356,18 +356,18 @@ pub fn read_structure_from_path(path: &str) -> Option<Structure> {
     } else {
         if path.ends_with(".pdb") || path.ends_with(".ent") {
             let reader = PDBReader::from_file(path).expect(
-                log_msg(FAIL, "Failed to read PDB file").as_str()
+                &log_msg(FAIL, format!("Failed to read PDB file: {}", path).as_str())
             );
             let structure = reader.read_structure().expect(
-                log_msg(FAIL, "Failed to read structure").as_str()
+                &log_msg(FAIL, format!("Failed to read structure from PDB file: {}", path).as_str())
             );
             Some(structure)
         } else if path.ends_with(".cif") {
             let reader = CIFReader::from_file(path).expect(
-                log_msg(FAIL, "Failed to read CIF file").as_str()
+                &log_msg(FAIL, format!("Failed to read CIF file: {}", path).as_str())
             );
             let structure = reader.read_structure().expect(
-                log_msg(FAIL, "Failed to read structure").as_str()
+                &log_msg(FAIL, format!("Failed to read structure from CIF file: {}", path).as_str())
             );
             Some(structure)
         } else {

@@ -147,7 +147,7 @@ pub fn res_index_to_char(chain: u8, res_ind: u64) -> String {
 
 #[cfg(feature = "foldcomp")]
 pub fn retrieval_wrapper_for_foldcompdb(
-    path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
+    db_key: usize, node_count: usize, query_vector: &Vec<GeometricHash>,
     _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize,
     multiple_bin: &Option<Vec<(usize, usize)>>, dist_cutoff: f32,
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
@@ -156,7 +156,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
     ca_distance_cutoff: f32, foldcomp_db_reader: &FoldcompDbReader,
 ) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
       Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
-    let compact = foldcomp_db_reader.read_single_structure(path).expect("Error reading structure from foldcomp db");
+    let compact = foldcomp_db_reader.read_single_structure_by_id(db_key).expect("Error reading structure from foldcomp db");
     let compact = compact.to_compact();
 
     // let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();

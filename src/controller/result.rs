@@ -360,7 +360,7 @@ pub fn sort_and_print_match_query_result(
                 b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
             } else {
                 if do_sort_by_rmsd {
-                    b.1.rmsd.partial_cmp(&a.1.rmsd).unwrap()
+                    a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
                 } else {
                     // If not sorting by rmsd, sort by idf
                     b.1.idf.partial_cmp(&a.1.idf).unwrap()
@@ -374,7 +374,7 @@ pub fn sort_and_print_match_query_result(
                 b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
             } else {
                 if do_sort_by_rmsd {
-                    b.1.rmsd.partial_cmp(&a.1.rmsd).unwrap()
+                    a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
                 } else {
                     // If not sorting by rmsd, sort by idf
                     b.1.idf.partial_cmp(&a.1.idf).unwrap()

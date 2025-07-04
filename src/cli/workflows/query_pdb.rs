@@ -547,7 +547,7 @@ pub fn query_pdb(env: AppArgs) {
                                     }
 
                                     // Filter query_count_vec with reasonable retrieval results
-                                    query_count_vec.retain(|(_, v)| v.matching_residues.len() > 0);
+                                    query_count_vec.retain(|(_, v)| structure_filter.filter_after_matching(v));
                                     return query_count_vec;
                                 }
                                 query_count_vec

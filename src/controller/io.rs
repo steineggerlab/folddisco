@@ -319,9 +319,10 @@ pub fn read_compact_structure(path: &str) -> Result<(CompactStructure, bool), ()
     } else {
         let mut split = path.split(':');
         let db_path = split.next().unwrap();
-        let id = split.next().unwrap();
-        let foldcomp_db_reader = FoldcompDbReader::new(db_path);
-        let structure_io_result = foldcomp_db_reader.read_single_structure(id);
+        let name = split.next().unwrap();
+        let mut foldcomp_db_reader = FoldcompDbReader::new(db_path);
+        foldcomp_db_reader.sort_lookup_by_name();
+        let structure_io_result = foldcomp_db_reader.read_single_structure(name);
         if let Ok(structure) = structure_io_result {
             structure.to_compact()
         } else {

@@ -22,7 +22,8 @@ use peak_alloc::PeakAlloc;
 #[cfg(feature= "foldcomp")]
 use crate::structure::io::fcz::*;
 
-
+#[cfg(feature = "foldcomp")]
+use rayon::prelude::ParallelSliceMut;
 
 #[global_allocator]
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
@@ -112,12 +113,14 @@ pub fn build_index(env: AppArgs) {
                     if is_dir {
                         load_path(&pdb_container, recursive)
                     } else {
-                        let lookup_vec = read_foldcomp_db_lookup(&pdb_container).expect(
+                        let mut lookup_vec = read_foldcomp_db_lookup(&pdb_container).expect(
                             &log_msg(FAIL, "Failed to read Foldcomp DB lookup")
                         );
-                        let index_vec = read_foldcomp_db_index(&pdb_container).expect(
+                        lookup_vec.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+                        let mut index_vec = read_foldcomp_db_index(&pdb_container).expect(
                             &log_msg(FAIL, "Failed to read Foldcomp DB index")
                         );
+                        index_vec.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
                         input_format = StructureFileFormat::FCZDB;
                         get_path_vector_out_of_lookup_and_index(&lookup_vec, &index_vec)
                     }

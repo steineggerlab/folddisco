@@ -44,9 +44,13 @@ impl FoldcompDbReader {
         let index = read_foldcomp_db_index(path).expect("Error reading foldcomp db index file.");
         let path_string_to_return = path.to_string();
         
-        // Sort lookup by name
+        // Sort lookup by db key
         let mut lookup = lookup;
-        lookup.par_sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        lookup.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+
+        // Sort index by db key
+        let mut index = index;
+        index.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
         
         FoldcompDbReader {
             path: path_string_to_return,

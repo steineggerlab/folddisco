@@ -228,7 +228,9 @@ impl FoldDisco {
 
                     #[cfg(feature = "foldcomp")]
                     let compact = if self.is_foldcomp_enabled {
-                        self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
+                        self.foldcomp_db_reader.read_single_structure_by_id(
+                            self.numeric_db_key_vec[pdb_pos]
+                        ).expect(
                             log_msg(FAIL, "Failed to read structure").as_str()
                         )
                     } else {
@@ -307,7 +309,9 @@ impl FoldDisco {
                         );
                         #[cfg(feature = "foldcomp")]
                         let compact = if self.is_foldcomp_enabled {
-                            self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
+                            self.foldcomp_db_reader.read_single_structure_by_id(
+                                self.numeric_db_key_vec[pdb_pos]
+                            ).expect(
                                 log_msg(FAIL, "Failed to read structure").as_str()
                             )
                         } else {
@@ -396,7 +400,9 @@ impl FoldDisco {
 
                         #[cfg(feature = "foldcomp")]
                         let compact = if self.is_foldcomp_enabled {
-                            self.foldcomp_db_reader.read_single_structure(pdb_path).expect(
+                            self.foldcomp_db_reader.read_single_structure_by_id(
+                                self.numeric_db_key_vec[pdb_pos]
+                            ).expect(
                                 log_msg(FAIL, "Failed to read structure").as_str()
                             )
                         } else {

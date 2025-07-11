@@ -167,13 +167,13 @@ pub fn make_query_map(
     nbin_dist: usize, nbin_angle: usize, multiple_bin: &Option<Vec<(usize, usize)>>,
     dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
     amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32, serial_query: bool,
-) -> (HashMap<GeometricHash, ((usize, usize), bool)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, f32, usize)>>) {
+) -> (HashMap<GeometricHash, ((usize, usize), bool)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
 
     let (compact, _) = read_compact_structure(path).expect("Failed to read compact structure");
     
     let mut hash_collection = HashMap::new();
-    let mut observed_distance_map: HashMap<(u8, u8), Vec<(f32, f32, usize)>> = HashMap::new();
-
+    let mut observed_distance_map: HashMap<(u8, u8), Vec<(f32, usize)>> = HashMap::new();
+    
     // Convert residue indices to vector indices
     let mut indices = Vec::new();
     let mut query_residues = query_residues.clone();
@@ -223,14 +223,14 @@ pub fn make_query_map(
                 feature_far[k] = feature[k].clone();
             }
             // Gather observed distance & aa pairs.
-            let aa_dist_info = compact.get_list_amino_acids_and_ca_cb_distances(indices[i], indices[j]);
+            let aa_dist_info = compact.get_list_amino_acids_and_distances(indices[i], indices[j]);
             if let Some(aa_dist_info) = aa_dist_info {
                 // Check if the pair is already in the map
                 let aa_pair = (aa_dist_info.0, aa_dist_info.1);
                 if observed_distance_map.contains_key(&aa_pair) {
-                    observed_distance_map.get_mut(&aa_pair).unwrap().push((aa_dist_info.2, aa_dist_info.3, indices[i]));
+                    observed_distance_map.get_mut(&aa_pair).unwrap().push((aa_dist_info.2, indices[i]));
                 } else {
-                    observed_distance_map.insert(aa_pair, vec![(aa_dist_info.2, aa_dist_info.3, indices[i])]);
+                    observed_distance_map.insert(aa_pair, vec![(aa_dist_info.2, indices[i])]);
                 }
             }
 

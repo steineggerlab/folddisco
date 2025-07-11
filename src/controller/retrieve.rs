@@ -471,17 +471,8 @@ pub fn retrieval_wrapper(
                 query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned
             )
         };
-        
-        // Check difference between rmsd_from_hash and rmsd
-        // If difference is greater than threshold (Default: 1.0), use rmsd_from_hash results regardless of results
-        
-        if (rmsd - rmsd_from_hash) < 1.0 {
-            (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, 
-         res_vec, rmsd, u_mat, t_mat, ca_coords)
-        } else {
-            (res_vec_from_hash.clone(), rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone(),
-            res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash)
-        }
+                
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, res_vec, rmsd, u_mat, t_mat, ca_coords)
         }).collect();
     // Split 
     let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 

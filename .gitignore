@@ -43,3 +43,4 @@ temp
 data/result/*.tsv
 index/e_coli*
 index/h_sapiens*
+bin/folddisco

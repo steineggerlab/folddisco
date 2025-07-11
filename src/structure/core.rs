@@ -476,6 +476,25 @@ impl CompactStructure {
         }
     }
     
+    pub fn get_list_amino_acids_and_ca_cb_distances(&self, i: usize, j: usize) -> Option<(u8, u8, f32, f32)> {
+        // Return i, j, aa_i, aa_j, distance
+        let aa_i = map_aa_to_u8(self.get_res_name(i));
+        let aa_j = map_aa_to_u8(self.get_res_name(j));
+        let ca_distance = self.get_ca_distance(i, j);
+        let cb_distance = self.get_cb_distance(i, j);
+        if ca_distance.is_none() || cb_distance.is_none() {
+            None
+        } else {
+            let ca_distance = ca_distance.unwrap();
+            let cb_distance = cb_distance.unwrap();
+            if ca_distance <= 20.0 {
+                Some((aa_i, aa_j, ca_distance, cb_distance))
+            } else {
+                None
+            }
+        }
+    }
+    
 }
 
 #[cfg(test)]

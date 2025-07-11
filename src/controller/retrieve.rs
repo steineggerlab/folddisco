@@ -48,12 +48,13 @@ pub fn retrieve_with_prefilter(
     compact: &CompactStructure, hash_set: &HashSet<GeometricHash>, prefilter: CombinationVecIterator,
     nbin_dist: usize, nbin_angle: usize, multiple_bin: &Option<Vec<(usize, usize)>>,
     dist_cutoff: f32, ca_distance_cutoff: f32,
-    query_aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
+    query_aa_dist_map: &HashMap<(u8, u8), Vec<(f32, f32, usize)>>,
 ) -> (Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>) {
     let mut output: Vec<(usize, usize, GeometricHash)> = Vec::new();
     let mut candidate_pairs: Vec<(usize, (usize, usize))> = Vec::new();
     let hash = hash_set.iter().next().cloned().unwrap();
     let mut feature = vec![0.0; 9];
+    let cb_distance_cutoff = ca_distance_cutoff;
     if prefilter.is_empty() {
         let comb = CombinationIterator::new(compact.num_residues);
         comb.for_each(|(i, j)| {
@@ -64,12 +65,14 @@ pub fn retrieve_with_prefilter(
                 let aa2 = map_aa_to_u8(&compact.residue_name[j]);
                 if query_aa_dist_map.contains_key(&(aa1, aa2)) {
                     let dists = query_aa_dist_map.get(&(aa1, aa2)).unwrap();
-                    let curr_dist = compact.get_ca_distance(i, j);
+                    let curr_ca_dist = compact.get_ca_distance(i, j);
+                    let curr_cb_dist = compact.get_cb_distance(i, j);
                     // If curr_dist is Some and within the threshold, add to candidate_pairs
-                    if curr_dist.is_some() {
-                        let curr_dist = curr_dist.unwrap();
-                        for (dist, qi) in dists {
-                            if (curr_dist - dist).abs() < ca_distance_cutoff {
+                    if curr_ca_dist.is_some() && curr_cb_dist.is_some() {
+                        let curr_dist = curr_ca_dist.unwrap();
+                        let curr_cb_dist = curr_cb_dist.unwrap();
+                        for (dist, cb_dist, qi) in dists {
+                            if (curr_dist - dist).abs() < ca_distance_cutoff && (curr_cb_dist - cb_dist).abs() < cb_distance_cutoff {
                                 candidate_pairs.push((*qi, (i, j)));
                             }
                         }
@@ -103,12 +106,14 @@ pub fn retrieve_with_prefilter(
                 let aa2 = map_aa_to_u8(&compact.residue_name[j]);
                 if query_aa_dist_map.contains_key(&(aa1, aa2)) {
                     let dists = query_aa_dist_map.get(&(aa1, aa2)).unwrap();
-                    let curr_dist = compact.get_ca_distance(i, j);
+                    let curr_ca_dist = compact.get_ca_distance(i, j);
+                    let curr_cb_dist = compact.get_cb_distance(i, j);
                     // If curr_dist is Some and within the threshold, add to candidate_pairs
-                    if curr_dist.is_some() {
-                        let curr_dist = curr_dist.unwrap();
-                        for (dist, qi) in dists {
-                            if (curr_dist - dist).abs() < ca_distance_cutoff{
+                    if curr_ca_dist.is_some() && curr_cb_dist.is_some() {
+                        let curr_ca_dist = curr_ca_dist.unwrap();
+                        let curr_cb_dist = curr_cb_dist.unwrap();
+                        for (dist, cb_dist, qi) in dists {
+                            if (curr_ca_dist - dist).abs() < ca_distance_cutoff && (curr_cb_dist - cb_dist).abs() < cb_distance_cutoff {
                                 candidate_pairs.push((*qi, (i, j)));
                             }
                         }
@@ -153,7 +158,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
     multiple_bin: &Option<Vec<(usize, usize)>>, dist_cutoff: f32,
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
-    aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
+    aa_dist_map: &HashMap<(u8, u8), Vec<(f32, f32, usize)>>,
     ca_distance_cutoff: f32, foldcomp_db_reader: &FoldcompDbReader,
 ) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
       Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
@@ -331,7 +336,7 @@ pub fn retrieval_wrapper(
     multiple_bin: &Option<Vec<(usize, usize)>>, dist_cutoff: f32,
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
-    aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
+    aa_dist_map: &HashMap<(u8, u8), Vec<(f32, f32, usize)>>,
     ca_distance_cutoff: f32,
 ) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
       Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {

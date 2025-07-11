@@ -41,3 +41,5 @@ data/huge_map
 data/test_write_hashmap_to_file
 temp
 data/result/*.tsv
+index/e_coli*
+index/h_sapiens*

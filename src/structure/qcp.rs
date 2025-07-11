@@ -91,7 +91,7 @@ impl QCPSuperimposer {
 
         let (rms, rot, _) = qcp(&centered_ref, &centered_coords, self.natoms);
 
-        self.rms = Some(rms);
+        // self.rms = Some(rms);
         self.rot = Some(rot);
         // Check rotated centered_coords and centered_ref
         let _rotated_coords = centered_ref.iter()
@@ -112,6 +112,28 @@ impl QCPSuperimposer {
             com_coords[2] - rotated_com_ref[2]
         ];
         self.tran = Some(tran);
+        // Calc rmsd from rotated_coords and coords.
+        let transformed_coords: Vec<[f32; 3]> = centered_ref.iter()
+            .map(|&coord| {
+                let rotated = rotate(coord, rot);
+                [
+                    rotated[0] + com_coords[0],
+                    rotated[1] + com_coords[1],
+                    rotated[2] + com_coords[2]
+                ]
+            })
+            .collect();
+        let rmsd: f32 = transformed_coords.iter()
+            .zip(coords.iter())
+            .map(|(&transformed, &original)| {
+                (transformed[0] - original[0]).powi(2) +
+                (transformed[1] - original[1]).powi(2) +
+                (transformed[2] - original[2]).powi(2)
+            })
+            .sum::<f32>() / self.natoms as f32;
+        let rmsd = rmsd.sqrt();
+
+        self.rms = Some(rmsd);
     }
 
     pub fn get_transformed(&mut self) -> Vec<[f32; 3]> {
@@ -241,7 +263,7 @@ fn qcp(coords1: &[[f32; 3]], coords2: &[[f32; 3]], natoms: usize) -> (f32, [[f32
     let mut mx_eigenv = e0; // starting guess (x in eqs above)
     let eval_prec = 1e-11; // convergence criterion
     let mut _converged = false;
-    let iteration = 50; // 5 is known to be enough according to BioPython but following the original
+    let iteration = 5; // 5 is known to be enough according to BioPython but following the original
     for _ in 0..iteration {
         let oldg = mx_eigenv;
 

@@ -3,10 +3,9 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::structure::qcp;
 use crate::utils::convert::{map_aa_to_u8, map_u8_to_aa}; 
 use crate::prelude::*; 
-use crate::structure::{coordinate::Coordinate, core::CompactStructure, qcp::QCPSuperimposer, kabsch::KabschSuperimposer}; 
+use crate::structure::{coordinate::Coordinate, core::CompactStructure, kabsch::KabschSuperimposer}; 
 use crate::utils::combination::{CombinationIterator, CombinationVecIterator};
 use crate::controller::graph::{connected_components_with_given_node_count, create_index_graph};
 use crate::controller::feature::get_single_feature;
@@ -609,8 +608,7 @@ pub fn rmsd_for_matched(
     compact1: &CompactStructure, compact2: &CompactStructure, 
     index1: &Vec<usize>, index2: &Vec<usize>
 ) -> f32 {
-    // let mut qcp = QCPSuperimposer::new();
-    let mut qcp = KabschSuperimposer::new();
+    let mut superposer = KabschSuperimposer::new();
 
     let coord_vec1: Vec<Coordinate> = index1.iter().map(
         |&i| (compact1.ca_vector.get_coord(i).unwrap(), compact1.cb_vector.get_coord(i).unwrap())
@@ -620,17 +618,16 @@ pub fn rmsd_for_matched(
         |&i| (compact2.ca_vector.get_coord(i).unwrap(), compact2.cb_vector.get_coord(i).unwrap())
     ).flat_map(|(a, b)| vec![a, b]).collect();
     
-    qcp.set_atoms(&coord_vec1, &coord_vec2);
-    qcp.run();
-    qcp.get_rms()
+    superposer.set_atoms(&coord_vec1, &coord_vec2);
+    superposer.run();
+    superposer.get_rms()
 }
 
 pub fn rmsd_with_calpha_and_rottran(
     compact1: &CompactStructure, compact2: &CompactStructure, 
     index1: &Vec<usize>, index2: &Vec<usize>
 ) -> (f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>) {
-    // let mut qcp = QCPSuperimposer::new();
-    let mut qcp = KabschSuperimposer::new();
+    let mut superposer = KabschSuperimposer::new();
     let coord_vec1: Vec<Coordinate> = index1.iter().map(
         |&i| (compact1.ca_vector.get_coord(i).unwrap(), compact1.cb_vector.get_coord(i).unwrap())
     ).flat_map(|(a, b)| vec![a, b]).collect();
@@ -643,9 +640,9 @@ pub fn rmsd_with_calpha_and_rottran(
         |&i| compact2.ca_vector.get_coord(i).unwrap()
     ).collect();
     
-    qcp.set_atoms(&coord_vec1, &coord_vec2);
-    qcp.run();
-    (qcp.get_rms(), qcp.rot.unwrap(), qcp.tran.unwrap(), target_calpha)
+    superposer.set_atoms(&coord_vec1, &coord_vec2);
+    superposer.run();
+    (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
 }
 
 #[cfg(test)]

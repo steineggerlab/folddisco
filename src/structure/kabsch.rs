@@ -9,9 +9,11 @@
 
 use crate::structure::coordinate::Coordinate;
 
-const EPSILON: f32 = 1.0e-8;
-const TOLERANCE: f32 = 0.01;
-const SQRT3: f32 = 1.7320508075688772; // sqrt(3)
+// Higher precision constants for f64 version
+const EPSILON: f64 = 1.0e-8;
+const TOLERANCE: f64 = 0.01;
+const SQRT3: f64 = 1.7320508075688772; // sqrt(3)
+
 const IP: [usize; 9] = [0, 1, 3, 1, 2, 4, 3, 4, 5]; // Index permutation for 3x3 matrix
 const IP2312: [usize; 4] = [1, 2, 0, 1]; // Index permutation for 2x2 matrix
 
@@ -74,7 +76,7 @@ impl KabschSuperimposer {
         
         let (rot, tran, rmsd) = match kabsch(&coords, &reference_coords, 2) {
             Some(result) => result,
-            None => panic!("Kabsch algorithm failed to compute rotation and translation."),
+            None => ([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], [0.0, 0.0, 0.0], f32::MAX),
         };
         
         self.rot = Some(rot);
@@ -151,50 +153,59 @@ fn add_vec(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }
 
+/// High-precision version of the Kabsch algorithm using f64 for better numerical stability
 fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f32; 3], f32)> {
+    // Convert input f32 arrays to f64 for computation
+    let x_f64: Vec<[f64; 3]> = x.iter().map(|arr| [arr[0] as f64, arr[1] as f64, arr[2] as f64]).collect();
+    let y_f64: Vec<[f64; 3]> = y.iter().map(|arr| [arr[0] as f64, arr[1] as f64, arr[2] as f64]).collect();
+    
     // -----------------------------------------------------------------------
     // 1. Basic sanity checks -------------------------------------------------
     // -----------------------------------------------------------------------
-    let n = x.len();
-    if n == 0 || y.len() != n || x[0].len() != 3 || y[0].len() != 3 {
-        return None;
+    let n = x_f64.len();
+    if n == 0 || y_f64.len() != n {
+        return Some(([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], [0.0, 0.0, 0.0], f32::MAX));
     }
 
     // -----------------------------------------------------------------------
     // 3. Scratch scalars / arrays -------------------------------------------
     // -----------------------------------------------------------------------
-    let mut rms = 0.0_f32;
-    let mut e0 = 0.0_f32;
-    let mut rms1 = 0.0_f32;
-    let mut sigma: f32;
+    let mut rms = 0.0_f64;
+    let mut e0 = 0.0_f64;
+    let mut _rms1 = 0.0_f64;
+    let sigma: f64;
 
-    // vectors
-    let mut s1: [f32; 3] = [0.0; 3];
-    let mut s2: [f32; 3] = [0.0; 3];
-    let mut sx: [f32; 3] = [0.0; 3];
-    let mut sy: [f32; 3] = [0.0; 3];
-    let mut sz: [f32; 3] = [0.0; 3];
-    let mut xc: [f32; 3] = [0.0; 3];
-    let mut yc: [f32; 3] = [0.0; 3];
-    let mut t: [f32; 3] = [0.0; 3];
-    let mut e: [f32; 3] = [0.0; 3];
+    // vectors (f64)
+    let mut s1: [f64; 3] = [0.0; 3];
+    let mut s2: [f64; 3] = [0.0; 3];
+    let mut sx: [f64; 3] = [0.0; 3];
+    let mut sy: [f64; 3] = [0.0; 3];
+    let mut sz: [f64; 3] = [0.0; 3];
+    let mut xc: [f64; 3] = [0.0; 3];
+    let mut yc: [f64; 3] = [0.0; 3];
+    let mut t: [f64; 3] = [0.0; 3];
+    let mut e: [f64; 3] = [0.0; 3];
 
-    // 3×3 matrices
-    let mut r: [[f32; 3]; 3] = [[0.0; 3]; 3];
-    let mut a: [[f32; 3]; 3] = [[0.0; 3]; 3];
-    let mut b: [[f32; 3]; 3] = [[0.0; 3]; 3];
-    let mut u: [[f32; 3]; 3] = [[0.0; 3]; 3]; // ← final rotation
+    // 3×3 matrices (f64)
+    let mut r: [[f64; 3]; 3] = [[0.0; 3]; 3];
+    let mut a: [[f64; 3]; 3] = [[0.0; 3]; 3];
+    let mut b: [[f64; 3]; 3] = [[0.0; 3]; 3];
+    let mut u: [[f64; 3]; 3] = [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0]
+    ];
 
-    // symmetric 3×3 stored as 6 upper‑triangular elements
-    let mut rr: [f32; 6] = [0.0; 6];
-    let mut ss: [f32; 6] = [0.0; 6];
+    // symmetric 3×3 stored as 6 upper‑triangular elements (f64)
+    let mut rr: [f64; 6] = [0.0; 6];
+    let mut ss: [f64; 6] = [0.0; 6];
 
     // -----------------------------------------------------------------------
     // 4. Accumulate first‑ and second‑order sums ----------------------------
     // -----------------------------------------------------------------------
     for i in 0..n {
-        let c1 = [x[i][0], x[i][1], x[i][2]];
-        let c2 = [y[i][0], y[i][1], y[i][2]];
+        let c1 = [x_f64[i][0], x_f64[i][1], x_f64[i][2]];
+        let c2 = [y_f64[i][0], y_f64[i][1], y_f64[i][2]];
 
         for j in 0..3 {
             s1[j] += c1[j];
@@ -216,16 +227,16 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
 
     // centres of mass
     for j in 0..3 {
-        xc[j] = s1[j] / (n as f32);
-        yc[j] = s2[j] / (n as f32);
+        xc[j] = s1[j] / (n as f64);
+        yc[j] = s2[j] / (n as f64);
     }
 
     // pre‑compute e0 if the caller asked for an RMSD
     if mode == 0 || mode == 2 {
         for i in 0..n {
-            e0 += (x[i][0] - xc[0]).powi(2) + (y[i][0] - yc[0]).powi(2);
-            e0 += (x[i][1] - xc[1]).powi(2) + (y[i][1] - yc[1]).powi(2);
-            e0 += (x[i][2] - xc[2]).powi(2) + (y[i][2] - yc[2]).powi(2);
+            e0 += (x_f64[i][0] - xc[0]).powi(2) + (y_f64[i][0] - yc[0]).powi(2);
+            e0 += (x_f64[i][1] - xc[1]).powi(2) + (y_f64[i][1] - yc[1]).powi(2);
+            e0 += (x_f64[i][2] - xc[2]).powi(2) + (y_f64[i][2] - yc[2]).powi(2);
         }
     }
 
@@ -233,12 +244,12 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
     // 5. Build cross‑covariance matrix r ------------------------------------
     // -----------------------------------------------------------------------
     for j in 0..3 {
-        r[j][0] = sx[j] - s1[0] * s2[j] / (n as f32);
-        r[j][1] = sy[j] - s1[1] * s2[j] / (n as f32);
-        r[j][2] = sz[j] - s1[2] * s2[j] / (n as f32);
+        r[j][0] = sx[j] - s1[0] * s2[j] / (n as f64);
+        r[j][1] = sy[j] - s1[1] * s2[j] / (n as f64);
+        r[j][2] = sz[j] - s1[2] * s2[j] / (n as f64);
     }
 
-    // determinant of r – the original code calls this “sigma”
+    // determinant of r
     let det_r = r[0][0] * (r[1][1] * r[2][2] - r[1][2] * r[2][1])
         - r[0][1] * (r[1][0] * r[2][2] - r[1][2] * r[2][0])
         + r[0][2] * (r[1][0] * r[2][1] - r[1][1] * r[2][0]);
@@ -264,15 +275,15 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
             + rr[0] * rr[5] - rr[3] * rr[3]
             + rr[0] * rr[2] - rr[1] * rr[1])
     ) / 3.0;
-    let mut det = det_r * det_r;
+    let det = det_r * det_r;
 
     e.fill(spur);
 
     if spur > 0.0 {
         // -------------------------------------------------------------------
-        // 7a. Eigen‑decomposition branch (identical to the original code) ----
+        // 7a. Eigen‑decomposition branch ----
         // -------------------------------------------------------------------
-        let mut d = spur * spur;
+        let d = spur * spur;
         let h = d - cof;
         let g = (spur * cof - det) / 2.0 - spur * h;
 
@@ -282,7 +293,19 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
             if disc < 0.0 {
                 disc = 0.0;
             }
-            let d_ang = ((disc).sqrt()).atan2(-g) / 3.0;
+            let sqrt_disc = disc.sqrt();
+            
+            // Robust angle computation to avoid NaN from extreme values
+            let d_ang = if g.abs() > 1e18 {  // Higher threshold for f64
+                if g > 0.0 {
+                    std::f64::consts::PI / 3.0
+                } else {
+                    0.0
+                }
+            } else {
+                sqrt_disc.atan2(-g) / 3.0
+            };
+            
             let cth = sqrth * d_ang.cos();
             let sth = sqrth * SQRT3 * d_ang.sin();
 
@@ -290,21 +313,19 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
             e[1] = spur - cth + sth;
             e[2] = spur - cth - sth;
 
-            //----------------------------------------------------------------
-            // The huge “mode != 0” branch that computes A, B, U and T -------
-            //----------------------------------------------------------------
             if mode != 0 {
                 let mut a_failed = false;
                 let mut b_failed = false;
+                
                 // ------- assemble eigen‑vectors in A ------------------------
                 for &l in &[0usize, 2usize] {
-                    d = e[l];
-                    ss[0] = (d - rr[2]) * (d - rr[5]) - rr[4] * rr[4];
-                    ss[1] = (d - rr[5]) * rr[1] + rr[3] * rr[4];
-                    ss[2] = (d - rr[0]) * (d - rr[5]) - rr[3] * rr[3];
-                    ss[3] = (d - rr[2]) * rr[3] + rr[1] * rr[4];
-                    ss[4] = (d - rr[0]) * rr[4] + rr[1] * rr[3];
-                    ss[5] = (d - rr[0]) * (d - rr[2]) - rr[1] * rr[1];
+                    let d_local = e[l];
+                    ss[0] = (d_local - rr[2]) * (d_local - rr[5]) - rr[4] * rr[4];
+                    ss[1] = (d_local - rr[5]) * rr[1] + rr[3] * rr[4];
+                    ss[2] = (d_local - rr[0]) * (d_local - rr[5]) - rr[3] * rr[3];
+                    ss[3] = (d_local - rr[2]) * rr[3] + rr[1] * rr[4];
+                    ss[4] = (d_local - rr[0]) * rr[4] + rr[1] * rr[3];
+                    ss[5] = (d_local - rr[0]) * (d_local - rr[2]) - rr[1] * rr[1];
 
                     for s in &mut ss {
                         if s.abs() <= EPSILON {
@@ -318,22 +339,22 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
                         _ => 2,
                     };
 
-                    d = 0.0;
+                    let mut d_norm = 0.0;
                     for i in 0..3 {
                         let k = IP[3 * j + i];
                         a[i][l] = ss[k];
-                        d += ss[k] * ss[k];
+                        d_norm += ss[k] * ss[k];
                     }
 
-                    if d > EPSILON {
-                        d = 1.0 / d.sqrt();
+                    if d_norm > EPSILON {
+                        d_norm = 1.0 / d_norm.sqrt();
                     } else {
-                        d = 0.0;
+                        d_norm = 0.0;
                     }
                     for i in 0..3 {
-                        a[i][l] *= d;
+                        a[i][l] *= d_norm;
                     }
-                } // end‑for l
+                }
 
                 // ---------- orthogonalise the middle column -----------------
                 let dot = a[0][0] * a[0][2] + a[1][0] * a[1][2] + a[2][0] * a[2][2];
@@ -460,10 +481,9 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
                         }
                     }
                 }
-            } // end if mode != 0
-        } // end if h > 0
-    } // end if spur > 0
-    else {
+            }
+        }
+    } else {
         // purely translational fit
         for i in 0..3 {
             t[i] = yc[i] - (u[i][0] * xc[0] + u[i][1] * xc[1] + u[i][2] * xc[2]);
@@ -487,41 +507,51 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
     d_s += e[1] + e[0];
 
     if mode == 0 || mode == 2 {
-        rms1 = e0 - 2.0 * d_s;
-        if rms1 < 0.0 {
-            rms1 = 0.0;
+        _rms1 = e0 - 2.0 * d_s;
+        if _rms1 < 0.0 {
+            _rms1 = 0.0;
         }
     }
 
     // Simple RMSD calculation as fallback
     if mode == 0 || mode == 2 {
         let mut sum_sq = 0.0;
+        
         for i in 0..n {
-            // Apply transformation: y_transformed = u * x + t
             let transformed = [
-                u[0][0] * (x[i][0] - xc[0]) + u[0][1] * (x[i][1] - xc[1]) + u[0][2] * (x[i][2] - xc[2]) + yc[0],
-                u[1][0] * (x[i][0] - xc[0]) + u[1][1] * (x[i][1] - xc[1]) + u[1][2] * (x[i][2] - xc[2]) + yc[1],
-                u[2][0] * (x[i][0] - xc[0]) + u[2][1] * (x[i][1] - xc[1]) + u[2][2] * (x[i][2] - xc[2]) + yc[2],
+                u[0][0] * x_f64[i][0] + u[0][1] * x_f64[i][1] + u[0][2] * x_f64[i][2] + t[0],
+                u[1][0] * x_f64[i][0] + u[1][1] * x_f64[i][1] + u[1][2] * x_f64[i][2] + t[1],
+                u[2][0] * x_f64[i][0] + u[2][1] * x_f64[i][1] + u[2][2] * x_f64[i][2] + t[2],
             ];
-            
+
             for j in 0..3 {
-                sum_sq += (transformed[j] - y[i][j]).powi(2);
+                let diff = transformed[j] - y_f64[i][j];
+                sum_sq += diff.powi(2);
             }
         }
-        rms = (sum_sq / (n as f32)).sqrt();
+        rms = (sum_sq / (n as f64)).sqrt();
     }
 
-    // rms = rms1;
+    // rms = rms1.sqrt();
 
     // -----------------------------------------------------------------------
-    // 9. Deliver results -----------------------------------------------------
+    // 9. Convert back to f32 and deliver results ----------------------------
     // -----------------------------------------------------------------------
-    Some((u, t, rms))
+    
+    // Convert f64 results back to f32
+    let u_f32: [[f32; 3]; 3] = [
+        [u[0][0] as f32, u[0][1] as f32, u[0][2] as f32],
+        [u[1][0] as f32, u[1][1] as f32, u[1][2] as f32],
+        [u[2][0] as f32, u[2][1] as f32, u[2][2] as f32],
+    ];
+    let t_f32: [f32; 3] = [t[0] as f32, t[1] as f32, t[2] as f32];
+    let mut rms_f32 = rms as f32;
+    if rms_f32.is_nan() {
+        rms_f32 = f32::MAX;
+    }
+    
+    Some((u_f32, t_f32, rms_f32))
 }
-
-
-
-
 
 
 
@@ -552,7 +582,10 @@ mod tests {
 
         let mut superimposer = KabschSuperimposer::new();
         superimposer.set_atoms(&source, &target1);
+        let start = std::time::Instant::now();
         println!("RMSD after superimposition: {}", superimposer.get_rms());
+        let duration = start.elapsed();
+        println!("Time taken for superimposition: {:?}", duration);
         println!("Transformed coordinates: {:?}", superimposer.get_transformed());
         println!("Rotation matrix: {:?}", superimposer.get_rotran().0);
         println!("Translation vector: {:?}", superimposer.get_rotran().1);
@@ -560,7 +593,10 @@ mod tests {
         
         superimposer.set_atoms(&source, &target2);
         assert!(superimposer.get_rms() < 0.2);
+        let start = std::time::Instant::now();
         println!("RMSD after superimposition: {}", superimposer.get_rms());
+        let duration = start.elapsed();
+        println!("Time taken for superimposition: {:?}", duration);
         println!("Transformed coordinates: {:?}", superimposer.get_transformed());
         println!("Rotation matrix: {:?}", superimposer.get_rotran().0);
         println!("Translation vector: {:?}", superimposer.get_rotran().1);

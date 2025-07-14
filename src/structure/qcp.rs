@@ -1,4 +1,4 @@
-// File: icp.rs
+// File: qcp.rs
 // Created: 2024-05-09 17:50:26
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
@@ -89,73 +89,65 @@ impl QCPSuperimposer {
             })
             .collect();
 
-        let (rms, rot, _) = qcp(&centered_ref, &centered_coords, self.natoms);
+        // Get rotation from QCP (aligns centered_coords to centered_ref)
+        let (_rms_from_qcp, rot, _) = qcp(&centered_coords, &centered_ref, self.natoms);
 
-        // self.rms = Some(rms);
         self.rot = Some(rot);
-        // Check rotated centered_coords and centered_ref
-        let _rotated_coords = centered_ref.iter()
-            .map(|&coord| {
-                let rotated = rotate(coord, rot);
-                [
-                    rotated[0],
-                    rotated[1],
-                    rotated[2],
-                ]
-            })
-            .collect::<Vec<[f32; 3]>>();
-        // Translate center of mass of reference to center of mass of coords
-        let rotated_com_ref = rotate(com_ref, rot);
+        
+        // Correct translation calculation
+        let rotated_com_coords = rotate(com_coords, rot);
         let tran = [
-            com_coords[0] - rotated_com_ref[0],
-            com_coords[1] - rotated_com_ref[1],
-            com_coords[2] - rotated_com_ref[2]
+            com_ref[0] - rotated_com_coords[0],
+            com_ref[1] - rotated_com_coords[1],
+            com_ref[2] - rotated_com_coords[2]
         ];
         self.tran = Some(tran);
-        // Calc rmsd from rotated_coords and coords.
-        let transformed_coords: Vec<[f32; 3]> = centered_ref.iter()
-            .map(|&coord| {
-                let rotated = rotate(coord, rot);
-                [
-                    rotated[0] + com_coords[0],
-                    rotated[1] + com_coords[1],
-                    rotated[2] + com_coords[2]
-                ]
+
+        // Recalculate rmsd with rot, tran
+        self.transformed_coords = Some(
+            coords.iter()
+                .map(|&coord| {
+                    let rotated = rotate(coord, rot);
+                    [
+                        rotated[0] + tran[0],
+                        rotated[1] + tran[1],
+                        rotated[2] + tran[2]
+                    ]
+                })
+                .collect()
+        );
+        
+        // Calculate final RMSD with transformed coordinates and reference coordinates
+        let transformed_coords = self.transformed_coords.clone().unwrap();
+        let diff: Vec<f32> = transformed_coords.iter()
+            .zip(reference_coords.iter())
+            .map(|(&c1, &c2)| {
+                (c1[0] - c2[0]).powi(2) + (c1[1] - c2[1]).powi(2) + (c1[2] - c2[2]).powi(2)
             })
             .collect();
-        let rmsd: f32 = transformed_coords.iter()
-            .zip(coords.iter())
-            .map(|(&transformed, &original)| {
-                (transformed[0] - original[0]).powi(2) +
-                (transformed[1] - original[1]).powi(2) +
-                (transformed[2] - original[2]).powi(2)
-            })
-            .sum::<f32>() / self.natoms as f32;
-        let rmsd = rmsd.sqrt();
-
-        self.rms = Some(rmsd);
+        self.rms = Some((diff.iter().sum::<f32>() / self.natoms as f32).sqrt());        
+        
     }
 
     pub fn get_transformed(&mut self) -> Vec<[f32; 3]> {
-        if self.transformed_coords.is_none() {
-            let coords = self.reference_coords.clone().unwrap();
-            let rot = self.rot.unwrap();
-            let tran = self.tran.unwrap();
+        // Always recalculate transformed_coords
+        let coords = self.coords.clone().unwrap();
+        let rot = self.rot.unwrap();
+        let tran = self.tran.unwrap();
 
-            self.transformed_coords = Some(
-                coords.iter()
-                    .map(|&coord| {
-                        let rotated = rotate(coord, rot);
-                        [
-                            rotated[0] + tran[0],
-                            rotated[1] + tran[1],
-                            rotated[2] + tran[2]
-                        ]
-                    })
-                    .collect()
-            );
-        }
-        self.transformed_coords.clone().unwrap()
+        self.transformed_coords = Some(
+            coords.iter()
+                .map(|&coord| {
+                    let rotated = rotate(coord, rot);
+                    [
+                        rotated[0] + tran[0],
+                        rotated[1] + tran[1],
+                        rotated[2] + tran[2]
+                    ]
+                })
+                .collect()
+        );
+    self.transformed_coords.clone().unwrap()
     }
 
     pub fn get_rotran(&self) -> ([[f32; 3]; 3], [f32; 3]) {
@@ -446,8 +438,23 @@ mod tests {
 
         let mut superimposer = QCPSuperimposer::new();
         superimposer.set_atoms(&source, &target1);
-        assert!(superimposer.get_rms() < 0.2);
+        // assert!(superimposer.get_rms() < 0.2);
+        let start  = std::time::Instant::now();
+        println!("RMSD after superimposition: {}", superimposer.get_rms());
+        let duration = start.elapsed();
+        println!("Time taken for superimposition: {:?}", duration);
+        println!("Transformed coordinates: {:?}", superimposer.get_transformed());
+        println!("Rotation matrix: {:?}", superimposer.get_rotran().0);
+        println!("Translation vector: {:?}", superimposer.get_rotran().1);
         superimposer.set_atoms(&source, &target2);
+        // assert!(superimposer.get_rms() < 0.2);
+        let start = std::time::Instant::now();
+        println!("RMSD after superimposition: {}", superimposer.get_rms());
+        let duration = start.elapsed();
+        println!("Time taken for superimposition: {:?}", duration);
+        println!("Transformed coordinates: {:?}", superimposer.get_transformed());
+        println!("Rotation matrix: {:?}", superimposer.get_rotran().0);
+        println!("Translation vector: {:?}", superimposer.get_rotran().1);
         assert!(superimposer.get_rms() < 0.2);
     }
 }

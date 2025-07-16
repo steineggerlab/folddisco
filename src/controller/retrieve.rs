@@ -15,7 +15,8 @@ use crate::controller::io::read_structure_from_path;
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::fcz::FoldcompDbReader;
 
-
+const PREFILTER_AA_SKIPPING_SIZE: usize = 200; // If query vector is larger than this, skip prefiltering amino acids
+const RESIDUE_RESCUE_COUNT_CUTOFF: usize = 2; 
 
 pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
     let mut output: HashSet<(u32, u32)> = HashSet::new();
@@ -179,15 +180,9 @@ pub fn retrieval_wrapper_for_foldcompdb(
         dist_cutoff, ca_distance_cutoff, aa_dist_map
     );
     
-    let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
+    let candidate_pair_map: HashMap<usize, HashSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
-            if !map.contains_key(&qi) {
-                let mut set = BTreeSet::new();
-                set.insert(pair);
-                map.insert(qi, set);
-            } else {
-                map.get_mut(&qi).unwrap().insert(pair);
-            }
+            map.entry(qi).or_insert_with(HashSet::new).insert(pair);
             map
         }
     );
@@ -217,60 +212,76 @@ pub fn retrieval_wrapper_for_foldcompdb(
             &subgraph, query_map, node_count, &query_symmetry_map,
         );
 
-        let mut query_indices_scanned: Vec<usize> = Vec::new();
-        let mut retrieved_indices_scanned: Vec<usize> = Vec::new();
+        // Pre-build HashSets for O(1) lookups instead of O(n) vector operations
+        let retrieved_indices_set: HashSet<usize> = retrieved_indices.iter().cloned().collect();
+        let query_to_retrieved: HashMap<usize, usize> = query_indices.iter()
+            .zip(retrieved_indices.iter())
+            .map(|(&q, &r)| (q, r))
+            .collect();
+
+        let mut query_indices_scanned: Vec<usize> = Vec::with_capacity(all_query_indices.len());
+        let mut retrieved_indices_scanned: Vec<usize> = Vec::with_capacity(retrieved_indices.len());
+        let mut retrieved_indices_scanned_set: HashSet<usize> = HashSet::with_capacity(retrieved_indices.len());
+
         // Sort component to match retrieved indices
-        let mut res_vec: Vec<ResidueMatch> = Vec::new();
-        let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::new();
+        let mut res_vec: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
+        let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
         let mut count_map: HashMap<usize, usize> = HashMap::new();
+        
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
             count_map.clear();
-            if query_indices.contains(&i) {
-                let index = query_indices.iter().position(|&x| x == i).unwrap();
-                let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_indices[index]);
+            if let Some(&retrieved_index) = query_to_retrieved.get(&i) {
+                let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_index);
                 res_vec_from_hash.push(Some((chain, res_ind)));
-                if !retrieved_indices_scanned.contains(&retrieved_indices[index]) {
+                
+                if !retrieved_indices_scanned_set.contains(&retrieved_index) {
                     res_vec.push(Some((chain, res_ind)));
                     query_indices_scanned.push(i);
-                    retrieved_indices_scanned.push(retrieved_indices[index]);
+                    retrieved_indices_scanned.push(retrieved_index);
+                    retrieved_indices_scanned_set.insert(retrieved_index);
                 } else {
-                    // Substitute res_vec
-                    let prev_index = retrieved_indices_scanned.iter().position(|&x| x == retrieved_indices[index]).unwrap();
-                    res_vec[prev_index] = None;
-                    res_vec.push(Some((chain, res_ind)));
-                    // Delete previous indices in query_indices_scanned and retrieved_indices_scanned
-                    query_indices_scanned.remove(prev_index);
-                    retrieved_indices_scanned.remove(prev_index);
-                    query_indices_scanned.push(i);
-                    retrieved_indices_scanned.push(retrieved_indices[index]);
+                    // Find and replace previous entry - more complex but still O(n) in worst case
+                    // This case should be rare, so we keep it simple
+                    if let Some(prev_pos) = retrieved_indices_scanned.iter().position(|&x| x == retrieved_index) {
+                        res_vec[prev_pos] = None;
+                        res_vec.push(Some((chain, res_ind)));
+                        query_indices_scanned.remove(prev_pos);
+                        retrieved_indices_scanned.remove(prev_pos);
+                        retrieved_indices_scanned_set.remove(&retrieved_index);
+                        query_indices_scanned.push(i);
+                        retrieved_indices_scanned.push(retrieved_index);
+                        retrieved_indices_scanned_set.insert(retrieved_index);
+                    }
                 }
-                // res_vec.push(res_index_to_char(chain, res_ind));
-                // query_indices_scanned.push(i);
-                // retrieved_indices_scanned.push(retrieved_indices[index]);
             } else {
                 res_vec_from_hash.push(None);
                 if candidate_pair_map.contains_key(&i) {
                     let pairs = candidate_pair_map.get(&i).unwrap().clone();
+                    let mut max_count = 0usize;
                     for (j, k) in pairs {
-                        // If retrieved_indices contains k, add j to mapping
-                        if retrieved_indices.contains(&k) {
-                            if !count_map.contains_key(&j) {
-                                count_map.insert(j, 1);
-                            } else {
-                                let count = count_map.get_mut(&j).unwrap();
-                                *count += 1;
+                        // Use HashSet for O(1) lookup instead of O(n) vector contains
+                        if retrieved_indices_set.contains(&k) {
+                            *count_map.entry(j).or_insert(0) += 1;
+                            // Track maximum count for this residue
+                            if *count_map.get(&j).unwrap() > max_count {
+                                max_count = *count_map.get(&j).unwrap();
                             }
                         }
                     }
                 }
                 if !count_map.is_empty() {
-                    let max = count_map.iter().max_by(|a, b| a.1.cmp(b.1)).unwrap();
-                    if *max.1 > 1 && !retrieved_indices_scanned.contains(max.0) {
-                        let (chain, res_ind) = get_chain_and_res_ind(&compact, *max.0);
+                    let max = count_map.iter().filter(|&(_, &v)| v == *count_map.values().max().unwrap())
+                        .map(|(&k, &v)| (k, v))
+                        .collect::<Vec<_>>();
+                    
+                    if max.len() == 1 && max[0].1 >= RESIDUE_RESCUE_COUNT_CUTOFF && !retrieved_indices_scanned_set.contains(&max[0].0) {
+                        // If only one max entry and it has count > 1, add it
+                        let (chain, res_ind) = get_chain_and_res_ind(&compact, max[0].0);
                         res_vec.push(Some((chain, res_ind)));
                         query_indices_scanned.push(i);
-                        retrieved_indices_scanned.push(*max.0);
+                        retrieved_indices_scanned.push(max[0].0);
+                        retrieved_indices_scanned_set.insert(max[0].0);
                     } else {
                         res_vec.push(None);
                     }
@@ -358,15 +369,9 @@ pub fn retrieval_wrapper(
         multiple_bin, dist_cutoff, ca_distance_cutoff, aa_dist_map
     );
 
-    let candidate_pair_map: HashMap<usize, BTreeSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
+    let candidate_pair_map: HashMap<usize, HashSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
-            if !map.contains_key(&qi) {
-                let mut set = BTreeSet::new();
-                set.insert(pair);
-                map.insert(qi, set);
-            } else {
-                map.get_mut(&qi).unwrap().insert(pair);
-            }
+            map.entry(qi).or_insert_with(HashSet::new).insert(pair);
             map
         }
     );
@@ -397,59 +402,78 @@ pub fn retrieval_wrapper(
             &subgraph, query_map, node_count, &query_symmetry_map,
         );
 
-        let mut query_indices_scanned: Vec<usize> = Vec::new();
-        let mut retrieved_indices_scanned: Vec<usize> = Vec::new();
+        // Pre-build HashSets for O(1) lookups instead of O(n) vector operations
+        let retrieved_indices_set: HashSet<usize> = retrieved_indices.iter().cloned().collect();
+        let query_to_retrieved: HashMap<usize, usize> = query_indices.iter()
+            .zip(retrieved_indices.iter())
+            .map(|(&q, &r)| (q, r))
+            .collect();
+
+        let mut query_indices_scanned: Vec<usize> = Vec::with_capacity(all_query_indices.len());
+        let mut retrieved_indices_scanned: Vec<usize> = Vec::with_capacity(all_query_indices.len());
+        let mut retrieved_indices_scanned_set: HashSet<usize> = HashSet::with_capacity(all_query_indices.len());
+
         // Sort component to match retrieved indices
-        let mut res_vec: Vec<ResidueMatch> = Vec::new();
-        let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::new();
+        let mut res_vec: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
+        let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
         let mut count_map: HashMap<usize, usize> = HashMap::new();
+        
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
             count_map.clear();
-            if query_indices.contains(&i) {
-                let index = query_indices.iter().position(|&x| x == i).unwrap();
-                let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_indices[index]);
+            if let Some(&retrieved_index) = query_to_retrieved.get(&i) {
+                let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_index);
                 res_vec_from_hash.push(Some((chain, res_ind)));
-                if !retrieved_indices_scanned.contains(&retrieved_indices[index]) {
+                
+                if !retrieved_indices_scanned_set.contains(&retrieved_index) {
                     res_vec.push(Some((chain, res_ind)));
                     query_indices_scanned.push(i);
-                    retrieved_indices_scanned.push(retrieved_indices[index]);
+                    retrieved_indices_scanned.push(retrieved_index);
+                    retrieved_indices_scanned_set.insert(retrieved_index);
                 } else {
-                    // Substitute res_vec
-                    let prev_index = retrieved_indices_scanned.iter().position(|&x| x == retrieved_indices[index]).unwrap();
-                    res_vec[prev_index] = None;
-                    res_vec.push(Some((chain, res_ind)));
-                    // Delete previous indices in query_indices_scanned and retrieved_indices_scanned
-                    query_indices_scanned.remove(prev_index);
-                    retrieved_indices_scanned.remove(prev_index);
-                    query_indices_scanned.push(i);
-                    retrieved_indices_scanned.push(retrieved_indices[index]);
+                    // Find and replace previous entry - more complex but still O(n) in worst case
+                    // This case should be rare, so we keep it simple
+                    if let Some(prev_pos) = retrieved_indices_scanned.iter().position(|&x| x == retrieved_index) {
+                        res_vec[prev_pos] = None;
+                        res_vec.push(Some((chain, res_ind)));
+                        query_indices_scanned.remove(prev_pos);
+                        retrieved_indices_scanned.remove(prev_pos);
+                        retrieved_indices_scanned_set.remove(&retrieved_index);
+                        query_indices_scanned.push(i);
+                        retrieved_indices_scanned.push(retrieved_index);
+                        retrieved_indices_scanned_set.insert(retrieved_index);
+                    }
                 }
             } else {
                 res_vec_from_hash.push(None);
                 if candidate_pair_map.contains_key(&i) {
                     let pairs = candidate_pair_map.get(&i).unwrap().clone();
-                    // pairs.sort_by(|a, b| a.0.cmp(&b.0));
-                    // pairs.dedup();
+                    let mut max_count = 0usize;
                     for (j, k) in pairs {
-                        // If retrieved_indices contains k, add j to mapping
-                        if retrieved_indices.contains(&k) {
-                            if !count_map.contains_key(&j) {
-                                count_map.insert(j, 1);
-                            } else {
-                                let count = count_map.get_mut(&j).unwrap();
-                                *count += 1;
+                        // Use HashSet for O(1) lookup instead of O(n) vector contains
+                        if retrieved_indices_set.contains(&k) {
+                            *count_map.entry(j).or_insert(0) += 1;
+                            // Track maximum count for this residue
+                            if *count_map.get(&j).unwrap() > max_count {
+                                max_count = *count_map.get(&j).unwrap();
                             }
                         }
                     }
                 }
                 if !count_map.is_empty() {
-                    let max = count_map.iter().max_by(|a, b| a.1.cmp(b.1)).unwrap();
-                    if *max.1 > 1 && !retrieved_indices_scanned.contains(max.0) {
-                        let (chain, res_ind) = get_chain_and_res_ind(&compact, *max.0);
+                    // let max = count_map.iter().max_by(|a, b| a.1.cmp(b.1)).unwrap();
+                    // Get all max entries as a vector
+                    let max = count_map.iter().filter(|&(_, &v)| v == *count_map.values().max().unwrap())
+                        .map(|(&k, &v)| (k, v))
+                        .collect::<Vec<_>>();
+
+                    if max.len() == 1 && max[0].1 >= RESIDUE_RESCUE_COUNT_CUTOFF && !retrieved_indices_scanned_set.contains(&max[0].0) {
+                        // If only one max entry and it has count > 1, add it
+                        let (chain, res_ind) = get_chain_and_res_ind(&compact, max[0].0);
                         res_vec.push(Some((chain, res_ind)));
                         query_indices_scanned.push(i);
-                        retrieved_indices_scanned.push(*max.0);
+                        retrieved_indices_scanned.push(max[0].0);
+                        retrieved_indices_scanned_set.insert(max[0].0);
                     } else {
                         res_vec.push(None);
                     }
@@ -508,6 +532,11 @@ pub fn prefilter_amino_acid(query_set: &HashSet<GeometricHash>, _hash_type: Hash
     let mut observed_aa2: HashSet<u8> = HashSet::with_capacity(20);
     let mut index_vec1 = BTreeSet::new();
     let mut index_vec2 = BTreeSet::new();
+    // If query_set is too large, just return empty sets
+    if query_set.len() > PREFILTER_AA_SKIPPING_SIZE {
+        return (index_vec1, index_vec2);
+    }
+
     let mut feature_holder = vec![0.0; 9];
     query_set.iter().for_each(|hash| {
         hash.reverse_hash_default(&mut feature_holder);
@@ -515,27 +544,25 @@ pub fn prefilter_amino_acid(query_set: &HashSet<GeometricHash>, _hash_type: Hash
         let aa2 = feature_holder[_hash_type.amino_acid_index().unwrap()[1]] as u8;
         if !observed_aa1.contains(&aa1) {
             observed_aa1.insert(aa1);
-            compact.residue_name.iter().enumerate().filter_map(|(i, &res)| {
+            let indices: Vec<usize> = compact.residue_name.iter().enumerate().filter_map(|(i, &res)| {
                 if res == map_u8_to_aa(aa1).as_bytes() {
                     Some(i)
                 } else {
                     None
                 }
-            }).for_each(|i| {
-                index_vec1.insert(i);
-            });
+            }).collect();
+            index_vec1.extend(indices);
         }
         if !observed_aa2.contains(&aa2) {
             observed_aa2.insert(aa2);
-            compact.residue_name.iter().enumerate().filter_map(|(i, &res)| {
+            let indices: Vec<usize> = compact.residue_name.iter().enumerate().filter_map(|(i, &res)| {
                 if res == map_u8_to_aa(aa2).as_bytes() {
                     Some(i)
                 } else {
                     None
                 }
-            }).for_each(|i| {
-                index_vec2.insert(i);
-            });
+            }).collect();
+            index_vec2.extend(indices);
         }
     });
     (index_vec1, index_vec2)
@@ -549,6 +576,11 @@ pub fn map_query_and_retrieved_residues(
 ) -> (Vec<usize>, Vec<usize>) {
     let mut query_indices: Vec<usize> = Vec::new();
     let mut retrieved_indices: Vec<usize> = Vec::new();
+    
+    // Use HashSets for O(1) lookups instead of O(n) vector contains operations
+    let mut query_indices_set: HashSet<usize> = HashSet::new();
+    let mut retrieved_indices_set: HashSet<usize> = HashSet::new();
+    
     // Iterate over edges in the graph
     retrieved.edge_indices().for_each(|edge| {
         let (i, j) = retrieved.edge_endpoints(edge).unwrap();
@@ -558,43 +590,63 @@ pub fn map_query_and_retrieved_residues(
             let (query_i, query_j) = query.unwrap().0;
             // If symmetry is true, push both query_i and query_j in ascending order
             if *query_symmetry_map.get(&hash).unwrap() {
-                if !query_indices.contains(&query_i) && !retrieved_indices.contains(&retrieved[i]) &&
-                   !query_indices.contains(&query_j) && !retrieved_indices.contains(&retrieved[j]) {
+                if !query_indices_set.contains(&query_i) && !retrieved_indices_set.contains(&retrieved[i]) &&
+                   !query_indices_set.contains(&query_j) && !retrieved_indices_set.contains(&retrieved[j]) {
                     // Remap by ordering
                     if query_i < query_j {
                         if retrieved[i] < retrieved[j] {
                             query_indices.push(query_i);
                             retrieved_indices.push(retrieved[i]);
+                            query_indices_set.insert(query_i);
+                            retrieved_indices_set.insert(retrieved[i]);
                             query_indices.push(query_j);
                             retrieved_indices.push(retrieved[j]);
+                            query_indices_set.insert(query_j);
+                            retrieved_indices_set.insert(retrieved[j]);
                         } else {
                             query_indices.push(query_i);
                             retrieved_indices.push(retrieved[j]);
+                            query_indices_set.insert(query_i);
+                            retrieved_indices_set.insert(retrieved[j]);
                             query_indices.push(query_j);
                             retrieved_indices.push(retrieved[i]);
+                            query_indices_set.insert(query_j);
+                            retrieved_indices_set.insert(retrieved[i]);
                         }
                     } else {
                         if retrieved[i] < retrieved[j] {
                             query_indices.push(query_j);
                             retrieved_indices.push(retrieved[i]);
+                            query_indices_set.insert(query_j);
+                            retrieved_indices_set.insert(retrieved[i]);
                             query_indices.push(query_i);
                             retrieved_indices.push(retrieved[j]);
+                            query_indices_set.insert(query_i);
+                            retrieved_indices_set.insert(retrieved[j]);
                         } else {
                             query_indices.push(query_j);
                             retrieved_indices.push(retrieved[j]);
+                            query_indices_set.insert(query_j);
+                            retrieved_indices_set.insert(retrieved[j]);
                             query_indices.push(query_i);
                             retrieved_indices.push(retrieved[i]);
+                            query_indices_set.insert(query_i);
+                            retrieved_indices_set.insert(retrieved[i]);
                         }
                     }
                 }
             }
-            if !query_indices.contains(&query_i) && !retrieved_indices.contains(&retrieved[i]) {
+            if !query_indices_set.contains(&query_i) && !retrieved_indices_set.contains(&retrieved[i]) {
                 query_indices.push(query_i);
                 retrieved_indices.push(retrieved[i]);
+                query_indices_set.insert(query_i);
+                retrieved_indices_set.insert(retrieved[i]);
             }
-            if !query_indices.contains(&query_j) && !retrieved_indices.contains(&retrieved[j]){
+            if !query_indices_set.contains(&query_j) && !retrieved_indices_set.contains(&retrieved[j]){
                 query_indices.push(query_j);
                 retrieved_indices.push(retrieved[j]);
+                query_indices_set.insert(query_j);
+                retrieved_indices_set.insert(retrieved[j]);
             }
         }
         if retrieved_indices.len() == node_count {
@@ -608,6 +660,7 @@ pub fn rmsd_for_matched(
     compact1: &CompactStructure, compact2: &CompactStructure, 
     index1: &Vec<usize>, index2: &Vec<usize>
 ) -> f32 {
+    // let mut superposer = KabschSuperimposer::new();
     let mut superposer = KabschSuperimposer::new();
 
     let coord_vec1: Vec<Coordinate> = index1.iter().map(

@@ -71,25 +71,25 @@ impl CompactStructure {
         // Store only backbone atoms
         let model = &origin.atom_vector;
 
-        let mut res_serial_vec: Vec<u64> = Vec::new();
-        let mut res_name_vec: Vec<[u8; 3]> = Vec::new();
-        let mut b_factors: Vec<f32> = Vec::new();
-        let mut n_vec = CarbonCoordinateVector::new();
-        let mut ca_vec = CarbonCoordinateVector::new();
-        let mut cb_vec = CarbonCoordinateVector::new();
+        let mut res_serial_vec: Vec<u64> = Vec::with_capacity(origin.num_residues);
+        let mut res_name_vec: Vec<[u8; 3]> = Vec::with_capacity(origin.num_residues);
+        let mut b_factors: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut n_vec = CarbonCoordinateVector::with_capacity(origin.num_residues);
+        let mut ca_vec = CarbonCoordinateVector::with_capacity(origin.num_residues);
+        let mut cb_vec = CarbonCoordinateVector::with_capacity(origin.num_residues);
 
-        let mut n_vec_x: Vec<f32> = Vec::new();
-        let mut n_vec_y: Vec<f32> = Vec::new();
-        let mut n_vec_z: Vec<f32> = Vec::new();
-        let mut ca_vec_x: Vec<f32> = Vec::new();
-        let mut ca_vec_y: Vec<f32> = Vec::new();
-        let mut ca_vec_z: Vec<f32> = Vec::new();
-        let mut cb_vec_x: Vec<f32> = Vec::new();
-        let mut cb_vec_y: Vec<f32> = Vec::new();
-        let mut cb_vec_z: Vec<f32> = Vec::new();
+        let mut n_vec_x: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut n_vec_y: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut n_vec_z: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut ca_vec_x: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut ca_vec_y: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut ca_vec_z: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut cb_vec_x: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut cb_vec_y: Vec<f32> = Vec::with_capacity(origin.num_residues);
+        let mut cb_vec_z: Vec<f32> = Vec::with_capacity(origin.num_residues);
         
-        
-        let mut chain_per_residue: Vec<u8> = Vec::new();
+
+        let mut chain_per_residue: Vec<u8> = Vec::with_capacity(origin.num_residues);
         let mut prev_res_serial: Option<u64> = None;
         let mut prev_res_name: Option<&[u8; 3]> = None;
         let mut n: Option<Coordinate> = None;

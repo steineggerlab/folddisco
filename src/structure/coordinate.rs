@@ -308,6 +308,27 @@ impl CarbonCoordinateVector {
             z: Vec::new(),
         }
     }
+    
+    pub fn with_capacity(capacity: usize) -> Self {
+        CarbonCoordinateVector {
+            x: Vec::with_capacity(capacity),
+            y: Vec::with_capacity(capacity),
+            z: Vec::with_capacity(capacity),
+        }
+    }
+    
+    pub fn len(&self) -> usize {
+        self.x.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.x.is_empty()
+    }
+    pub fn clear(&mut self) {
+        self.x.clear();
+        self.y.clear();
+        self.z.clear();
+    }
+
     pub fn get(&self, idx: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
         // Handle out of bound
         if idx >= self.x.len() {

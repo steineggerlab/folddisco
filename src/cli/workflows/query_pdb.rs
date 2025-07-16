@@ -49,9 +49,9 @@ input/output:
  
 search parameters:
  -t, --threads <INT>              Number of threads [1]
- -d, --distance <FLOAT>           Distance threshold in Angstroms. Multiple values can be separated by comma [0.0]
- -a, --angle <FLOAT>              Angle threshold. Multiple values can be separated by comma [0.0]
- --ca-distance <FLOAT>            C-alpha distance threshold in matching residues [1.5]
+ -d, --distance <FLOAT>           Distance threshold in Angstroms. Multiple values can be separated by comma [0.5]
+ -a, --angle <FLOAT>              Angle threshold. Multiple values can be separated by comma [5.0]
+ --ca-distance <FLOAT>            C-alpha distance threshold in matching residues [1.0]
  --sampling-count <INT>           Number of sampled hashes to search [all]
  --sampling-ratio <FLOAT>         Sampling ratio for hashes used in searching. For long queries, smaller ratio is recommended [1.0]
  --freq-filter <FLOAT>            Skip queries with hash frequency higher than given ratio [0.0]

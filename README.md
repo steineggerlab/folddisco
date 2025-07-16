@@ -71,8 +71,6 @@ Download pre-built index files:
 
 ### Querying
 
-> ## **NOTE:** `-r` flag has been removed. Now, residue matching and RMSD calculation are enabled by default. If you want to skip residue matching and RMSD calculation, use `--skip-match`.
-
 #### Examples
 ```bash
 # Search with default settings. This will print out matching motifs with sorting by RMSD.

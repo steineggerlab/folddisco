@@ -185,6 +185,7 @@ pub fn read_usize_vector(path: &str)-> Result<(Mmap, &'static [u64]), Error> {
 pub fn get_values_with_offset(vec: &[u64], offset: usize, length: usize) -> &[u64] {
     &vec[offset..offset + length]
 }
+
 pub fn get_values_with_offset_u16(vec: &[u16], offset: usize, length: usize) -> &[u16] {
     &vec[offset..offset + length]
 }

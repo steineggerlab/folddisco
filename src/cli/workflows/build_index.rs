@@ -17,16 +17,12 @@ use crate::cli::*;
 use crate::controller::io::write_usize_vector_in_bits;
 use crate::prelude::*;
 use crate::structure::io::StructureFileFormat;
-use peak_alloc::PeakAlloc;
 
 #[cfg(feature= "foldcomp")]
 use crate::structure::io::fcz::*;
 
 #[cfg(feature = "foldcomp")]
 use rayon::prelude::ParallelSliceMut;
-
-#[global_allocator]
-static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 pub const HELP_INDEX: &str = "\
 usage: folddisco index -p <i:PDB_DIR>|<i:FOLDCOMP_DB> -i <o:INDEX_PATH> [OPTIONS]
@@ -168,9 +164,7 @@ pub fn build_index(env: AppArgs) {
                     if verbose { print_log_msg(INFO, &format!("Indexing chunk {}", i)); }
                     format!("{}_{}", index_path, i)
                 };
-                if verbose {
-                    print_log_msg(INFO, &format!("Before initializing (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb()))
-                };
+
                 #[cfg(not(feature = "foldcomp"))]
                 let mut folddisco = FoldDisco::new(
                     pdb_path_vec.to_vec(), hash_type, num_threads, 
@@ -201,7 +195,7 @@ pub fn build_index(env: AppArgs) {
                             print_log_msg(INFO, "Collecting ids of the structures"); 
                             measure_time!(folddisco.collect_hash_vec());
                             print_log_msg(INFO, 
-                                &format!("Total {} hashes collected (Allocated {}MB)", folddisco.hash_id_vec.len(), PEAK_ALLOC.current_usage_as_mb())
+                                &format!("Total {} hashes collected", folddisco.hash_id_vec.len())
                             );
                             measure_time!(folddisco.sort_hash_vec());
                         } else {
@@ -213,9 +207,7 @@ pub fn build_index(env: AppArgs) {
                         if verbose {
                             print_log_msg(INFO, "Collecting ids of the structures");
                             measure_time!(folddisco.collect_and_count());
-                            print_log_msg(INFO, 
-                                &format!("Hashes collected (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
-                            );
+                            print_log_msg(INFO, &format!("Hashes collected"));
                             measure_time!(folddisco.fold_disco_index.allocate_entries());
                             measure_time!(folddisco.add_entries());
                             measure_time!(folddisco.fold_disco_index.finish_index());
@@ -229,10 +221,7 @@ pub fn build_index(env: AppArgs) {
                         }
                     }
                 }
-                if verbose { print_log_msg(INFO,
-                    &format!("Hash sorted (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb())
-                    // "Hash sorted"
-                ); }
+                if verbose { print_log_msg(INFO,"Hash sorted"); }
                 folddisco.fill_numeric_id_vec();
 
                 match index_mode {
@@ -241,7 +230,7 @@ pub fn build_index(env: AppArgs) {
                         let value_path = format!("{}.value", index_path);
                         if verbose {
                             let (offset_map, value_vec) = measure_time!(convert_sorted_hash_vec_to_simplemap(folddisco.hash_id_vec));
-                            print_log_msg(INFO, &format!("Offset & values acquired (Allocated {}MB)", PEAK_ALLOC.current_usage_as_mb()));
+                            print_log_msg(INFO, &format!("Offset & values acquired"));
                             measure_time!(offset_map.dump_to_disk(&PathBuf::from(&offset_path)).expect(
                                &log_msg(FAIL, "Failed to save offset table")
                             ));

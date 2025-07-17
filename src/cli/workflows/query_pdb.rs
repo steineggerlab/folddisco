@@ -63,8 +63,6 @@ filtering options:
  --total-match <INT>              Filter out structures with less than total match count [0]
  --covered-node <INT>             Filter out structures not covered by given number of nodes with hashes [0]
  --covered-node-ratio <FLOAT>     Filter out structures not covered by given ratio of nodes with hashes [0.0]
- --covered-edge <INT>             Filter out structures not covered by given number of edges with hashes [0]
- --covered-edge-ratio <FLOAT>     Filter out structures not covered by given ratio of edges with hashes [0.0]
  --max-node <INT>                 Filter out structures of maximum matching node size smaller than given value [0]
  --max-node-ratio <FLOAT>         Filter out structures of maximum matching node size smaller than given ratio [0.0]
  --score <FLOAT>                  IDF score cutoff [0.0]
@@ -128,8 +126,6 @@ pub fn query_pdb(env: AppArgs) {
             total_match_count,
             covered_node_count,
             covered_node_ratio,
-            covered_edge_count,
-            covered_edge_ratio,
             max_matching_node_count,
             max_matching_node_ratio,
             idf_score_cutoff,
@@ -335,10 +331,10 @@ pub fn query_pdb(env: AppArgs) {
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
                         // Make filters out of filtering parameters
                         let structure_filter = StructureFilter::new(
-                            total_match_count, covered_node_count, covered_node_ratio, covered_edge_count, covered_edge_ratio,
+                            total_match_count, covered_node_count, covered_node_ratio,
                             idf_score_cutoff, num_res_cutoff, plddt_cutoff, 
                             max_matching_node_count, max_matching_node_ratio, rmsd_cutoff,
-                            _residue_count, _residue_count * (_residue_count - 1)
+                            _residue_count,
                         );
 
                         match mode {
@@ -660,8 +656,6 @@ mod tests {
             total_match_count: 0,
             covered_node_count: 0,
             covered_node_ratio: 0.0,
-            covered_edge_count: 0,
-            covered_edge_ratio: 0.0,
             max_matching_node_count: 0,
             max_matching_node_ratio: 0.0,
             idf_score_cutoff: 0.0,
@@ -710,8 +704,6 @@ mod tests {
                 total_match_count: 0,
                 covered_node_count: 0,
                 covered_node_ratio: 0.0,
-                covered_edge_count: 0,
-                covered_edge_ratio: 0.0,
                 idf_score_cutoff: 0.0,
                 connected_node_count: 0,
                 connected_node_ratio: 0.0,
@@ -760,8 +752,6 @@ mod tests {
             total_match_count: 0,
             covered_node_count: 0,
             covered_node_ratio: 0.0,
-            covered_edge_count: 0,
-            covered_edge_ratio: 0.0,
             max_matching_node_count: 0,
             max_matching_node_ratio: 0.0,
             idf_score_cutoff: 0.0,

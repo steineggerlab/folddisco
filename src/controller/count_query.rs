@@ -1,6 +1,5 @@
 // Functions for ranking queried results
 
-use dashmap::DashMap;
 use rayon::prelude::*;  // Import rayon for parallel iterators
 
 use std::collections::HashMap;
@@ -12,79 +11,154 @@ use super::io::get_values_with_offset_u16;
 use super::map::SimpleHashMap;
 use super::result::StructureResult;
 
-pub fn count_query_idmode<'a>(
-    queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
-    offset_table: &SimpleHashMap, value_vec: &[u16], lookup: &'a Vec<(String, usize, usize, f32, usize)>, 
-    sampling_ratio: Option<f32>, sampling_count: Option<usize>,
-    freq_filter: Option<f32>, length_penalty_power: Option<f32>,
-) -> DashMap<usize, StructureResult<'a>> {
-    let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
-    // Sampling query
-    let queries_to_iter = sample_query_idmode(queries, offset_table, sampling_ratio, sampling_count);
-    queries_to_iter.par_iter().for_each(|query| {  // Use parallel iterator
-        if let Some(offset) = offset_table.get(query) {
-            let single_queried_values = get_values_with_offset_u16(value_vec, offset.0, offset.1);
-            let hash_count = offset.1;            
-            if let Some(freq_filter) = freq_filter {
-                if hash_count as f32 / lookup.len() as f32 > freq_filter {
-                    // If the hash count is too low, skip the query
-                    return;
-                }
-            }
-            let edge_info = query_map.get(query).unwrap();
-            let edge = edge_info.0;
+// Optimized: Use compact data structure for HPC with large pre-allocated vectors
+#[derive(Debug, Clone)]
+struct CompactEntry {
+    db_key: usize,
+    node_count: u16,
+    match_count: u16,
+    idf_sum: f32,
+    nres: usize,
+    plddt: f32,
+    // Use bit flags instead of HashSets for efficiency
+    nodes_bitmap: u128,  // Support up to 128 unique nodes
+    initialized: bool,
+}
 
-            for &value in single_queried_values.iter() {
-                let id = &lookup[value as usize].0;
-                let nid = lookup[value as usize].1;
-                let nres = lookup[value as usize].2;
-                let plddt = lookup[value as usize].3;
-                let db_key = lookup[value as usize].4;
-
-                let idf = (lookup.len() as f32 / hash_count as f32).log2();
-
-                let mut is_new: bool = false;
-                let entry = query_count_map.entry(nid);
-                // Not consuming the entry, so we can modify it
-                let mut ref_mut = entry.or_insert_with(|| {
-                    let total_match_count = 1usize;
-                    is_new = true;
-                    StructureResult::new(
-                        id, nid, total_match_count, 2, 1, 
-                        idf, nres, plddt, &edge, db_key
-                    )
-                });
-                
-                // Modify with ref_mut
-                let result = ref_mut.value_mut();
-                if !is_new {
-                    // Now modify the `result` directly
-                    // Check if node_set has edge.0 and edge.1
-                    result.node_set.insert(edge.0);
-                    result.node_set.insert(edge.1);
-                    result.node_count = result.node_set.len();
-                    let has_edge = result.edge_set.contains(&edge);
-                    if !has_edge {
-                        result.edge_set.insert(edge);
-                        result.edge_count += 1;
-                    }
-                    result.total_match_count += 1;
-                    result.idf += idf;
-
-                }
-            }
+impl Default for CompactEntry {
+    fn default() -> Self {
+        Self {
+            db_key: 0,
+            node_count: 0,
+            match_count: 0,
+            idf_sum: 0.0,
+            nres: 0,
+            plddt: 0.0,
+            nodes_bitmap: 0,
+            initialized: false,
         }
-    });
+    }
+}
+
+pub fn count_query_idmode<'a>(
+    queries: &[GeometricHash],
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    offset_table: &SimpleHashMap,
+    value_vec: &[u16],
+    lookup: &'a [(String, usize, usize, f32, usize)],
+    sampling_ratio: Option<f32>,
+    sampling_count: Option<usize>,
+    freq_filter: Option<f32>,
+    length_penalty_power: Option<f32>,
+) -> Vec<(usize, StructureResult<'a>)> {
+    let sampled = sample_query_idmode(queries, offset_table, sampling_ratio, sampling_count);
+    let total_hits = lookup.len() as f32;
+    let lp = length_penalty_power.unwrap_or(0.5);
+    let num_ids = lookup.len();
     
-    let length_penalty_power = length_penalty_power.unwrap_or(0.5);
-    // Normalize idf by nres
-    query_count_map.par_iter_mut().for_each(|mut entry| {
-        let result = entry.value_mut();
-        let length_penalty = (result.nres as f32).powf(-1.0 * length_penalty_power);
-        result.idf *= length_penalty;
-    });
+    // Pre-allocate thread results for zero allocation overhead - use only CompactEntry
+    let num_threads = rayon::current_num_threads();
+    let chunk_size = (sampled.len() + num_threads - 1) / num_threads;
     
-    query_count_map
+    // Pre-allocate Vec<CompactEntry> for multi-threading
+    let thread_results: Vec<Vec<CompactEntry>> = sampled
+        .par_chunks(chunk_size)
+        .map(|chunk| {
+            let mut local_results: Vec<CompactEntry> = vec![CompactEntry::default(); num_ids];
+            
+            for q in chunk.iter() {
+                if let Some((off, hc)) = offset_table.get(q) {
+                    if freq_filter.map_or(false, |f| (*hc as f32 / total_hits) > f) {
+                        continue;  // Skip queries that do not pass the frequency filter
+                    }
+
+                    let edge = query_map.get(q).unwrap().0;
+
+                    for &val in get_values_with_offset_u16(value_vec, *off, *hc).iter() {
+                        let lookup_entry = &lookup[val as usize];
+                        let nid = lookup_entry.1;
+                        let db_key = lookup_entry.4;
+                        let nres = lookup_entry.2;
+                        let plddt = lookup_entry.3;
+                        let idf = (total_hits / (*hc as f32)).log2();
+
+                        let entry = &mut local_results[nid];
+
+                        // Initialize entry if not already initialized
+                        if !entry.initialized {
+                            entry.db_key = db_key;
+                            entry.nres = nres;
+                            entry.plddt = plddt;
+                            entry.initialized = true;
+                        }
+
+                        // Track unique nodes using bitmaps
+                        let node0_bit = 1u128 << (edge.0 % 128);
+                        let node1_bit = 1u128 << (edge.1 % 128);
+                        
+                        entry.nodes_bitmap |= node0_bit | node1_bit;
+                        
+                        entry.match_count += 1;
+                        entry.idf_sum += idf;
+                    }
+                }
+            }
+            local_results
+        })
+        .collect();
+
+    // Parallel processing with bitmap aggregation
+    let results: Vec<(usize, StructureResult<'a>)> = (0..num_ids)
+        .into_par_iter()
+        .filter_map(|nid| {
+            let mut merged_entry = CompactEntry::default();
+            let mut combined_nodes_bitmap = 0u128;
+            let mut found_data = false;
+            
+            // Collect all data from threads for this nid
+            for thread_array in &thread_results {
+                let entry = &thread_array[nid];
+                if entry.initialized {
+                    if !found_data {
+                        // First thread with data - initialize merged entry
+                        merged_entry = entry.clone();
+                        combined_nodes_bitmap = entry.nodes_bitmap;
+                        found_data = true;
+                    } else {
+                        // Merge with existing data
+                        merged_entry.match_count += entry.match_count;
+                        merged_entry.idf_sum += entry.idf_sum;
+                        combined_nodes_bitmap |= entry.nodes_bitmap;
+                    }
+                }
+            }
+            
+            if found_data && merged_entry.match_count > 0 {
+                // Count bits in bitmaps for final counts
+                merged_entry.node_count = combined_nodes_bitmap.count_ones() as u16;
+                merged_entry.idf_sum *= (merged_entry.nres as f32).powf(-lp);
+                
+                let lookup_entry = &lookup[nid];
+                let dummy_edge = (0, 0);
+                let sr = StructureResult::new(
+                    &lookup_entry.0,
+                    nid,
+                    merged_entry.match_count as usize,
+                    merged_entry.node_count as usize,
+                    merged_entry.idf_sum,
+                    merged_entry.nres,
+                    merged_entry.plddt,
+                    &dummy_edge,
+                    merged_entry.db_key,
+                );
+                Some((nid, sr))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    results
 }
 
 pub fn count_query_bigmode<'a>(
@@ -92,84 +166,129 @@ pub fn count_query_bigmode<'a>(
     big_index: &FolddiscoIndex, lookup: &'a Vec<(String, usize, usize, f32, usize)>, 
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
     freq_filter: Option<f32>, length_penalty_power: Option<f32>,
-) -> DashMap<usize, StructureResult<'a>> {
-    let query_count_map = DashMap::new();  // Use DashMap instead of HashMap
-    
+) -> Vec<(usize, StructureResult<'a>)> {
     let queries_to_iter = sample_query_bigmode(queries, big_index, sampling_ratio, sampling_count);
-
-    queries_to_iter.par_iter().for_each(|query| {  // Use parallel iterator
-        let single_queried_values = big_index.get_entries(query.as_u32());
-        let hash_count = single_queried_values.len();
-        if let Some(freq_filter) = freq_filter {
-            if hash_count as f32 / lookup.len() as f32 > freq_filter {
-                // If the hash count is too low, skip the query
-                return;
-            }
-        }        
-        let edge_info = query_map.get(query).unwrap();
-        let edge = edge_info.0;
-
-        for &value in single_queried_values.iter() {
-            if value >= lookup.len() {
-                println!("Error: {} >= {}", value, lookup.len());
-                println!("Error query: {:?}", query);
-                continue;
-            }
-            let id = &lookup[value].0;
-            let nid = lookup[value].1;
-            let nres = lookup[value].2;
-            let plddt = lookup[value].3;
-            let db_key = lookup[value].4;
-
-            let idf = (lookup.len() as f32 / hash_count as f32).log2();
-            let mut is_new: bool = false;
-            let entry = query_count_map.entry(nid);
-            // Not consuming the entry, so we can modify it
-            let mut ref_mut = entry.or_insert_with(|| {
-                let total_match_count = 1usize;
-                is_new = true;
-                StructureResult::new(
-                    id, nid, total_match_count, 2, 1, 
-                    idf, nres, plddt, &edge, db_key
-                )
-            });
+    let num_ids = lookup.len();
+    let lp = length_penalty_power.unwrap_or(0.5);
+    
+    // Pre-allocate thread results for zero allocation overhead - use only CompactEntry
+    let num_threads = rayon::current_num_threads();
+    let chunk_size = (queries_to_iter.len() + num_threads - 1) / num_threads;
+    
+    // Pre-allocate Vec<CompactEntry> for multi-threading on HPC
+    let thread_results: Vec<Vec<CompactEntry>> = queries_to_iter
+        .par_chunks(chunk_size)
+        .map(|chunk| {
+            let mut local_results: Vec<CompactEntry> = vec![CompactEntry::default(); num_ids];
+            
+            for query in chunk.iter() {
+                let single_queried_values = big_index.get_entries(query.as_u32());
+                let hash_count = single_queried_values.len();
                 
-            // Modify with ref_mut
-            let result = ref_mut.value_mut();
-            if !is_new {
-                // Now modify the `result` directly
-                // Check if node_set has edge.0 and edge.1
-                result.node_set.insert(edge.0);
-                result.node_set.insert(edge.1);
-                result.node_count = result.node_set.len();
-                let has_edge = result.edge_set.contains(&edge);
-                if !has_edge {
-                    result.edge_set.insert(edge);
-                    result.edge_count += 1;
+                if let Some(freq_filter) = freq_filter {
+                    if hash_count as f32 / lookup.len() as f32 > freq_filter {
+                        continue;  // Skip queries that do not pass the frequency filter
+                    }
                 }
-                result.total_match_count += 1;
-                result.idf += idf; 
+                
+                let edge = query_map.get(query).unwrap().0;
+
+                for &value in single_queried_values.iter() {
+                    if value >= lookup.len() {
+                        continue;  // Skip invalid values
+                    }
+                    
+                    let lookup_entry = &lookup[value];
+                    let nid = lookup_entry.1;
+                    let nres = lookup_entry.2;
+                    let plddt = lookup_entry.3;
+                    let db_key = lookup_entry.4;
+                    let idf = (lookup.len() as f32 / hash_count as f32).log2();
+
+                    let entry = &mut local_results[nid];
+
+                    // Initialize entry if not already initialized
+                    if !entry.initialized {
+                        entry.nres = nres;
+                        entry.plddt = plddt;
+                        entry.db_key = db_key;
+                        entry.initialized = true;
+                    }
+
+                    // Track unique nodes using bitmaps
+                    let node0_bit = 1u128 << (edge.0 % 128);
+                    let node1_bit = 1u128 << (edge.1 % 128);
+                    
+                    entry.nodes_bitmap |= node0_bit | node1_bit;
+                    
+                    entry.match_count += 1;
+                    entry.idf_sum += idf;
+                }
             }
-        }
-    });
-    
-    let length_penalty_power = length_penalty_power.unwrap_or(0.5);
-    // Normalize idf by nres
-    query_count_map.par_iter_mut().for_each(|mut entry| {
-        let result = entry.value_mut();
-        let length_penalty = (result.nres as f32).powf(-1.0 * length_penalty_power);
-        result.idf *= length_penalty;
-    });
-    
-    query_count_map
+            local_results
+        })
+        .collect();
+
+    // Lock-free parallel processing with bitmap aggregation
+    let results: Vec<(usize, StructureResult<'a>)> = (0..num_ids)
+        .into_par_iter()
+        .filter_map(|nid| {
+            let mut merged_entry = CompactEntry::default();
+            let mut combined_nodes_bitmap = 0u128;
+            let mut found_data = false;
+            
+            // Collect all data from threads for this nid
+            for thread_array in &thread_results {
+                let entry = &thread_array[nid];
+                if entry.initialized {
+                    if !found_data {
+                        // First thread with data - initialize merged entry
+                        merged_entry = entry.clone();
+                        combined_nodes_bitmap = entry.nodes_bitmap;
+                        found_data = true;
+                    } else {
+                        // Merge with existing data
+                        merged_entry.match_count += entry.match_count;
+                        merged_entry.idf_sum += entry.idf_sum;
+                        combined_nodes_bitmap |= entry.nodes_bitmap;
+                    }
+                }
+            }
+            
+            if found_data && merged_entry.match_count > 0 {
+                // Count bits in bitmaps for final counts
+                merged_entry.node_count = combined_nodes_bitmap.count_ones() as u16;
+                merged_entry.idf_sum *= (merged_entry.nres as f32).powf(-lp);
+                
+                let lookup_entry = &lookup[nid];
+                let dummy_edge = (0, 0);
+                let sr = StructureResult::new(
+                    &lookup_entry.0,
+                    nid,
+                    merged_entry.match_count as usize,
+                    merged_entry.node_count as usize,
+                    merged_entry.idf_sum,
+                    merged_entry.nres,
+                    merged_entry.plddt,
+                    &dummy_edge,
+                    merged_entry.db_key,
+                );
+                Some((nid, sr))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    results
 }
 
 fn sample_query_idmode(
-    queries: &Vec<GeometricHash>, offset_table: &SimpleHashMap,
+    queries: &[GeometricHash], offset_table: &SimpleHashMap,
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
 ) -> Vec<GeometricHash> {
     match (sampling_ratio, sampling_count) {
-        (None, None) => queries.clone(),
+        (None, None) => queries.to_vec(),
         (Some(sampling_ratio), None) => {
             let mut sampled_queries = queries.par_iter().map(|query| {
                 if let Some(offset) = offset_table.get(query) {
@@ -196,7 +315,7 @@ fn sample_query_idmode(
             sampled_queries.truncate(sampling_count);
             sampled_queries.into_iter().map(|(query, _)| *query).collect()
         },
-        (Some(_), Some(_)) => queries.clone(),
+        (Some(_), Some(_)) => queries.to_vec(),
     }
 }
 

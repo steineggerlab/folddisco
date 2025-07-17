@@ -57,8 +57,6 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             total_match_count: args.value_from_str("--total-match").unwrap_or(0),
             covered_node_count: args.value_from_str("--covered-node").unwrap_or(0),
             covered_node_ratio: args.value_from_str("--covered-node-ratio").unwrap_or(0.0),
-            covered_edge_count: args.value_from_str("--covered-edge").unwrap_or(0),
-            covered_edge_ratio: args.value_from_str("--covered-edge-ratio").unwrap_or(0.0),
             max_matching_node_count: args.value_from_str("--max-node").unwrap_or(0),
             max_matching_node_ratio: args.value_from_str("--max-node-ratio").unwrap_or(0.0),
             idf_score_cutoff: args.value_from_str("--score").unwrap_or(0.0),

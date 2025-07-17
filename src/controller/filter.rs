@@ -6,8 +6,6 @@ pub struct StructureFilter {
     pub total_match_count: usize,
     pub covered_node_count: usize,
     pub covered_node_ratio: f32,
-    pub covered_edge_count: usize,
-    pub covered_edge_ratio: f32,
     pub idf_score: f32,
     pub nres: usize,
     pub plddt: f32,
@@ -17,23 +15,19 @@ pub struct StructureFilter {
     pub rmsd: f32,
     // Expected number of residues and nodes
     pub expected_node_count: usize,
-    pub expected_edge_count: usize,
 }
 
 impl StructureFilter {
     pub fn new(
         total_match_count: usize, covered_node_count: usize, 
-        covered_node_ratio: f32, covered_edge_count: usize, covered_edge_ratio: f32,
-        idf: f32, nres: usize, plddt: f32,
+        covered_node_ratio: f32, idf: f32, nres: usize, plddt: f32,
         max_matching_node_count: usize, max_matching_node_ratio: f32,
-        rmsd: f32, expected_node_count: usize, expected_edge_count: usize,
+        rmsd: f32, expected_node_count: usize,
     ) -> Self {
         StructureFilter {
             total_match_count: total_match_count,
             covered_node_count,
             covered_node_ratio,
-            covered_edge_count,
-            covered_edge_ratio,
             idf_score: idf,
             nres,
             plddt,
@@ -41,7 +35,6 @@ impl StructureFilter {
             max_matching_node_ratio: max_matching_node_ratio,
             rmsd,
             expected_node_count,
-            expected_edge_count,
         }
     }
 
@@ -51,8 +44,6 @@ impl StructureFilter {
             total_match_count: 0,
             covered_node_count: 0,
             covered_node_ratio: 0.0,
-            covered_edge_count: 0,
-            covered_edge_ratio: 0.0,
             idf_score: 0.0,
             nres: 0,
             plddt: 0.0,
@@ -60,19 +51,15 @@ impl StructureFilter {
             max_matching_node_ratio: 0.0,
             rmsd: 0.0,
             expected_node_count: 0,
-            expected_edge_count: 0,
         }
     }
     
     // Default filters
     pub fn default(node_count: usize) -> Self {
-        let expected_edge_count = node_count * (node_count - 1);
         StructureFilter {
             total_match_count: 0,
             covered_node_count: 0,
             covered_node_ratio: 0.8,
-            covered_edge_count: 0,
-            covered_edge_ratio: 0.4,
             idf_score: 0.0,
             nres: 0,
             plddt: 0.0,
@@ -80,7 +67,6 @@ impl StructureFilter {
             max_matching_node_ratio: 0.0,
             rmsd: 0.0,
             expected_node_count: node_count,
-            expected_edge_count: expected_edge_count,
         }
     }
     
@@ -97,12 +83,6 @@ impl StructureFilter {
         }
         if self.covered_node_ratio > 0.0 {
             pass = pass && result.node_count as f32 / self.expected_node_count as f32 >= self.covered_node_ratio;
-        }
-        if self.covered_edge_count > 0 {
-            pass = pass && result.edge_count >= self.covered_edge_count;
-        }
-        if self.covered_edge_ratio > 0.0 {
-            pass = pass && result.edge_count as f32 / self.expected_edge_count as f32 >= self.covered_edge_ratio;
         }
         if self.idf_score > 0.0 {
             pass = pass && result.idf >= self.idf_score;

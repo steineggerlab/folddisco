@@ -5,7 +5,7 @@ use std::io::Write;
 use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use memmap2::{Mmap, MmapMut};
+use memmap2::{Mmap, MmapMut, MmapOptions};
 // use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
 
@@ -268,10 +268,10 @@ pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
 
     let entries_file = std::fs::OpenOptions::new()
         .read(true)
-        .write(true)
+        .write(false)
         .open(&index_path)
         .expect("Unable to open index file");
-    let entries_mmap = unsafe { MmapMut::map_mut(&entries_file).expect("Unable to map index file") };
+    let entries_mmap = unsafe { MmapOptions::new().map_copy(&entries_file).expect("Unable to map index file") };
 
     ( FolddiscoIndex {
         offsets: UnsafeCell::new(vec![]),

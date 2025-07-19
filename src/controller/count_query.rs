@@ -11,31 +11,71 @@ use super::io::get_values_with_offset_u16;
 use super::map::SimpleHashMap;
 use super::result::StructureResult;
 
+
+// Efficient bit vector for tracking sets of IDs
+#[derive(Debug, Clone)]
+struct BitVector {
+    bits: Vec<u64>,
+    capacity: usize,
+}
+
+impl BitVector {
+    fn new(capacity: usize) -> Self {
+        let words_needed = (capacity + 63) / 64;
+        Self {
+            bits: vec![0u64; words_needed],
+            capacity,
+        }
+    }
+    #[inline]
+    fn set(&mut self, id: usize) {
+        if id < self.capacity {
+            let word_idx = id / 64;
+            let bit_idx = id % 64;
+            self.bits[word_idx] |= 1u64 << bit_idx;
+        }
+    }
+    #[inline]
+    fn is_set(&self, id: usize) -> bool {
+        if id >= self.capacity {
+            return false;
+        }
+        let word_idx = id / 64;
+        let bit_idx = id % 64;
+        (self.bits[word_idx] & (1u64 << bit_idx)) != 0
+    }
+    // #[inline]
+    // fn count_ones(&self) -> u32 {
+    //     self.bits.iter().map(|&word| word.count_ones()).sum()
+    // }
+    // Clear all bits
+    #[inline]
+    fn clear(&mut self) {
+        self.bits.fill(0);
+    }
+}
+
+
 // Optimized: Use compact data structure for HPC with large pre-allocated vectors
 #[derive(Debug, Clone)]
 struct CompactEntry {
-    db_key: usize,
     node_count: u16,
-    match_count: u16,
+    edge_count: u32,
+    match_count: u32,
     idf_sum: f32,
-    nres: usize,
-    plddt: f32,
-    // Use bit flags instead of HashSets for efficiency
-    nodes_bitmap: u128,  // Support up to 128 unique nodes
+    // idf_max_per_edge: f32,  // Track max IDF per edge and sum.
     initialized: bool,
 }
 
 impl Default for CompactEntry {
     fn default() -> Self {
         Self {
-            db_key: 0,
             node_count: 0,
+            edge_count: 0,
             match_count: 0,
             idf_sum: 0.0,
-            nres: 0,
-            plddt: 0.0,
-            nodes_bitmap: 0,
-            initialized: false,
+            // idf_max_per_edge: 0.0,  // Initialize max IDF per edge
+            initialized: false,  // Track if this entry has been initialized
         }
     }
 }
@@ -56,51 +96,76 @@ pub fn count_query_idmode<'a>(
     let lp = length_penalty_power.unwrap_or(0.5);
     let num_ids = lookup.len();
     
-    // Pre-allocate thread results for zero allocation overhead - use only CompactEntry
-    let num_threads = rayon::current_num_threads();
-    let chunk_size = (sampled.len() + num_threads - 1) / num_threads;
+    let node_grouped = build_node_groups(&sampled, query_map);
     
     // Pre-allocate Vec<CompactEntry> for multi-threading
-    let thread_results: Vec<Vec<CompactEntry>> = sampled
-        .par_chunks(chunk_size)
-        .map(|chunk| {
+    let thread_results: Vec<Vec<CompactEntry>> = node_grouped
+        .par_iter().map(|(_node, chunk)| {
             let mut local_results: Vec<CompactEntry> = vec![CompactEntry::default(); num_ids];
+            let mut node_occupancy = BitVector::new(num_ids);
+            let mut edge_occupancy = BitVector::new(num_ids);
+            let mut prev_edge = None;
+            // let mut idf_max_per_edge = 0.0;  // Track max IDF per edge
             
-            for q in chunk.iter() {
+            for (_i, (e, q)) in chunk.iter().enumerate() {
+                // Check if we're starting a new edge
+                let need_edge_update = prev_edge.map_or(true, |prev| prev != *e);
+                
+                if need_edge_update {
+                    // Finalize previous edge's counts
+                    if prev_edge.is_some() {
+                        for nid in 0..num_ids {
+                            if edge_occupancy.is_set(nid) {
+                                local_results[nid].edge_count += 1;
+                                // Update max IDF per edge
+                                // local_results[nid].idf_max_per_edge += idf_max_per_edge;
+                            }
+                        }
+                    }
+                    // Start tracking new edge
+                    edge_occupancy.clear();
+                    prev_edge = Some(*e);
+                    // idf_max_per_edge = 0.0;  // Reset max IDF for new edge
+                }
+                
                 if let Some((off, hc)) = offset_table.get(q) {
                     if freq_filter.map_or(false, |f| (*hc as f32 / total_hits) > f) {
                         continue;  // Skip queries that do not pass the frequency filter
                     }
 
-                    let edge = query_map.get(q).unwrap().0;
-
                     for &val in get_values_with_offset_u16(value_vec, *off, *hc).iter() {
-                        let lookup_entry = &lookup[val as usize];
-                        let nid = lookup_entry.1;
-                        let db_key = lookup_entry.4;
-                        let nres = lookup_entry.2;
-                        let plddt = lookup_entry.3;
+                        let nid = lookup[val as usize].1;
                         let idf = (total_hits / (*hc as f32)).log2();
-
                         let entry = &mut local_results[nid];
 
                         // Initialize entry if not already initialized
                         if !entry.initialized {
-                            entry.db_key = db_key;
-                            entry.nres = nres;
-                            entry.plddt = plddt;
                             entry.initialized = true;
+                            node_occupancy.set(nid);
                         }
-
-                        // Track unique nodes using bitmaps
-                        let node0_bit = 1u128 << (edge.0 % 128);
-                        let node1_bit = 1u128 << (edge.1 % 128);
-                        
-                        entry.nodes_bitmap |= node0_bit | node1_bit;
-                        
                         entry.match_count += 1;
                         entry.idf_sum += idf;
+                        
+                        // Track that this edge hits this target
+                        edge_occupancy.set(nid);
+                        // Update max IDF per edge
+                        // if idf > idf_max_per_edge {
+                        //     idf_max_per_edge = idf;
+                        // }
                     }
+                }
+            }
+            // Set node count based on occupancy
+            for nid in 0..num_ids {
+                if node_occupancy.is_set(nid) {
+                    local_results[nid].node_count = 1;  // Initialize node count
+                }
+            }
+            
+            // Finalize the last edge's counts
+            for nid in 0..num_ids {
+                if edge_occupancy.is_set(nid) {
+                    local_results[nid].edge_count += 1;  // Increment edge count for last edge
                 }
             }
             local_results
@@ -112,7 +177,6 @@ pub fn count_query_idmode<'a>(
         .into_par_iter()
         .filter_map(|nid| {
             let mut merged_entry = CompactEntry::default();
-            let mut combined_nodes_bitmap = 0u128;
             let mut found_data = false;
             
             // Collect all data from threads for this nid
@@ -122,34 +186,33 @@ pub fn count_query_idmode<'a>(
                     if !found_data {
                         // First thread with data - initialize merged entry
                         merged_entry = entry.clone();
-                        combined_nodes_bitmap = entry.nodes_bitmap;
                         found_data = true;
                     } else {
                         // Merge with existing data
                         merged_entry.match_count += entry.match_count;
                         merged_entry.idf_sum += entry.idf_sum;
-                        combined_nodes_bitmap |= entry.nodes_bitmap;
+                        // merged_entry.idf_max_per_edge = entry.idf_max_per_edge;  // Merge max IDF per edge  
+                        merged_entry.node_count += entry.node_count;
+                        merged_entry.edge_count += entry.edge_count;  // Add edge count merging
                     }
                 }
             }
             
             if found_data && merged_entry.match_count > 0 {
-                // Count bits in bitmaps for final counts
-                merged_entry.node_count = combined_nodes_bitmap.count_ones() as u16;
-                merged_entry.idf_sum *= (merged_entry.nres as f32).powf(-lp);
-                
                 let lookup_entry = &lookup[nid];
-                let dummy_edge = (0, 0);
+                // Count bits in bitmaps for final counts
+                merged_entry.idf_sum *= (lookup_entry.2 as f32).powf(-lp);
+                // No length penalty applied to max IDF per edge
                 let sr = StructureResult::new(
                     &lookup_entry.0,
                     nid,
                     merged_entry.match_count as usize,
                     merged_entry.node_count as usize,
+                    merged_entry.edge_count as usize,
                     merged_entry.idf_sum,
-                    merged_entry.nres,
-                    merged_entry.plddt,
-                    &dummy_edge,
-                    merged_entry.db_key,
+                    lookup_entry.2,
+                    lookup_entry.3,
+                    lookup_entry.4,
                 );
                 Some((nid, sr))
             } else {
@@ -171,17 +234,34 @@ pub fn count_query_bigmode<'a>(
     let num_ids = lookup.len();
     let lp = length_penalty_power.unwrap_or(0.5);
     
-    // Pre-allocate thread results for zero allocation overhead - use only CompactEntry
-    let num_threads = rayon::current_num_threads();
-    let chunk_size = (queries_to_iter.len() + num_threads - 1) / num_threads;
+    let node_grouped = build_node_groups(&queries_to_iter, query_map);
     
-    // Pre-allocate Vec<CompactEntry> for multi-threading on HPC
-    let thread_results: Vec<Vec<CompactEntry>> = queries_to_iter
-        .par_chunks(chunk_size)
-        .map(|chunk| {
+    // Pre-allocate Vec<CompactEntry> for multi-threading
+    let thread_results: Vec<Vec<CompactEntry>> = node_grouped
+        .par_iter().map(|(_node, chunk)| {
             let mut local_results: Vec<CompactEntry> = vec![CompactEntry::default(); num_ids];
-            
-            for query in chunk.iter() {
+            let mut node_occupancy = BitVector::new(num_ids);
+            let mut edge_occupancy = BitVector::new(num_ids);
+            let mut prev_edge = None;
+
+            for (_i, (e, query)) in chunk.iter().enumerate() {
+                // Check if we're starting a new edge
+                let need_edge_update = prev_edge.map_or(true, |prev| prev != *e);
+                
+                if need_edge_update {
+                    // Finalize previous edge's counts
+                    if prev_edge.is_some() {
+                        for nid in 0..num_ids {
+                            if edge_occupancy.is_set(nid) {
+                                local_results[nid].edge_count += 1;
+                            }
+                        }
+                    }
+                    // Start tracking new edge
+                    edge_occupancy.clear();
+                    prev_edge = Some(*e);
+                }
+                
                 let single_queried_values = big_index.get_entries(query.as_u32());
                 let hash_count = single_queried_values.len();
                 
@@ -190,51 +270,53 @@ pub fn count_query_bigmode<'a>(
                         continue;  // Skip queries that do not pass the frequency filter
                     }
                 }
-                
-                let edge = query_map.get(query).unwrap().0;
+
+                let idf = (lookup.len() as f32 / hash_count as f32).log2();
 
                 for &value in single_queried_values.iter() {
                     if value >= lookup.len() {
                         continue;  // Skip invalid values
                     }
-                    
+                
                     let lookup_entry = &lookup[value];
                     let nid = lookup_entry.1;
-                    let nres = lookup_entry.2;
-                    let plddt = lookup_entry.3;
-                    let db_key = lookup_entry.4;
-                    let idf = (lookup.len() as f32 / hash_count as f32).log2();
-
                     let entry = &mut local_results[nid];
 
                     // Initialize entry if not already initialized
                     if !entry.initialized {
-                        entry.nres = nres;
-                        entry.plddt = plddt;
-                        entry.db_key = db_key;
                         entry.initialized = true;
+                        node_occupancy.set(nid);
                     }
-
-                    // Track unique nodes using bitmaps
-                    let node0_bit = 1u128 << (edge.0 % 128);
-                    let node1_bit = 1u128 << (edge.1 % 128);
-                    
-                    entry.nodes_bitmap |= node0_bit | node1_bit;
-                    
                     entry.match_count += 1;
                     entry.idf_sum += idf;
+                    
+                    // Track that this edge hits this target
+                    edge_occupancy.set(nid);
+                }
+            }
+            
+            // Set node count based on occupancy
+            for nid in 0..num_ids {
+                if node_occupancy.is_set(nid) {
+                    local_results[nid].node_count = 1;  // Initialize node count
+                }
+            }
+            
+            // Finalize the last edge's counts
+            for nid in 0..num_ids {
+                if edge_occupancy.is_set(nid) {
+                    local_results[nid].edge_count += 1;  // Increment edge count for last edge
                 }
             }
             local_results
         })
         .collect();
 
-    // Lock-free parallel processing with bitmap aggregation
+    // Parallel processing with bitmap aggregation
     let results: Vec<(usize, StructureResult<'a>)> = (0..num_ids)
         .into_par_iter()
         .filter_map(|nid| {
             let mut merged_entry = CompactEntry::default();
-            let mut combined_nodes_bitmap = 0u128;
             let mut found_data = false;
             
             // Collect all data from threads for this nid
@@ -244,34 +326,32 @@ pub fn count_query_bigmode<'a>(
                     if !found_data {
                         // First thread with data - initialize merged entry
                         merged_entry = entry.clone();
-                        combined_nodes_bitmap = entry.nodes_bitmap;
                         found_data = true;
                     } else {
                         // Merge with existing data
                         merged_entry.match_count += entry.match_count;
                         merged_entry.idf_sum += entry.idf_sum;
-                        combined_nodes_bitmap |= entry.nodes_bitmap;
+                        merged_entry.node_count += entry.node_count;
+                        merged_entry.edge_count += entry.edge_count;  // Add edge count merging
                     }
                 }
             }
             
             if found_data && merged_entry.match_count > 0 {
-                // Count bits in bitmaps for final counts
-                merged_entry.node_count = combined_nodes_bitmap.count_ones() as u16;
-                merged_entry.idf_sum *= (merged_entry.nres as f32).powf(-lp);
-                
                 let lookup_entry = &lookup[nid];
-                let dummy_edge = (0, 0);
+                // Apply length penalty to the final IDF score
+                merged_entry.idf_sum *= (lookup_entry.2 as f32).powf(-lp);
+                
                 let sr = StructureResult::new(
                     &lookup_entry.0,
                     nid,
                     merged_entry.match_count as usize,
                     merged_entry.node_count as usize,
+                    merged_entry.edge_count as usize,  // Use actual edge count instead of node count
                     merged_entry.idf_sum,
-                    merged_entry.nres,
-                    merged_entry.plddt,
-                    &dummy_edge,
-                    merged_entry.db_key,
+                    lookup_entry.2,
+                    lookup_entry.3,
+                    lookup_entry.4,
                 );
                 Some((nid, sr))
             } else {
@@ -348,4 +428,24 @@ fn sample_query_bigmode(
         },
         (Some(_), Some(_)) => queries.clone(),
     }
+}
+
+// Shared function to build node groups from queries
+fn build_node_groups(
+    sampled_queries: &[GeometricHash],
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+) -> HashMap<usize, Vec<((usize, usize), GeometricHash)>> {
+    let mut node_groups: HashMap<usize, Vec<((usize, usize), GeometricHash)>> = HashMap::new();
+
+    for &query in sampled_queries {
+        if let Some(((e0, e1), _)) = query_map.get(&query) {
+            let edge = (*e0, *e1);
+            node_groups.entry(edge.0).or_insert_with(Vec::new).push((edge, query));
+        }
+    }
+    for (_, chunk) in node_groups.iter_mut() {
+        // Sort the chunk by edge.
+        chunk.sort_by_key(|(edge, _)| *edge);
+    }
+    node_groups
 }

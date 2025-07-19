@@ -1,7 +1,6 @@
 // QueryResult struct and its implementation
 
 use std::fmt;
-use std::collections::HashSet;
 use std::io::Write;
 use rayon::slice::ParallelSliceMut;
 
@@ -12,7 +11,7 @@ use crate::structure::coordinate::Coordinate;
 use super::ResidueMatch;
 
 
-pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tkey\tquery_residues";
+pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tkey\tquery_residues";
 pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tkey\tquery_residues";
 pub const MATCH_QUERY_RESULT_SUPERPOSE_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tu_vector\tt_vector\ttarget_ca_coords\tkey\tquery_residues";
 
@@ -22,10 +21,10 @@ pub struct StructureResult<'a> {
     pub db_key: usize, // Database key for the structure
     pub total_match_count: usize,
     pub node_count: usize,
+    pub edge_count: usize,  // Add edge count field
     pub idf: f32,
     pub nres: usize,
     pub plddt: f32,
-    pub node_set: HashSet<usize>,
     pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with connected components
     pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with c-alpha distances
     pub max_matching_node_count: usize,
@@ -34,29 +33,26 @@ pub struct StructureResult<'a> {
 
 impl<'a> StructureResult<'a> {
     pub fn new(
-        id: &'a str, nid: usize, total_match_count: usize, node_count: usize,
-        idf: f32, nres: usize, plddt: f32, edge: &(usize, usize), db_key: usize
+        id: &'a str, nid: usize, total_match_count: usize, node_count: usize, edge_count: usize,
+        idf: f32, nres: usize, plddt: f32, db_key: usize
     ) -> Self {
-        let mut node_set = HashSet::new();
-        node_set.insert(edge.0);
-        node_set.insert(edge.1);
         Self {
             id,
             nid,
             db_key,
             total_match_count,
             node_count,
+            edge_count: edge_count,
             idf,
             nres,
             plddt,
-            node_set: node_set,
             matching_residues: Vec::new(),
             matching_residues_processed: Vec::new(),
             max_matching_node_count: 0,
             min_rmsd_with_max_match: 0.0,
         }
     }
-    
+
     pub fn into_match_query_results(&self, skip_ca_dist: bool) -> Vec<MatchResult> {
         match skip_ca_dist {
             false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates))| {
@@ -108,8 +104,8 @@ impl<'a> fmt::Display for StructureResult<'a> {
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
-            self.id, self.idf, self.total_match_count, self.node_count,
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
+            self.id, self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.max_matching_node_count, self.min_rmsd_with_max_match,
             self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )
@@ -132,8 +128,8 @@ impl<'a> fmt::Debug for StructureResult<'a> {
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
-            self.id ,self.idf, self.total_match_count, self.node_count,
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
+            self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.max_matching_node_count, self.min_rmsd_with_max_match,
             self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )
@@ -156,8 +152,8 @@ impl<'a> StructureResult<'a> {
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
-            self.id ,self.idf, self.total_match_count, self.node_count,
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
+            self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.max_matching_node_count, self.min_rmsd_with_max_match,
             self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )

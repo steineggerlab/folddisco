@@ -128,6 +128,20 @@ pub fn build_index(env: AppArgs) {
             };
             
             let index_mode = IndexMode::get_with_str(mode.as_str());
+            // Set index_mode if pdb_path_vec.len() > 65536
+            let index_mode = if pdb_path_vec.len() > u16::max_value() as usize {
+                if verbose {
+                    print_log_msg(
+                        INFO, &format!(
+                            "Number of PDB files ({}) exceeds 65536, switching to Big mode",
+                            pdb_path_vec.len()
+                        )
+                    );
+                }
+                IndexMode::Big
+            } else {
+                index_mode
+            };
             if index_mode == IndexMode::Big && verbose {
                 print_log_msg(INFO, "Indexing in Big mode.");
             }

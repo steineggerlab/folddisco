@@ -134,6 +134,7 @@ pub fn query_pdb(env: AppArgs) {
             num_res_cutoff,
             plddt_cutoff,
             rmsd_cutoff,
+            tm_score_cutoff,
             top_n,
             web_mode,
             sampling_count,
@@ -334,7 +335,7 @@ pub fn query_pdb(env: AppArgs) {
                             total_match_count, covered_node_count, covered_node_ratio,
                             idf_score_cutoff, num_res_cutoff, plddt_cutoff, 
                             max_matching_node_count, max_matching_node_ratio, rmsd_cutoff,
-                            0.0, _residue_count,
+                            tm_score_cutoff, _residue_count,
                         );
 
                         match mode {
@@ -561,7 +562,7 @@ pub fn query_pdb(env: AppArgs) {
                 drop(query_residues);
                 let match_filter= MatchFilter::new(
                     connected_node_count, connected_node_ratio, idf_score_cutoff,
-                    rmsd_cutoff, 0.0, _residue_count,
+                    rmsd_cutoff, tm_score_cutoff, _residue_count,
                 );
 
                 match query_mode {
@@ -668,6 +669,7 @@ mod tests {
             num_res_cutoff: 3000,
             plddt_cutoff: 0.0,
             rmsd_cutoff: 1.0,
+            tm_score_cutoff: 0.1,
             top_n: 1000,
             web_mode: false,
             sampling_count: None,
@@ -764,6 +766,7 @@ mod tests {
             num_res_cutoff: 3000,
             plddt_cutoff: 0.0,
             rmsd_cutoff: 1.0,
+            tm_score_cutoff: 0.1,
             top_n: 1000,
             web_mode: false,
             sampling_count: None,

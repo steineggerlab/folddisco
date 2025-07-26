@@ -57,6 +57,7 @@ pub enum AppArgs {
         connected_node_count: usize,
         connected_node_ratio: f32,
         rmsd_cutoff: f32,
+        tm_score_cutoff: f32,
         // top N filtering
         top_n: usize,
         web_mode: bool,

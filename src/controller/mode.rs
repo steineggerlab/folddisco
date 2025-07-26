@@ -260,7 +260,9 @@ pub enum QueryMode {
     Web, // Web mode. Top N matches applied.
     PerStructureSortByScore,
     PerStructureSortByRmsd,
+    PerStructureSortByZScore, // Sort by Z-score for structure results
     PerMatchSortByScore, // This needs per match score calculation
+    PerMatchSortByZScore, // Sort by Z-score for match results
     ContradictoryPrintError,
     ContradictorySortError,
 }
@@ -269,21 +271,26 @@ impl QueryMode {
     pub fn from_flags(
         skip_match: bool, is_web: bool,
         per_structure: bool, per_match: bool,
-        sort_by_rmsd: bool, sort_by_score: bool, 
+        sort_by_rmsd: bool, sort_by_score: bool, sort_by_z_score: bool,
     ) -> Self {
-        match (skip_match, is_web, per_structure, per_match, sort_by_rmsd, sort_by_score) {
+        match (skip_match, is_web, per_structure, per_match, sort_by_rmsd, sort_by_score, sort_by_z_score) {
             // Cannot print per match and per structure at the same time -> error
-            (_, _, true, true, _, _) => Self::ContradictoryPrintError, // 16
-            // Cannot print sort by rmsd and sort by score at the same time -> error
-            (_, _, _, _, true, true) => Self::ContradictorySortError, // (64 - 16) / 4 = 12
+            (_, _, true, true, _, _, _) => Self::ContradictoryPrintError, 
+            // Cannot sort by multiple criteria at the same time -> error
+            (_, _, _, _, true, true, _) => Self::ContradictorySortError,
+            (_, _, _, _, true, _, true) => Self::ContradictorySortError,
+            (_, _, _, _, _, true, true) => Self::ContradictorySortError,
             // Skip match
-            (_, true, _, _, _, _) => Self::Web, // (64 - 28) / 2 = 18
-            (true, _, _, _, _, _) => Self::SkipMatch, // (64 - 46) / 2 = 9
-            // Checking remaining cases
-            (false, false, false, _, _, false) => Self::PerMatchDefault, 
-            (false, false, false, _, false, true) => Self::PerMatchSortByScore, 
-            (false, false, true, false, _, false) => Self::PerStructureSortByRmsd, 
-            (false, false, true, false, false, true) => Self::PerStructureSortByScore,
+            (_, true, _, _, _, _, _) => Self::Web,
+            (true, _, _, _, _, _, _) => Self::SkipMatch,
+            // Z-score sorting modes
+            (false, false, true, false, false, false, true) => Self::PerStructureSortByZScore,
+            (false, false, false, _, false, false, true) => Self::PerMatchSortByZScore,
+            // Existing modes
+            (false, false, false, _, _, false, false) => Self::PerMatchDefault, 
+            (false, false, false, _, false, true, false) => Self::PerMatchSortByScore, 
+            (false, false, true, false, _, false, false) => Self::PerStructureSortByRmsd, 
+            (false, false, true, false, false, true, false) => Self::PerStructureSortByScore,
         }
     }
 }

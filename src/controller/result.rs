@@ -287,6 +287,115 @@ impl<'a> MatchResult<'a> {
     }
 }
 
+// Simple Z-score based statistics and scoring
+#[derive(Debug, Clone)]
+pub struct SimpleStats {
+    pub idf_mean: f32,
+    pub idf_std: f32,
+    pub rmsd_mean: f32,
+    pub rmsd_std: f32,
+    pub tm_mean: f32,
+    pub tm_std: f32,
+}
+
+impl SimpleStats {
+    pub fn new() -> Self {
+        Self {
+            idf_mean: 0.0,
+            idf_std: 1.0,
+            rmsd_mean: 0.0,
+            rmsd_std: 1.0,
+            tm_mean: 0.0,
+            tm_std: 1.0,
+        }
+    }
+    
+    /// Calculate statistics from structure results
+    pub fn calculate_from_structure_results(results: &[(usize, StructureResult)]) -> Self {
+        if results.is_empty() {
+            return Self::new();
+        }
+        
+        let idfs: Vec<f32> = results.iter().map(|(_, r)| r.idf).collect();
+        let rmsds: Vec<f32> = results.iter().map(|(_, r)| r.min_rmsd_with_max_match).collect();
+        let tm_scores: Vec<f32> = results.iter().map(|(_, r)| r.max_tm_score_with_max_match).collect();
+        
+        Self {
+            idf_mean: calculate_mean(&idfs),
+            idf_std: calculate_std(&idfs),
+            rmsd_mean: calculate_mean(&rmsds),
+            rmsd_std: calculate_std(&rmsds),
+            tm_mean: calculate_mean(&tm_scores),
+            tm_std: calculate_std(&tm_scores),
+        }
+    }
+    
+    /// Calculate statistics from match results
+    pub fn calculate_from_match_results(results: &[(usize, MatchResult)]) -> Self {
+        if results.is_empty() {
+            return Self::new();
+        }
+        
+        let idfs: Vec<f32> = results.iter().map(|(_, r)| r.idf).collect();
+        let rmsds: Vec<f32> = results.iter().map(|(_, r)| r.rmsd).collect();
+        let tm_scores: Vec<f32> = results.iter().map(|(_, r)| r.tm_score).collect();
+        
+        Self {
+            idf_mean: calculate_mean(&idfs),
+            idf_std: calculate_std(&idfs),
+            rmsd_mean: calculate_mean(&rmsds),
+            rmsd_std: calculate_std(&rmsds),
+            tm_mean: calculate_mean(&tm_scores),
+            tm_std: calculate_std(&tm_scores),
+        }
+    }
+}
+
+// Helper functions for statistics
+fn calculate_mean(values: &[f32]) -> f32 {
+    if values.is_empty() { return 0.0; }
+    values.iter().sum::<f32>() / values.len() as f32
+}
+
+fn calculate_std(values: &[f32]) -> f32 {
+    if values.len() < 2 { return 1.0; }
+    let mean = calculate_mean(values);
+    let variance = values.iter()
+        .map(|x| (x - mean).powi(2))
+        .sum::<f32>() / (values.len() - 1) as f32;
+    variance.sqrt().max(0.001) // Avoid division by zero
+}
+
+// Z-score calculation methods
+impl<'a> StructureResult<'a> {
+    /// Calculate simple Z-score: 0.5 * (structural_z) + 0.5 * (idf_z)
+    /// where structural_z = 0.5 * (tm_z - rmsd_z)
+    pub fn calculate_simple_z_score(&self, stats: &SimpleStats) -> f32 {
+        let idf_z = (self.idf - stats.idf_mean) / stats.idf_std;
+        let tm_z = (self.max_tm_score_with_max_match - stats.tm_mean) / stats.tm_std;
+        let rmsd_z = -((self.min_rmsd_with_max_match - stats.rmsd_mean) / stats.rmsd_std); // Negative for higher is better
+        
+        let structural_z = 0.5 * (tm_z + rmsd_z);
+        let composite_z = 0.5 * structural_z + 0.5 * idf_z;
+        
+        composite_z
+    }
+}
+
+impl<'a> MatchResult<'a> {
+    /// Calculate simple Z-score for individual matches
+    pub fn calculate_simple_z_score(&self, stats: &SimpleStats) -> f32 {
+        let idf_z = (self.idf - stats.idf_mean) / stats.idf_std;
+        let tm_z = (self.tm_score - stats.tm_mean) / stats.tm_std;
+        let rmsd_z = -((self.rmsd - stats.rmsd_mean) / stats.rmsd_std); // Negative for higher is better
+        
+        let structural_z = 0.5 * (tm_z + rmsd_z);
+        let composite_z = 0.5 * structural_z + 0.5 * idf_z;
+        
+        composite_z
+    }
+}
+
 pub fn sort_and_print_structure_query_result(
     results: &mut Vec<(usize, StructureResult)>, do_sort_by_rmsd: bool, 
     output_path: &str, query_string: &str, header: bool, verbose: bool,
@@ -417,6 +526,157 @@ pub fn sort_and_print_match_query_result(
         // let mut id_container = String::new();
         for (_k, v) in results.iter() {
             println!("{}\t{}", v.to_string(superpose), query_string);
+        }
+    }
+}
+
+// Z-score based sorting functions
+pub fn sort_and_print_structure_query_result_z_score(
+    results: &mut Vec<(usize, StructureResult)>, 
+    output_path: &str, 
+    query_string: &str, 
+    header: bool, 
+    verbose: bool,
+) {
+    // Calculate statistics from the results
+    let stats = if verbose {
+        print_log_msg(INFO, "Calculating Z-score statistics for ranking");
+        measure_time!(SimpleStats::calculate_from_structure_results(results))
+    } else {
+        SimpleStats::calculate_from_structure_results(results)
+    };
+    
+    if verbose {
+        print_log_msg(INFO, &format!(
+            "Stats - IDF: {:.2}±{:.2}, RMSD: {:.2}±{:.2}, TM: {:.3}±{:.3}",
+            stats.idf_mean, stats.idf_std, stats.rmsd_mean, stats.rmsd_std, stats.tm_mean, stats.tm_std
+        ));
+    }
+    
+    // Sort by Z-score (descending order - higher Z-score is better)
+    if verbose {
+        measure_time!(results.par_sort_by(|a, b| {
+            let z_score_a = a.1.calculate_simple_z_score(&stats);
+            let z_score_b = b.1.calculate_simple_z_score(&stats);
+            z_score_b.partial_cmp(&z_score_a).unwrap()
+        }));
+    } else {
+        results.par_sort_by(|a, b| {
+            let z_score_a = a.1.calculate_simple_z_score(&stats);
+            let z_score_b = b.1.calculate_simple_z_score(&stats);
+            z_score_b.partial_cmp(&z_score_a).unwrap()
+        });
+    }
+
+    // Output with Z-scores
+    if !output_path.is_empty() {
+        let file = std::fs::File::create(&output_path).expect(
+            &log_msg(FAIL, &format!("Failed to create file: {}", &output_path))
+        );
+        let mut writer = std::io::BufWriter::new(file);
+        if header {
+            writer.write_all(format!("{}\tz_score\n", STRUCTURE_QUERY_RESULT_HEADER).as_bytes()).expect(
+                &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+            );
+        }
+        for (_k, v) in results.iter() {
+            let z_score = v.calculate_simple_z_score(&stats);
+            writer.write_all(format!("{:?}\t{:.4}\t{}\n", v, z_score, query_string).as_bytes()).expect(
+                &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+            );
+        }
+    } else {
+        if header {
+            println!("{}\tz_score", STRUCTURE_QUERY_RESULT_HEADER);
+        }
+        for (_k, v) in results.iter() {
+            let z_score = v.calculate_simple_z_score(&stats);
+            println!("{:?}\t{:.4}\t{}", v, z_score, query_string);
+        }
+    }
+}
+
+pub fn sort_and_print_match_query_result_z_score(
+    results: &mut Vec<(usize, MatchResult)>, 
+    top_n: usize,
+    output_path: &str, 
+    query_string: &str, 
+    superpose: bool, 
+    header: bool, 
+    verbose: bool,
+) {
+    // Calculate statistics from the results
+    let stats = if verbose {
+        print_log_msg(INFO, "Calculating Z-score statistics for ranking");
+        measure_time!(SimpleStats::calculate_from_match_results(results))
+    } else {
+        SimpleStats::calculate_from_match_results(results)
+    };
+    
+    if verbose {
+        print_log_msg(INFO, &format!(
+            "Stats - IDF: {:.2}±{:.2}, RMSD: {:.2}±{:.2}, TM: {:.3}±{:.3}",
+            stats.idf_mean, stats.idf_std, stats.rmsd_mean, stats.rmsd_std, stats.tm_mean, stats.tm_std
+        ));
+    }
+
+    // Sort by Z-score (descending order - higher Z-score is better)
+    if verbose {
+        measure_time!(results.par_sort_by(|a, b| {
+            let z_score_a = a.1.calculate_simple_z_score(&stats);
+            let z_score_b = b.1.calculate_simple_z_score(&stats);
+            z_score_b.partial_cmp(&z_score_a).unwrap()
+        }));
+    } else {
+        results.par_sort_by(|a, b| {
+            let z_score_a = a.1.calculate_simple_z_score(&stats);
+            let z_score_b = b.1.calculate_simple_z_score(&stats);
+            z_score_b.partial_cmp(&z_score_a).unwrap()
+        });
+    }
+
+    // Apply top N filter
+    if top_n != usize::MAX {
+        if verbose {
+            print_log_msg(INFO, &format!("Limiting result to top {} matches", top_n));
+        }
+        results.truncate(top_n);
+    }
+
+    // Output with Z-scores
+    if !output_path.is_empty() {
+        let file = std::fs::File::create(&output_path).expect(
+            &log_msg(FAIL, &format!("Failed to create file: {}", &output_path))
+        );
+        let mut writer = std::io::BufWriter::new(file);
+        let header_str = if superpose {
+            format!("{}\tz_score", MATCH_QUERY_RESULT_SUPERPOSE_HEADER)
+        } else {
+            format!("{}\tz_score", MATCH_QUERY_RESULT_HEADER)
+        };
+        if header {
+            writer.write_all(format!("{}\n", header_str).as_bytes()).expect(
+                &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+            );
+        }
+        for (_k, v) in results.iter() {
+            let z_score = v.calculate_simple_z_score(&stats);
+            writer.write_all(format!("{}\t{:.4}\t{}\n", v.to_string(superpose), z_score, query_string).as_bytes()).expect(
+                &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+            );
+        }
+    } else {
+        let header_str = if superpose {
+            format!("{}\tz_score", MATCH_QUERY_RESULT_SUPERPOSE_HEADER)
+        } else {
+            format!("{}\tz_score", MATCH_QUERY_RESULT_HEADER)
+        };
+        if header {
+            println!("{}", header_str);
+        }
+        for (_k, v) in results.iter() {
+            let z_score = v.calculate_simple_z_score(&stats);
+            println!("{}\t{:.4}\t{}", v.to_string(superpose), z_score, query_string);
         }
     }
 }

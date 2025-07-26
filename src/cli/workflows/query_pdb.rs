@@ -24,7 +24,9 @@ use crate::controller::query::{
 use crate::controller::count_query::{count_query_bigmode, count_query_idmode};
 use crate::controller::result::{
     convert_structure_query_result_to_match_query_results, 
-    sort_and_print_match_query_result, sort_and_print_structure_query_result, StructureResult
+    sort_and_print_match_query_result, sort_and_print_structure_query_result, 
+    sort_and_print_match_query_result_z_score, sort_and_print_structure_query_result_z_score,
+    StructureResult
 };
 use crate::controller::retrieve::retrieval_wrapper;
 use crate::index::indextable::{load_big_index, FolddiscoIndex};
@@ -143,6 +145,7 @@ pub fn query_pdb(env: AppArgs) {
             length_penalty,
             sort_by_rmsd,
             sort_by_score,
+            sort_by_z_score,
             output_per_structure,
             output_per_match,
             output_with_superpose,
@@ -163,7 +166,7 @@ pub fn query_pdb(env: AppArgs) {
             
             let query_mode = QueryMode::from_flags(
                 skip_match, web_mode, output_per_structure, output_per_match,
-                sort_by_rmsd, sort_by_score
+                sort_by_rmsd, sort_by_score, sort_by_z_score
             );
             // Error handling
             match query_mode {
@@ -588,6 +591,16 @@ pub fn query_pdb(env: AppArgs) {
                             false,
                         );
                     }
+                    QueryMode::PerMatchSortByZScore => {
+                        let mut match_results = convert_structure_query_result_to_match_query_results(
+                            &queried_from_indices, skip_ca_match
+                        );
+                        match_results.retain(|(_, v)| match_filter.filter(v));
+                        sort_and_print_match_query_result_z_score(
+                            &mut match_results, top_n, 
+                            &output_path, &query_string, output_with_superpose, header, verbose,
+                        );
+                    }
                     QueryMode::Web => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
                             &queried_from_indices, skip_ca_match
@@ -609,6 +622,12 @@ pub fn query_pdb(env: AppArgs) {
                     QueryMode::PerStructureSortByScore | QueryMode::SkipMatch => {
                         sort_and_print_structure_query_result(
                             &mut queried_from_indices, false, &output_path, 
+                            &query_string, header, verbose
+                        );
+                    }
+                    QueryMode::PerStructureSortByZScore => {
+                        sort_and_print_structure_query_result_z_score(
+                            &mut queried_from_indices, &output_path, 
                             &query_string, header, verbose
                         );
                     }
@@ -678,6 +697,7 @@ mod tests {
             length_penalty: None,
             sort_by_rmsd: true,
             sort_by_score: false,
+            sort_by_z_score: false,
             output_per_structure: false,
             output_per_match: true,
             output_with_superpose: false,
@@ -775,6 +795,7 @@ mod tests {
             length_penalty: None,
             sort_by_rmsd: false,
             sort_by_score: true,
+            sort_by_z_score: false,
             output_per_structure: true,
             output_per_match: false,
             output_with_superpose: true,

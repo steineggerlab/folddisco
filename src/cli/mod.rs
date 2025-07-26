@@ -69,6 +69,7 @@ pub enum AppArgs {
         // sorting mode
         sort_by_rmsd: bool,
         sort_by_score: bool,
+        sort_by_z_score: bool,
         // output mode
         output_per_structure: bool,
         output_per_match: bool,

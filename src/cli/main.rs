@@ -65,7 +65,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             num_res_cutoff: args.value_from_str("--num-residue").unwrap_or(50000),
             plddt_cutoff: args.value_from_str("--plddt").unwrap_or(0.0),
             rmsd_cutoff: args.value_from_str("--rmsd").unwrap_or(0.0),
-            tm_score_cutoff: args.value_from_str("--tm-score").unwrap_or(0.1),
+            tm_score_cutoff: args.value_from_str("--tm-score").unwrap_or(0.0),
             top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
             web_mode: args.contains("--web"), // Web mode for output
             // Query filtering
@@ -76,6 +76,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             // Sorting mode
             sort_by_rmsd: args.contains("--sort-by-rmsd"),
             sort_by_score: args.contains("--sort-by-score"),
+            sort_by_z_score: args.contains("--sort-by-z-score"),
             // Output mode
             output_per_structure: args.contains("--per-structure"),
             output_per_match: args.contains("--per-match"),

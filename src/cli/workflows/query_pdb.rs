@@ -334,7 +334,7 @@ pub fn query_pdb(env: AppArgs) {
                             total_match_count, covered_node_count, covered_node_ratio,
                             idf_score_cutoff, num_res_cutoff, plddt_cutoff, 
                             max_matching_node_count, max_matching_node_ratio, rmsd_cutoff,
-                            _residue_count,
+                            0.0, _residue_count,
                         );
 
                         match mode {
@@ -404,6 +404,7 @@ pub fn query_pdb(env: AppArgs) {
                                             v.matching_residues_processed = retrieval_result.1;
                                             v.max_matching_node_count = retrieval_result.2;
                                             v.min_rmsd_with_max_match = retrieval_result.3;
+                                            v.max_tm_score_with_max_match = retrieval_result.4;
                                         }));
                                     } else {
                                         query_count_vec.par_iter_mut().for_each(|(_, v)| {
@@ -434,6 +435,7 @@ pub fn query_pdb(env: AppArgs) {
                                             v.matching_residues_processed = retrieval_result.1;
                                             v.max_matching_node_count = retrieval_result.2;
                                             v.min_rmsd_with_max_match = retrieval_result.3;
+                                            v.max_tm_score_with_max_match = retrieval_result.4;
                                         });
                                     }
                                     
@@ -509,6 +511,7 @@ pub fn query_pdb(env: AppArgs) {
                                             v.matching_residues_processed = retrieval_result.1;
                                             v.max_matching_node_count = retrieval_result.2;
                                             v.min_rmsd_with_max_match = retrieval_result.3;
+                                            v.max_tm_score_with_max_match = retrieval_result.4;
                                         }));
                                     } else {
                                         query_count_vec.par_iter_mut().for_each(|(_, v)| {
@@ -539,6 +542,7 @@ pub fn query_pdb(env: AppArgs) {
                                             v.matching_residues_processed = retrieval_result.1;
                                             v.max_matching_node_count = retrieval_result.2;
                                             v.min_rmsd_with_max_match = retrieval_result.3;
+                                            v.max_tm_score_with_max_match = retrieval_result.4;
                                         });
                                     }
 
@@ -557,7 +561,7 @@ pub fn query_pdb(env: AppArgs) {
                 drop(query_residues);
                 let match_filter= MatchFilter::new(
                     connected_node_count, connected_node_ratio, idf_score_cutoff,
-                    rmsd_cutoff, _residue_count,
+                    rmsd_cutoff, 0.0, _residue_count,
                 );
 
                 match query_mode {

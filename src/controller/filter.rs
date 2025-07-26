@@ -13,6 +13,7 @@ pub struct StructureFilter {
     pub max_matching_node_count: usize,
     pub max_matching_node_ratio: f32,
     pub rmsd: f32,
+    pub tm_score: f32,
     // Expected number of residues and nodes
     pub expected_node_count: usize,
 }
@@ -22,7 +23,7 @@ impl StructureFilter {
         total_match_count: usize, covered_node_count: usize, 
         covered_node_ratio: f32, idf: f32, nres: usize, plddt: f32,
         max_matching_node_count: usize, max_matching_node_ratio: f32,
-        rmsd: f32, expected_node_count: usize,
+        rmsd: f32, tm_score: f32, expected_node_count: usize,
     ) -> Self {
         StructureFilter {
             total_match_count: total_match_count,
@@ -34,6 +35,7 @@ impl StructureFilter {
             max_matching_node_count: max_matching_node_count,
             max_matching_node_ratio: max_matching_node_ratio,
             rmsd,
+            tm_score,
             expected_node_count,
         }
     }
@@ -50,6 +52,7 @@ impl StructureFilter {
             max_matching_node_count: 0,
             max_matching_node_ratio: 0.0,
             rmsd: 0.0,
+            tm_score: 0.0,
             expected_node_count: 0,
         }
     }
@@ -66,6 +69,7 @@ impl StructureFilter {
             max_matching_node_count: 0,
             max_matching_node_ratio: 0.0,
             rmsd: 0.0,
+            tm_score: 0.0,
             expected_node_count: node_count,
         }
     }
@@ -111,6 +115,9 @@ impl StructureFilter {
         if self.rmsd > 0.0 {
             pass = pass && result.min_rmsd_with_max_match <= self.rmsd;
         }
+        if self.tm_score > 0.0 {
+            pass = pass && result.max_tm_score_with_max_match >= self.tm_score;
+        }
         //
         pass
     }
@@ -122,17 +129,19 @@ pub struct MatchFilter {
     pub node_ratio: f32,
     pub avg_idf: f32,
     pub rmsd: f32,
+    pub tm_score: f32,
     // Expected number of nodes
     pub expected_node_count: usize,
 }
 
 impl MatchFilter {
-    pub fn new(node_count: usize, node_ratio: f32, avg_idf: f32, rmsd: f32, expected_node_count: usize) -> Self {
+    pub fn new(node_count: usize, node_ratio: f32, avg_idf: f32, rmsd: f32, tm_score: f32, expected_node_count: usize) -> Self {
         MatchFilter {
             node_count,
             node_ratio,
             avg_idf,
             rmsd,
+            tm_score,
             expected_node_count,
         }
     }
@@ -144,6 +153,7 @@ impl MatchFilter {
             node_ratio: 0.0,
             avg_idf: 0.0,
             rmsd: 0.0,
+            tm_score: 0.0,
             expected_node_count: 0,
         }
     }
@@ -153,6 +163,7 @@ impl MatchFilter {
             node_ratio: 0.8,
             avg_idf: 0.0,
             rmsd: 1.0, // Default at 1.0
+            tm_score: 0.0,
             expected_node_count: node_count,
         }
     }
@@ -173,6 +184,9 @@ impl MatchFilter {
         }
         if self.rmsd > 0.0 {
             pass = pass && result.rmsd <= self.rmsd;
+        }
+        if self.tm_score > 0.0 {
+            pass = pass && result.tm_score >= self.tm_score;
         }
         //
         pass

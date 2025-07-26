@@ -19,6 +19,7 @@ pub struct QCPSuperimposer {
     pub tran: Option<[f32; 3]>,
     pub rms: Option<f32>,
     pub init_rms: Option<f32>,
+    pub tm_score: Option<f32>,
     pub natoms: usize,
 }
 
@@ -32,6 +33,7 @@ impl QCPSuperimposer {
             tran: None,
             rms: None,
             init_rms: None,
+            tm_score: None,
             natoms: 0,
         }
     }
@@ -45,6 +47,13 @@ impl QCPSuperimposer {
         self.set(&fixed_coords, &moving_coords);
         self.run();
         self.rms = Some(self.get_rms());
+        
+        // Calculate and cache TM-score
+        let coords = self.coords.as_ref().unwrap();
+        let reference_coords = self.reference_coords.as_ref().unwrap();
+        let rot = self.rot.unwrap();
+        let tran = self.tran.unwrap();
+        self.tm_score = Some(calculate_tm_score(coords, reference_coords, rot, tran));
     }
 
     pub fn set(&mut self, reference_coords: &[[f32; 3]], coords: &[[f32; 3]]) {
@@ -127,6 +136,9 @@ impl QCPSuperimposer {
             .collect();
         self.rms = Some((diff.iter().sum::<f32>() / self.natoms as f32).sqrt());        
         
+        // Calculate TM-score
+        self.tm_score = Some(calculate_tm_score(&coords, &reference_coords, rot, tran));
+        
     }
 
     pub fn get_transformed(&mut self) -> Vec<[f32; 3]> {
@@ -175,6 +187,101 @@ impl QCPSuperimposer {
     pub fn get_rms(&self) -> f32 {
         self.rms.unwrap()
     }
+
+    /// Calculate TM-score between two aligned structures
+    /// TM-score is normalized by the target structure length
+    pub fn get_tm_score(&self) -> f32 {
+        self.tm_score.expect("TM-score not calculated. Run superposition first.")
+    }
+
+    /// Calculate TM-score normalized by a specific length (useful for comparing structures of different lengths)
+    pub fn get_tm_score_normalized(&self, norm_length: usize) -> f32 {
+        let coords = self.coords.as_ref().expect("Coordinates not set");
+        let reference_coords = self.reference_coords.as_ref().expect("Reference coordinates not set");
+        let rot = self.rot.expect("Superposition not performed");
+        let tran = self.tran.expect("Superposition not performed");
+        
+        calculate_tm_score_with_length(coords, reference_coords, rot, tran, norm_length)
+    }
+}
+
+/// Calculate TM-score between two aligned coordinate sets
+/// 
+/// # Arguments
+/// * `coords1` - Moving coordinates (will be transformed)
+/// * `coords2` - Target coordinates (reference)
+/// * `rotation` - Rotation matrix from alignment
+/// * `translation` - Translation vector from alignment
+/// 
+/// # Returns
+/// TM-score normalized by the target structure length
+pub fn calculate_tm_score(
+    coords1: &[[f32; 3]], 
+    coords2: &[[f32; 3]], 
+    rotation: [[f32; 3]; 3], 
+    translation: [f32; 3]
+) -> f32 {
+    calculate_tm_score_with_length(coords1, coords2, rotation, translation, coords2.len())
+}
+
+/// Calculate TM-score with custom normalization length
+/// 
+/// # Arguments
+/// * `coords1` - Moving coordinates (will be transformed)
+/// * `coords2` - Target coordinates (reference)
+/// * `rotation` - Rotation matrix from alignment
+/// * `translation` - Translation vector from alignment
+/// * `norm_length` - Length to use for normalization (typically target length)
+/// 
+/// # Returns
+/// TM-score normalized by the specified length
+pub fn calculate_tm_score_with_length(
+    coords1: &[[f32; 3]], 
+    coords2: &[[f32; 3]], 
+    rotation: [[f32; 3]; 3], 
+    translation: [f32; 3],
+    norm_length: usize
+) -> f32 {
+    assert_eq!(coords1.len(), coords2.len(), "Coordinate arrays must have the same length");
+    
+    let n = coords1.len();
+    if n == 0 || norm_length == 0 {
+        return 0.0;
+    }
+    
+    // Calculate d0 normalization factor: d0 = 1.24 * (L_norm - 15)^(1/3) - 1.8
+    let d0 = if norm_length <= 15 {
+        0.5 // Minimum d0 for very short sequences
+    } else {
+        1.24 * ((norm_length - 15) as f32).powf(1.0/3.0) - 1.8
+    }.max(0.5); // Ensure d0 is at least 0.5
+    
+    let d0_sq = d0 * d0;
+    
+    // Calculate TM-score
+    let mut tm_sum = 0.0;
+    
+    for i in 0..n {
+        // Transform coords1[i] using rotation and translation
+        let transformed = rotate(coords1[i], rotation);
+        let transformed = [
+            transformed[0] + translation[0],
+            transformed[1] + translation[1],
+            transformed[2] + translation[2]
+        ];
+        
+        // Calculate squared distance to coords2[i]
+        let dx = transformed[0] - coords2[i][0];
+        let dy = transformed[1] - coords2[i][1];
+        let dz = transformed[2] - coords2[i][2];
+        let dist_sq = dx * dx + dy * dy + dz * dz;
+        
+        // Add to TM-score sum: 1 / (1 + (di/d0)^2)
+        tm_sum += 1.0 / (1.0 + dist_sq / d0_sq);
+    }
+    
+    // Normalize by target length
+    tm_sum / (norm_length as f32)
 }
 
 fn mean(coords: &[[f32; 3]]) -> [f32; 3] {
@@ -441,6 +548,7 @@ mod tests {
         // assert!(superimposer.get_rms() < 0.2);
         let start  = std::time::Instant::now();
         println!("RMSD after superimposition: {}", superimposer.get_rms());
+        println!("TM-score: {}", superimposer.get_tm_score());
         let duration = start.elapsed();
         println!("Time taken for superimposition: {:?}", duration);
         println!("Transformed coordinates: {:?}", superimposer.get_transformed());
@@ -450,11 +558,33 @@ mod tests {
         // assert!(superimposer.get_rms() < 0.2);
         let start = std::time::Instant::now();
         println!("RMSD after superimposition: {}", superimposer.get_rms());
+        println!("TM-score: {}", superimposer.get_tm_score());
         let duration = start.elapsed();
         println!("Time taken for superimposition: {:?}", duration);
         println!("Transformed coordinates: {:?}", superimposer.get_transformed());
         println!("Rotation matrix: {:?}", superimposer.get_rotran().0);
         println!("Translation vector: {:?}", superimposer.get_rotran().1);
         assert!(superimposer.get_rms() < 0.2);
+    }
+
+    #[test]
+    fn test_tm_score_calculation() {
+        // Test TM-score calculation with identical structures
+        let coords = vec![
+            Coordinate::new(1.0, 2.0, 3.0),
+            Coordinate::new(4.0, 5.0, 6.0),
+            Coordinate::new(7.0, 8.0, 9.0),
+        ];
+
+        let mut superimposer = QCPSuperimposer::new();
+        superimposer.set_atoms(&coords, &coords);
+        
+        println!("QCP RMSD for identical structures: {}", superimposer.get_rms());
+        println!("QCP TM-score for identical structures: {}", superimposer.get_tm_score());
+        
+        // TM-score should be 1.0 for identical structures
+        let tm_score = superimposer.get_tm_score();
+        assert!((tm_score - 1.0).abs() < 1e-6);
+        assert!(superimposer.get_rms() < 1e-6);
     }
 }

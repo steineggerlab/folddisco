@@ -27,6 +27,7 @@ pub struct KabschSuperimposer {
     pub tran: Option<[f32; 3]>,
     pub rms: Option<f32>,
     pub init_rms: Option<f32>,
+    pub tm_score: Option<f32>,
     pub natoms: usize,
 }
 
@@ -40,8 +41,25 @@ impl KabschSuperimposer {
             tran: None,
             rms: None,
             init_rms: None,
+            tm_score: None,
             natoms: 0,
         }
+    }
+
+    /// Calculate TM-score between two aligned structures
+    /// TM-score is normalized by the target structure length
+    pub fn get_tm_score(&self) -> f32 {
+        self.tm_score.expect("TM-score not calculated. Run superposition first.")
+    }
+
+    /// Calculate TM-score normalized by a specific length (useful for comparing structures of different lengths)
+    pub fn get_tm_score_normalized(&self, norm_length: usize) -> f32 {
+        let coords = self.coords.as_ref().expect("Coordinates not set");
+        let reference_coords = self.reference_coords.as_ref().expect("Reference coordinates not set");
+        let rot = self.rot.expect("Superposition not performed");
+        let tran = self.tran.expect("Superposition not performed");
+        
+        calculate_tm_score_with_length(coords, reference_coords, rot, tran, norm_length)
     }
 
     pub fn set_atoms(&mut self, fixed: &[Coordinate], moving: &[Coordinate]) {
@@ -53,6 +71,13 @@ impl KabschSuperimposer {
         self.set(&fixed_coords, &moving_coords);
         self.run();
         self.rms = Some(self.get_rms());
+        
+        // Calculate and cache TM-score
+        let coords = self.coords.as_ref().unwrap();
+        let reference_coords = self.reference_coords.as_ref().unwrap();
+        let rot = self.rot.unwrap();
+        let tran = self.tran.unwrap();
+        self.tm_score = Some(calculate_tm_score(coords, reference_coords, rot, tran));
     }
 
     pub fn set(&mut self, reference_coords: &[[f32; 3]], coords: &[[f32; 3]]) {
@@ -82,6 +107,9 @@ impl KabschSuperimposer {
         self.rot = Some(rot);
         self.tran = Some(tran);
         self.rms = Some(rmsd);
+        
+        // Calculate TM-score
+        self.tm_score = Some(calculate_tm_score(&coords, &reference_coords, rot, tran));
         
         // Get transformed coordinates
         self.transformed_coords = Some(
@@ -553,6 +581,131 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
     Some((u_f32, t_f32, rms_f32))
 }
 
+/// Calculate TM-score between two aligned coordinate sets
+/// 
+/// # Arguments
+/// * `coords1` - Moving coordinates (will be transformed)
+/// * `coords2` - Target coordinates (reference)
+/// * `rotation` - Rotation matrix from Kabsch alignment
+/// * `translation` - Translation vector from Kabsch alignment
+/// 
+/// # Returns
+/// TM-score normalized by the target structure length
+pub fn calculate_tm_score(
+    coords1: &[[f32; 3]], 
+    coords2: &[[f32; 3]], 
+    rotation: [[f32; 3]; 3], 
+    translation: [f32; 3]
+) -> f32 {
+    calculate_tm_score_with_length(coords1, coords2, rotation, translation, coords2.len())
+}
+
+/// Calculate TM-score with custom normalization length
+/// 
+/// # Arguments
+/// * `coords1` - Moving coordinates (will be transformed)
+/// * `coords2` - Target coordinates (reference)
+/// * `rotation` - Rotation matrix from Kabsch alignment
+/// * `translation` - Translation vector from Kabsch alignment
+/// * `norm_length` - Length to use for normalization (typically target length)
+/// 
+/// # Returns
+/// TM-score normalized by the specified length
+pub fn calculate_tm_score_with_length(
+    coords1: &[[f32; 3]], 
+    coords2: &[[f32; 3]], 
+    rotation: [[f32; 3]; 3], 
+    translation: [f32; 3],
+    norm_length: usize
+) -> f32 {
+    assert_eq!(coords1.len(), coords2.len(), "Coordinate arrays must have the same length");
+    
+    let n = coords1.len();
+    if n == 0 || norm_length == 0 {
+        return 0.0;
+    }
+    
+    // Calculate d0 normalization factor: d0 = 1.24 * (L_norm - 15)^(1/3) - 1.8
+    let d0 = if norm_length <= 15 {
+        0.5 // Minimum d0 for very short sequences
+    } else {
+        1.24 * ((norm_length - 15) as f32).powf(1.0/3.0) - 1.8
+    }.max(0.5); // Ensure d0 is at least 0.5
+    
+    let d0_sq = d0 * d0;
+    
+    // Calculate TM-score
+    let mut tm_sum = 0.0;
+    
+    for i in 0..n {
+        // Transform coords1[i] using rotation and translation
+        let transformed = matrix_vector_multiply(rotation, coords1[i]);
+        let transformed = add_vec(transformed, translation);
+        
+        // Calculate squared distance to coords2[i]
+        let dx = transformed[0] - coords2[i][0];
+        let dy = transformed[1] - coords2[i][1];
+        let dz = transformed[2] - coords2[i][2];
+        let dist_sq = dx * dx + dy * dy + dz * dz;
+        
+        // Add to TM-score sum: 1 / (1 + (di/d0)^2)
+        tm_sum += 1.0 / (1.0 + dist_sq / d0_sq);
+    }
+    
+    // Normalize by target length
+    tm_sum / (norm_length as f32)
+}
+
+/// Calculate Global Distance Test (GDT) scores
+/// GDT measures the percentage of residues under different distance thresholds
+/// 
+/// # Arguments
+/// * `coords1` - Moving coordinates (will be transformed)
+/// * `coords2` - Target coordinates (reference)
+/// * `rotation` - Rotation matrix from Kabsch alignment
+/// * `translation` - Translation vector from Kabsch alignment
+/// * `thresholds` - Distance thresholds to test (typically [1.0, 2.0, 4.0, 8.0])
+/// 
+/// # Returns
+/// Vector of GDT percentages for each threshold
+pub fn calculate_gdt_scores(
+    coords1: &[[f32; 3]], 
+    coords2: &[[f32; 3]], 
+    rotation: [[f32; 3]; 3], 
+    translation: [f32; 3],
+    thresholds: &[f32]
+) -> Vec<f32> {
+    assert_eq!(coords1.len(), coords2.len(), "Coordinate arrays must have the same length");
+    
+    let n = coords1.len();
+    if n == 0 {
+        return vec![0.0; thresholds.len()];
+    }
+    
+    // Calculate distances for all residues
+    let mut distances = Vec::with_capacity(n);
+    
+    for i in 0..n {
+        // Transform coords1[i] using rotation and translation
+        let transformed = matrix_vector_multiply(rotation, coords1[i]);
+        let transformed = add_vec(transformed, translation);
+        
+        // Calculate distance to coords2[i]
+        let dx = transformed[0] - coords2[i][0];
+        let dy = transformed[1] - coords2[i][1];
+        let dz = transformed[2] - coords2[i][2];
+        let dist = (dx * dx + dy * dy + dz * dz).sqrt();
+        
+        distances.push(dist);
+    }
+    
+    // Calculate GDT scores for each threshold
+    thresholds.iter().map(|&threshold| {
+        let count = distances.iter().filter(|&&dist| dist <= threshold).count();
+        (count as f32) / (n as f32) * 100.0
+    }).collect()
+}
+
 
 
 #[cfg(test)]
@@ -584,6 +737,7 @@ mod tests {
         superimposer.set_atoms(&source, &target1);
         let start = std::time::Instant::now();
         println!("RMSD after superimposition: {}", superimposer.get_rms());
+        println!("TM-score: {}", superimposer.get_tm_score());
         let duration = start.elapsed();
         println!("Time taken for superimposition: {:?}", duration);
         println!("Transformed coordinates: {:?}", superimposer.get_transformed());
@@ -595,6 +749,7 @@ mod tests {
         assert!(superimposer.get_rms() < 0.2);
         let start = std::time::Instant::now();
         println!("RMSD after superimposition: {}", superimposer.get_rms());
+        println!("TM-score: {}", superimposer.get_tm_score());
         let duration = start.elapsed();
         println!("Time taken for superimposition: {:?}", duration);
         println!("Transformed coordinates: {:?}", superimposer.get_transformed());
@@ -613,5 +768,79 @@ mod tests {
         let mut superimposer = KabschSuperimposer::new();
         superimposer.set_atoms(&coords, &coords);
         assert!(superimposer.get_rms() < 1e-6);
+        
+        // TM-score should be 1.0 for identical structures
+        let tm_score = superimposer.get_tm_score();
+        println!("TM-score for identical structures: {}", tm_score);
+        assert!((tm_score - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_tm_score_calculation() {
+        // Test TM-score calculation with known structures
+        let coords1 = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [3.0, 0.0, 0.0],
+        ];
+        
+        let coords2 = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [3.0, 0.0, 0.0],
+        ];
+        
+        // Identity transformation
+        let rotation = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let translation = [0.0, 0.0, 0.0];
+        
+        let tm_score = calculate_tm_score(&coords1, &coords2, rotation, translation);
+        println!("TM-score for identical aligned structures: {}", tm_score);
+        assert!((tm_score - 1.0).abs() < 1e-6);
+        
+        // Test with small displacement
+        let coords2_displaced = vec![
+            [0.1, 0.0, 0.0],
+            [1.1, 0.0, 0.0],
+            [2.1, 0.0, 0.0],
+            [3.1, 0.0, 0.0],
+        ];
+        
+        let tm_score_displaced = calculate_tm_score(&coords1, &coords2_displaced, rotation, translation);
+        println!("TM-score with 0.1Å displacement: {}", tm_score_displaced);
+        assert!(tm_score_displaced > 0.8); // Should still be high
+        assert!(tm_score_displaced < 1.0); // But less than perfect
+    }
+
+    #[test]
+    fn test_gdt_calculation() {
+        let coords1 = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [3.0, 0.0, 0.0],
+        ];
+        
+        let coords2 = vec![
+            [0.5, 0.0, 0.0], // 0.5Å distance
+            [1.0, 1.5, 0.0], // 1.5Å distance
+            [2.0, 0.0, 2.5], // 2.5Å distance
+            [3.0, 0.0, 5.0], // 5.0Å distance
+        ];
+        
+        let rotation = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let translation = [0.0, 0.0, 0.0];
+        let thresholds = [1.0, 2.0, 4.0, 8.0];
+        
+        let gdt_scores = calculate_gdt_scores(&coords1, &coords2, rotation, translation, &thresholds);
+        println!("GDT scores: {:?}", gdt_scores);
+        
+        // Expected: 25% under 1Å, 50% under 2Å, 75% under 4Å, 100% under 8Å
+        assert!((gdt_scores[0] - 25.0).abs() < 1e-6);
+        assert!((gdt_scores[1] - 50.0).abs() < 1e-6);
+        assert!((gdt_scores[2] - 75.0).abs() < 1e-6);
+        assert!((gdt_scores[3] - 100.0).abs() < 1e-6);
     }
 }

@@ -11,7 +11,7 @@ use crate::structure::coordinate::Coordinate;
 use super::ResidueMatch;
 
 
-pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tkey\tquery_residues";
+pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tmax_tm_score\tnres\tplddt\tmatching_residues\tkey\tquery_residues";
 pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tkey\tquery_residues";
 pub const MATCH_QUERY_RESULT_SUPERPOSE_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tu_vector\tt_vector\ttarget_ca_coords\tkey\tquery_residues";
 
@@ -25,10 +25,11 @@ pub struct StructureResult<'a> {
     pub idf: f32,
     pub nres: usize,
     pub plddt: f32,
-    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with connected components
-    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with c-alpha distances
+    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with connected components (added TM-score)
+    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with c-alpha distances (added TM-score)
     pub max_matching_node_count: usize,
     pub min_rmsd_with_max_match: f32,
+    pub max_tm_score_with_max_match: f32,
 }
 
 impl<'a> StructureResult<'a> {
@@ -50,22 +51,23 @@ impl<'a> StructureResult<'a> {
             matching_residues_processed: Vec::new(),
             max_matching_node_count: 0,
             min_rmsd_with_max_match: 0.0,
+            max_tm_score_with_max_match: 0.0,
         }
     }
 
     pub fn into_match_query_results(&self, skip_ca_dist: bool) -> Vec<MatchResult> {
         match skip_ca_dist {
-            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates))| {
+            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, tm_score, u_matrix, t_matrix, matching_coordinates))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
-                    self.id, i, self.idf, residues.clone(), *rmsd,
+                    self.id, i, self.idf, residues.clone(), *rmsd, *tm_score,
                     *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key
                 )
             }).collect(),
-            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates))| {
+            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, tm_score, u_matrix, t_matrix, matching_coordinates))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
-                    self.id, i, self.idf, residues.clone(), *rmsd,
+                    self.id, i, self.idf, residues.clone(), *rmsd, *tm_score,
                     *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key
                 )
             }).collect(),
@@ -94,19 +96,19 @@ impl<'a> fmt::Display for StructureResult<'a> {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
                 // Join with comma
-                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, z, _, _, _)| format!("{}:{:.4}:{:.4}", x.iter().map(|x| {
                     match x {
                         // Convert u8 to char
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
                     }
-                }).collect::<Vec<String>>().join(","), y)
+                }).collect::<Vec<String>>().join(","), y, z)
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
             self.id, self.idf, self.total_match_count, self.node_count, self.edge_count,
-            self.max_matching_node_count, self.min_rmsd_with_max_match,
+            self.max_matching_node_count, self.min_rmsd_with_max_match, self.max_tm_score_with_max_match,
             self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )
     }
@@ -119,18 +121,18 @@ impl<'a> fmt::Debug for StructureResult<'a> {
         } else {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
-                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, z, _, _, _)| format!("{}:{:.4}:{:.4}", x.iter().map(|x| {
                     match x {
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
                     }
-                }).collect::<Vec<String>>().join(","), y)
+                }).collect::<Vec<String>>().join(","), y, z)
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
-            self.max_matching_node_count, self.min_rmsd_with_max_match,
+            self.max_matching_node_count, self.min_rmsd_with_max_match, self.max_tm_score_with_max_match,
             self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )
     }
@@ -143,18 +145,18 @@ impl<'a> StructureResult<'a> {
         } else {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
-                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, z, _, _, _)| format!("{}:{:.4}:{:.4}", x.iter().map(|x| {
                     match x {
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
                     }
-                }).collect::<Vec<String>>().join(","), y)
+                }).collect::<Vec<String>>().join(","), y, z)
             ).collect::<Vec<String>>().join(";")
         };
         write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
+            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
             self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
-            self.max_matching_node_count, self.min_rmsd_with_max_match,
+            self.max_matching_node_count, self.min_rmsd_with_max_match, self.max_tm_score_with_max_match,
             self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
         )
     }
@@ -168,6 +170,7 @@ pub struct MatchResult<'a> {
     pub idf: f32,
     pub matching_residues: Vec<ResidueMatch>,
     pub rmsd: f32,
+    pub tm_score: f32,
     pub u_matrix: [[f32; 3]; 3],
     pub t_matrix: [f32; 3],
     pub matching_coordinates: Vec<Coordinate>,
@@ -175,7 +178,7 @@ pub struct MatchResult<'a> {
 
 impl<'a> MatchResult<'a> {
     pub fn new(
-        id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
+        id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32, tm_score: f32,
         u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize
     ) -> Self {
         //
@@ -193,6 +196,7 @@ impl<'a> MatchResult<'a> {
             idf: avg_idf,
             matching_residues,
             rmsd,
+            tm_score,
             u_matrix,
             t_matrix,
             matching_coordinates,
@@ -294,7 +298,8 @@ pub fn sort_and_print_structure_query_result(
                 if a.1.max_matching_node_count != b.1.max_matching_node_count {
                     b.1.max_matching_node_count.partial_cmp(&a.1.max_matching_node_count).unwrap()
                 } else {
-                    a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
+                    // a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
+                    b.1.max_tm_score_with_max_match.partial_cmp(&a.1.max_tm_score_with_max_match).unwrap()
                 }
             }));
         } else {
@@ -303,7 +308,8 @@ pub fn sort_and_print_structure_query_result(
                 if a.1.max_matching_node_count != b.1.max_matching_node_count {
                     b.1.max_matching_node_count.partial_cmp(&a.1.max_matching_node_count).unwrap()
                 } else {
-                    a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
+                    // a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
+                    b.1.max_tm_score_with_max_match.partial_cmp(&a.1.max_tm_score_with_max_match).unwrap()
                 }
             });
         }

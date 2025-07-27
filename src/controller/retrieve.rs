@@ -9,7 +9,7 @@ use crate::structure::{coordinate::Coordinate, core::CompactStructure, kabsch::K
 use crate::utils::combination::{CombinationIterator, CombinationVecIterator};
 use crate::controller::graph::{connected_components_with_given_node_count, create_index_graph};
 use crate::controller::feature::get_single_feature;
-use crate::controller::ResidueMatch;
+use crate::controller::{query, ResidueMatch};
 use crate::controller::io::read_structure_from_path;
 
 #[cfg(feature = "foldcomp")]
@@ -159,7 +159,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
       Vec<(Vec<ResidueMatch>, f32, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32, f32) {
     let compact = foldcomp_db_reader.read_single_structure_by_id(db_key).expect("Error reading structure from foldcomp db");
     let compact = compact.to_compact();
-
+    let query_num_residues = all_query_indices.len();
     // let mut indices_found: Vec<Vec<(usize, usize)>> = Vec::new();
     // Iterate over query vector and retrieve indices
     // Parallel
@@ -292,14 +292,14 @@ pub fn retrieval_wrapper_for_foldcompdb(
         });
 
         let (rmsd_from_hash, tm_score_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
-            query_structure, &compact, &query_indices, &retrieved_indices
+            query_structure, &compact, &query_indices, &retrieved_indices, query_num_residues
         );
         
         let (rmsd, tm_score, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
             (rmsd_from_hash, tm_score_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
         } else {
             rmsd_with_calpha_and_rottran(
-                query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned
+                query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned, query_num_residues
             )
         };
         
@@ -356,7 +356,7 @@ pub fn retrieval_wrapper(
     // Parallel
     let query_set: HashSet<GeometricHash> = HashSet::from_iter(query_vector.clone());
     let query_symmetry_map = get_hash_symmetry_map(&query_set);
-    
+    let query_num_residues = all_query_indices.len();
     // let (index_set1, index_set2) = prefilter_amino_acid(&query_set, _hash_type, &compact);
 
     let aa_filter = if _hash_type.amino_acid_index().is_some() {
@@ -487,14 +487,14 @@ pub fn retrieval_wrapper(
         });
 
         let (rmsd_from_hash, tm_score_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
-            query_structure, &compact, &query_indices, &retrieved_indices
+            query_structure, &compact, &query_indices, &retrieved_indices, query_num_residues
         );
         
         let (rmsd, tm_score,  u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
             (rmsd_from_hash, tm_score_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
         } else {
             rmsd_with_calpha_and_rottran(
-                query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned
+                query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned, query_num_residues
             )
         };
                 
@@ -684,7 +684,7 @@ pub fn rmsd_for_matched(
 
 pub fn rmsd_with_calpha_and_rottran(
     compact1: &CompactStructure, compact2: &CompactStructure, 
-    index1: &Vec<usize>, index2: &Vec<usize>
+    index1: &Vec<usize>, index2: &Vec<usize>, query_num_residues: usize
 ) -> (f32, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>) {
     let mut superposer = KabschSuperimposer::new();
     let coord_vec1: Vec<Coordinate> = index1.iter().map(
@@ -701,7 +701,7 @@ pub fn rmsd_with_calpha_and_rottran(
     
     superposer.set_atoms(&coord_vec1, &coord_vec2);
     superposer.run();
-    (superposer.get_rms(), superposer.get_tm_score(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+    (superposer.get_rms(), superposer.get_tm_score_normalized(query_num_residues * 2), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
 }
 
 #[cfg(test)]

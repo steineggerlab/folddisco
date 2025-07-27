@@ -590,7 +590,7 @@ fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f
 /// * `translation` - Translation vector from Kabsch alignment
 /// 
 /// # Returns
-/// TM-score normalized by the target structure length
+/// TM-score normalized by the query
 pub fn calculate_tm_score(
     coords1: &[[f32; 3]], 
     coords2: &[[f32; 3]], 

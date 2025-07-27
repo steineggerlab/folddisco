@@ -403,23 +403,26 @@ pub fn sort_and_print_structure_query_result(
     if do_sort_by_rmsd {
         if verbose {
             measure_time!(results.par_sort_by(|a, b| {
-                // Primary by max_matching_node_count, secondary by min_rmsd
-                if a.1.max_matching_node_count != b.1.max_matching_node_count {
-                    b.1.max_matching_node_count.partial_cmp(&a.1.max_matching_node_count).unwrap()
-                } else {
-                    // a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
-                    b.1.max_tm_score_with_max_match.partial_cmp(&a.1.max_tm_score_with_max_match).unwrap()
-                }
+                // Testing solely by max_tm_score_with_max_match
+                b.1.max_tm_score_with_max_match.partial_cmp(&a.1.max_tm_score_with_max_match).unwrap()
+                // // Primary by max_matching_node_count, secondary by min_rmsd
+                // if a.1.max_matching_node_count != b.1.max_matching_node_count {
+                //     b.1.max_matching_node_count.partial_cmp(&a.1.max_matching_node_count).unwrap()
+                // } else {
+                //     // a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
+                //     b.1.max_tm_score_with_max_match.partial_cmp(&a.1.max_tm_score_with_max_match).unwrap()
+                // }
             }));
         } else {
             results.par_sort_by(|a, b| {
-                // Primary by max_matching_node_count, secondary by min_rmsd
-                if a.1.max_matching_node_count != b.1.max_matching_node_count {
-                    b.1.max_matching_node_count.partial_cmp(&a.1.max_matching_node_count).unwrap()
-                } else {
-                    // a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
-                    b.1.max_tm_score_with_max_match.partial_cmp(&a.1.max_tm_score_with_max_match).unwrap()
-                }
+                b.1.max_tm_score_with_max_match.partial_cmp(&a.1.max_tm_score_with_max_match).unwrap()
+                // // Primary by max_matching_node_count, secondary by min_rmsd
+                // if a.1.max_matching_node_count != b.1.max_matching_node_count {
+                //     b.1.max_matching_node_count.partial_cmp(&a.1.max_matching_node_count).unwrap()
+                // } else {
+                //     // a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
+                //     b.1.max_tm_score_with_max_match.partial_cmp(&a.1.max_tm_score_with_max_match).unwrap()
+                // }
             });
         }
     }
@@ -461,30 +464,34 @@ pub fn sort_and_print_match_query_result(
     if verbose {
         measure_time!(results.par_sort_by(|a, b| {
             // Primary by max_matching_node_count, secondary by min_rmsd
-            if a.1.node_count != b.1.node_count {
-                b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
-            } else {
-                if do_sort_by_rmsd {
-                    a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
-                } else {
-                    // If not sorting by rmsd, sort by idf
-                    b.1.idf.partial_cmp(&a.1.idf).unwrap()
-                }
-            }
+            // Testing
+            b.1.tm_score.partial_cmp(&a.1.tm_score).unwrap()
+            // if a.1.node_count != b.1.node_count {
+            //     b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
+            // } else {
+            //     if do_sort_by_rmsd {
+            //         a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
+            //     } else {
+            //         // If not sorting by rmsd, sort by idf
+            //         b.1.idf.partial_cmp(&a.1.idf).unwrap()
+            //     }
+            // }
         }));
     } else {
         results.par_sort_by(|a, b| {
             // Primary by max_matching_node_count, secondary by min_rmsd
-            if a.1.node_count != b.1.node_count {
-                b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
-            } else {
-                if do_sort_by_rmsd {
-                    a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
-                } else {
-                    // If not sorting by rmsd, sort by idf
-                    b.1.idf.partial_cmp(&a.1.idf).unwrap()
-                }
-            }
+            // Testing
+            b.1.tm_score.partial_cmp(&a.1.tm_score).unwrap()
+            // if a.1.node_count != b.1.node_count {
+            //     b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
+            // } else {
+            //     if do_sort_by_rmsd {
+            //         a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
+            //     } else {
+            //         // If not sorting by rmsd, sort by idf
+            //         b.1.idf.partial_cmp(&a.1.idf).unwrap()
+            //     }
+            // }
         });
     }
     // Apply top N filter if top_n is not usize::MAX

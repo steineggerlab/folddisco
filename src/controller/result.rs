@@ -366,31 +366,102 @@ fn calculate_std(values: &[f32]) -> f32 {
     variance.sqrt().max(0.001) // Avoid division by zero
 }
 
-// Z-score calculation methods
+// Z-score calculation methods with adaptive weighting based on query length
 impl<'a> StructureResult<'a> {
-    /// Calculate simple Z-score: 0.5 * (structural_z) + 0.5 * (idf_z)
-    /// where structural_z = 0.5 * (tm_z - rmsd_z)
-    pub fn calculate_simple_z_score(&self, stats: &SimpleStats) -> f32 {
+    /// Calculate adaptive Z-score with sophisticated weighting based on query length
+    /// RMSD: 40% at 2-3 residues, decays to 0% at 10 residues
+    /// TM-score: increases from 0% to 30% at 10 residues, then saturates
+    /// IDF: fills remaining weight, approaching 100% for long queries
+    pub fn calculate_simple_z_score(&self, stats: &SimpleStats, query_length: usize) -> f32 {
         let idf_z = (self.idf - stats.idf_mean) / stats.idf_std;
         let tm_z = (self.max_tm_score_with_max_match - stats.tm_mean) / stats.tm_std;
         let rmsd_z = -((self.min_rmsd_with_max_match - stats.rmsd_mean) / stats.rmsd_std); // Negative for higher is better
         
-        let structural_z = 0.5 * (tm_z + rmsd_z);
-        let composite_z = 0.5 * structural_z + 0.5 * idf_z;
+        // Adaptive weighting based on query length
+        let query_len = query_length as f32;
+        
+        // RMSD weight: 40% at 2-3 residues, linear decay to 0% at 10 residues
+        let rmsd_weight = if query_len <= 3.0 {
+            0.4
+        } else if query_len >= 10.0 {
+            0.0
+        } else {
+            // Linear decay from 0.4 at len=3 to 0.0 at len=10
+            0.4 - 0.4 * (query_len - 3.0) / (10.0 - 3.0)
+        };
+        
+        // TM-score weight: increases from 0% to 30% at 10 residues, then saturates at 30%
+        let tm_weight = if query_len <= 2.0 {
+            0.0
+        } else if query_len >= 10.0 {
+            0.3
+        } else {
+            // Linear increase from 0.0 at len=2 to 0.3 at len=10
+            0.3 * (query_len - 2.0) / (10.0 - 2.0)
+        };
+        
+        // IDF weight: fills remaining weight (approaching 100% for long queries)
+        let structural_weight = rmsd_weight + tm_weight;
+        let idf_weight = 1.0 - structural_weight;
+        
+        // Combine structural metrics
+        let structural_z = if structural_weight > 0.0 {
+            (rmsd_weight * rmsd_z + tm_weight * tm_z) / structural_weight
+        } else {
+            0.0
+        };
+        
+        let composite_z = structural_weight * structural_z + idf_weight * idf_z;
         
         composite_z
     }
 }
 
 impl<'a> MatchResult<'a> {
-    /// Calculate simple Z-score for individual matches
-    pub fn calculate_simple_z_score(&self, stats: &SimpleStats) -> f32 {
+    /// Calculate adaptive Z-score for individual matches with sophisticated weighting
+    /// RMSD: 40% at 2-3 residues, decays to 0% at 10 residues
+    /// TM-score: increases from 0% to 30% at 10 residues, then saturates
+    /// IDF: fills remaining weight, approaching 100% for long queries
+    pub fn calculate_simple_z_score(&self, stats: &SimpleStats, query_length: usize) -> f32 {
         let idf_z = (self.idf - stats.idf_mean) / stats.idf_std;
         let tm_z = (self.tm_score - stats.tm_mean) / stats.tm_std;
         let rmsd_z = -((self.rmsd - stats.rmsd_mean) / stats.rmsd_std); // Negative for higher is better
         
-        let structural_z = 0.5 * (tm_z + rmsd_z);
-        let composite_z = 0.5 * structural_z + 0.5 * idf_z;
+        // Adaptive weighting based on query length
+        let query_len = query_length as f32;
+        
+        // RMSD weight: 40% at 2-3 residues, linear decay to 0% at 10 residues
+        let rmsd_weight = if query_len <= 3.0 {
+            0.4
+        } else if query_len >= 10.0 {
+            0.0
+        } else {
+            // Linear decay from 0.4 at len=3 to 0.0 at len=10
+            0.4 - 0.4 * (query_len - 3.0) / (10.0 - 3.0)
+        };
+        
+        // TM-score weight: increases from 0% to 30% at 10 residues, then saturates at 30%
+        let tm_weight = if query_len <= 2.0 {
+            0.0
+        } else if query_len >= 10.0 {
+            0.3
+        } else {
+            // Linear increase from 0.0 at len=2 to 0.3 at len=10
+            0.3 * (query_len - 2.0) / (10.0 - 2.0)
+        };
+        
+        // IDF weight: fills remaining weight (approaching 100% for long queries)
+        let structural_weight = rmsd_weight + tm_weight;
+        let idf_weight = 1.0 - structural_weight;
+        
+        // Combine structural metrics
+        let structural_z = if structural_weight > 0.0 {
+            (rmsd_weight * rmsd_z + tm_weight * tm_z) / structural_weight
+        } else {
+            0.0
+        };
+        
+        let composite_z = structural_weight * structural_z + idf_weight * idf_z;
         
         composite_z
     }
@@ -542,6 +613,7 @@ pub fn sort_and_print_structure_query_result_z_score(
     results: &mut Vec<(usize, StructureResult)>, 
     output_path: &str, 
     query_string: &str, 
+    query_length: usize,
     header: bool, 
     verbose: bool,
 ) {
@@ -554,23 +626,42 @@ pub fn sort_and_print_structure_query_result_z_score(
     };
     
     if verbose {
+        // Calculate weight distribution for display
+        let query_len = query_length as f32;
+        let rmsd_weight = if query_len <= 3.0 {
+            0.4
+        } else if query_len >= 10.0 {
+            0.0
+        } else {
+            0.4 - 0.4 * (query_len - 3.0) / (10.0 - 3.0)
+        };
+        let tm_weight = if query_len <= 2.0 {
+            0.0
+        } else if query_len >= 10.0 {
+            0.3
+        } else {
+            0.3 * (query_len - 2.0) / (10.0 - 2.0)
+        };
+        let idf_weight = 1.0 - (rmsd_weight + tm_weight);
+        
         print_log_msg(INFO, &format!(
-            "Stats - IDF: {:.2}±{:.2}, RMSD: {:.2}±{:.2}, TM: {:.3}±{:.3}",
-            stats.idf_mean, stats.idf_std, stats.rmsd_mean, stats.rmsd_std, stats.tm_mean, stats.tm_std
+            "Stats - IDF: {:.2}±{:.2}, RMSD: {:.2}±{:.2}, TM: {:.3}±{:.3}, Query length: {}, Weights [RMSD:{:.1}%, TM:{:.1}%, IDF:{:.1}%]",
+            stats.idf_mean, stats.idf_std, stats.rmsd_mean, stats.rmsd_std, stats.tm_mean, stats.tm_std, 
+            query_length, rmsd_weight * 100.0, tm_weight * 100.0, idf_weight * 100.0
         ));
     }
     
     // Sort by Z-score (descending order - higher Z-score is better)
     if verbose {
         measure_time!(results.par_sort_by(|a, b| {
-            let z_score_a = a.1.calculate_simple_z_score(&stats);
-            let z_score_b = b.1.calculate_simple_z_score(&stats);
+            let z_score_a = a.1.calculate_simple_z_score(&stats, query_length);
+            let z_score_b = b.1.calculate_simple_z_score(&stats, query_length);
             z_score_b.partial_cmp(&z_score_a).unwrap()
         }));
     } else {
         results.par_sort_by(|a, b| {
-            let z_score_a = a.1.calculate_simple_z_score(&stats);
-            let z_score_b = b.1.calculate_simple_z_score(&stats);
+            let z_score_a = a.1.calculate_simple_z_score(&stats, query_length);
+            let z_score_b = b.1.calculate_simple_z_score(&stats, query_length);
             z_score_b.partial_cmp(&z_score_a).unwrap()
         });
     }
@@ -587,7 +678,7 @@ pub fn sort_and_print_structure_query_result_z_score(
             );
         }
         for (_k, v) in results.iter() {
-            let z_score = v.calculate_simple_z_score(&stats);
+            let z_score = v.calculate_simple_z_score(&stats, query_length);
             writer.write_all(format!("{:?}\t{:.4}\t{}\n", v, z_score, query_string).as_bytes()).expect(
                 &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
             );
@@ -597,7 +688,7 @@ pub fn sort_and_print_structure_query_result_z_score(
             println!("{}\tz_score", STRUCTURE_QUERY_RESULT_HEADER);
         }
         for (_k, v) in results.iter() {
-            let z_score = v.calculate_simple_z_score(&stats);
+            let z_score = v.calculate_simple_z_score(&stats, query_length);
             println!("{:?}\t{:.4}\t{}", v, z_score, query_string);
         }
     }
@@ -608,6 +699,7 @@ pub fn sort_and_print_match_query_result_z_score(
     top_n: usize,
     output_path: &str, 
     query_string: &str, 
+    query_length: usize,
     superpose: bool, 
     header: bool, 
     verbose: bool,
@@ -621,23 +713,42 @@ pub fn sort_and_print_match_query_result_z_score(
     };
     
     if verbose {
+        // Calculate weight distribution for display
+        let query_len = query_length as f32;
+        let rmsd_weight = if query_len <= 3.0 {
+            0.4
+        } else if query_len >= 10.0 {
+            0.0
+        } else {
+            0.4 - 0.4 * (query_len - 3.0) / (10.0 - 3.0)
+        };
+        let tm_weight = if query_len <= 2.0 {
+            0.0
+        } else if query_len >= 10.0 {
+            0.3
+        } else {
+            0.3 * (query_len - 2.0) / (10.0 - 2.0)
+        };
+        let idf_weight = 1.0 - (rmsd_weight + tm_weight);
+        
         print_log_msg(INFO, &format!(
-            "Stats - IDF: {:.2}±{:.2}, RMSD: {:.2}±{:.2}, TM: {:.3}±{:.3}",
-            stats.idf_mean, stats.idf_std, stats.rmsd_mean, stats.rmsd_std, stats.tm_mean, stats.tm_std
+            "Stats - IDF: {:.2}±{:.2}, RMSD: {:.2}±{:.2}, TM: {:.3}±{:.3}, Query length: {}, Weights [RMSD:{:.1}%, TM:{:.1}%, IDF:{:.1}%]",
+            stats.idf_mean, stats.idf_std, stats.rmsd_mean, stats.rmsd_std, stats.tm_mean, stats.tm_std, 
+            query_length, rmsd_weight * 100.0, tm_weight * 100.0, idf_weight * 100.0
         ));
     }
 
     // Sort by Z-score (descending order - higher Z-score is better)
     if verbose {
         measure_time!(results.par_sort_by(|a, b| {
-            let z_score_a = a.1.calculate_simple_z_score(&stats);
-            let z_score_b = b.1.calculate_simple_z_score(&stats);
+            let z_score_a = a.1.calculate_simple_z_score(&stats, query_length);
+            let z_score_b = b.1.calculate_simple_z_score(&stats, query_length);
             z_score_b.partial_cmp(&z_score_a).unwrap()
         }));
     } else {
         results.par_sort_by(|a, b| {
-            let z_score_a = a.1.calculate_simple_z_score(&stats);
-            let z_score_b = b.1.calculate_simple_z_score(&stats);
+            let z_score_a = a.1.calculate_simple_z_score(&stats, query_length);
+            let z_score_b = b.1.calculate_simple_z_score(&stats, query_length);
             z_score_b.partial_cmp(&z_score_a).unwrap()
         });
     }
@@ -667,7 +778,7 @@ pub fn sort_and_print_match_query_result_z_score(
             );
         }
         for (_k, v) in results.iter() {
-            let z_score = v.calculate_simple_z_score(&stats);
+            let z_score = v.calculate_simple_z_score(&stats, query_length);
             writer.write_all(format!("{}\t{:.4}\t{}\n", v.to_string(superpose), z_score, query_string).as_bytes()).expect(
                 &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
             );
@@ -682,7 +793,7 @@ pub fn sort_and_print_match_query_result_z_score(
             println!("{}", header_str);
         }
         for (_k, v) in results.iter() {
-            let z_score = v.calculate_simple_z_score(&stats);
+            let z_score = v.calculate_simple_z_score(&stats, query_length);
             println!("{}\t{:.4}\t{}", v.to_string(superpose), z_score, query_string);
         }
     }

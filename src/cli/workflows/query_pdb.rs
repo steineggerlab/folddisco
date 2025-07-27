@@ -299,7 +299,7 @@ pub fn query_pdb(env: AppArgs) {
                 
                 let (query_residues, aa_substitutions) = parse_query_string(&query_string, query_structure.chains[0]);
                 
-                let _residue_count = if query_residues.is_empty() {
+                let residue_count = if query_residues.is_empty() {
                     query_structure.num_residues
                 } else {
                     query_residues.len()
@@ -338,7 +338,7 @@ pub fn query_pdb(env: AppArgs) {
                             total_match_count, covered_node_count, covered_node_ratio,
                             idf_score_cutoff, num_res_cutoff, plddt_cutoff, 
                             max_matching_node_count, max_matching_node_ratio, rmsd_cutoff,
-                            tm_score_cutoff, _residue_count,
+                            tm_score_cutoff, residue_count,
                         );
 
                         match mode {
@@ -565,7 +565,7 @@ pub fn query_pdb(env: AppArgs) {
                 drop(query_residues);
                 let match_filter= MatchFilter::new(
                     connected_node_count, connected_node_ratio, idf_score_cutoff,
-                    rmsd_cutoff, tm_score_cutoff, _residue_count,
+                    rmsd_cutoff, tm_score_cutoff, residue_count,
                 );
 
                 match query_mode {
@@ -598,7 +598,7 @@ pub fn query_pdb(env: AppArgs) {
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result_z_score(
                             &mut match_results, top_n, 
-                            &output_path, &query_string, output_with_superpose, header, verbose,
+                            &output_path, &query_string, residue_count, output_with_superpose, header, verbose,
                         );
                     }
                     QueryMode::Web => {
@@ -628,7 +628,7 @@ pub fn query_pdb(env: AppArgs) {
                     QueryMode::PerStructureSortByZScore => {
                         sort_and_print_structure_query_result_z_score(
                             &mut queried_from_indices, &output_path, 
-                            &query_string, header, verbose
+                            &query_string, residue_count, header, verbose
                         );
                     }
                     _ => {}

@@ -15,47 +15,6 @@ Search protein structures motifs against the [AlphaFoldDB](https://alphafold.ebi
 - Side-chain orientation-capturing feature and frequency-based scoring for higher precision
 - Multi-threaded processing for fast indexing and querying
 
-## Quick Start
-```bash
-# Clone this repository and navigate to the directory
-git clone https://github.com/steineggerlab/folddisco.git
-cd folddisco
-```
-
-To quickly start with Folddisco, you can run the following command to build and run example queries:
-```bash
-sh quick_start.sh
-```
-
-Or you can follow the steps below to install and run Folddisco manually.
-```bash
-# Install Rust and Cargo if not installed
-# Check https://www.rust-lang.org/tools/install for installation instructions
-# Install folddisco using Cargo
-cargo install --features foldcomp --path .
-
-# Start with example data
-folddisco index -p data/serine_peptidases -i index/serine_peptidases_folddisco
-
-# Query a motif against the indexed serine peptidases
-folddisco query -i index/serine_peptidases_folddisco -q query/serine_peptidases.txt
-folddisco query -i index/serine_peptidases_folddisco -p query/4CHA.pdb -q B57,B102,C195 # This is same as the above query
-```
-
-Alternatively, you can use the pre-built human proteome index and query a zinc finger motif.
-```bash
-# Download human proteome index. Use wget or aria2 to download the index.
-cd index
-aria2c https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz
-
-# Extract the index
-tar -xzf h_sapiens_folddisco.tar.gz
-cd ..
-
-# Search a zinc finger motif against human proteome
-folddisco query -i index/h_sapiens_folddisco -q query/zinc_finger.txt --threads 4 --top 100
-```
-
 ## Installation
 
 ### Default Installation
@@ -77,14 +36,14 @@ cargo build --release --features foldcomp
 ```bash
 # Default indexing for a small dataset
 # h_sapiens directory or foldcomp database is indexed with default parameters
-folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12
+folddisco index -p h_sapiens -i index/h_sapiens -t 12
 
 # Indexing big protein dataset
-folddisco index -p swissprot -i index/swissprot_folddisco -t 64 -m big -v
+folddisco index -p swissprot -i index/swissprot -t 64 -m big -v
 
 # Indexing with custom hash type and parameters
-folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12 --type default -d 16 -a 4 # Default
-folddisco index -p h_sapiens -i index/h_sapiens_pdbtype -t 12 --type pdb -d 8 -a 3 # PDB
+folddisco index -p h_sapiens -i index/h_sapiens -t 12 --type default -d 16 -a 4 # Default
+folddisco index -p h_sapiens -i index/h_sapiens -t 12 --type pdb -d 8 -a 3 # PDB
 ```
 
 #### Default Usage
@@ -101,6 +60,11 @@ folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -m big
 #### Custom Binning and Features
 ```bash
 folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -d <DISTANCE_BINS> -a <ANGLE_BINS> -y <FEATURE_TYPE>
+```
+
+#### Example: Indexing the Human Proteome
+```bash
+folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12
 ```
 
 #### Pre-built Indices
@@ -175,32 +139,29 @@ folddisco query -i <INDEX> -p <QUERY_PDB> -q <QUERY_RESIDUES> -d <DISTANCE_THRES
 ### Match Result
 Default output which prints out one matching motif per line
 ```
-id	node_count	idf_score	rmsd	matching_residues	key	query_residues
-data/serine_peptidases/4cha.pdb	3	0.6138	0.0000	B57,B102,C195	4	B57,B102,C195
-data/serine_peptidases/4cha.pdb	3	0.6138	0.0874	F57,F102,G195	4	B57,B102,C195
-data/serine_peptidases/1pq5.pdb	3	0.4869	0.2609	A56,A99,A195	3	B57,B102,C195
-data/serine_peptidases/1ju3.pdb	2	0.0617	0.7792	_,A223,A234	1	B57,B102,C195
-data/serine_peptidases/1l7a.pdb	2	0.0584	0.7883	_,A146,A127	2	B57,B102,C195
-data/serine_peptidases/1l7a.pdb	2	0.0584	0.8078	_,B146,B127	2	B57,B102,C195
-data/serine_peptidases/1azw.pdb	2	0.1856	0.9234	A179,_,B176	0	B57,B102,C195
+id	node_count	avg_idf	rmsd	matching_residues	query_residues
+AF-P00957-F1-model_v4.pdb	3	48.7694	0.2861	_,A666,A564,A568	F207,F212,F225,F229
+AF-P0A6K3-F1-model_v4.pdb	3	58.2650	0.4315	A91,_,A133,A137	F207,F212,F225,F229
+AF-P26649-F1-model_v4.pdb	2	36.0934	0.2204	A53,_,A22,_	F207,F212,F225,F229
+AF-P05020-F1-model_v4.pdb	2	50.9269	0.3112	_,_,A17,A19	F207,F212,F225,F229
+AF-P55798-F1-model_v4.pdb	2	62.1218	0.3725	_,_,A132,A14	F207,F212,F225,F229
 ```
 - `id`: Identifier of the protein structure
 - `node_count`: Number of nodes in the match
 - `idf_score`: Inverse document frequency score of matched structure
 - `rmsd`: Root mean square deviation
 - `matching_residues`: Residue indices in the match (comma-separated, _ for no match)
-- `key`: Numeric identifier of the structure
 - `query_residues`: Residue indices in the query (comma-separated)
 
 ### Structure Result
 Output with one structure per line (`--per-structure`)
 ```
-id	idf_score	total_match_count	node_count	edge_count	max_node_cov	min_rmsd	nres	plddt	matching_residues	key	query_residues
-data/serine_peptidases/4cha.pdb	0.6138	8	3	6	3	0.0000	477	13.5404	B57,B102,C195:0.0000;F57,F102,G195:0.0874	4	B57,B102,C195
-data/serine_peptidases/1pq5.pdb	0.4869	4	3	4	3	0.2609	224	5.1340	A56,A99,A195:0.2609	3	B57,B102,C195
-data/serine_peptidases/1ju3.pdb	0.0617	2	2	2	2	0.7792	570	19.4881	_,A223,A234:0.7792	1	B57,B102,C195
-data/serine_peptidases/1l7a.pdb	0.0584	2	2	2	2	0.7883	636	11.7037	_,A146,A127:0.7883;_,B146,B127:0.8078	2	B57,B102,C195
-data/serine_peptidases/1azw.pdb	0.1856	2	2	2	2	0.9234	626	34.2399	A179,_,B176:0.9234	0	B57,B102,C195
+id	idf_score	total_match_count	node_count	edge_count	max_node_cov	min_rmsd	nres	plddt	matching_residues	query_residues
+AF-P55798-F1-model_v4.pdb	62.1218	4	3	4	2	0.3725	218	95.4576	,,A132,A14:0.3725;,A39,A18,:0.6083	F207,F212,F225,F229
+AF-P0A6K3-F1-model_v4.pdb	58.2650	4	3	4	3	0.4315	169	97.1329	A91,_,A133,A137:0.4315	F207,F212,F225,F229
+AF-P05020-F1-model_v4.pdb	50.9269	4	3	4	3	0.4391	348	97.0974	,,A17,A19:0.3112;_,A222,A178,A203:0.4391	F207,F212,F225,F229
+AF-P00957-F1-model_v4.pdb	48.7694	4	3	4	3	0.2861	876	90.7232	_,A666,A564,A568:0.2861	F207,F212,F225,F229
+AF-P26649-F1-model_v4.pdb	36.0934	2	2	2	2	0.2204	66	75.4210	A53,,A22,:0.2204	F207,F212,F225,F229
 ```
 - `id`: Identifier of the protein structure
 - `idf_score`: Inverse document frequency score with length penalty; Higher score indicates more matches within smaller structures
@@ -212,7 +173,6 @@ data/serine_peptidases/1azw.pdb	0.1856	2	2	2	2	0.9234	626	34.2399	A179,_,B176:0.
 - `nres`: Number of residues
 - `plddt`: Predicted local distance difference test score
 - `matching_residues`: Residue indices in the match (comma-separated, _ for no match, semicolon-separated for multiple matches with RMSD)
-- `key`: Numeric identifier of the structure
 - `query_residues`: Residue indices in the query (comma-separated)
 
 ### Display Options
@@ -222,6 +182,10 @@ data/serine_peptidases/1azw.pdb	0.1856	2	2	2	2	0.9234	626	34.2399	A179,_,B176:0.
 - `--sort-by-rmsd`: Sorts by RMSD.
 - `--top <N>`: Outputs top N results.
 - `--header`: Outputs header for the result.
+
+## Example Index List
+- **Human proteome:** `index/h_sapiens_folddisco` (23K structures, [Download](https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz))
+- **E. coli proteome:** `index/e_coli_folddisco` (4K structures, [Download](https://foldcomp.steineggerlab.workers.dev/e_coli_folddisco.tar.gz))
 
 ## Example Query List
 - `query/`

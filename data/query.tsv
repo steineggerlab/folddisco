@@ -1,0 +1,5 @@
+analysis/query/4cha.pdb	B57,B102,C195	data/result/serine_protease.tsv
+analysis/query/1g2f.pdb	F207,F212,F225,F229	data/result/zinc_finger.tsv
+analysis/query/1lap.pdb	250,255,273,332,334	data/result/aminopeptidase.tsv
+analysis/query/001_1JD4_A.pdb		data/result/fragment.tsv
+analysis/query/4cha.pdb	B57,B102	

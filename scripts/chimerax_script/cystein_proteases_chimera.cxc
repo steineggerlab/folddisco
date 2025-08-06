@@ -1,0 +1,35 @@
+cd ../cys_proteases
+open 2tmd.pdb 1ggt.pdb 1sc9.pdb 1gpm.pdb 1e2t.pdb 1okg.pdb
+color gray
+
+## color cys,his,asp into hotpink,green,orange
+color #1:30 #2:314 #3:81 #4:86 #5:72 #6:253 hotpink
+color #1:172 #2:373 #3:235 #4:181 #5:110 #6:75 green
+color #1:267 #2:396 #3:207 #4:239 #5:125 #6:61 orange
+
+## color ca red, cb white
+# color #1:30,172,267@ca #2:314,373,396@ca #3:81,235,207@ca #4:86,181,239@ca #5:72,110,125@ca #6:253,75,61@ca red
+# color #1:30,172,267@cb #2:314,373,396@cb #3:81,235,207@cb #4:86,181,239@cb #5:72,110,125@cb #6:253,75,61@cb white
+
+style stick
+hide cartoon
+hide atom
+
+# show only triad
+show #1/A:30,172,267 #2/A:314,373,396 #3/A:81,235,207 #4/A:86,181,239 #5/A:72,110,125 #6/A:253,75,61 atom
+
+align #1/A:30,172,267 to #1/A:30,172,267;align #2/A:314,373,396 to #1/A:30,172,267;align #3/A:81,235,207 to #1/A:30,172,267;align #4/A:86,181,239 to #1/A:30,172,267
+
+### comments(not alignable): #5,#6
+hide #5,#6
+
+### used awk commands ###
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {ORS=" ";print"open"} !($0~/,/) && NR!=1 {print $2".pdb"}'
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {ORS=" ";print"color";i=1} !($0~/,/) && NR!=1 {printf "#%d:%d ",i,$3;i++} END {print "hotpink"}'
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {ORS=" ";print"color";i=1} !($0~/,/) && NR!=1 {printf "#%d:%d ",i,$4;i++} END {print "green"}'
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {ORS=" ";print"color";i=1} !($0~/,/) && NR!=1 {printf "#%d:%d ",i,$5;i++} END {print "orange"}'
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {ORS=" ";print"color";i=1} !($0~/,/) && NR!=1 {printf "#%d:%d,%d,%d@ca ",i,$3,$4,$5;i++} END {print "red"}'
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {ORS=" ";print"color";i=1} !($0~/,/) && NR!=1 {printf "#%d:%d,%d,%d@cb ",i,$3,$4,$5;i++} END {print "white"}'
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {ORS=" ";print"show";i=1} !($0~/,/) && NR!=1 {printf "#%d/A:%d,%d,%d ",i,$3,$4,$5;i++} END {print "atom"}'
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {i=1} !($0~/,/) && NR!=1 {printf "align #%d:%d,%d,%d to #1:30,172,267;",i,$3,$4,$5;i++ }'
+# cat info_cyshisasp.tsv| tr -d "[]" | awk -F "\t" 'BEGIN {i=1} !($0~/,/) && NR!=1 {printf "align #%d/A:%d,%d,%d to #1/A:30,172,267;",i,$3,$4,$5;i++ }'

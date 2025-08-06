@@ -7,13 +7,14 @@
 
 # Build
 cargo build --release --features foldcomp
-echo "[INFO] Build complete. The folddisco binary is located at target/release/folddisco"
+# Color [INFO] in green
+echo "\033[32m[INFO]\033[0m Build complete. The folddisco binary is located at target/release/folddisco"
 # Start with example data
-echo "[INFO] Indexing data/serine_peptidases to index/serine_peptidases_folddisco"
+echo "\033[32m[INFO]\033[0m Indexing data/serine_peptidases to index/serine_peptidases_folddisco"
 target/release/folddisco index -p data/serine_peptidases -i index/serine_peptidases_folddisco
-echo "[INFO] Indexing complete."
-echo "[INFO] Search query/serine_peptidase.txt against the index built"
+echo "\033[32m[INFO]\033[0m Indexing complete."
+echo "\033[32m[INFO]\033[0m Search query/serine_peptidase.txt against the index built"
 
 # Query a motif against the indexed serine peptidases
 target/release/folddisco query -i index/serine_peptidases_folddisco -q query/serine_peptidase.txt
-echo "[INFO] Querying complete. Results are printed to the console."
+echo "\033[32m[INFO]\033[0m Querying complete. Results are printed to the console."

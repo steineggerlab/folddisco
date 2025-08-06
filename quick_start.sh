@@ -1,4 +1,4 @@
-# File: quick_start_with_build.sh
+# File: quick_start.sh
 # Created: 2025-08-07 02:59:59
 # Author: Hyunbin Kim (khb7840@gmail.com)
 # Description:
@@ -7,10 +7,12 @@
 
 # Build
 cargo build --release --features foldcomp
+echo "[INFO] Build complete. The folddisco binary is located at target/release/folddisco"
 # Start with example data
-echo "[INFO] Starting folddisco with example data..."
+echo "[INFO] Indexing data/serine_peptidases to index/serine_peptidases_folddisco"
 target/release/folddisco index -p data/serine_peptidases -i index/serine_peptidases_folddisco
-echo "[INFO] Indexing complete. Now querying the motif..."
+echo "[INFO] Indexing complete."
+echo "[INFO] Search query/serine_peptidase.txt against the index built"
 
 # Query a motif against the indexed serine peptidases
 target/release/folddisco query -i index/serine_peptidases_folddisco -q query/serine_peptidase.txt

@@ -22,8 +22,9 @@ git clone https://github.com/steineggerlab/folddisco.git
 cd folddisco
 ```
 
-To quickly start with Folddisco, you can run the following command to build and run example queries:
+To quickly start with Folddisco, you can run the following command to build and run example queries.
 ```bash
+# Make sure you have Rust and Cargo installed
 sh quick_start.sh
 ```
 

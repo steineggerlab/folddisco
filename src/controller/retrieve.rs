@@ -135,6 +135,8 @@ pub fn retrieve_with_prefilter(
             }
         }
     }
+    // Sort candidatpar_sort_byfirst element (query index)
+    // candidate_pairs.par_sort_by_key(|(qi, _)| *qi);
     (output, candidate_pairs)
 }
 
@@ -180,9 +182,9 @@ pub fn retrieval_wrapper_for_foldcompdb(
         dist_cutoff, ca_distance_cutoff, aa_dist_map
     );
     
-    let candidate_pair_map: HashMap<usize, HashSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
+    let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
-            map.entry(qi).or_insert_with(HashSet::new).insert(pair);
+            map.entry(qi).or_insert_with(Vec::new).push(pair);
             map
         }
     );
@@ -227,7 +229,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
         let mut res_vec: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
         let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
         let mut count_map: HashMap<usize, usize> = HashMap::new();
-        
+        let mut pairs_vec: Vec<(usize, usize)> = Vec::new();
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
             count_map.clear();
@@ -258,14 +260,17 @@ pub fn retrieval_wrapper_for_foldcompdb(
                 res_vec_from_hash.push(None);
                 if candidate_pair_map.contains_key(&i) {
                     let pairs = candidate_pair_map.get(&i).unwrap().clone();
+                    pairs_vec.clear();
+                    pairs_vec.extend(pairs);
+                    pairs_vec.sort_by_key(|&(j, _)| j);
                     let mut max_count = 0usize;
-                    for (j, k) in pairs {
+                    for (j, k) in &pairs_vec {
                         // Use HashSet for O(1) lookup instead of O(n) vector contains
-                        if retrieved_indices_set.contains(&k) {
-                            *count_map.entry(j).or_insert(0) += 1;
+                        if retrieved_indices_set.contains(k) {
+                            *count_map.entry(*j).or_insert(0) += 1;
                             // Track maximum count for this residue
-                            if *count_map.get(&j).unwrap() > max_count {
-                                max_count = *count_map.get(&j).unwrap();
+                            if *count_map.get(j).unwrap() > max_count {
+                                max_count = *count_map.get(j).unwrap();
                             }
                         }
                     }
@@ -369,9 +374,9 @@ pub fn retrieval_wrapper(
         multiple_bin, dist_cutoff, ca_distance_cutoff, aa_dist_map
     );
 
-    let candidate_pair_map: HashMap<usize, HashSet<(usize, usize)>> = candidate_pairs.into_iter().fold(
+    let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
         HashMap::new(), |mut map, (qi, pair)| {
-            map.entry(qi).or_insert_with(HashSet::new).insert(pair);
+            map.entry(qi).or_insert_with(Vec::new).push(pair);
             map
         }
     );
@@ -417,7 +422,7 @@ pub fn retrieval_wrapper(
         let mut res_vec: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
         let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
         let mut count_map: HashMap<usize, usize> = HashMap::new();
-        
+
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
             count_map.clear();
@@ -447,15 +452,15 @@ pub fn retrieval_wrapper(
             } else {
                 res_vec_from_hash.push(None);
                 if candidate_pair_map.contains_key(&i) {
-                    let pairs = candidate_pair_map.get(&i).unwrap().clone();
+                    let pairs = candidate_pair_map.get(&i).unwrap();
                     let mut max_count = 0usize;
                     for (j, k) in pairs {
                         // Use HashSet for O(1) lookup instead of O(n) vector contains
                         if retrieved_indices_set.contains(&k) {
-                            *count_map.entry(j).or_insert(0) += 1;
+                            *count_map.entry(*j).or_insert(0) += 1;
                             // Track maximum count for this residue
-                            if *count_map.get(&j).unwrap() > max_count {
-                                max_count = *count_map.get(&j).unwrap();
+                            if *count_map.get(j).unwrap() > max_count {
+                                max_count = *count_map.get(j).unwrap();
                             }
                         }
                     }
@@ -574,85 +579,94 @@ pub fn map_query_and_retrieved_residues(
     node_count: usize,
     query_symmetry_map: &HashMap<GeometricHash, bool>,
 ) -> (Vec<usize>, Vec<usize>) {
-    let mut query_indices: Vec<usize> = Vec::new();
-    let mut retrieved_indices: Vec<usize> = Vec::new();
+    let mut query_indices: Vec<usize> = Vec::with_capacity(node_count);
+    let mut retrieved_indices: Vec<usize> = Vec::with_capacity(node_count);
+
+    // Find max indices to allocate fixed-size arrays
+    let max_query_idx = query_map.values().map(|((i, j), _)| (*i).max(*j)).max().unwrap_or(0);
+    let max_retrieved_idx = retrieved.node_weights().max().copied().unwrap_or(0);
     
-    // Use HashSets for O(1) lookups instead of O(n) vector contains operations
-    let mut query_indices_set: HashSet<usize> = HashSet::new();
-    let mut retrieved_indices_set: HashSet<usize> = HashSet::new();
+    // Pre-allocate vectors for O(1) lookups 
+    let mut query_used = vec![false; max_query_idx + 1];
+    let mut retrieved_used = vec![false; max_retrieved_idx + 1];
     
-    // Iterate over edges in the graph
-    retrieved.edge_indices().for_each(|edge| {
+    // Count observations first pass - using arrays
+    let mut query_to_retrieved_counts = vec![vec![0u8; max_retrieved_idx + 1]; max_query_idx + 1];
+    
+    // First pass: count all observations
+    for edge in retrieved.edge_indices() {
         let (i, j) = retrieved.edge_endpoints(edge).unwrap();
         let hash = retrieved[edge];
-        let query = query_map.get(&hash);
-        if query.is_some() {
-            let (query_i, query_j) = query.unwrap().0;
-            // If symmetry is true, push both query_i and query_j in ascending order
-            if *query_symmetry_map.get(&hash).unwrap() {
-                if !query_indices_set.contains(&query_i) && !retrieved_indices_set.contains(&retrieved[i]) &&
-                   !query_indices_set.contains(&query_j) && !retrieved_indices_set.contains(&retrieved[j]) {
-                    // Remap by ordering
-                    if query_i < query_j {
-                        if retrieved[i] < retrieved[j] {
-                            query_indices.push(query_i);
-                            retrieved_indices.push(retrieved[i]);
-                            query_indices_set.insert(query_i);
-                            retrieved_indices_set.insert(retrieved[i]);
-                            query_indices.push(query_j);
-                            retrieved_indices.push(retrieved[j]);
-                            query_indices_set.insert(query_j);
-                            retrieved_indices_set.insert(retrieved[j]);
-                        } else {
-                            query_indices.push(query_i);
-                            retrieved_indices.push(retrieved[j]);
-                            query_indices_set.insert(query_i);
-                            retrieved_indices_set.insert(retrieved[j]);
-                            query_indices.push(query_j);
-                            retrieved_indices.push(retrieved[i]);
-                            query_indices_set.insert(query_j);
-                            retrieved_indices_set.insert(retrieved[i]);
-                        }
+        
+        if let Some(&((query_i, query_j), _)) = query_map.get(&hash) {
+            let is_symmetric = *query_symmetry_map.get(&hash).unwrap();
+            
+            if is_symmetric {
+                // Handle symmetric pairs with proper ordering
+                let (q1, q2, r1, r2) = if query_i < query_j {
+                    if retrieved[i] < retrieved[j] {
+                        (query_i, query_j, retrieved[i], retrieved[j])
                     } else {
-                        if retrieved[i] < retrieved[j] {
-                            query_indices.push(query_j);
-                            retrieved_indices.push(retrieved[i]);
-                            query_indices_set.insert(query_j);
-                            retrieved_indices_set.insert(retrieved[i]);
-                            query_indices.push(query_i);
-                            retrieved_indices.push(retrieved[j]);
-                            query_indices_set.insert(query_i);
-                            retrieved_indices_set.insert(retrieved[j]);
-                        } else {
-                            query_indices.push(query_j);
-                            retrieved_indices.push(retrieved[j]);
-                            query_indices_set.insert(query_j);
-                            retrieved_indices_set.insert(retrieved[j]);
-                            query_indices.push(query_i);
-                            retrieved_indices.push(retrieved[i]);
-                            query_indices_set.insert(query_i);
-                            retrieved_indices_set.insert(retrieved[i]);
-                        }
+                        (query_i, query_j, retrieved[j], retrieved[i])
                     }
-                }
-            }
-            if !query_indices_set.contains(&query_i) && !retrieved_indices_set.contains(&retrieved[i]) {
-                query_indices.push(query_i);
-                retrieved_indices.push(retrieved[i]);
-                query_indices_set.insert(query_i);
-                retrieved_indices_set.insert(retrieved[i]);
-            }
-            if !query_indices_set.contains(&query_j) && !retrieved_indices_set.contains(&retrieved[j]){
-                query_indices.push(query_j);
-                retrieved_indices.push(retrieved[j]);
-                query_indices_set.insert(query_j);
-                retrieved_indices_set.insert(retrieved[j]);
+                } else {
+                    if retrieved[i] < retrieved[j] {
+                        (query_j, query_i, retrieved[i], retrieved[j])
+                    } else {
+                        (query_j, query_i, retrieved[j], retrieved[i])
+                    }
+                };
+                
+                // Increment counts (saturating at 255)
+                query_to_retrieved_counts[q1][r1] = query_to_retrieved_counts[q1][r1].saturating_add(1);
+                query_to_retrieved_counts[q2][r2] = query_to_retrieved_counts[q2][r2].saturating_add(1);
+            } else {
+                // Handle asymmetric pairs
+                query_to_retrieved_counts[query_i][retrieved[i]] = query_to_retrieved_counts[query_i][retrieved[i]].saturating_add(1);
+                query_to_retrieved_counts[query_j][retrieved[j]] = query_to_retrieved_counts[query_j][retrieved[j]].saturating_add(1);
             }
         }
-        if retrieved_indices.len() == node_count {
-            return;
+    }
+    
+    // Second pass: find best mappings using pre-computed counts
+    // Create candidates list without heap allocations
+    let mut candidates: Vec<(u8, usize, usize)> = Vec::with_capacity(node_count * 2); // (count, query_idx, retrieved_idx)
+    
+    for query_idx in 0..=max_query_idx {
+        let mut max_count = 0u8;
+        let mut best_retrieved = 0;
+        
+        // Find the retrieved index with maximum count for this query
+        for retrieved_idx in 0..=max_retrieved_idx {
+            let count = query_to_retrieved_counts[query_idx][retrieved_idx];
+            if count > max_count {
+                max_count = count;
+                best_retrieved = retrieved_idx;
+            }
         }
+        
+        if max_count > 0 {
+            candidates.push((max_count, query_idx, best_retrieved));
+        }
+    }
+    
+    // Sort candidates by count (descending), then by indices for determinism
+    candidates.sort_unstable_by(|a, b| {
+        b.0.cmp(&a.0) // Count descending
+            .then_with(|| a.1.cmp(&b.1)) // Query index ascending
+            .then_with(|| a.2.cmp(&b.2)) // Retrieved index ascending
     });
+    
+    // Select non-conflicting mappings
+    for (count, query_idx, retrieved_idx) in candidates {
+        if count > 0 && !query_used[query_idx] && !retrieved_used[retrieved_idx] {
+            query_indices.push(query_idx);
+            retrieved_indices.push(retrieved_idx);
+            query_used[query_idx] = true;
+            retrieved_used[retrieved_idx] = true;
+        }
+    }
+    
     (query_indices, retrieved_indices)
 }
 

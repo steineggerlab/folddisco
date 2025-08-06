@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn test_build_index() {
         let env = AppArgs::Index {
-            pdb_container: Some("data/serine_peptidases_filtered".to_string()),
+            pdb_container: Some("data/serine_peptidases".to_string()),
             hash_type: "pdbtr".to_string(),
             index_path: "data/serine_peptidases_pdbtr_small".to_string(),
             mode: "id".to_string(),

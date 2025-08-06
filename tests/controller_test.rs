@@ -12,7 +12,7 @@ use common::loader;
 #[test]
 fn test_folddisco_pdbmotifsincos() {
     // Test if the default hashing schemes are working
-    let pdb_paths = loader::load_path("data/serine_peptidases_filtered");
+    let pdb_paths = loader::load_path("data/serine_peptidases");
     let mut fold_disco = FoldDisco::create_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
     measure_time!(fold_disco.collect_hash_vec());
     fold_disco.fill_numeric_id_vec();

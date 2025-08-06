@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_parse_path_by_id_type() {
-        let pdb_path = "data/serine_peptidases_filtered/1azw.pdb";
+        let pdb_path = "data/serine_peptidases/1azw.pdb";
         let afdb_path = "data/AF-P17538-F1-model_v4.pdb";
 
         let pdb_id = parse_path_by_id_type(pdb_path, &IdType::Pdb);
@@ -331,6 +331,6 @@ mod tests {
         assert_eq!(basename_ext_id, "AF-P17538-F1-model_v4.pdb");
         assert_eq!(basename_no_ext_id, "AF-P17538-F1-model_v4");
         println!("abs_path: {}", abs_path);
-        assert_eq!(rel_path, "data/serine_peptidases_filtered/1azw.pdb");
+        assert_eq!(rel_path, "data/serine_peptidases/1azw.pdb");
     }
 }

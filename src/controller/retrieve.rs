@@ -720,7 +720,7 @@ mod tests {
 
     #[test]
     fn test_retrieval_wrapper() {
-        let path = String::from("data/serine_peptidases_filtered/4cha.pdb");
+        let path = String::from("data/serine_peptidases/4cha.pdb");
         let query_string = "B57,B102,C195";
         let (query_residues, aa_substitutions) = parse_query_string(query_string, b'A');
         let hash_type = HashType::PDBTrRosetta;
@@ -736,7 +736,7 @@ mod tests {
         let queries: Vec<GeometricHash> = query_map.keys().cloned().collect();
         let compact = read_structure_from_path(&path).expect("Error reading structure from path");
         let compact = compact.to_compact();
-        let new_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
+        let new_path = String::from("data/serine_peptidases/4cha.pdb");
         let output = measure_time!(retrieval_wrapper(
             &new_path, query_residues.len(), &queries, hash_type, nbin_dist, nbin_angle, &None,
             dist_cutoff, &query_map, &compact, &query_indices, &aa_dist_map, 1.5,

@@ -640,7 +640,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_query_pdb_workflow() {
-        let pdb_path = String::from("data/serine_peptidases_filtered/4cha.pdb");
+        let pdb_path = String::from("data/serine_peptidase/4cha.pdb");
         let query_string = String::from("B57,B102,C195");
         let threads = 1;
         let index_path = Some(String::from("data/serine_peptidases_pdbtr_small"));

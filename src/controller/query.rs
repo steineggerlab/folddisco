@@ -378,7 +378,7 @@ mod tests {
             (b'F', 207), (b'F', 212), (b'F', 225)
         ];
         let amino_acid_substitutions = vec![None; query_residues.len()];
-        // let path = String::from("data/serine_peptidases_filtered/1aq2.pdb");
+        // let path = String::from("data/serine_peptidases/1aq2.pdb");
         // let query_residues = vec![
         //     (b'A', 250), (b'A', 232), (b'A', 269)
         // ];

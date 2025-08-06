@@ -1,46 +1,21 @@
 .DS_Store
 /target
-/data/toy
-/data/note.md
-/data/serine_peptidases
-/data/cys_proteases
-/data/yeast
-/data/yeast_full
 **/archive
 *_index_table.tsv
 *_hash_per_pair.tsv
 *.pdb.tsv
-data/cys_his_asp.zip
-yeast_raw_feature.tsv
-data/serine_vae_hash_table_rounded.tsv
-data/serine_vae_per_pair_hash.tsv
-data/serine_hash_raw.tsv
-serine_vae_per_pair_hash.tsv
 analysis/
 *_hash_raw.tsv
 *_index_table.tsv
-data/homeobox_hash_raw. tsv
-data/homeobox_index_table.tsv
-data/homeobox_index_table.tsv
-data/homeobox_hash_raw. tsv
 *.log
-data/merops_afdb_pa_hash_active_site.tsv
-data/merops_pdb_hash_active_site.tsv
-data/index_table_test.txt
-data/index.bin
 *.bin
 # index files
 *.value
 *.offset
 *.lookup
-!data/foldcomp/example_db.lookup
 *.type
-data/test_write_hashmap_to_file
 test_write_u64_vector
-data/huge_map
-data/test_write_hashmap_to_file
 temp
-data/result/*.tsv
 index/e_coli*
 index/h_sapiens*
 bin/folddisco

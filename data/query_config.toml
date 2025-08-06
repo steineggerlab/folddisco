@@ -1,8 +1,0 @@
-amino_acid = 0
-angle_threshold = [0.0]
-dist_threshold = [0.0]
-match_cutoff = [0.0]
-num_res_cutoff = 50000
-plddt_cutoff = 0.0
-retrieve = true
-score_cutoff = 0.0

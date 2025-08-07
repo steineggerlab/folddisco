@@ -15,35 +15,49 @@ Search protein structures motifs against the [AlphaFoldDB](https://alphafold.ebi
 - Side-chain orientation-capturing feature and frequency-based scoring for higher precision
 - Multi-threaded processing for fast indexing and querying
 
-## Quick Start
+## Installation
 ```bash
-# Clone this repository and navigate to the directory
 git clone https://github.com/steineggerlab/folddisco.git
 cd folddisco
-```
-
-To quickly start with Folddisco, you can run the following command to build and run example queries.
-```bash
-# Make sure you have Rust and Cargo installed
-sh quick_start.sh
-```
-
-Or you can follow the steps below to install and run Folddisco manually.
-```bash
-# Install Rust and Cargo if not installed
-# Check https://www.rust-lang.org/tools/install for installation instructions
-# Install folddisco using Cargo
 cargo install --features foldcomp --path .
+```
+## Quick start
+Folddisco queries a database of precomputed geometric hashes computed from structures. The command below will read all PDB or mmCIF from `serine_peptidases` folder and generate an index `serine_peptidases_folddisco`. For large database >65k structures use `-m big`.
+```bash
 
-# Start with example data
 folddisco index -p data/serine_peptidases -i index/serine_peptidases_folddisco
-
-# Query a motif against the indexed serine peptidases
-folddisco query -i index/serine_peptidases_folddisco -q query/serine_peptidases.txt
-folddisco query -i index/serine_peptidases_folddisco -p query/4CHA.pdb -q B57,B102,C195 # This is same as the above query
 ```
 
-Alternatively, you can use the pre-built human proteome index and query a zinc finger motif.
+### Querying a Single Motif
+To search for a specific structural motif, you'll use three main flags:
+-   **`-p`**: Provides the query protein's structure file (PDB/mmCIF).
+-   **`-q`**: Specifies the comma-separated list of residues that form your motif.
+-   **`-i`**: Points to the target database index you want to search against.
+
+If you omit the **`-q`** flag, `folddisco` defaults to a "whole structure" search. It will find all possible motifs from your entire query protein and search for them in the index.
+
+```bash
+# Search for the catalytic triad from 4CHA.pdb against the indexed peptidases.
+folddisco query -i index/serine_peptidases_folddisco -p query/4CHA.pdb -q B57,B102,C195
+```
+
+### Searching Multiple Motifs (Batch Mode)
+
+To search for many motifs at once, you can provide a single query file to the **`-q`** flag (and omit the `-p` flag).
+
+This file must be a **tab-separated** text file with two columns:
+1.  **Column 1:** Path to the query structure (PDB/mmCIF).
+2.  **Column 2:** Comma-separated list of motif residues.
+
+```bash
+folddisco query -i index/serine_peptidases_folddisco -q query/serine_peptidases.txt
+```
+
+### Download pre-build database 
+Alternatively, you can download the pre-built human proteome index and use it to search for a common motif, like a C4 zinc finger.
+
+This example is fully self-contained. You can copy and paste the entire block into your terminal.
+
 ```bash
 # Download human proteome index. Use wget or aria2 to download the index.
 cd index
@@ -57,20 +71,12 @@ cd ..
 folddisco query -i index/h_sapiens_folddisco -q query/zinc_finger.txt --threads 4 --top 100
 ```
 
-## Installation
+#### Pre-built Indices
+Download pre-built index files:
+- [Human proteome](https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz)
+- [E. coli proteome](https://foldcomp.steineggerlab.workers.dev/e_coli_folddisco.tar.gz)
 
-### Default Installation
-```bash
-cargo install --features foldcomp --path .
-```
-
-### Build from Source
-```bash
-cargo build --release --features foldcomp
-# Binary is located at target/release/folddisco
-```
-
-## Commands
+## Example commands
 
 ### Indexing
 
@@ -103,11 +109,6 @@ folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -m big
 ```bash
 folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -d <DISTANCE_BINS> -a <ANGLE_BINS> -y <FEATURE_TYPE>
 ```
-
-#### Pre-built Indices
-Download pre-built index files:
-- [Human proteome](https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz)
-- [E. coli proteome](https://foldcomp.steineggerlab.workers.dev/e_coli_folddisco.tar.gz)
 
 ### Querying
 

@@ -22,7 +22,25 @@ cd folddisco
 cargo install --features foldcomp --path .
 ```
 ## Quick start
-Folddisco queries a database of precomputed geometric hashes computed from structures. The command below will read all PDB or mmCIF from `serine_peptidases` folder and generate an index `serine_peptidases_folddisco`. For large database >65k structures use `-m big`.
+Folddisco queries a database of precomputed geometric hashes computed from structures. 
+
+### Download pre-build database 
+Alternatively, you can download the pre-built human proteome index and use it to search for a common motif, like a C4 zinc finger.
+
+This example is fully self-contained. You can copy and paste the entire block into your terminal.
+
+```bash
+# Download human proteome index. Use wget or aria2 to download the index.
+cd index
+aria2c https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz
+
+# Extract the index
+tar -xzf h_sapiens_folddisco.tar.gz
+cd ..
+```
+
+### Build an custom index 
+The command below will read all PDB or mmCIF from `serine_peptidases` folder and generate an index `serine_peptidases_folddisco`. For large databases with >65k structures use `-m big`.
 ```bash
 
 folddisco index -p data/serine_peptidases -i index/serine_peptidases_folddisco
@@ -42,7 +60,6 @@ folddisco query -i index/serine_peptidases_folddisco -p query/4CHA.pdb -q B57,B1
 ```
 
 ### Searching Multiple Motifs (Batch Mode)
-
 To search for many motifs at once, you can provide a single query file to the **`-q`** flag (and omit the `-p` flag).
 
 This file must be a **tab-separated** text file with two columns:
@@ -50,25 +67,8 @@ This file must be a **tab-separated** text file with two columns:
 2.  **Column 2:** Comma-separated list of motif residues.
 
 ```bash
-folddisco query -i index/serine_peptidases_folddisco -q query/serine_peptidases.txt
-```
-
-### Download pre-build database 
-Alternatively, you can download the pre-built human proteome index and use it to search for a common motif, like a C4 zinc finger.
-
-This example is fully self-contained. You can copy and paste the entire block into your terminal.
-
-```bash
-# Download human proteome index. Use wget or aria2 to download the index.
-cd index
-aria2c https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz
-
-# Extract the index
-tar -xzf h_sapiens_folddisco.tar.gz
-cd ..
-
-# Search a zinc finger motif against human proteome
-folddisco query -i index/h_sapiens_folddisco -q query/zinc_finger.txt --threads 4 --top 100
+# Search a zinc finger motif against pre-downloaded human proteome (see Download pre-build database)
+folddisco query -i index/h_sapiens_folddisco -q query/serine_peptidases.txt
 ```
 
 #### Pre-built Indices

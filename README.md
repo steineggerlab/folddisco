@@ -124,9 +124,7 @@ folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -m big
 folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -d <DISTANCE_BINS> -a <ANGLE_BINS> -y <FEATURE_TYPE>
 ```
 
-### Querying
-
-#### Examples
+### Example Querying
 ```bash
 # Search with default settings. This will print out matching motifs with sorting by RMSD.
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
@@ -163,7 +161,6 @@ folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --cov
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by-score
 folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 4 --top 100 --sort-by-score --per-structure --skip-match
 ```
-
 
 #### Default Usage
 ```bash

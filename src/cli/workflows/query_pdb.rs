@@ -17,9 +17,12 @@ use crate::controller::filter::{MatchFilter, StructureFilter};
 use crate::controller::map::SimpleHashMap;
 use crate::controller::mode::{IndexMode, QueryMode};
 use crate::cli::*;
-use crate::controller::io::{read_compact_structure, read_u16_vector};
+use crate::controller::io::{
+    read_compact_structure, read_u16_vector, 
+    check_and_get_indices, get_offset_value_lookup_type,
+};
 use crate::controller::query::{
-    check_and_get_indices, get_offset_value_lookup_type, make_query_map, parse_threshold_string
+    make_query_map, parse_threshold_string
 };
 use crate::controller::count_query::{count_query_bigmode, count_query_idmode};
 use crate::controller::result::{
@@ -37,6 +40,8 @@ use crate::controller::retrieve::retrieval_wrapper_for_foldcompdb;
 use crate::structure::io::fcz::FoldcompDbReader;
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::StructureFileFormat;
+#[cfg(feature = "foldcomp")]
+use crate::controller::io::get_foldcomp_db_path_with_prefix;
 
 pub const HELP_QUERY: &str = "\
 usage: folddisco query -p <i:PDB> -q <QUERY> -i <i:INDEX> [OPTIONS] 
@@ -271,7 +276,14 @@ pub fn query_pdb(env: AppArgs) {
             let foldcomp_db_reader = match config.input_format {
                 StructureFileFormat::FCZDB => {
                     if !skip_match {
-                        let foldcomp_db_path = config.foldcomp_db.clone().unwrap();
+                        let mut foldcomp_db_path = config.foldcomp_db.clone().unwrap();
+                        // If foldcomp_db_path is not a valid path, check foldcomp db with index prefix
+                        if !std::path::PathBuf::from(&foldcomp_db_path).is_file() {
+                            let local_foldcomp_db_path = get_foldcomp_db_path_with_prefix(&index_prefix);
+                            if local_foldcomp_db_path.is_some() {
+                                foldcomp_db_path = local_foldcomp_db_path.unwrap();
+                            }
+                        }
                         if verbose {
                             measure_time!(FoldcompDbReader::new(foldcomp_db_path.as_str()))
                         } else {

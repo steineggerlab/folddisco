@@ -14,7 +14,7 @@ use crate::cli::config::{write_index_config_to_file, IndexConfig};
 use crate::controller::map::convert_sorted_hash_vec_to_simplemap;
 use crate::controller::mode::{parse_path_vec_by_id_type, IdType, IndexMode};
 use crate::cli::*;
-use crate::controller::io::write_usize_vector_in_bits;
+use crate::controller::io::{default_index_path, write_usize_vector_in_bits};
 use crate::prelude::*;
 use crate::structure::io::StructureFileFormat;
 
@@ -91,6 +91,12 @@ pub fn build_index(env: AppArgs) {
             }
             // help is handled in the main function
             let pdb_container_clone = pdb_container.clone();
+            let index_path = if index_path.is_empty() {
+                // Get default index path
+                default_index_path(pdb_container.as_ref().unwrap())
+            } else { 
+                index_path
+            };
             #[cfg(feature = "foldcomp")]
             let pdb_container_name: &'static str = Box::leak(pdb_container.clone().unwrap().into_boxed_str());
             #[allow(unused_mut)]
@@ -241,7 +247,7 @@ pub fn build_index(env: AppArgs) {
                 match index_mode {
                     IndexMode::Id => {
                         let offset_path = format!("{}.offset", index_path);
-                        let value_path = format!("{}.value", index_path);
+                        let value_path = index_path.clone(); // Changed to new format without .value extension 2025-08-08 21:33:08
                         if verbose {
                             let (offset_map, value_vec) = measure_time!(convert_sorted_hash_vec_to_simplemap(folddisco.hash_id_vec));
                             print_log_msg(INFO, &format!("Offset & values acquired"));
@@ -299,7 +305,7 @@ pub fn build_index(env: AppArgs) {
                     Some(pdb_container_name.to_string()), multiple_bins.clone(),
                 );
                 write_index_config_to_file(&hash_type_path, index_config);
-                if verbose { print_log_msg(DONE, &format!("Indexing done for chunk {} - {}", i, index_path)); }
+                if verbose { print_log_msg(DONE, &format!("Indexing done for chunk {} - {}", i+1, index_path)); }
             });
             if verbose { print_log_msg(DONE, "Done."); }
         }

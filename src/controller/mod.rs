@@ -294,7 +294,7 @@ impl FoldDisco {
         let total_chunks = chunked_paths.len();
         chunked_paths.enumerate().for_each(|(chunk_index, chunk)| {
             // Print percentage of completion
-            print_log_msg(INFO, &format!("Processing chunk {}/{}", chunk_index, total_chunks));
+            print_log_msg(INFO, &format!("Processing chunk {}/{}", chunk_index + 1, total_chunks));
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
                     .par_iter()
@@ -385,7 +385,7 @@ impl FoldDisco {
         let chunked_paths = self.path_vec.chunks(chunk_size);
         let total_chunks = chunked_paths.len();
         chunked_paths.enumerate().for_each(|(chunk_index, chunk)| {
-            print_log_msg(INFO, &format!("Processing chunk {}/{}", chunk_index, total_chunks));
+            print_log_msg(INFO, &format!("Processing chunk {}/{}", chunk_index + 1, total_chunks));
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
                     .par_iter()

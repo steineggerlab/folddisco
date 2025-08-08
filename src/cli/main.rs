@@ -29,7 +29,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
         Some("index") => Ok(AppArgs::Index {
             pdb_container: args.opt_value_from_str(["-p", "--pdbs"])?,
             hash_type: args.value_from_str(["-y", "--type"]).unwrap_or("default".into()),
-            index_path: args.value_from_str(["-i", "--index"]).unwrap_or("folddisco_index".into()),
+            index_path: args.value_from_str(["-i", "--index"]).unwrap_or("".into()),
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             mode: args.value_from_str(["-m", "--mode"]).unwrap_or("id".into()),
             num_bin_dist: args.value_from_str(["-d", "--distance"]).unwrap_or(0),

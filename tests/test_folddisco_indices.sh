@@ -255,58 +255,66 @@ test_querying() {
 create_old_format_index() {
     log_info "Creating old format index for backward compatibility test..."
     
-    # Create an index and then convert to old format
-    local old_index="idx_old_format"
+    # Test both id and big modes for old format compatibility
+    local modes=("id" "big")
+    
+    for mode in "${modes[@]}"; do
+        log_info "Creating old format index with mode: $mode"
+        
+        # Create an index and then convert to old format
+        local old_index="idx_old_format_${mode}"
 
-    if ../"$BINARY_WITH_FOLDCOMP" index -p "../$TEST_PDB_DIR" -i "$old_index" -m "id" -t "$NUM_THREADS"; then
-        # Convert new format to old format (add .value extension)
-        if [[ -f "$old_index" ]]; then
-            mv "$old_index" "${old_index}.value"
-            log_success "Created old format index with .value extension"
-            record_test_result "INDEX_old_format_compatibility" "PASS"
-            echo "$old_index" >> "index_list.txt"
-            
-            # Test querying with old format index immediately
-            test_old_format_querying "$old_index"
+        if ../"$BINARY_WITH_FOLDCOMP" index -p "../$TEST_PDB_DIR" -i "$old_index" -m "$mode" -t "$NUM_THREADS"; then
+            # Convert new format to old format (add .value extension)
+            if [[ -f "$old_index" ]]; then
+                mv "$old_index" "${old_index}.value"
+                log_success "Created old format index with .value extension (mode: $mode)"
+                record_test_result "INDEX_old_format_compatibility_${mode}" "PASS"
+                echo "$old_index" >> "index_list.txt"
+                
+                # Test querying with old format index immediately
+                test_old_format_querying "$old_index" "$mode"
+            else
+                log_error "Failed to create old format index (mode: $mode)"
+                record_test_result "INDEX_old_format_compatibility_${mode}" "FAIL"
+                return 1
+            fi
         else
-            log_error "Failed to create old format index"
-            record_test_result "INDEX_old_format_compatibility" "FAIL"
+            log_error "Failed to create base index for old format test (mode: $mode)"
+            record_test_result "INDEX_old_format_compatibility_${mode}" "FAIL"
             return 1
         fi
-    else
-        log_error "Failed to create base index for old format test"
-        record_test_result "INDEX_old_format_compatibility" "FAIL"
-        return 1
-    fi
+    done
 }
 
 test_old_format_querying() {
     local old_index="$1"
+    local mode="$2"
     
-    log_info "Testing querying with old format index (.value extension)..."
+    log_info "Testing querying with old format index (.value extension) - mode: $mode"
     
     # Test with foldcomp-enabled binary
-    log_info "Testing old format query with foldcomp-enabled binary"
-    if test_querying "$BINARY_WITH_FOLDCOMP" "$old_index" "random" "old_format_foldcomp_binary"; then
-        record_test_result "QUERY_old_format_foldcomp_binary" "PASS"
+    log_info "Testing old format query with foldcomp-enabled binary (mode: $mode)"
+    if test_querying "$BINARY_WITH_FOLDCOMP" "$old_index" "random" "old_format_foldcomp_binary_${mode}"; then
+        record_test_result "QUERY_old_format_foldcomp_binary_${mode}" "PASS"
     else
-        record_test_result "QUERY_old_format_foldcomp_binary" "FAIL"
+        record_test_result "QUERY_old_format_foldcomp_binary_${mode}" "FAIL"
     fi
     
     # Test with non-foldcomp binary
-    log_info "Testing old format query with non-foldcomp binary"
-    if test_querying "$BINARY_WITHOUT_FOLDCOMP" "$old_index" "random" "old_format_no_foldcomp_binary"; then
-        record_test_result "QUERY_old_format_no_foldcomp_binary" "PASS"
+    log_info "Testing old format query with non-foldcomp binary (mode: $mode)"
+    if test_querying "$BINARY_WITHOUT_FOLDCOMP" "$old_index" "random" "old_format_no_foldcomp_binary_${mode}"; then
+        record_test_result "QUERY_old_format_no_foldcomp_binary_${mode}" "PASS"
     else
-        record_test_result "QUERY_old_format_no_foldcomp_binary" "FAIL"
+        record_test_result "QUERY_old_format_no_foldcomp_binary_${mode}" "FAIL"
     fi
     
     # Test from repo directory as well
-    log_info "Testing old format query from repo directory"
-    if test_querying "$BINARY_WITH_FOLDCOMP" "$old_index" "repo" "old_format_repo_location"; then
-        record_test_result "QUERY_old_format_repo_location" "PASS"
+    log_info "Testing old format query from repo directory (mode: $mode)"
+    if test_querying "$BINARY_WITH_FOLDCOMP" "$old_index" "repo" "old_format_repo_location_${mode}"; then
+        record_test_result "QUERY_old_format_repo_location_${mode}" "PASS"
     else
-        record_test_result "QUERY_old_format_repo_location" "FAIL"
+        record_test_result "QUERY_old_format_repo_location_${mode}" "FAIL"
     fi
 }
 

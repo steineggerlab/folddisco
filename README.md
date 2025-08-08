@@ -1,19 +1,13 @@
 # Folddisco
 
 Folddisco is a bioinformatics tool for indexing and searching discontinuous motifs in protein structures. 
-It is designed to handle large-scale protein databases with unmatched speed and efficiency, 
-enabling the detection of structural motifs across thousands of proteomes or millions of structures.
+It is designed to handle large-scale protein databases with efficiently, enabling the detection of structural motifs across thousands of proteomes or millions of structures.
 
 ## Publications
 [Kim H, Kim RS, Mirdita M, Steinegger M. Structural motif search across the protein-universe with Folddisco. bioRxiv, doi: 10.1101/2025.07.06.663357  (2025)](https://www.biorxiv.org/content/10.1101/2025.07.06.663357v1)
 
 ## Webserver 
 Search protein structures motifs against the [AlphaFoldDB](https://alphafold.ebi.ac.uk/) and [PDB](https://www.rcsb.org/) in seconds using the Folddisco webserver ([code](https://github.com/soedinglab/mmseqs2-app)): [search.foldseek.com/folddisco](https://search.foldseek.com/folddisco) 🚀
-
-## Features
-- Reduced index size, which enables large databases like AlphaFold to fit on a single disk
-- Side-chain orientation-capturing feature and frequency-based scoring for higher precision
-- Multi-threaded processing for fast indexing and querying
 
 ## Installation
 ```bash

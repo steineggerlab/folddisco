@@ -170,7 +170,7 @@ impl FolddiscoIndex {
         }
         if self.mmap_on_disk {
             // Allocate a memory map for total_entries on disk. SSD is recommended
-            let index_path = format!("{}.value", self.index_path);
+            let index_path = self.index_path.clone();
             let index_file = std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -202,7 +202,7 @@ impl FolddiscoIndex {
 
         if !self.mmap_on_disk {
             // Copy the data to a file
-            let index_path = format!("{}.value", self.index_path);
+            let index_path = self.index_path.clone();
             let index_file = std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -254,7 +254,12 @@ impl FolddiscoIndex {
 
 pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
     let offset_path = format!("{}.offset", index_prefix);
-    let index_path = format!("{}.value", index_prefix);
+    // Compatibility
+    let index_path = if std::path::Path::new(&format!("{}.value", index_prefix)).exists() {
+        format!("{}.value", index_prefix)
+    } else {
+        index_prefix.to_string() // Changed to new format without .value extension
+    };
     let offset_file = std::fs::File::open(&offset_path).expect("Unable to open offset file");
     let offset_mmap = unsafe { Mmap::map(&offset_file).expect("Unable to map offset file") };
     let offsets = unsafe {

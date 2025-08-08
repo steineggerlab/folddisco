@@ -7,7 +7,6 @@ use std::collections::HashMap;
 
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::utils::convert::{is_aa_group_char, map_one_letter_to_u8_vec};
-use crate::prelude::{print_log_msg, INFO};
 use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
 use super::feature::get_single_feature;
@@ -326,45 +325,6 @@ pub fn parse_query_string(query_string: &str, mut default_chain: u8) -> (Vec<(u8
 }
 
 
-pub fn get_offset_value_lookup_type(index_path: String) -> (String, String, String, String) {
-    let offset_path = format!("{}.offset", index_path.clone());
-    let value_path = format!("{}.value", index_path.clone());
-    let lookup_path = format!("{}.lookup", index_path.clone());
-    let hash_type_path = format!("{}.type", index_path.clone());
-    assert!(std::path::Path::new(&offset_path).is_file());
-    assert!(std::path::Path::new(&value_path).is_file());
-    assert!(std::path::Path::new(&lookup_path).is_file());
-    assert!(std::path::Path::new(&hash_type_path).is_file());
-    (offset_path, value_path, lookup_path, hash_type_path)
-}
-
-pub fn check_and_get_indices(index_path: Option<String>, verbose: bool) -> Vec<String> {
-    // Get path. formatting without quotation marks
-    let index_path = index_path.unwrap();
-    // Check if index_path_0 is a file.
-    let _index_chunk_prefix = format!("{}_0", index_path.clone());
-    let index_chunk_path = format!("{}_0.offset", index_path.clone());
-    let mut index_paths = Vec::new();
-    if std::path::Path::new(&index_chunk_path).is_file() {
-        if verbose {
-            print_log_msg(INFO, &format!("Index table is chunked"));
-        }
-        let mut i = 0;
-        loop {
-            let index_chunk_prefix = format!("{}_{}", index_path.clone(), i);
-            let index_chunk_path = format!("{}.offset", index_chunk_prefix);
-            if std::path::Path::new(&index_chunk_path).is_file() {
-                index_paths.push(index_chunk_prefix);
-                i += 1;
-            } else {
-                break;
-            }
-        }
-    } else {
-        index_paths.push(index_path.clone());
-    }
-    index_paths
-}
 
 // ADD TEST
 #[cfg(test)]

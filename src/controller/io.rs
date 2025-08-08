@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write, Error};
 use memmap2::Mmap;
-use crate::prelude::{log_msg, GeometricHash, HashType, FAIL};
+use crate::prelude::{print_log_msg, log_msg, GeometricHash, HashType, FAIL, INFO};
 use crate::structure::core::{CompactStructure, Structure};
 use crate::{CIFReader, PDBReader};
 use std::mem::size_of;
@@ -377,6 +377,107 @@ pub fn read_structure_from_path(path: &str) -> Option<Structure> {
         }
     }
 }
+
+
+// Functions to load index files
+pub fn get_offset_value_lookup_type(index_path: String) -> (String, String, String, String) {
+    let offset_path = format!("{}.offset", index_path.clone());
+    let lookup_path = format!("{}.lookup", index_path.clone());
+    let hash_type_path = format!("{}.type", index_path.clone());
+
+    // Check for new format (no extension) first, then fall back to .value extension
+    let value_path = if std::path::Path::new(&index_path).is_file() {
+        index_path.clone()  // New format: no extension
+    } else {
+        format!("{}.value", index_path.clone())  // Old format: with .value extension
+    };
+
+    assert!(std::path::Path::new(&offset_path).is_file());
+    assert!(std::path::Path::new(&value_path).is_file());
+    assert!(std::path::Path::new(&lookup_path).is_file());
+    assert!(std::path::Path::new(&hash_type_path).is_file());
+    (offset_path, value_path, lookup_path, hash_type_path)
+}
+
+// Functions to load index files
+pub fn check_and_get_indices(index_path: Option<String>, verbose: bool) -> Vec<String> {
+    // Get path. formatting without quotation marks
+    let index_path = index_path.unwrap();
+    // Check if index_path_0 is a file.
+    let _index_chunk_prefix = format!("{}_0", index_path.clone());
+    let index_chunk_path = format!("{}_0.offset", index_path.clone());
+    let mut index_paths = Vec::new();
+    if std::path::Path::new(&index_chunk_path).is_file() {
+        if verbose {
+            print_log_msg(INFO, &format!("Index table is chunked"));
+        }
+        let mut i = 0;
+        loop {
+            let index_chunk_prefix = format!("{}_{}", index_path.clone(), i);
+            let index_chunk_path = format!("{}.offset", index_chunk_prefix);
+            if std::path::Path::new(&index_chunk_path).is_file() {
+                index_paths.push(index_chunk_prefix);
+                i += 1;
+            } else {
+                break;
+            }
+        }
+    } else {
+        index_paths.push(index_path.clone());
+    }
+    index_paths
+}
+
+
+#[cfg(feature = "foldcomp")]
+pub fn get_foldcomp_db_path_with_prefix(prefix: &str) -> Option<String> {
+    // If prefix format is like "*_folddisco", use "*" as prefix. 
+    // Candidate paths with the prefix: parsed_prefix, parsed_prefix_foldcomp
+    // Check if db_path, db_path.index, db_path.lookup exists.
+    
+    // Parse prefix - remove _folddisco if present
+    let parsed_prefix = if prefix.ends_with("_folddisco") {
+        prefix.trim_end_matches("_folddisco").to_string()
+    } else {
+        prefix.to_string()
+    };
+    
+    // Create candidate prefixes
+    let candidate_prefixes = vec![
+        parsed_prefix.clone(),
+        format!("{}_foldcomp", parsed_prefix)
+    ];
+    // Check each candidate prefix for foldcomp database files
+    for candidate in candidate_prefixes {
+        if is_valid_foldcomp_db(&candidate) {
+            return Some(candidate);
+        }
+    }
+    
+    None
+}
+
+#[cfg(feature = "foldcomp")]
+fn is_valid_foldcomp_db(db_path: &str) -> bool {
+    // Check if the required foldcomp database files exist
+    let db_file = std::path::Path::new(db_path);
+    let index_path = format!("{}.index", db_path);
+    let lookup_path = format!("{}.lookup", db_path);
+    let index_file = std::path::Path::new(&index_path);
+    let lookup_file = std::path::Path::new(&lookup_path);
+    db_file.is_file() && index_file.is_file() && lookup_file.is_file()
+}
+
+pub fn default_index_path(input_path: &str) -> String {
+    // If input_path ends with "_foldcomp", remove it and add "_folddisco"
+    // Else, return input_path + "_folddisco"
+    if input_path.ends_with("_foldcomp") {
+        input_path.replace("_foldcomp", "_folddisco")
+    } else {
+        format!("{}_folddisco", input_path)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

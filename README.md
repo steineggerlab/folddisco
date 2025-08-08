@@ -39,6 +39,11 @@ tar -xzf h_sapiens_folddisco.tar.gz
 cd ..
 ```
 
+#### Pre-built Indices
+Download pre-built index files:
+- [Human proteome](https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz)
+- [E. coli proteome](https://foldcomp.steineggerlab.workers.dev/e_coli_folddisco.tar.gz)
+
 ### Build an custom index 
 The command below will read all PDB or mmCIF from `serine_peptidases` folder and generate an index `serine_peptidases_folddisco`. For large databases with >65k structures use `-m big`.
 ```bash
@@ -58,6 +63,20 @@ If you omit the **`-q`** flag, `folddisco` defaults to a "whole structure" searc
 # Search for the catalytic triad from 4CHA.pdb against the indexed peptidases.
 folddisco query -i index/serine_peptidases_folddisco -p query/4CHA.pdb -q B57,B102,C195
 ```
+#### Residue & motif syntax
+We allow to customize the query motif using some motif syntax.
+* **Residues:** `B57` = chain `B`, residue number `57`. Ranges are inclusive: `1-10`.
+* **Lists:** comma-separated: `B57,B102,C195`.
+* **Substitutions:** `:<ALT>` allows alternatives:
+  * Single amino acid: `164:H`
+  * Set: `247:ND` (Asp or Asn)
+  * Wildcard/categories:
+    * `X`: any amino acid
+    * `p`: positively charged (e.g., K,R,H)
+    * `n`: negatively charged (e.g., D,E)
+    * `h`: polar (define precisely here)
+    * `b`: hydrophobic (define precisely)
+    * `a`: aromatic (e.g., F,Y,W)
 
 ### Searching Multiple Motifs (Batch Mode)
 To search for many motifs at once, you can provide a single query file to the **`-q`** flag (and omit the `-p` flag).
@@ -70,11 +89,6 @@ This file must be a **tab-separated** text file with two columns:
 # Search a zinc finger motif against pre-downloaded human proteome (see Download pre-build database)
 folddisco query -i index/h_sapiens_folddisco -q query/serine_peptidases.txt
 ```
-
-#### Pre-built Indices
-Download pre-built index files:
-- [Human proteome](https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz)
-- [E. coli proteome](https://foldcomp.steineggerlab.workers.dev/e_coli_folddisco.tar.gz)
 
 ## Example commands
 

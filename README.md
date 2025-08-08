@@ -94,7 +94,7 @@ folddisco query -i index/h_sapiens_folddisco -q query/serine_peptidases.txt
 
 ### Usage of Query Module
 ```bash
-folddisco query -i <INDEX> -p <QUERY_PDB> -q <QUERY_RESIDUES> [-d <DISTANCE_THRESHOLD> -a <ANGLE_THRESHOLD> --skip-match -t <THREADS>]
+folddisco query -i <INDEX> -p <QUERY_PDB> [-q <QUERY_RESIDUES> -d <DISTANCE_THRESHOLD> -a <ANGLE_THRESHOLD> --skip-match -t <THREADS>]
 ```
 
 **Important parameter:**

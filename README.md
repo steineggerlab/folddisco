@@ -90,41 +90,22 @@ This file must be a **tab-separated** text file with two columns:
 folddisco query -i index/h_sapiens_folddisco -q query/serine_peptidases.txt
 ```
 
-## Example commands
+## Commands
 
-### Indexing
-
-#### Examples
+### Usage of Query Module
 ```bash
-# Default indexing for a small dataset
-# h_sapiens directory or foldcomp database is indexed with default parameters
-folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12
-
-# Indexing big protein dataset
-folddisco index -p swissprot -i index/swissprot_folddisco -t 64 -m big -v
-
-# Indexing with custom hash type and parameters
-folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12 --type default -d 16 -a 4 # Default
-folddisco index -p h_sapiens -i index/h_sapiens_pdbtype -t 12 --type pdb -d 8 -a 3 # PDB
+folddisco query -i <INDEX> -p <QUERY_PDB> -q <QUERY_RESIDUES> [-d <DISTANCE_THRESHOLD> -a <ANGLE_THRESHOLD> --skip-match -t <THREADS>]
 ```
 
-#### Default Usage
-```bash
-folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS>
-```
+**Important parameter:**
+- `-d`: Distance threshold in Å increase sensitivity during the prefilter (default: 0.5)
+- `-a`: Angle threshold in degrees, increase sensitivity during the prefilter (default: 20)
+- `--skip-match`: Skips residue matching and RMSD calculation (prefilter only, much faster)
+- `--top`: Only report top N hits from the prefilter (controls speed and size of result)
+- `-t`: Threads used for search
+- `-v`: Verbose output
 
-#### For Large Databases
-```bash
-folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -m big
-```
-- **Mode `big`:** Generates an 8GB fixed-size offset file suitable for datasets with more than 65,536 structures.
-
-#### Custom Binning and Features
-```bash
-folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> -d <DISTANCE_BINS> -a <ANGLE_BINS> -y <FEATURE_TYPE>
-```
-
-### Example Querying
+#### Example Querying
 ```bash
 # Search with default settings. This will print out matching motifs with sorting by RMSD.
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
@@ -162,18 +143,34 @@ folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco 
 folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 4 --top 100 --sort-by-score --per-structure --skip-match
 ```
 
-#### Usage & Important Parameter
+### Indexing
+
+### Usage of Index Module
 ```bash
-folddisco query -i <INDEX> -p <QUERY_PDB|QUERY_TSV> -q <QUERY_RESIDUES> -d <DISTANCE_THRESHOLD> -a <ANGLE_THRESHOLD> --skip-match -t <THREADS>
+folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> [-d <DISTANCE_BINS> -a <ANGLE_BINS> -y <FEATURE_TYPE>]
 ```
-- `-v`: Verbose output
-- `-d`: Distance threshold for prefilter
-- `-a`: Angle threshold for prefilter
-- `--skip-match`: Skips residue matching and RMSD calculation (prefilter only, much faster)
+
+**Important parameter:**
+- `-d`: Distance threshold in Å for pairs to be included (default: 16)
+- `-a`: Bin size of Angle (default: 4)
+- `--type`: Define how structures are stored in PDB or (default) foldcomp format 
+- `-m`: For big databases (>65k structures) enable -m big for efficiency. Mode `big`, generates an 8GB fixed-size offset.
 - `-t`: Threads used for search
+- `-v`: Verbose output
 
-#### Distance and Angle Thresholds
+#### Examples
+```bash
+# Default indexing for a small dataset
+# h_sapiens directory or foldcomp database is indexed with default parameters
+folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12
 
+# Indexing big protein dataset
+folddisco index -p swissprot -i index/swissprot_folddisco -t 64 -m big -v
+
+# Indexing with custom hash type and parameters
+folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12 --type default -d 16 -a 4 # Default
+folddisco index -p h_sapiens -i index/h_sapiens_pdbtype -t 12 --type pdb -d 8 -a 3 # PDB
+```
 
 ## Output
 ### Match Result
@@ -240,6 +237,6 @@ data/serine_peptidases/1azw.pdb	0.1856	2	2	2	2	0.9234	626	34.2399	A179,_,B176:0.
 
 ## Contributions
 
-<a href="https://github.com/steineggerlab/motifsearch/graphs/contributors">
+<a href="https://github.com/steineggerlab/folddisco/graphs/contributors">
   <img src="https://contributors-img.firebaseapp.com/image?repo=steineggerlab/folddisco" />
 </a>

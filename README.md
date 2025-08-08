@@ -1,6 +1,6 @@
 # Folddisco
 
-Folddisco is a bioinformatics tool for indexing and searching discontinuous motifs in protein structures. 
+Folddisco is tool for searching discontinuous motifs in protein structures.
 It is designed to handle large-scale protein databases with efficiently, enabling the detection of structural motifs across thousands of proteomes or millions of structures.
 
 ## Publications
@@ -11,6 +11,16 @@ Search protein structures motifs against the [AlphaFoldDB](https://alphafold.ebi
 
 ## Installation
 ```bash
+# Precompiled binary for Linux x86-64
+wget https://mmseqs.com/folddisco/folddisco-linux-x86_64.tar.gz; tar xvfz folddisco-linux-x86_64.tar.gz; export PATH=$(pwd)/folddisco/bin/:$PATH
+
+# Precompiled binary for Linux ARM64
+wget https://mmseqs.com/folddisco/folddisco-linux-arm64.tar.gz; tar xvfz folddisco-linux-arm64.tar.gz; export PATH=$(pwd)/folddisco/bin/:$PATH
+
+# macOS (universal, works on Apple Silicon and Intel Macs)
+wget https://mmseqs.com/folddisco/folddisco-macos-universal.tar.gz; tar xvfz folddisco-macos-universal.tar.gz; export PATH=$(pwd)/folddisco/bin/:$PATH
+
+# Compile from source
 git clone https://github.com/steineggerlab/folddisco.git
 cd folddisco
 cargo install --features foldcomp --path .
@@ -19,7 +29,7 @@ cargo install --features foldcomp --path .
 Folddisco queries a database of precomputed geometric hashes computed from structures. 
 
 ### Download pre-build database 
-Alternatively, you can download the pre-built human proteome index and use it to search for a common motif, like a C4 zinc finger.
+You can download the pre-built human proteome index and use it to search for a common motif, like a zinc finger.
 
 This example is fully self-contained. You can copy and paste the entire block into your terminal.
 
@@ -39,9 +49,8 @@ Download pre-built index files:
 - [E. coli proteome](https://foldcomp.steineggerlab.workers.dev/e_coli_folddisco.tar.gz)
 
 ### Build an custom index 
-The command below will read all PDB or mmCIF from `serine_peptidases` folder and generate an index `serine_peptidases_folddisco`. For large databases with >65k structures use `-m big`.
+The command below will read all PDB or mmCIF from `serine_peptidases` folder and generate an index `serine_peptidases_folddisco`.
 ```bash
-
 folddisco index -p data/serine_peptidases -i index/serine_peptidases_folddisco
 ```
 
@@ -66,11 +75,11 @@ We allow to customize the query motif using some motif syntax.
   * Set: `247:ND` (Asp or Asn)
   * Wildcard/categories:
     * `X`: any amino acid
-    * `p`: positively charged (e.g., K,R,H)
-    * `n`: negatively charged (e.g., D,E)
-    * `h`: polar (define precisely here)
-    * `b`: hydrophobic (define precisely)
-    * `a`: aromatic (e.g., F,Y,W)
+    * `p`: positively charged (Arg, His, Lys)
+    * `n`: negatively charged (Asp, Glu)
+    * `h`: polar (Asn, Gln, Ser, Thr, Tyr)
+    * `b`: hydrophobic (Ala, Cys, Gly, Ile, Leu, Met, Phe, Pro, Val)
+    * `a`: aromatic (His, Phe, Trp, Ty)
 
 ### Searching Multiple Motifs (Batch Mode)
 To search for many motifs at once, you can provide a single query file to the **`-q`** flag (and omit the `-p` flag).
@@ -94,7 +103,7 @@ folddisco query -i <INDEX> -p <QUERY_PDB> [-q <QUERY_RESIDUES> -d <DISTANCE_THRE
 **Important parameter:**
 - `-d`: Distance threshold in Å increase sensitivity during the prefilter (default: 0.5)
 - `-a`: Angle threshold in degrees, increase sensitivity during the prefilter (default: 20)
-- `--skip-match`: Skips residue matching and RMSD calculation (prefilter only, much faster)
+- `--skip-match`: Skips residue matching and RMSD calculation (prefilter only, much faster with same ranking)
 - `--top`: Only report top N hits from the prefilter (controls speed and size of result)
 - `-t`: Threads used for search
 - `-v`: Verbose output

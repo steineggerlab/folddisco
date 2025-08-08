@@ -437,7 +437,7 @@ pub fn get_foldcomp_db_path_with_prefix(prefix: &str) -> Option<String> {
     
     // Parse prefix - remove _folddisco if present
     let parsed_prefix = if prefix.ends_with("_folddisco") {
-        prefix.replace("_folddisco", "")
+        prefix.trim_end_matches("_folddisco").to_string()
     } else {
         prefix.to_string()
     };
@@ -447,7 +447,6 @@ pub fn get_foldcomp_db_path_with_prefix(prefix: &str) -> Option<String> {
         parsed_prefix.clone(),
         format!("{}_foldcomp", parsed_prefix)
     ];
-    
     // Check each candidate prefix for foldcomp database files
     for candidate in candidate_prefixes {
         if is_valid_foldcomp_db(&candidate) {
@@ -466,7 +465,6 @@ fn is_valid_foldcomp_db(db_path: &str) -> bool {
     let lookup_path = format!("{}.lookup", db_path);
     let index_file = std::path::Path::new(&index_path);
     let lookup_file = std::path::Path::new(&lookup_path);
-    
     db_file.is_file() && index_file.is_file() && lookup_file.is_file()
 }
 

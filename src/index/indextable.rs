@@ -254,7 +254,12 @@ impl FolddiscoIndex {
 
 pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
     let offset_path = format!("{}.offset", index_prefix);
-    let index_path = index_prefix.to_string(); // Changed to new format without .value extension
+    // Compatibility
+    let index_path = if std::path::Path::new(&format!("{}.value", index_prefix)).exists() {
+        format!("{}.value", index_prefix)
+    } else {
+        index_prefix.to_string() // Changed to new format without .value extension
+    };
     let offset_file = std::fs::File::open(&offset_path).expect("Unable to open offset file");
     let offset_mmap = unsafe { Mmap::map(&offset_file).expect("Unable to map offset file") };
     let offsets = unsafe {

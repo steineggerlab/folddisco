@@ -75,13 +75,14 @@ We allow to customize the query motif using some motif syntax.
 ### Searching Multiple Motifs (Batch Mode)
 To search for many motifs at once, you can provide a single query file to the **`-q`** flag (and omit the `-p` flag).
 
-This file must be a **tab-separated** text file with two columns:
+This file must be a **tab-separated** text file with these columns:
 1.  **Column 1:** Path to the query structure (PDB/mmCIF).
 2.  **Column 2:** Comma-separated list of motif residues.
+3.  **Column 3:** (Optional) path to the output file (default: `stdout`).
 
 ```bash
 # Search a zinc finger motif against pre-downloaded human proteome (see Download pre-build database)
-folddisco query -i index/h_sapiens_folddisco -q query/serine_peptidases.txt
+folddisco query -i index/h_sapiens_folddisco -q query/serine_peptidase.txt
 ```
 
 ## Commands
@@ -120,7 +121,7 @@ folddisco query -i index/h_sapiens_folddisco -q query/knottin.txt -d 0.5 -a 5 --
 # Query with amino-acid substitutions and range. 
 # Alternative amino acids can be given after colon. 
 # X: substitute to any amino acid, p: positive-charged, n: negative-charged, h: hydrophilic, b: hydrophobic, a: aromatic
-# Here's enolase query with 3 substitutions; Allow His at 164, Asp & Asn at 247, and His at 297.
+# Here's enolase query with 3 substitutions; Allow His at 164, Asp & Asn at 247, and His at 297. (Install e_coli_folddisco index first)
 folddisco query -p query/2MNR.pdb -q 164:H,195,221,247:ND,297:H -i index/e_coli_folddisco -d 0.5 -a 5 --top 10 --header --per-structure
 # Range can be given with dash. This will query first 10 residues and 11th residue with subsitution to any amino acid.
 folddisco query -p query/4CHA.pdb -q 1-10,11:X -i index/h_sapiens_folddisco -t 6 --serial-index
@@ -147,10 +148,10 @@ folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> [-d <DISTA
 **Important parameter:**
 - `-d`: Distance threshold in Å for pairs to be included (default: 16)
 - `-a`: Bin size of Angle (default: 4)
-- `--type`: Define how structures are stored in PDB or (default) foldcomp format 
 - `-m`: For big databases (>65k structures) enable -m big for efficiency. Mode `big`, generates an 8GB fixed-size offset.
 - `-t`: Threads used for search
 - `-v`: Verbose output
+- `--type`: Define which features sets are stored in the index; `default` (Folddisco), `pdb` (RCSB feature sets), or `tr` (trRosetta).
 
 #### Examples
 ```bash

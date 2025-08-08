@@ -218,17 +218,6 @@ data/serine_peptidases/1azw.pdb	0.1856	2	2	2	2	0.9234	626	34.2399	A179,_,B176:0.
 - `--top <N>`: Outputs top N results.
 - `--header`: Outputs header for the result.
 
-## Example Query List
-- `query/`
-  - `1G2F.pdb`: Zinc finger protein
-  - `4CHA.pdb`: Serine protease
-  - `1LAP.pdb`: Aminopeptidase
-  - `zinc_finger.txt`: 1G2F.pdb F207,F212,F225,F229
-  - `serine_protease.txt`: 4CHA.pdb B57,B102,C195
-  - `aminopeptidase.txt`: 1LAP.pdb 250,255,273,332,334
-  - `knottin.txt`: 2N6N.pdb 3,10,15,16,21,23,28,30
-  - `enolase.txt`: 2MNR.pdb 164:H,195,221,247:ND,297:H
-
 ## Contributions
 
 <a href="https://github.com/steineggerlab/folddisco/graphs/contributors">

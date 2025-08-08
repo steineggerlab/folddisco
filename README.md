@@ -162,27 +162,18 @@ folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco 
 folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 4 --top 100 --sort-by-score --per-structure --skip-match
 ```
 
-#### Default Usage
+#### Usage & Important Parameter
 ```bash
-folddisco query -i <INDEX> -p <QUERY_PDB> -q <QUERY_RESIDUES> --skip-match -t <THREADS>
+folddisco query -i <INDEX> -p <QUERY_PDB|QUERY_TSV> -q <QUERY_RESIDUES> -d <DISTANCE_THRESHOLD> -a <ANGLE_THRESHOLD> --skip-match -t <THREADS>
 ```
-- `--skip-match`: Skips residue matching and RMSD calculation.
-- `-v`: Verbose output.
-
-#### Whole Structure as Query
-```bash
-folddisco query -i <INDEX> -p <QUERY_PDB> --skip-match -t <THREADS>
-```
-
-#### Using a Query File
-```bash
-folddisco query -i <INDEX> -q <QUERY_FILE> --skip-match -t <THREADS>
-```
+- `-v`: Verbose output
+- `-d`: Distance threshold for prefilter
+- `-a`: Angle threshold for prefilter
+- `--skip-match`: Skips residue matching and RMSD calculation (prefilter only, much faster)
+- `-t`: Threads used for search
 
 #### Distance and Angle Thresholds
-```bash
-folddisco query -i <INDEX> -p <QUERY_PDB> -q <QUERY_RESIDUES> -d <DISTANCE_THRESHOLD> -a <ANGLE_THRESHOLD> --skip-match -t <THREADS>
-```
+
 
 ## Output
 ### Match Result

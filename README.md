@@ -45,8 +45,11 @@ cd ..
 
 #### Pre-built Indices
 Download pre-built index files:
-- [Human proteome](https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz)
-- [E. coli proteome](https://foldcomp.steineggerlab.workers.dev/e_coli_folddisco.tar.gz)
+- [Human proteome](https://steineggerlab.s3.amazonaws.com/folddisco/h_sapiens_folddisco.tar.gz)
+- [E. coli proteome](https://steineggerlab.s3.amazonaws.com/folddisco/e_coli_folddisco.tar.gz)
+- [AFDB proteome of 16 model organisms](https://steineggerlab.s3.amazonaws.com/folddisco/afdb_proteome_v4_folddisco.tar.gz)
+- [Swiss-Prot](https://steineggerlab.s3.amazonaws.com/folddisco/afdb_swissprot_v4_folddisco.tar.gz)
+
 
 ### Build an custom index 
 The command below will read all PDB or mmCIF from `serine_peptidases` folder and generate an index `serine_peptidases_folddisco`.

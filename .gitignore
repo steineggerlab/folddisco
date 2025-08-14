@@ -15,7 +15,10 @@ analysis/
 *.lookup
 *.type
 *_folddisco
+*.tar.gz
 temp
+# Pre-built indices
+index/afdb*
 index/e_coli*
 index/h_sapiens*
 bin/folddisco

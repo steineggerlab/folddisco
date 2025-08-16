@@ -22,3 +22,6 @@ index/afdb*
 index/e_coli*
 index/h_sapiens*
 bin/folddisco
+data/serine_peptidases_pdbtr_small
+data/example_db_folddisco_db
+test.index

@@ -80,6 +80,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             output_per_match: args.contains("--per-match"),
             output_with_superpose: args.contains("--superpose"), // Print target CA, U, T
             skip_ca_match: args.contains("--skip-ca-match"),
+            partial_fit: args.contains("--partial-fit"), // Enable LMS based superposition.
             header: args.contains("--header"),
             serial_query: args.contains("--serial-index"),
             output: args.value_from_str(["-o", "--output"]).unwrap_or("".into()),

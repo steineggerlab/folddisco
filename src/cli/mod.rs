@@ -73,6 +73,7 @@ pub enum AppArgs {
         output_per_match: bool,
         output_with_superpose: bool,
         skip_ca_match: bool,
+        partial_fit: bool, // Enable LMS based superposition.
         header: bool,
         serial_query: bool,
         output: String,

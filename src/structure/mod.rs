@@ -5,3 +5,4 @@ pub mod feature;
 pub mod io;
 pub mod qcp;
 pub mod kabsch;
+pub mod lms_qcp;

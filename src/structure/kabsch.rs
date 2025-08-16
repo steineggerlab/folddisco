@@ -154,7 +154,7 @@ fn add_vec(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
 }
 
 /// High-precision version of the Kabsch algorithm using f64 for better numerical stability
-fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f32; 3], f32)> {
+pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f32; 3], f32)> {
     // Convert input f32 arrays to f64 for computation
     let x_f64: Vec<[f64; 3]> = x.iter().map(|arr| [arr[0] as f64, arr[1] as f64, arr[2] as f64]).collect();
     let y_f64: Vec<[f64; 3]> = y.iter().map(|arr| [arr[0] as f64, arr[1] as f64, arr[2] as f64]).collect();

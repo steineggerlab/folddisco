@@ -3,6 +3,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+use crate::structure::lms_qcp::LmsQcpSuperimposer;
 use crate::utils::convert::{map_aa_to_u8, map_u8_to_aa}; 
 use crate::prelude::*; 
 use crate::structure::{coordinate::Coordinate, core::CompactStructure, kabsch::KabschSuperimposer}; 
@@ -156,7 +157,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
-    ca_distance_cutoff: f32, foldcomp_db_reader: &FoldcompDbReader,
+    ca_distance_cutoff: f32, partial_fit: bool,
+    foldcomp_db_reader: &FoldcompDbReader,
 ) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
       Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
     let compact = foldcomp_db_reader.read_single_structure_by_id(db_key).expect("Error reading structure from foldcomp db");
@@ -297,14 +299,14 @@ pub fn retrieval_wrapper_for_foldcompdb(
         });
 
         let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
-            query_structure, &compact, &query_indices, &retrieved_indices
+            query_structure, &compact, &query_indices, &retrieved_indices, partial_fit
         );
         
         let (rmsd, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
             (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
         } else {
             rmsd_with_calpha_and_rottran(
-                query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned
+                query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned, partial_fit
             )
         };
         
@@ -347,7 +349,7 @@ pub fn retrieval_wrapper(
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
-    ca_distance_cutoff: f32,
+    ca_distance_cutoff: f32, partial_fit: bool,
 ) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
       Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
     // Load structure to retrieve motif
@@ -489,14 +491,14 @@ pub fn retrieval_wrapper(
         });
 
         let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
-            query_structure, &compact, &query_indices, &retrieved_indices
+            query_structure, &compact, &query_indices, &retrieved_indices, partial_fit
         );
         
         let (rmsd, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
             (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
         } else {
             rmsd_with_calpha_and_rottran(
-                query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned
+                query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned, partial_fit
             )
         };
                 
@@ -672,11 +674,8 @@ pub fn map_query_and_retrieved_residues(
 
 pub fn rmsd_for_matched(
     compact1: &CompactStructure, compact2: &CompactStructure, 
-    index1: &Vec<usize>, index2: &Vec<usize>
+    index1: &Vec<usize>, index2: &Vec<usize>, lms: bool
 ) -> f32 {
-    // let mut superposer = KabschSuperimposer::new();
-    let mut superposer = KabschSuperimposer::new();
-
     let coord_vec1: Vec<Coordinate> = index1.iter().map(
         |&i| (compact1.ca_vector.get_coord(i).unwrap(), compact1.cb_vector.get_coord(i).unwrap())
     ).flat_map(|(a, b)| vec![a, b]).collect();
@@ -684,17 +683,35 @@ pub fn rmsd_for_matched(
     let coord_vec2: Vec<Coordinate> = index2.iter().map(
         |&i| (compact2.ca_vector.get_coord(i).unwrap(), compact2.cb_vector.get_coord(i).unwrap())
     ).flat_map(|(a, b)| vec![a, b]).collect();
-    
-    superposer.set_atoms(&coord_vec1, &coord_vec2);
-    superposer.run();
-    superposer.get_rms()
+
+    match lms {
+        true => {
+            if index1.len() <= 3 {
+                let mut superposer = KabschSuperimposer::new();
+                superposer.set_atoms(&coord_vec1, &coord_vec2);
+                superposer.run();
+                superposer.get_rms()
+            } else {
+                let mut superposer = LmsQcpSuperimposer::new();
+                superposer.set_atoms(&coord_vec1, &coord_vec2);
+                superposer.run();
+                superposer.get_rms_inliers()
+            }
+        }
+        false => {
+            let mut superposer = KabschSuperimposer::new();
+            superposer.set_atoms(&coord_vec1, &coord_vec2);
+            superposer.run();
+            superposer.get_rms()
+        }
+    }
 }
 
 pub fn rmsd_with_calpha_and_rottran(
     compact1: &CompactStructure, compact2: &CompactStructure, 
-    index1: &Vec<usize>, index2: &Vec<usize>
+    index1: &Vec<usize>, index2: &Vec<usize>, lms: bool
 ) -> (f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>) {
-    let mut superposer = KabschSuperimposer::new();
+
     let coord_vec1: Vec<Coordinate> = index1.iter().map(
         |&i| (compact1.ca_vector.get_coord(i).unwrap(), compact1.cb_vector.get_coord(i).unwrap())
     ).flat_map(|(a, b)| vec![a, b]).collect();
@@ -707,9 +724,27 @@ pub fn rmsd_with_calpha_and_rottran(
         |&i| compact2.ca_vector.get_coord(i).unwrap()
     ).collect();
     
-    superposer.set_atoms(&coord_vec1, &coord_vec2);
-    superposer.run();
-    (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+    match lms {
+        true => {
+            if index1.len() <= 3 {
+                let mut superposer = KabschSuperimposer::new();
+                superposer.set_atoms(&coord_vec1, &coord_vec2);
+                superposer.run();
+                (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+            } else {
+                let mut superposer = LmsQcpSuperimposer::new();
+                superposer.set_atoms(&coord_vec1, &coord_vec2);
+                superposer.run();
+                (superposer.get_rms_inliers(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+            }
+        }
+        false => {
+            let mut superposer = KabschSuperimposer::new();
+            superposer.set_atoms(&coord_vec1, &coord_vec2);
+            superposer.run();
+            (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -739,7 +774,7 @@ mod tests {
         let new_path = String::from("data/serine_peptidases/4cha.pdb");
         let output = measure_time!(retrieval_wrapper(
             &new_path, query_residues.len(), &queries, hash_type, nbin_dist, nbin_angle, &None,
-            dist_cutoff, &query_map, &compact, &query_indices, &aa_dist_map, 1.5,
+            dist_cutoff, &query_map, &compact, &query_indices, &aa_dist_map, 1.5, false,
         ));
         println!("{:?}", output);
     }

@@ -7,6 +7,9 @@
 
 // use crate::*;
 use folddisco::cli::{workflows::{build_index, benchmark, query_pdb}, *};
+use git_version::git_version;
+
+const VERSION_STRING: &str = git_version!(args = ["--abbrev=40", "--always", "--dirty=-modified"]);
 const HELP: &str = "\
 usage: folddisco <command> [<args>]
 
@@ -14,6 +17,7 @@ subcommands:
   index     Create a new index table from multiple protein structures
   query     Query a motif from an index table
   benchmark Benchmark the performance of folddisco
+  version   Print version information
 
 options:
   -h, --help                 Print this help menu
@@ -109,7 +113,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             verbose: args.contains(["-v", "--verbose"]),
         }),
         Some("version") => {
-            println!("{}", env!("CARGO_PKG_VERSION"));
+            println!("{}", VERSION_STRING);
             std::process::exit(0);
         },
         Some(_) => Err("Invalid subcommand".into()),

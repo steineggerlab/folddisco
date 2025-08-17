@@ -33,6 +33,7 @@ regex = "1.10.4"
 petgraph = "0.6.4"
 libc = "0.2.155"
 dashmap = { version = "6.1.0", features = ["rayon"] }
+git-version = "0.3.9"
 
 
 [build-dependencies]

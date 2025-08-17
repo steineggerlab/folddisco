@@ -9,7 +9,7 @@
 use folddisco::cli::{workflows::{build_index, benchmark, query_pdb}, *};
 use git_version::git_version;
 
-const VERSION_STRING: &str = git_version!(args = ["--abbrev=40", "--always", "--dirty=-modified"]);
+const VERSION_STRING: &str = git_version!(args = ["--abbrev=40", "--always"]);
 const HELP: &str = "\
 usage: folddisco <command> [<args>]
 

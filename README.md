@@ -11,6 +11,12 @@ Search protein structures motifs against the [AlphaFoldDB](https://alphafold.ebi
 
 ## Installation
 ```bash
+# Install from Bioconda
+conda create -n folddisco -c conda-forge -c bioconda folddisco
+
+# Install through docker
+docker pull ghcr.io/steineggerlab/folddisco:master
+
 # Precompiled binary for Linux x86-64
 wget https://mmseqs.com/folddisco/folddisco-linux-x86_64.tar.gz; tar xvfz folddisco-linux-x86_64.tar.gz; export PATH=$(pwd)/folddisco/bin/:$PATH
 

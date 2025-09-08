@@ -230,6 +230,32 @@ pub fn get_geometric_hash_as_u32_from_structure(
     hash_vec
 }
 
+pub fn get_geometric_hash_as_u32_from_structure_with_shifts(
+    structure: &CompactStructure, hash_type: HashType, 
+    dist_cutoff: f32,
+) -> Vec<u32> {
+    let res_bound = CombinationIterator::new(structure.num_residues);
+    let mut hash_vec = Vec::new();
+    let mut feature = vec![0.0; 9];
+    
+    res_bound.for_each(|(i, j)| {
+        if i == j {
+            return;
+        }
+        let has_feature = get_single_feature(i, j, structure, hash_type, dist_cutoff, &mut feature);
+        if has_feature {
+            let (unique_count, unique_hashes) = GeometricHash::perfect_hash_with_shifts_dedup_inline(&feature, hash_type);
+            for k in 0..unique_count as usize {
+                hash_vec.push(unique_hashes[k]);
+            }
+        }
+    });
+    
+    // Reduce memory usage
+    hash_vec.shrink_to_fit();
+    hash_vec
+}
+
 impl HashType {
     pub fn amino_acid_index(&self) -> Option<Vec<usize>> {
         match self {
@@ -257,6 +283,77 @@ impl HashType {
             HashType::TertiaryInteraction => Some(vec![0, 1, 2, 3, 4, 5, 6]),
             HashType::Hybrid => Some(vec![4, 5, 6, 7, 8]),
             _ => None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::controller::io::read_structure_from_path;
+    use std::time::Instant;
+
+    #[test]
+    fn test_get_geometric_hash_with_shifts() {
+        // Load a test structure
+        let structure_path = "data/AF-P17538-F1-model_v4.pdb";
+        if let Some(structure) = read_structure_from_path(structure_path) {
+            let compact_structure = CompactStructure::build(&structure);
+            let hash_type = HashType::PDBTrRosetta;
+            let dist_cutoff = 20.0;
+            
+            println!("=== Performance Comparison: Normal vs Shifting ===");
+            
+            // Time the normal hashing approach
+            let start_normal = Instant::now();
+            let hash_vec_normal = get_geometric_hash_as_u32_from_structure(
+                &compact_structure, hash_type, 16, 4, dist_cutoff, &None
+            );
+            let duration_normal = start_normal.elapsed();
+            
+            // Time the shifting approach
+            let start_shifts = Instant::now();
+            let hash_vec_with_shifts = get_geometric_hash_as_u32_from_structure_with_shifts(
+                &compact_structure, hash_type, dist_cutoff
+            );
+            let duration_shifts = start_shifts.elapsed();
+            
+            // Display timing results
+            println!("Normal approach: {:?} ({} hashes)", duration_normal, hash_vec_normal.len());
+            println!("Shifting approach: {:?} ({} hashes)", duration_shifts, hash_vec_with_shifts.len());
+            println!("Performance ratio (shifts/normal): {:.2}x", 
+                     duration_shifts.as_secs_f64() / duration_normal.as_secs_f64());
+            
+            // Should have more hashes with shifting than without
+            assert!(hash_vec_with_shifts.len() >= hash_vec_normal.len());
+            
+            // Verify we have unique values due to deduplication
+            let mut unique_hashes = std::collections::HashSet::new();
+            for hash in &hash_vec_with_shifts {
+                unique_hashes.insert(*hash);
+            }
+            
+            // Should have fewer unique hashes than total due to deduplication
+            assert!(unique_hashes.len() <= hash_vec_with_shifts.len());
+            
+            // Display deduplication statistics
+            let hash_multiplier = hash_vec_with_shifts.len() as f64 / hash_vec_normal.len() as f64;
+            let dedup_efficiency = 100.0 * unique_hashes.len() as f64 / hash_vec_with_shifts.len() as f64;
+            
+            println!("Hash multiplication factor: {:.1}x", hash_multiplier);
+            println!("Total shift hashes: {}", hash_vec_with_shifts.len());
+            println!("Unique shift hashes: {}", unique_hashes.len());
+            println!("Deduplication efficiency: {:.1}%", dedup_efficiency);
+            
+            // Calculate performance per hash
+            let time_per_hash_normal = duration_normal.as_nanos() as f64 / hash_vec_normal.len() as f64;
+            let time_per_hash_shifts = duration_shifts.as_nanos() as f64 / hash_vec_with_shifts.len() as f64;
+            
+            println!("Time per hash (normal): {:.2} ns", time_per_hash_normal);
+            println!("Time per hash (shifts): {:.2} ns", time_per_hash_shifts);
+            println!("Per-hash overhead: {:.2}x", time_per_hash_shifts / time_per_hash_normal);
+        } else {
+            println!("Test structure not found, skipping test");
         }
     }
 }

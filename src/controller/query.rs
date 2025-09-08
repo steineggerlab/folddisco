@@ -133,6 +133,27 @@ fn apply_substitutions(
     }
 }
 
+fn add_shifted_hashes(
+    feature: &Vec<f32>,
+    hash_collection: &mut HashMap<GeometricHash, ((usize, usize), bool)>,
+    i_idx: usize, j_idx: usize, hash_type: HashType,
+) {
+    // Add shifted hashes for boundary coverage to reduce false negatives from discretization
+    // Only supported for PDBTrRosetta hash type which has shifting implementation
+    if hash_type == HashType::PDBTrRosetta {
+        let (unique_count, unique_hashes) = GeometricHash::perfect_hash_with_shifts_dedup_inline(feature, hash_type);
+        
+        // Insert each unique shifted hash variant
+        for k in 0..unique_count as usize {
+            let hash_value = GeometricHash::from_u32(unique_hashes[k], hash_type);
+            // Only insert if not already present (avoid duplicates)
+            if !hash_collection.contains_key(&hash_value) {
+                hash_collection.insert(hash_value, ((i_idx, j_idx), false));
+            }
+        }
+    }
+}
+
 fn expand_and_insert(
     target_feature_indices: &[usize], threshold_vector: &[f32],
     feature_near: &mut Vec<f32>, feature_far: &mut Vec<f32>,
@@ -237,6 +258,11 @@ pub fn make_query_map(
             insert_binned_hash(
                 &mut hash_collection, &feature, (indices[i], indices[j]), 
                 hash_type, nbin_dist, nbin_angle, multiple_bin, true
+            );
+
+            // Add shifted hashes for boundary coverage
+            add_shifted_hashes(
+                &feature, &mut hash_collection, indices[i], indices[j], hash_type
             );
 
             // Apply substitutions
@@ -402,5 +428,24 @@ mod tests {
             (b'B', 232), (b'B', 233), (b'B', 234), 
             (b'C', 269),
         ], vec![None, None, None, None, None, None, Some(vec![5])]));
+    }
+    
+    #[test]
+    fn test_add_shifted_hashes() {
+        let mut hash_collection = HashMap::new();
+        let feature = vec![1.0, 2.0, 10.5, 15.2, 0.8, 1.2, 2.1, 0.0, 0.0]; // PDBTrRosetta feature
+        let hash_type = HashType::PDBTrRosetta;
+        
+        // Test that shifted hashes are added for PDBTrRosetta
+        add_shifted_hashes(&feature, &mut hash_collection, 0, 1, hash_type);
+        
+        // Should have added multiple shifted hash variants
+        assert!(hash_collection.len() > 0);
+        println!("Added {} shifted hash variants", hash_collection.len());
+        
+        // Test that no hashes are added for other hash types
+        let mut hash_collection_other = HashMap::new();
+        add_shifted_hashes(&feature, &mut hash_collection_other, 0, 1, HashType::TrRosetta);
+        assert_eq!(hash_collection_other.len(), 0);
     }
 }

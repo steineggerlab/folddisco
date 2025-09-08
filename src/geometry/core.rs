@@ -191,6 +191,13 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
+
+    pub fn perfect_hash_with_shifts_dedup_inline(feature: &Vec<f32>, hash_type: HashType) -> (u8, [u32; 8]) {
+        match hash_type {
+            HashType::PDBTrRosetta => super::pdb_tr::HashValue::perfect_hash_with_shifts_dedup_inline(feature),
+            _ => panic!("Hash type does not support shift deduplication"),
+        }
+    }
     
     pub fn perfect_hash_default(feature: &Vec<f32>, hash_type: HashType) -> Self {
         match hash_type {

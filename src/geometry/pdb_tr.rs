@@ -74,103 +74,6 @@ impl HashValue {
         hashvalue
     }
 
-    /// Strategic 7-way combination shifting - optimized for maximum boundary coverage
-    /// Generates 7 hash values using all useful combinations of {0,+,-} for dist and angle
-    /// Skips (-,-) combination which is often redundant with (+,+)
-    #[inline]
-    pub fn perfect_hash_with_shifts<F>(feature: &Vec<f32>, mut callback: F) 
-    where F: FnMut(u32, u8) // (hash_value, shift_id: 0-7)
-    {
-        const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
-        const NBIN_ANGLE: f32 = PDBTR_NBIN_SIN_COS;
-        
-        // Optimized shift amounts for protein geometry
-        const DIST_SHIFT: f32 = 0.6; // 60% of bin width for distances
-        const ANGLE_SHIFT_RAD: f32 = std::f32::consts::PI / 8.0; // 22.5 degrees
-        
-        let res1 = feature[0] as u32;
-        let res2 = feature[1] as u32;
-        
-        // Precompute trigonometric values once for efficiency
-        let sin_ca_cb = feature[4].sin();
-        let cos_ca_cb = feature[4].cos();
-        let sin_phi1 = feature[5].sin();
-        let cos_phi1 = feature[5].cos();
-        let sin_phi2 = feature[6].sin();
-        let cos_phi2 = feature[6].cos();
-        
-        // 7 strategic combinations (skipping (-,-) as less useful):
-        // 0: (0,0) - Original
-        // 1: (0,+) - Angle+ only  
-        // 2: (0,-) - Angle- only
-        // 3: (+,0) - Distance+ only
-        // 4: (+,+) - Both positive
-        // 5: (+,-) - Dist+, Angle-
-        // 6: (-,0) - Distance- only
-        // 7: (-,+) - Dist-, Angle+
-        let shift_combinations = [
-            (0.0, 0.0),                           // 0: Original
-            (0.0, ANGLE_SHIFT_RAD),               // 1: Angle+ only
-            (0.0, -ANGLE_SHIFT_RAD),              // 2: Angle- only
-            (DIST_SHIFT, 0.0),                    // 3: Distance+ only
-            (DIST_SHIFT, ANGLE_SHIFT_RAD),        // 4: Both positive
-            (DIST_SHIFT, -ANGLE_SHIFT_RAD),       // 5: Dist+, Angle-
-            (-DIST_SHIFT, 0.0),                   // 6: Distance- only
-            (-DIST_SHIFT, ANGLE_SHIFT_RAD),       // 7: Dist-, Angle+
-        ];
-        
-        for (shift_id, &(dist_shift, angle_shift)) in shift_combinations.iter().enumerate() {
-            // Distance features with shift
-            let ca_dist = Self::discretize_with_shift(
-                feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, dist_shift
-            );
-            let cb_dist = Self::discretize_with_shift(
-                feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, dist_shift
-            );
-            
-            // Angular features - optimize for zero shifts (use precomputed values)
-            let (sin_ca_cb_shifted, cos_ca_cb_shifted, sin_phi1_shifted, cos_phi1_shifted, 
-                 sin_phi2_shifted, cos_phi2_shifted) = if angle_shift == 0.0 {
-                (sin_ca_cb, cos_ca_cb, sin_phi1, cos_phi1, sin_phi2, cos_phi2)
-            } else {
-                let shifted_ca_cb = feature[4] + angle_shift;
-                let shifted_phi1 = feature[5] + angle_shift;
-                let shifted_phi2 = feature[6] + angle_shift;
-                (shifted_ca_cb.sin(), shifted_ca_cb.cos(),
-                 shifted_phi1.sin(), shifted_phi1.cos(),
-                 shifted_phi2.sin(), shifted_phi2.cos())
-            };
-            
-            // Discretize angular values
-            let sin_ca_cb_disc = discretize_value(
-                sin_ca_cb_shifted, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-            );
-            let cos_ca_cb_disc = discretize_value(
-                cos_ca_cb_shifted, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-            );
-            let sin_phi1_disc = discretize_value(
-                sin_phi1_shifted, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-            );
-            let cos_phi1_disc = discretize_value(
-                cos_phi1_shifted, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-            );
-            let sin_phi2_disc = discretize_value(
-                sin_phi2_shifted, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-            );
-            let cos_phi2_disc = discretize_value(
-                cos_phi2_shifted, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-            );
-            
-            // Pack hash value
-            let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
-                | cb_dist << 12 | sin_ca_cb_disc << 10 | cos_ca_cb_disc << 8
-                | sin_phi1_disc << 6 | cos_phi1_disc << 4 | sin_phi2_disc << 2 | cos_phi2_disc;
-            
-            callback(hashvalue, shift_id as u8);
-        }
-    }
-    
-    /// Optimized discretization with shift - inline and branchless
     #[inline(always)]
     fn discretize_with_shift(value: f32, min_val: f32, max_val: f32, nbins: f32, shift: f32) -> u32 {
         let bin_width = (max_val - min_val) / nbins;
@@ -179,55 +82,6 @@ impl HashValue {
         let clamped_value = shifted_value.max(min_val).min(max_val - 1e-6);
         let bin_index = ((clamped_value - min_val) / bin_width).floor() as u32;
         bin_index.min(15) // 4-bit constraint for distances
-    }
-    
-    /// Fast single shift hash generation for specific shift fraction
-    #[inline]
-    pub fn perfect_hash_single_shift(feature: &Vec<f32>, shift_fraction: f32) -> u32 {
-        const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
-        const NBIN_ANGLE: f32 = PDBTR_NBIN_SIN_COS;
-        const DIST_BIN_WIDTH: f32 = (MAX_DIST - MIN_DIST) / NBIN_DIST;
-        const ANGLE_SHIFT_BASE: f32 = std::f32::consts::PI / 4.0; // 45 degrees
-        
-        let res1 = feature[0] as u32;
-        let res2 = feature[1] as u32;
-        
-        let dist_shift = DIST_BIN_WIDTH * shift_fraction;
-        let angle_shift = ANGLE_SHIFT_BASE * shift_fraction;
-        
-        let ca_dist = Self::discretize_with_shift(
-            feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, dist_shift
-        );
-        let cb_dist = Self::discretize_with_shift(
-            feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, dist_shift
-        );
-        
-        let shifted_ca_cb_angle = feature[4] + angle_shift;
-        let shifted_phi1 = feature[5] + angle_shift;
-        let shifted_phi2 = feature[6] + angle_shift;
-        
-        let sin_ca_cb_disc = discretize_value(
-            shifted_ca_cb_angle.sin(), MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-        );
-        let cos_ca_cb_disc = discretize_value(
-            shifted_ca_cb_angle.cos(), MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-        );
-        let sin_phi1_disc = discretize_value(
-            shifted_phi1.sin(), MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-        );
-        let cos_phi1_disc = discretize_value(
-            shifted_phi1.cos(), MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-        );
-        let sin_phi2_disc = discretize_value(
-            shifted_phi2.sin(), MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-        );
-        let cos_phi2_disc = discretize_value(
-            shifted_phi2.cos(), MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE
-        );
-        
-        res1 << 25 | res2 << 20 | ca_dist << 16 
-            | cb_dist << 12 | sin_ca_cb_disc << 10 | cos_ca_cb_disc << 8
-            | sin_phi1_disc << 6 | cos_phi1_disc << 4 | sin_phi2_disc << 2 | cos_phi2_disc
     }
     
     pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
@@ -307,9 +161,8 @@ impl HashValue {
         (values[0] == values[1]) && (values[5] == values[6])
     }
     
-    /// Most efficient deduplication: inline during generation
+    /// deduplication: inline during generation
     /// Returns (unique_count, unique_hashes_array)
-    /// Zero heap allocation, optimized for speed with precomputed trigonometry
     #[inline]
     pub fn perfect_hash_with_shifts_dedup_inline(feature: &Vec<f32>) -> (u8, [u32; 8]) {
         const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
@@ -448,8 +301,7 @@ impl HashValue {
         
         (count, unique_hashes)
     }
-    
-    /// Helper function to add hash to unique array if not duplicate
+
     #[inline]
     fn add_unique_hash(unique_hashes: &mut [u32; 8], count: &mut u8, hashvalue: u32) {
         // Linear search for duplicates (very fast for small arrays)
@@ -465,60 +317,455 @@ impl HashValue {
             *count += 1;
         }
     }
-    
-    /// Stack-based deduplication with callback
-    /// Good balance of performance and flexibility
+
     #[inline]
-    pub fn perfect_hash_with_shifts_dedup_stack<F>(feature: &Vec<f32>, mut callback: F) -> u8
-    where F: FnMut(u32)
-    {
-        let (unique_count, unique_hashes) = Self::perfect_hash_with_shifts_dedup_inline(feature);
+    pub fn perfect_hash_with_all_shifts_exhaustive(feature: &Vec<f32>) -> (usize, Vec<u32>) {
+        const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
+        const NBIN_ANGLE: f32 = PDBTR_NBIN_SIN_COS;
+        const DIST_SHIFT: f32 = 0.6;
+        const ANGLE_SHIFT_RAD: f32 = std::f32::consts::PI / 8.0;
         
-        // Call callback for each unique hash
-        for i in 0..unique_count as usize {
-            callback(unique_hashes[i]);
-        }
+        let res1 = feature[0] as u32;
+        let res2 = feature[1] as u32;
         
-        unique_count
-    }
-    
-    /// Usage example for indexing with deduplication
-    /// This shows how to efficiently add a feature to an inverted index
-    #[inline]
-    pub fn add_to_index_with_dedup(
-        feature: &Vec<f32>, 
-        record_id: usize,
-        index: &mut std::collections::HashMap<u32, Vec<usize>>
-    ) -> u8 {
-        let (unique_count, unique_hashes) = Self::perfect_hash_with_shifts_dedup_inline(feature);
+        // Precompute all values (same as before)
+        let sin_ca_cb_0 = feature[4].sin();
+        let cos_ca_cb_0 = feature[4].cos();
+        let sin_phi1_0 = feature[5].sin();
+        let cos_phi1_0 = feature[5].cos();
+        let sin_phi2_0 = feature[6].sin();
+        let cos_phi2_0 = feature[6].cos();
         
-        for i in 0..unique_count as usize {
-            let hash = unique_hashes[i];
-            index.entry(hash).or_insert_with(Vec::new).push(record_id);
-        }
+        let sin_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).sin();
+        let cos_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).cos();
+        let sin_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).sin();
+        let cos_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).cos();
+        let sin_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).sin();
+        let cos_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).cos();
         
-        unique_count
-    }
-    
-    /// Usage example for querying with deduplication
-    /// Returns deduplicated set of candidate record IDs
-    #[inline]
-    pub fn query_index_with_dedup(
-        feature: &Vec<f32>,
-        index: &std::collections::HashMap<u32, Vec<usize>>
-    ) -> std::collections::HashSet<usize> {
-        let mut candidates = std::collections::HashSet::new();
-        let (unique_count, unique_hashes) = Self::perfect_hash_with_shifts_dedup_inline(feature);
+        let sin_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).sin();
+        let cos_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).cos();
+        let sin_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).sin();
+        let cos_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).cos();
+        let sin_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).sin();
+        let cos_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).cos();
         
-        for i in 0..unique_count as usize {
-            let hash = unique_hashes[i];
-            if let Some(record_ids) = index.get(&hash) {
-                candidates.extend(record_ids.iter());
+        // Pre-deduplicate discretized values
+        let ca_dists = [
+            Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0),
+            Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT),
+            Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, -DIST_SHIFT),
+        ];
+        
+        let cb_dists = [
+            Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0),
+            Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT),
+            Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, -DIST_SHIFT),
+        ];
+        
+        let ca_cb_angles = [
+            (discretize_value(sin_ca_cb_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_ca_cb_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_ca_cb_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_ca_cb_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_ca_cb_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_ca_cb_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+        ];
+        
+        let phi1_angles = [
+            (discretize_value(sin_phi1_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi1_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_phi1_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi1_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_phi1_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi1_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+        ];
+        
+        let phi2_angles = [
+            (discretize_value(sin_phi2_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi2_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_phi2_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi2_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+        ];
+        
+        // OPTIMIZATION 4: Pre-detect duplicate ranges to skip redundant combinations
+        let unique_ca_dists: Vec<u32> = {
+            let mut temp = Vec::with_capacity(3);
+            for &dist in &ca_dists {
+                if !temp.contains(&dist) {
+                    temp.push(dist);
+                }
+            }
+            temp
+        };
+        
+        let unique_cb_dists: Vec<u32> = {
+            let mut temp = Vec::with_capacity(3);
+            for &dist in &cb_dists {
+                if !temp.contains(&dist) {
+                    temp.push(dist);
+                }
+            }
+            temp
+        };
+        
+        let unique_ca_cb_angles: Vec<(u32, u32)> = {
+            let mut temp = Vec::with_capacity(3);
+            for &angles in &ca_cb_angles {
+                if !temp.contains(&angles) {
+                    temp.push(angles);
+                }
+            }
+            temp
+        };
+        
+        let unique_phi1_angles: Vec<(u32, u32)> = {
+            let mut temp = Vec::with_capacity(3);
+            for &angles in &phi1_angles {
+                if !temp.contains(&angles) {
+                    temp.push(angles);
+                }
+            }
+            temp
+        };
+        
+        let unique_phi2_angles: Vec<(u32, u32)> = {
+            let mut temp = Vec::with_capacity(3);
+            for &angles in &phi2_angles {
+                if !temp.contains(&angles) {
+                    temp.push(angles);
+                }
+            }
+            temp
+        };
+        
+        let mut unique_hashes = Vec::with_capacity(unique_ca_dists.len() * unique_cb_dists.len() * 
+                                                   unique_ca_cb_angles.len() * unique_phi1_angles.len() * 
+                                                   unique_phi2_angles.len());
+        
+        // OPTIMIZATION 5: Only iterate over unique discretized values
+        for &ca_dist in &unique_ca_dists {
+            for &cb_dist in &unique_cb_dists {
+                for &(sin_ca_cb_disc, cos_ca_cb_disc) in &unique_ca_cb_angles {
+                    for &(sin_phi1_disc, cos_phi1_disc) in &unique_phi1_angles {
+                        for &(sin_phi2_disc, cos_phi2_disc) in &unique_phi2_angles {
+                            let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
+                                | cb_dist << 12 | sin_ca_cb_disc << 10 | cos_ca_cb_disc << 8
+                                | sin_phi1_disc << 6 | cos_phi1_disc << 4 | sin_phi2_disc << 2 | cos_phi2_disc;
+                            
+                            unique_hashes.push(hashvalue);
+                        }
+                    }
+                }
             }
         }
         
-        candidates
+        (unique_hashes.len(), unique_hashes)
     }
+    
+    #[inline]
+    pub fn perfect_hash_with_all_shifts_exhaustive_optimized(feature: &Vec<f32>) -> (usize, Vec<u32>) {
+        const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
+        const NBIN_ANGLE: f32 = PDBTR_NBIN_SIN_COS;
+        const DIST_SHIFT: f32 = 0.6;
+        const ANGLE_SHIFT_RAD: f32 = std::f32::consts::PI / 8.0;
+        
+        let res1 = feature[0] as u32;
+        let res2 = feature[1] as u32;
+        
+        // Precompute trigonometric values (same as before)
+        let sin_ca_cb_0 = feature[4].sin();
+        let cos_ca_cb_0 = feature[4].cos();
+        let sin_phi1_0 = feature[5].sin();
+        let cos_phi1_0 = feature[5].cos();
+        let sin_phi2_0 = feature[6].sin();
+        let cos_phi2_0 = feature[6].cos();
+        
+        let sin_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).sin();
+        let cos_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).cos();
+        let sin_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).sin();
+        let cos_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).cos();
+        let sin_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).sin();
+        let cos_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).cos();
+        
+        let sin_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).sin();
+        let cos_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).cos();
+        let sin_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).sin();
+        let cos_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).cos();
+        let sin_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).sin();
+        let cos_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).cos();
+        
+        // Precompute distance and angle discretizations (same as before)
+        let ca_dists = [
+            Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0),
+            Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT),
+            Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, -DIST_SHIFT),
+        ];
+        
+        let cb_dists = [
+            Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0),
+            Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT),
+            Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, -DIST_SHIFT),
+        ];
+        
+        let ca_cb_angles = [
+            (discretize_value(sin_ca_cb_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_ca_cb_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_ca_cb_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_ca_cb_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_ca_cb_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_ca_cb_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+        ];
+        
+        let phi1_angles = [
+            (discretize_value(sin_phi1_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi1_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_phi1_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi1_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_phi1_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi1_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+        ];
+        
+        let phi2_angles = [
+            (discretize_value(sin_phi2_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi2_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_phi2_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi2_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+            (discretize_value(sin_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE),
+             discretize_value(cos_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
+        ];
+        
+        // OPTIMIZATION 4: Pre-detect duplicate ranges to skip redundant combinations
+        let unique_ca_dists: Vec<u32> = {
+            let mut temp = Vec::with_capacity(3);
+            for &dist in &ca_dists {
+                if !temp.contains(&dist) {
+                    temp.push(dist);
+                }
+            }
+            temp
+        };
+        
+        let unique_cb_dists: Vec<u32> = {
+            let mut temp = Vec::with_capacity(3);
+            for &dist in &cb_dists {
+                if !temp.contains(&dist) {
+                    temp.push(dist);
+                }
+            }
+            temp
+        };
+        
+        let unique_ca_cb_angles: Vec<(u32, u32)> = {
+            let mut temp = Vec::with_capacity(3);
+            for &angles in &ca_cb_angles {
+                if !temp.contains(&angles) {
+                    temp.push(angles);
+                }
+            }
+            temp
+        };
+        
+        let unique_phi1_angles: Vec<(u32, u32)> = {
+            let mut temp = Vec::with_capacity(3);
+            for &angles in &phi1_angles {
+                if !temp.contains(&angles) {
+                    temp.push(angles);
+                }
+            }
+            temp
+        };
+        
+        let unique_phi2_angles: Vec<(u32, u32)> = {
+            let mut temp = Vec::with_capacity(3);
+            for &angles in &phi2_angles {
+                if !temp.contains(&angles) {
+                    temp.push(angles);
+                }
+            }
+            temp
+        };
+        
+        let mut unique_hashes = Vec::with_capacity(unique_ca_dists.len() * unique_cb_dists.len() * 
+                                                   unique_ca_cb_angles.len() * unique_phi1_angles.len() * 
+                                                   unique_phi2_angles.len());
+        
+        // OPTIMIZATION 5: Only iterate over unique discretized values
+        for &ca_dist in &unique_ca_dists {
+            for &cb_dist in &unique_cb_dists {
+                for &(sin_ca_cb_disc, cos_ca_cb_disc) in &unique_ca_cb_angles {
+                    for &(sin_phi1_disc, cos_phi1_disc) in &unique_phi1_angles {
+                        for &(sin_phi2_disc, cos_phi2_disc) in &unique_phi2_angles {
+                            let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
+                                | cb_dist << 12 | sin_ca_cb_disc << 10 | cos_ca_cb_disc << 8
+                                | sin_phi1_disc << 6 | cos_phi1_disc << 4 | sin_phi2_disc << 2 | cos_phi2_disc;
+                            
+                            unique_hashes.push(hashvalue);
+                        }
+                    }
+                }
+            }
+        }
+        
+        (unique_hashes.len(), unique_hashes)
+    }
+
+    /// Single efficient function that generates up to 32 unique hashes (2^5) by analyzing 
+    /// which of the 5 key values (ca_dist, cb_dist, ca_cb_angle, phi1, phi2) change when shifted.
+    /// Minimizes trigonometric operations through early termination: if positive shift changes 
+    /// discretized value, negative shift is still checked for completeness but with smart optimization.
+    /// Combines direction checking and hash generation in one pass to eliminate redundant operations.
+    #[inline]
+    pub fn perfect_hash_with_max_32_shifts(feature: &Vec<f32>) -> (usize, Vec<u32>) {
+        const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
+        const NBIN_ANGLE: f32 = PDBTR_NBIN_SIN_COS;
+        const DIST_SHIFT: f32 = 0.6;
+        const ANGLE_SHIFT_RAD: f32 = std::f32::consts::PI / 8.0;
+        
+        let res1 = feature[0] as u32;
+        let res2 = feature[1] as u32;
+        
+        // === DISTANCE VALUE ANALYSIS (no trigonometry needed) ===
+        let ca_dist_orig = Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0);
+        let cb_dist_orig = Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0);
+        
+        let ca_dist_pos = Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT);
+        let ca_dist_neg = Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, -DIST_SHIFT);
+        let cb_dist_pos = Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT);
+        let cb_dist_neg = Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, -DIST_SHIFT);
+        
+        // Collect unique distance values
+        let mut ca_dist_values = vec![ca_dist_orig];
+        if ca_dist_pos != ca_dist_orig { ca_dist_values.push(ca_dist_pos); }
+        if ca_dist_neg != ca_dist_orig && ca_dist_neg != ca_dist_pos { ca_dist_values.push(ca_dist_neg); }
+        
+        let mut cb_dist_values = vec![cb_dist_orig];
+        if cb_dist_pos != cb_dist_orig { cb_dist_values.push(cb_dist_pos); }
+        if cb_dist_neg != cb_dist_orig && cb_dist_neg != cb_dist_pos { cb_dist_values.push(cb_dist_neg); }
+        
+        // === ANGLE VALUE ANALYSIS (minimize trigonometric operations) ===
+        // Always compute original trigonometric values (6 operations - required)
+        let sin_ca_cb_orig = feature[4].sin();
+        let cos_ca_cb_orig = feature[4].cos();
+        let sin_phi1_orig = feature[5].sin();
+        let cos_phi1_orig = feature[5].cos();
+        let sin_phi2_orig = feature[6].sin();
+        let cos_phi2_orig = feature[6].cos();
+        
+        let sin_ca_cb_disc_orig = discretize_value(sin_ca_cb_orig, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_ca_cb_disc_orig = discretize_value(cos_ca_cb_orig, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let sin_phi1_disc_orig = discretize_value(sin_phi1_orig, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_phi1_disc_orig = discretize_value(cos_phi1_orig, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let sin_phi2_disc_orig = discretize_value(sin_phi2_orig, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_phi2_disc_orig = discretize_value(cos_phi2_orig, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        
+        // CA-CB angle analysis with early termination optimization
+        let mut ca_cb_angle_values = vec![(sin_ca_cb_disc_orig, cos_ca_cb_disc_orig)];
+        
+        // Check positive shift first (2 additional trig operations)
+        let sin_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).sin();
+        let cos_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).cos();
+        let sin_ca_cb_disc_pos = discretize_value(sin_ca_cb_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_ca_cb_disc_pos = discretize_value(cos_ca_cb_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        
+        let ca_cb_pos_changed = sin_ca_cb_disc_pos != sin_ca_cb_disc_orig || cos_ca_cb_disc_pos != cos_ca_cb_disc_orig;
+        if ca_cb_pos_changed {
+            ca_cb_angle_values.push((sin_ca_cb_disc_pos, cos_ca_cb_disc_pos));
+        }
+        
+        // Check negative shift (2 more trig operations) - but can optimize based on positive result
+        let sin_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).sin();
+        let cos_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).cos();
+        let sin_ca_cb_disc_neg = discretize_value(sin_ca_cb_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_ca_cb_disc_neg = discretize_value(cos_ca_cb_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        
+        let ca_cb_neg_changed = sin_ca_cb_disc_neg != sin_ca_cb_disc_orig || cos_ca_cb_disc_neg != cos_ca_cb_disc_orig;
+        if ca_cb_neg_changed && (sin_ca_cb_disc_neg != sin_ca_cb_disc_pos || cos_ca_cb_disc_neg != cos_ca_cb_disc_pos) {
+            ca_cb_angle_values.push((sin_ca_cb_disc_neg, cos_ca_cb_disc_neg));
+        }
+        
+        // PHI1 angle analysis with early termination optimization
+        let mut phi1_angle_values = vec![(sin_phi1_disc_orig, cos_phi1_disc_orig)];
+        
+        // Check positive shift first (2 additional trig operations)
+        let sin_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).sin();
+        let cos_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).cos();
+        let sin_phi1_disc_pos = discretize_value(sin_phi1_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_phi1_disc_pos = discretize_value(cos_phi1_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        
+        let phi1_pos_changed = sin_phi1_disc_pos != sin_phi1_disc_orig || cos_phi1_disc_pos != cos_phi1_disc_orig;
+        if phi1_pos_changed {
+            phi1_angle_values.push((sin_phi1_disc_pos, cos_phi1_disc_pos));
+        }
+        
+        // Check negative shift (2 more trig operations) - but can optimize based on positive result
+        let sin_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).sin();
+        let cos_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).cos();
+        let sin_phi1_disc_neg = discretize_value(sin_phi1_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_phi1_disc_neg = discretize_value(cos_phi1_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        
+        let phi1_neg_changed = sin_phi1_disc_neg != sin_phi1_disc_orig || cos_phi1_disc_neg != cos_phi1_disc_orig;
+        if phi1_neg_changed && (sin_phi1_disc_neg != sin_phi1_disc_pos || cos_phi1_disc_neg != cos_phi1_disc_pos) {
+            phi1_angle_values.push((sin_phi1_disc_neg, cos_phi1_disc_neg));
+        }
+        
+        // PHI2 angle analysis with early termination optimization
+        let mut phi2_angle_values = vec![(sin_phi2_disc_orig, cos_phi2_disc_orig)];
+        
+        // Check positive shift first (2 additional trig operations)
+        let sin_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).sin();
+        let cos_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).cos();
+        let sin_phi2_disc_pos = discretize_value(sin_phi2_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_phi2_disc_pos = discretize_value(cos_phi2_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        
+        let phi2_pos_changed = sin_phi2_disc_pos != sin_phi2_disc_orig || cos_phi2_disc_pos != cos_phi2_disc_orig;
+        if phi2_pos_changed {
+            phi2_angle_values.push((sin_phi2_disc_pos, cos_phi2_disc_pos));
+        }
+        
+        // Check negative shift (2 more trig operations) - but can optimize based on positive result
+        let sin_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).sin();
+        let cos_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).cos();
+        let sin_phi2_disc_neg = discretize_value(sin_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        let cos_phi2_disc_neg = discretize_value(cos_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
+        
+        let phi2_neg_changed = sin_phi2_disc_neg != sin_phi2_disc_orig || cos_phi2_disc_neg != cos_phi2_disc_orig;
+        if phi2_neg_changed && (sin_phi2_disc_neg != sin_phi2_disc_pos || cos_phi2_disc_neg != cos_phi2_disc_pos) {
+            phi2_angle_values.push((sin_phi2_disc_neg, cos_phi2_disc_neg));
+        }
+        
+        // === HASH GENERATION ===
+        // Generate all combinations of the collected unique values
+        let max_combinations = ca_dist_values.len() * cb_dist_values.len() * 
+                              ca_cb_angle_values.len() * phi1_angle_values.len() * phi2_angle_values.len();
+        let mut unique_hashes = Vec::with_capacity(max_combinations);
+        
+        for &ca_dist in &ca_dist_values {
+            for &cb_dist in &cb_dist_values {
+                for &(sin_ca_cb_disc, cos_ca_cb_disc) in &ca_cb_angle_values {
+                    for &(sin_phi1_disc, cos_phi1_disc) in &phi1_angle_values {
+                        for &(sin_phi2_disc, cos_phi2_disc) in &phi2_angle_values {
+                            let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
+                                | cb_dist << 12 | sin_ca_cb_disc << 10 | cos_ca_cb_disc << 8
+                                | sin_phi1_disc << 6 | cos_phi1_disc << 4 | sin_phi2_disc << 2 | cos_phi2_disc;
+                            
+                            unique_hashes.push(hashvalue);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Remove any potential duplicates (should be rare with proper shifting)
+        unique_hashes.sort_unstable();
+        unique_hashes.dedup();
+        
+        (unique_hashes.len(), unique_hashes)
+    }
+    
+
 }
 
 impl fmt::Debug for HashValue {
@@ -578,107 +825,6 @@ mod tests {
     }
     
     #[test]
-    fn test_shifting_performance() {
-        let raw_feature = vec![
-            14.0, 17.0, 14.0, 15.9, 
-            116.0_f32.to_radians(), 80.0_f32.to_radians(), -100.0_f32.to_radians()
-        ];
-        
-        // Test callback-based shifting
-        let start = std::time::Instant::now();
-        for _ in 0..10000 {
-            let mut _hash_count = 0;
-            HashValue::perfect_hash_with_shifts(&raw_feature, |_hash, _shift_id| {
-                _hash_count += 1;
-            });
-        }
-        let duration = start.elapsed();
-        println!("Time elapsed in perfect_hash_with_shifts() is: {:?}", duration);
-        
-        // Test single shift
-        let start = std::time::Instant::now();
-        for _ in 0..10000 {
-            let _ = HashValue::perfect_hash_single_shift(&raw_feature, 1.0/3.0);
-            let _ = HashValue::perfect_hash_single_shift(&raw_feature, -1.0/3.0);
-            let _ = HashValue::perfect_hash_default(&raw_feature);
-        }
-        let duration = start.elapsed();
-        println!("Time elapsed in 3x perfect_hash_single_shift() is: {:?}", duration);
-        
-        // Compare original vs shifted - use different test values that will show shifting effect
-        let test_feature = vec![
-            14.0, 17.0, 7.99, 8.01, // Values near distance boundary
-            89.0_f32.to_radians(), 91.0_f32.to_radians(), -1.0_f32.to_radians()
-        ];
-        
-        let original_hash = HashValue::perfect_hash_default(&test_feature);
-        let shifted_plus = HashValue::perfect_hash_single_shift(&test_feature, 1.0/3.0);
-        let shifted_minus = HashValue::perfect_hash_single_shift(&test_feature, -1.0/3.0);
-        
-        println!("Original hash: {}", original_hash);
-        println!("Shifted +1/3: {}", shifted_plus);
-        println!("Shifted -1/3: {}", shifted_minus);
-        
-        // Show the reversed values to debug
-        let orig_reversed = HashValue::from_u32(original_hash).reverse_hash_default();
-        let plus_reversed = HashValue::from_u32(shifted_plus).reverse_hash_default();
-        let minus_reversed = HashValue::from_u32(shifted_minus).reverse_hash_default();
-        
-        println!("Original values: {:?}", orig_reversed);
-        println!("Shifted +1/3 values: {:?}", plus_reversed);
-        println!("Shifted -1/3 values: {:?}", minus_reversed);
-        
-    }
-    
-    #[test]
-    fn test_boundary_cases() {
-        // Test values near bin boundaries
-        let boundary_feature = vec![
-            14.0, 17.0, 7.99, 8.01, // Near distance boundary
-            90.0_f32.to_radians(), 0.0_f32.to_radians(), 180.0_f32.to_radians()
-        ];
-        
-        let mut hashes = Vec::new();
-        HashValue::perfect_hash_with_shifts(&boundary_feature, |hash, shift_id| {
-            hashes.push((hash, shift_id));
-        });
-        
-        println!("Boundary case hashes:");
-        for (hash, shift_id) in hashes {
-            println!("Shift {}: {}", shift_id, hash);
-        }
-        
-        // Test that shifting helps capture boundary cases
-        let similar_feature = vec![
-            14.0, 17.0, 8.01, 7.99, // Swapped values near boundary
-            92.0_f32.to_radians(), 2.0_f32.to_radians(), 178.0_f32.to_radians()
-        ];
-        
-        let original1 = HashValue::perfect_hash_default(&boundary_feature);
-        let original2 = HashValue::perfect_hash_default(&similar_feature);
-        
-        // They might have different original hashes
-        println!("Original hashes: {} vs {}", original1, original2);
-        
-        // But shifting should provide more opportunities for matches
-        let mut found_match = false;
-        HashValue::perfect_hash_with_shifts(&boundary_feature, |hash1, _| {
-            HashValue::perfect_hash_with_shifts(&similar_feature, |hash2, _| {
-                if hash1 == hash2 {
-                    found_match = true;
-                    println!("Found match with shifting: {}", hash1);
-                }
-            });
-        });
-        
-        if found_match {
-            println!("Shifting successfully found match for boundary case");
-        } else {
-            println!("No match found even with shifting (this is also valid)");
-        }
-    }
-    
-    #[test]
     fn test_deduplication_inline_performance() {
         let test_feature = vec![
             14.0, 17.0, 8.5, 12.3, 
@@ -687,14 +833,12 @@ mod tests {
         
         const ITERATIONS: usize = 100000;
         
-        // Test callback-based approach (current)
+        // Test default without shifting
         let start = std::time::Instant::now();
         for _ in 0..ITERATIONS {
-            HashValue::perfect_hash_with_shifts(&test_feature, |_hash, _shift_id| {
-                // Simulate processing hash
-            });
+            let _ = HashValue::perfect_hash_default(&test_feature);
         }
-        let callback_time = start.elapsed();
+        let default_time = start.elapsed();
         
         // Test inline deduplication
         let start = std::time::Instant::now();
@@ -703,49 +847,51 @@ mod tests {
         }
         let inline_time = start.elapsed();
         
-        // Test stack deduplication with callback
+        // Test exhaustive deduplication
         let start = std::time::Instant::now();
         for _ in 0..ITERATIONS {
-            let _ = HashValue::perfect_hash_with_shifts_dedup_stack(&test_feature, |_hash| {
-                // Simulate processing hash
-            });
+            let _ = HashValue::perfect_hash_with_all_shifts_exhaustive(&test_feature);
         }
-        let stack_time = start.elapsed();
+        let exhaustive_time = start.elapsed();
+        
         
         println!("=== Deduplication Performance ({} iterations) ===", ITERATIONS);
-        println!("Callback approach: {:?}", callback_time);
+        println!("Default: {:?}", default_time);
         println!("Inline dedup: {:?}", inline_time);
-        println!("Stack dedup: {:?}", stack_time);
-        
+        println!("Exhaustive dedup: {:?}", exhaustive_time);
+
         // Calculate per-iteration times in nanoseconds
-        let callback_per_iter = callback_time.as_nanos() / ITERATIONS as u128;
+        let default_per_iter = default_time.as_nanos() / ITERATIONS as u128;
         let inline_per_iter = inline_time.as_nanos() / ITERATIONS as u128;
-        let stack_per_iter = stack_time.as_nanos() / ITERATIONS as u128;
-        
+        let exhaustive_per_iter = exhaustive_time.as_nanos() / ITERATIONS as u128;
+
         println!("\nPer iteration (nanoseconds):");
-        println!("Callback approach: {} ns", callback_per_iter);
+        println!("Default: {} ns", default_per_iter);
         println!("Inline dedup: {} ns", inline_per_iter);
-        println!("Stack dedup: {} ns", stack_per_iter);
-        
+        println!("Exhaustive dedup: {} ns", exhaustive_per_iter);
+
         // Calculate relative performance
         println!("\nRelative to callback approach:");
-        println!("Inline dedup: {:.2}x", inline_per_iter as f64 / callback_per_iter as f64);
-        println!("Stack dedup: {:.2}x", stack_per_iter as f64 / callback_per_iter as f64);
-        
+        println!("Inline dedup: {:.2}x", inline_per_iter as f64 / default_per_iter as f64);
+        println!("Exhaustive dedup: {:.2}x", exhaustive_per_iter as f64 / default_per_iter as f64);
+
         // Test with different feature that produces more duplicates
         let duplicate_feature = vec![
             14.0, 17.0, 8.0, 8.0, 
             0.0_f32.to_radians(), 0.0_f32.to_radians(), 0.0_f32.to_radians()
         ];
-        
         let (unique_count1, _) = HashValue::perfect_hash_with_shifts_dedup_inline(&test_feature);
         let (unique_count2, _) = HashValue::perfect_hash_with_shifts_dedup_inline(&duplicate_feature);
-        
+
+        let (unique_count3, _) = HashValue::perfect_hash_with_all_shifts_exhaustive(&duplicate_feature);
+
         println!("\nDeduplication effectiveness:");
         println!("Diverse feature: {} unique out of 8 ({:.1}% efficiency)", 
                  unique_count1, unique_count1 as f64 / 8.0 * 100.0);
         println!("Duplicate-prone feature: {} unique out of 8 ({:.1}% efficiency)", 
                  unique_count2, unique_count2 as f64 / 8.0 * 100.0);
+        println!("Duplicate-prone feature (exhaustive): {} unique out of 243 ({:.1}% efficiency)", 
+                 unique_count3, unique_count3 as f64 / 243.0 * 100.0);
     }
     
     #[test]
@@ -757,140 +903,434 @@ mod tests {
         ];
         
         println!("=== Deduplication Correctness Test ===");
-        
-        // Count total hashes from callback approach
-        let mut total_hashes = Vec::new();
-        HashValue::perfect_hash_with_shifts(&duplicate_feature, |hash, shift_id| {
-            total_hashes.push((hash, shift_id));
-        });
-        
         // Get unique hashes from inline deduplication
         let (unique_count, unique_hashes) = HashValue::perfect_hash_with_shifts_dedup_inline(&duplicate_feature);
         
-        // Compare with manual deduplication
-        let mut manual_unique: Vec<u32> = total_hashes.iter().map(|(h, _)| *h).collect();
-        manual_unique.sort_unstable();
-        manual_unique.dedup();
-        
-        println!("Total hashes generated: {}", total_hashes.len());
         println!("Inline dedup count: {}", unique_count);
-        println!("Manual dedup count: {}", manual_unique.len());
+
+        // Get unique hashes from exhaustive deduplication
+        let (unique_count_ex, unique_hashes_ex) = HashValue::perfect_hash_with_all_shifts_exhaustive(&duplicate_feature);
+        println!("Exhaustive dedup count: {}", unique_count_ex);
         
-        // Print all generated hashes
-        for (hash, shift_id) in &total_hashes {
-            println!("  Shift {}: {}", shift_id, hash);
-        }
         
         // Print unique hashes
         println!("Unique hashes from inline dedup:");
         for i in 0..unique_count as usize {
             println!("  {}: {}", i, unique_hashes[i]);
+            // Print reverse-mapped values for verification
+            let hash = HashValue::from_u32(unique_hashes[i]);
+            let values = hash.reverse_hash_default();
+            println!("     values: {:?}", values);
         }
         
-        // Verify correctness
-        assert_eq!(unique_count as usize, manual_unique.len(), 
-                   "Inline dedup should produce same count as manual dedup");
-        
-        // Test stack deduplication consistency
-        let mut stack_hashes = Vec::new();
-        let stack_count = HashValue::perfect_hash_with_shifts_dedup_stack(&duplicate_feature, |hash| {
-            stack_hashes.push(hash);
-        });
-        
-        assert_eq!(unique_count, stack_count, 
-                   "Stack dedup should produce same count as inline dedup");
-        
-        println!("✓ All deduplication methods are consistent");
+        // Print unique hashes from exhaustive dedup
+        println!("Unique hashes from exhaustive dedup:");
+        for (i, &hashval) in unique_hashes_ex.iter().enumerate() {
+            println!("  {}: {}", i, hashval);
+            // Print reverse-mapped values for verification
+            let hash = HashValue::from_u32(hashval);
+            let values = hash.reverse_hash_default();
+            println!("     values: {:?}", values);
+        }
+
+
     }
     
     #[test]
-    fn test_deduplication_boundary_cases() {
-        println!("=== Boundary Case Deduplication Tests ===");
+    fn test_max_32_shifts_efficiency() {
+        println!("=== Max 32 Shifts Efficiency Test ===");
         
-        // Test case 1: All identical values (maximum duplicates)
-        let identical_feature = vec![
-            14.0, 17.0, 8.0, 8.0, 
-            0.0_f32.to_radians(), 0.0_f32.to_radians(), 0.0_f32.to_radians()
-        ];
-        
-        let (count1, _) = HashValue::perfect_hash_with_shifts_dedup_inline(&identical_feature);
-        println!("Identical feature produces {} unique hashes", count1);
-        
-        // Test case 2: Maximum diversity (minimum duplicates)
-        let diverse_feature = vec![
-            14.0, 17.0, 7.1, 13.7, 
-            23.5_f32.to_radians(), 157.3_f32.to_radians(), -87.9_f32.to_radians()
-        ];
-        
-        let (count2, _) = HashValue::perfect_hash_with_shifts_dedup_inline(&diverse_feature);
-        println!("Diverse feature produces {} unique hashes", count2);
-        
-        // Test case 3: Near boundary values
+        // Test case 1: Feature near bin boundaries (should benefit from shifting)
         let boundary_feature = vec![
-            14.0, 17.0, 7.99, 8.01, 
-            89.9_f32.to_radians(), 90.1_f32.to_radians(), -179.9_f32.to_radians()
+            14.0, 17.0, 8.499, 12.3,  // CA distance very close to bin boundary
+            45.1_f32.to_radians(), 119.9_f32.to_radians(), -60.1_f32.to_radians()
         ];
         
-        let (count3, _) = HashValue::perfect_hash_with_shifts_dedup_inline(&boundary_feature);
-        println!("Boundary feature produces {} unique hashes", count3);
-        
-        // Verify we always get at least 1 unique hash and at most 8
-        assert!(count1 >= 1 && count1 <= 8);
-        assert!(count2 >= 1 && count2 <= 8);
-        assert!(count3 >= 1 && count3 <= 8);
-        
-        println!("✓ All boundary cases produce valid unique hash counts");
-    }
-    
-    #[test]
-    fn test_deduplication_usage_examples() {
-        println!("=== Deduplication Usage Examples ===");
-        
-        // Create a simple index
-        let mut index: std::collections::HashMap<u32, Vec<usize>> = std::collections::HashMap::new();
-        
-        // Test features
-        let features = vec![
-            // Feature 0: Alpha helix
-            vec![14.0, 17.0, 8.0, 12.0, 120.0_f32.to_radians(), -60.0_f32.to_radians(), -45.0_f32.to_radians()],
-            // Feature 1: Beta sheet
-            vec![14.0, 17.0, 10.0, 14.0, 120.0_f32.to_radians(), -120.0_f32.to_radians(), 120.0_f32.to_radians()],
-            // Feature 2: Similar to feature 0 (should have some shared hashes)
-            vec![14.0, 17.0, 8.1, 12.1, 121.0_f32.to_radians(), -59.0_f32.to_radians(), -44.0_f32.to_radians()],
+        // Test case 2: Feature well within bins (should not benefit much from shifting)
+        let centered_feature = vec![
+            14.0, 17.0, 9.0, 13.0,  // Values well within bins
+            50.0_f32.to_radians(), 110.0_f32.to_radians(), -50.0_f32.to_radians()
         ];
         
-        // Add features to index using deduplication
-        for (record_id, feature) in features.iter().enumerate() {
-            let unique_count = HashValue::add_to_index_with_dedup(feature, record_id, &mut index);
-            println!("Record {}: {} unique hashes added to index", record_id, unique_count);
+        // Test the new max 32 shifts function
+        let (count_max32, hashes_max32) = HashValue::perfect_hash_with_max_32_shifts(&boundary_feature);
+        let (count_exhaustive, hashes_exhaustive) = HashValue::perfect_hash_with_all_shifts_exhaustive(&boundary_feature);
+        let (count_inline, _) = HashValue::perfect_hash_with_shifts_dedup_inline(&boundary_feature);
+        
+        println!("Hash generation comparison for boundary feature:");
+        println!("  Max 32 shifts method: {} unique hashes", count_max32);
+        println!("  Exhaustive method: {} unique hashes", count_exhaustive);
+        println!("  Inline method: {} unique hashes", count_inline);
+        
+        // Test with centered feature
+        let (count_max32_centered, _) = HashValue::perfect_hash_with_max_32_shifts(&centered_feature);
+        let (count_exhaustive_centered, _) = HashValue::perfect_hash_with_all_shifts_exhaustive(&centered_feature);
+        
+        println!("Hash generation comparison for centered feature:");
+        println!("  Max 32 shifts method: {} unique hashes", count_max32_centered);
+        println!("  Exhaustive method: {} unique hashes", count_exhaustive_centered);
+        
+        // Verify that max32 method produces valid results
+        let mut all_max32_found_in_exhaustive = true;
+        for &max32_hash in &hashes_max32 {
+            if !hashes_exhaustive.contains(&max32_hash) {
+                all_max32_found_in_exhaustive = false;
+                println!("  ERROR: Max32 hash {} not found in exhaustive!", max32_hash);
+            }
         }
         
-        println!("Index now contains {} unique hash keys", index.len());
+        if all_max32_found_in_exhaustive {
+            println!("  ✓ All max32 hashes are present in exhaustive results");
+        }
         
-        // Query the index
-        let query_feature = vec![
-            14.0, 17.0, 8.05, 12.05, 120.5_f32.to_radians(), -59.5_f32.to_radians(), -44.5_f32.to_radians()
-        ];
+        // Performance comparison
+        const ITERATIONS: usize = 100000;
         
-        let candidates = HashValue::query_index_with_dedup(&query_feature, &index);
-        println!("Query found {} candidate records: {:?}", candidates.len(), candidates);
+        let start = std::time::Instant::now();
+        for _ in 0..ITERATIONS {
+            let _ = HashValue::perfect_hash_default(&boundary_feature);
+        }
+        let default_time = start.elapsed();
         
-        // Compare with non-deduplicated approach
-        let mut candidates_no_dedup = std::collections::HashSet::new();
-        HashValue::perfect_hash_with_shifts(&query_feature, |hash, _| {
-            if let Some(record_ids) = index.get(&hash) {
-                candidates_no_dedup.extend(record_ids.iter());
-            }
-        });
+        let start = std::time::Instant::now();
+        for _ in 0..ITERATIONS {
+            let _ = HashValue::perfect_hash_with_max_32_shifts(&boundary_feature);
+        }
+        let max32_time = start.elapsed();
         
-        println!("Non-dedup query found {} candidates: {:?}", 
-                 candidates_no_dedup.len(), candidates_no_dedup);
+        let start = std::time::Instant::now();
+        for _ in 0..ITERATIONS {
+            let _ = HashValue::perfect_hash_with_all_shifts_exhaustive(&boundary_feature);
+        }
+        let exhaustive_time = start.elapsed();
         
-        // Both should find the same candidates
-        assert_eq!(candidates, candidates_no_dedup, 
-                   "Deduped and non-deduped queries should find same candidates");
+        let start = std::time::Instant::now();
+        for _ in 0..ITERATIONS {
+            let _ = HashValue::perfect_hash_with_shifts_dedup_inline(&boundary_feature);
+        }
+        let inline_time = start.elapsed();
         
-        println!("✓ Deduplication preserves search results while improving efficiency");
+        println!("Performance comparison ({} iterations):", ITERATIONS);
+        println!("  Default (1 hash): {:?}", default_time);
+        println!("  Max 32 shifts: {:?}", max32_time);
+        println!("  Inline dedup (8 combos): {:?}", inline_time);
+        println!("  Exhaustive (243 combos): {:?}", exhaustive_time);
+        
+        let default_per_iter = default_time.as_nanos() / ITERATIONS as u128;
+        let max32_per_iter = max32_time.as_nanos() / ITERATIONS as u128;
+        let inline_per_iter = inline_time.as_nanos() / ITERATIONS as u128;
+        let exhaustive_per_iter = exhaustive_time.as_nanos() / ITERATIONS as u128;
+        
+        println!("Per iteration (nanoseconds):");
+        println!("  Default: {} ns", default_per_iter);
+        println!("  Max 32: {} ns", max32_per_iter);
+        println!("  Inline: {} ns", inline_per_iter);
+        println!("  Exhaustive: {} ns", exhaustive_per_iter);
+        
+        println!("Efficiency (hashes per nanosecond * 1000):");
+        println!("  Default: {:.1}", 1.0 / default_per_iter as f64 * 1000.0);
+        println!("  Max 32: {:.1}", count_max32 as f64 / max32_per_iter as f64 * 1000.0);
+        println!("  Inline: {:.1}", count_inline as f64 / inline_per_iter as f64 * 1000.0);
+        println!("  Exhaustive: {:.1}", count_exhaustive as f64 / exhaustive_per_iter as f64 * 1000.0);
+        
+        println!("Max combinations possible: {} (2^5 = 32)", 2_u32.pow(5));
+        println!("Actual max combinations achieved: {}", count_max32);
     }
 
+    #[test]
+    fn test_feature_distribution_analysis() {
+        use crate::controller::io::read_structure_from_path;
+        use crate::structure::core::CompactStructure;
+        use crate::controller::feature::get_single_feature;
+        use crate::utils::combination::CombinationIterator;
+        use crate::geometry::core::HashType;
+        
+        println!("=== PDBTrRosetta Feature Distribution Analysis ===");
+        
+        // Try to load test structures
+        let test_structures = vec![
+            "data/AF-P17538-F1-model_v4.pdb",
+            "analysis/AF-P76176-F1-model_v4.pdb", 
+            "analysis/AF-O15391-F1-model_v4.pdb",
+            "analysis/1ntc.pdb",
+            "analysis/3jb9.pdb",
+        ];
+        
+        let mut all_features = Vec::new();
+        let mut structures_analyzed = 0;
+        
+        for structure_path in &test_structures {
+            if let Some(structure) = read_structure_from_path(structure_path) {
+                println!("\nAnalyzing structure: {}", structure_path);
+                let compact_structure = CompactStructure::build(&structure);
+                let hash_type = HashType::PDBTrRosetta;
+                let dist_cutoff = 20.0;
+                
+                let res_bound = CombinationIterator::new(compact_structure.num_residues);
+                let mut feature = vec![0.0; 9];
+                let mut structure_features = Vec::new();
+                
+                res_bound.for_each(|(i, j)| {
+                    if i == j { return; }
+                    
+                    let has_feature = get_single_feature(i, j, &compact_structure, hash_type, dist_cutoff, &mut feature);
+                    if has_feature {
+                        // Store the geometric features (skip amino acid indices)
+                        structure_features.push(vec![
+                            feature[2], // CA distance
+                            feature[3], // CB distance  
+                            feature[4], // CA-CB angle
+                            feature[5], // Phi1 torsion
+                            feature[6], // Phi2 torsion
+                        ]);
+                    }
+                });
+                
+                println!("  Extracted {} feature pairs", structure_features.len());
+                all_features.extend(structure_features);
+                structures_analyzed += 1;
+                
+                if structures_analyzed >= 3 { break; } // Limit to avoid too much output
+            }
+        }
+        
+        if all_features.is_empty() {
+            println!("No structures found for analysis. Skipping distribution test.");
+            return;
+        }
+        
+        println!("\n=== Distribution Analysis Results ===");
+        println!("Total features analyzed: {} from {} structures", all_features.len(), structures_analyzed);
+        
+        // Analyze each feature dimension
+        let feature_names = vec!["CA Distance", "CB Distance", "CA-CB Angle", "Phi1 Torsion", "Phi2 Torsion"];
+        
+        for (dim, name) in feature_names.iter().enumerate() {
+            let mut values: Vec<f32> = all_features.iter().map(|f| f[dim]).collect();
+            values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            
+            let min_val = values[0];
+            let max_val = values[values.len() - 1];
+            let mean = values.iter().sum::<f32>() / values.len() as f32;
+            let median = values[values.len() / 2];
+            
+            // Calculate standard deviation
+            let variance = values.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / values.len() as f32;
+            let std_dev = variance.sqrt();
+            
+            // Calculate quantiles
+            let q25 = values[values.len() / 4];
+            let q75 = values[values.len() * 3 / 4];
+            
+            println!("\n{} Distribution:", name);
+            println!("  Range: [{:.3}, {:.3}]", min_val, max_val);
+            println!("  Mean: {:.3} ± {:.3}", mean, std_dev);
+            println!("  Median: {:.3}", median);
+            println!("  Quartiles: Q25={:.3}, Q75={:.3}", q25, q75);
+            
+            // For angles, also show in degrees
+            if dim >= 2 {
+                println!("  Range (degrees): [{:.1}°, {:.1}°]", min_val.to_degrees(), max_val.to_degrees());
+                println!("  Mean (degrees): {:.1}° ± {:.1}°", mean.to_degrees(), std_dev.to_degrees());
+            }
+            
+            // Analyze current binning effectiveness
+            let current_nbin = if dim < 2 { PDBTR_NBIN_DIST as usize } else { PDBTR_NBIN_SIN_COS as usize };
+            println!("  Current bins: {}", current_nbin);
+            
+            if dim < 2 {
+                // Distance binning analysis
+                let bin_width = (MAX_DIST - MIN_DIST) / current_nbin as f32;
+                println!("  Current bin width: {:.3} Å", bin_width);
+                
+                // Show how many features fall in each bin
+                let mut bin_counts = vec![0; current_nbin];
+                for &val in &values {
+                    let bin = ((val - MIN_DIST) / bin_width).min((current_nbin - 1) as f32) as usize;
+                    bin_counts[bin] += 1;
+                }
+                
+                println!("  Bin occupancy (showing non-empty bins):");
+                for (i, &count) in bin_counts.iter().enumerate() {
+                    if count > 0 {
+                        let bin_start = MIN_DIST + i as f32 * bin_width;
+                        let bin_end = bin_start + bin_width;
+                        println!("    Bin {}: [{:.1}, {:.1}] -> {} features ({:.1}%)", 
+                                i, bin_start, bin_end, count, 
+                                100.0 * count as f32 / values.len() as f32);
+                    }
+                }
+            } else {
+                // Angle binning analysis (sin/cos representation)
+                let sin_values: Vec<f32> = values.iter().map(|x| x.sin()).collect();
+                let cos_values: Vec<f32> = values.iter().map(|x| x.cos()).collect();
+                
+                let bin_width = (MAX_SIN_COS - MIN_SIN_COS) / current_nbin as f32;
+                println!("  Current sin/cos bin width: {:.3}", bin_width);
+                
+                // Analyze sin values
+                let mut sin_bin_counts = vec![0; current_nbin];
+                for &val in &sin_values {
+                    let bin = ((val - MIN_SIN_COS) / bin_width).min((current_nbin - 1) as f32) as usize;
+                    sin_bin_counts[bin] += 1;
+                }
+                
+                // Analyze cos values
+                let mut cos_bin_counts = vec![0; current_nbin];
+                for &val in &cos_values {
+                    let bin = ((val - MIN_SIN_COS) / bin_width).min((current_nbin - 1) as f32) as usize;
+                    cos_bin_counts[bin] += 1;
+                }
+                
+                println!("  Sin value bin occupancy:");
+                for (i, &count) in sin_bin_counts.iter().enumerate() {
+                    if count > 0 {
+                        let bin_start = MIN_SIN_COS + i as f32 * bin_width;
+                        let bin_end = bin_start + bin_width;
+                        println!("    Sin Bin {}: [{:.2}, {:.2}] -> {} features ({:.1}%)", 
+                                i, bin_start, bin_end, count, 
+                                100.0 * count as f32 / values.len() as f32);
+                    }
+                }
+                
+                println!("  Cos value bin occupancy:");
+                for (i, &count) in cos_bin_counts.iter().enumerate() {
+                    if count > 0 {
+                        let bin_start = MIN_SIN_COS + i as f32 * bin_width;
+                        let bin_end = bin_start + bin_width;
+                        println!("    Cos Bin {}: [{:.2}, {:.2}] -> {} features ({:.1}%)", 
+                                i, bin_start, bin_end, count, 
+                                100.0 * count as f32 / values.len() as f32);
+                    }
+                }
+            }
+        }
+        
+        // Analyze feature correlations
+        println!("\n=== Feature Correlation Analysis ===");
+        for i in 0..5 {
+            for j in (i+1)..5 {
+                let values_i: Vec<f32> = all_features.iter().map(|f| f[i]).collect();
+                let values_j: Vec<f32> = all_features.iter().map(|f| f[j]).collect();
+                
+                let correlation = calculate_correlation(&values_i, &values_j);
+                if correlation.abs() > 0.1 {
+                    println!("  {} vs {}: correlation = {:.3}", 
+                            feature_names[i], feature_names[j], correlation);
+                }
+            }
+        }
+        
+        // Suggest optimal binning based on distribution
+        println!("\n=== Binning Recommendations ===");
+        
+        // Distance recommendations
+        let ca_distances: Vec<f32> = all_features.iter().map(|f| f[0]).collect();
+        let cb_distances: Vec<f32> = all_features.iter().map(|f| f[1]).collect();
+        
+        println!("Distance Binning Suggestions:");
+        suggest_distance_binning(&ca_distances, "CA Distance");
+        suggest_distance_binning(&cb_distances, "CB Distance");
+        
+        // Angle recommendations  
+        let angles = vec![
+            ("CA-CB Angle", 2),
+            ("Phi1 Torsion", 3), 
+            ("Phi2 Torsion", 4),
+        ];
+        
+        println!("\nAngle Binning Suggestions:");
+        for (name, dim) in angles {
+            let angle_values: Vec<f32> = all_features.iter().map(|f| f[dim]).collect();
+            suggest_angle_binning(&angle_values, name);
+        }
+    }
+    
+    // Helper function to calculate Pearson correlation
+    fn calculate_correlation(x: &[f32], y: &[f32]) -> f32 {
+        let n = x.len() as f32;
+        let mean_x = x.iter().sum::<f32>() / n;
+        let mean_y = y.iter().sum::<f32>() / n;
+        
+        let numerator: f32 = x.iter().zip(y.iter())
+            .map(|(xi, yi)| (xi - mean_x) * (yi - mean_y))
+            .sum();
+            
+        let sum_sq_x: f32 = x.iter().map(|xi| (xi - mean_x).powi(2)).sum();
+        let sum_sq_y: f32 = y.iter().map(|yi| (yi - mean_y).powi(2)).sum();
+        
+        if sum_sq_x == 0.0 || sum_sq_y == 0.0 {
+            0.0
+        } else {
+            numerator / (sum_sq_x * sum_sq_y).sqrt()
+        }
+    }
+    
+    // Suggest optimal distance binning
+    fn suggest_distance_binning(values: &[f32], name: &str) {
+        let mut sorted_values = values.to_vec();
+        sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let min_val = sorted_values[0];
+        let max_val = sorted_values[sorted_values.len() - 1];
+        let range = max_val - min_val;
+        
+        println!("  {} ({:.1} - {:.1} Å, range: {:.1} Å):", name, min_val, max_val, range);
+        
+        // Current uniform binning
+        let current_bin_width = (MAX_DIST - MIN_DIST) / NBIN_DIST as f32;
+        let effective_bins = (range / current_bin_width).ceil() as usize;
+        println!("    Current uniform: {:.2} Å bins, ~{} effective bins", current_bin_width, effective_bins);
+        
+        // Suggest protein-aware boundaries for different ranges
+        if name.contains("CA") {
+            println!("    Protein-aware suggestion: [3.8, 4.5, 6.0, 8.0, 10.0, 12.0, 15.0, 18.0] (secondary structure based)");
+        } else {
+            println!("    Protein-aware suggestion: [3.5, 4.2, 5.0, 6.5, 8.0, 10.0, 12.0, 15.0] (side chain packing based)");
+        }
+        
+        // Quantile-based suggestion
+        print!("    Quantile-based suggestion: [");
+        let nbin_dist_int = PDBTR_NBIN_DIST as usize;
+        for i in 0..=nbin_dist_int {
+            let quantile = i as f32 / nbin_dist_int as f32;
+            let index = (quantile * (sorted_values.len() - 1) as f32) as usize;
+            print!("{:.1}", sorted_values[index]);
+            if i < nbin_dist_int { print!(", "); }
+        }
+        println!("]");
+    }
+    
+    // Suggest optimal angle binning  
+    fn suggest_angle_binning(values: &[f32], name: &str) {
+        let mut sorted_values = values.to_vec();
+        sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let min_val = sorted_values[0];
+        let max_val = sorted_values[sorted_values.len() - 1];
+        
+        println!("  {} ({:.1}° - {:.1}°):", name, min_val.to_degrees(), max_val.to_degrees());
+        
+        // Analyze sin/cos distributions
+        let sin_values: Vec<f32> = values.iter().map(|x| x.sin()).collect();
+        let cos_values: Vec<f32> = values.iter().map(|x| x.cos()).collect();
+        
+        let sin_range = sin_values.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap() - 
+                       sin_values.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let cos_range = cos_values.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap() - 
+                       cos_values.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        
+        println!("    Sin range: {:.2}, Cos range: {:.2}", sin_range, cos_range);
+        
+        // Current binning
+        let current_sin_cos_bin_width = (MAX_SIN_COS - MIN_SIN_COS) / PDBTR_NBIN_SIN_COS as f32;
+        println!("    Current sin/cos bin width: {:.2}", current_sin_cos_bin_width);
+        
+        // Suggest Ramachandran-aware binning for torsion angles
+        if name.contains("Phi") {
+            println!("    Ramachandran-aware suggestion: [-162°, -126°, -54°, -12°, 12°, 54°, 126°, 162°]");
+        } else {
+            println!("    Uniform angle suggestion: 45° intervals");
+        }
+    }
 }

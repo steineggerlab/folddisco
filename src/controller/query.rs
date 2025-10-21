@@ -3,8 +3,8 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-use std::collections::HashMap;
-
+// use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::utils::convert::{is_aa_group_char, map_one_letter_to_u8_vec};
 use crate::utils::combination::CombinationIterator;
@@ -170,8 +170,8 @@ pub fn make_query_map(
 
     let (compact, _) = read_compact_structure(path).expect("Failed to read compact structure");
     
-    let mut hash_collection = HashMap::new();
-    let mut observed_distance_map: HashMap<(u8, u8), Vec<(f32, usize)>> = HashMap::new();
+    let mut hash_collection = HashMap::default();
+    let mut observed_distance_map: HashMap<(u8, u8), Vec<(f32, usize)>> = HashMap::default();
     
     // Convert residue indices to vector indices
     let mut indices = Vec::new();
@@ -188,7 +188,7 @@ pub fn make_query_map(
         }
     }
 
-    let mut substitution_map: HashMap<usize, Vec<u8>> = HashMap::new();
+    let mut substitution_map: HashMap<usize, Vec<u8>> = HashMap::default();
     
     for (i, (chain, ri)) in query_residues.iter().enumerate() {
         let index = if serial_query { Some(*ri as usize) } else { compact.get_index(&chain, &ri) };

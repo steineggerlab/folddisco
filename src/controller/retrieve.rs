@@ -1,5 +1,8 @@
 // 
-use std::collections::{BTreeSet, HashMap, HashSet};
+// use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::BTreeSet;
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+
 use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -20,7 +23,7 @@ const PREFILTER_AA_SKIPPING_SIZE: usize = 200; // If query vector is larger than
 const RESIDUE_RESCUE_COUNT_CUTOFF: usize = 2; 
 
 pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)> {
-    let mut output: HashSet<(u32, u32)> = HashSet::new();
+    let mut output: HashSet<(u32, u32)> = HashSet::default();
     let mut feature = vec![0.0; 9];
     for hash in hash_vec {
         hash.reverse_hash_default(&mut feature);
@@ -185,7 +188,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
     );
     
     let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
-        HashMap::new(), |mut map, (qi, pair)| {
+        HashMap::default(), |mut map, (qi, pair)| {
             map.entry(qi).or_insert_with(Vec::new).push(pair);
             map
         }
@@ -225,12 +228,13 @@ pub fn retrieval_wrapper_for_foldcompdb(
 
         let mut query_indices_scanned: Vec<usize> = Vec::with_capacity(all_query_indices.len());
         let mut retrieved_indices_scanned: Vec<usize> = Vec::with_capacity(retrieved_indices.len());
-        let mut retrieved_indices_scanned_set: HashSet<usize> = HashSet::with_capacity(retrieved_indices.len());
-
+        // let mut retrieved_indices_scanned_set: HashSet<usize> = HashSet::with_capacity(retrieved_indices.len());
+        let mut retrieved_indices_scanned_set: HashSet<usize> = HashSet::default();
+        
         // Sort component to match retrieved indices
         let mut res_vec: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
         let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
-        let mut count_map: HashMap<usize, usize> = HashMap::new();
+        let mut count_map: HashMap<usize, usize> = HashMap::default();
         let mut pairs_vec: Vec<(usize, usize)> = Vec::new();
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
@@ -377,7 +381,7 @@ pub fn retrieval_wrapper(
     );
 
     let candidate_pair_map: HashMap<usize, Vec<(usize, usize)>> = candidate_pairs.into_iter().fold(
-        HashMap::new(), |mut map, (qi, pair)| {
+        HashMap::default(), |mut map, (qi, pair)| {
             map.entry(qi).or_insert_with(Vec::new).push(pair);
             map
         }
@@ -387,7 +391,7 @@ pub fn retrieval_wrapper(
     // NOTE: Naive implementation to find matching components. Need to be improved to handle partial matches
     let graph = create_index_graph(&indices_found);
     let connected = connected_components_with_given_node_count(&graph, node_count);
-    
+
     // Parallel
 // Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>
     let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, 
@@ -418,12 +422,13 @@ pub fn retrieval_wrapper(
 
         let mut query_indices_scanned: Vec<usize> = Vec::with_capacity(all_query_indices.len());
         let mut retrieved_indices_scanned: Vec<usize> = Vec::with_capacity(all_query_indices.len());
-        let mut retrieved_indices_scanned_set: HashSet<usize> = HashSet::with_capacity(all_query_indices.len());
+        let mut retrieved_indices_scanned_set: HashSet<usize> = HashSet::default();
+        retrieved_indices_scanned_set.reserve(all_query_indices.len());
 
         // Sort component to match retrieved indices
         let mut res_vec: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
         let mut res_vec_from_hash: Vec<ResidueMatch> = Vec::with_capacity(all_query_indices.len());
-        let mut count_map: HashMap<usize, usize> = HashMap::new();
+        let mut count_map: HashMap<usize, usize> = HashMap::default();
 
         all_query_indices.iter().for_each(|&i| {
             // If i is in query_indices, get the corresponding retrieved index
@@ -458,7 +463,7 @@ pub fn retrieval_wrapper(
                     let mut max_count = 0usize;
                     for (j, k) in pairs {
                         // Use HashSet for O(1) lookup instead of O(n) vector contains
-                        if retrieved_indices_set.contains(&k) {
+                        if retrieved_indices_set.contains(k) {
                             *count_map.entry(*j).or_insert(0) += 1;
                             // Track maximum count for this residue
                             if *count_map.get(j).unwrap() > max_count {
@@ -526,7 +531,7 @@ pub fn retrieval_wrapper(
 }
 
 fn get_hash_symmetry_map(query_set: &HashSet<GeometricHash>) -> HashMap<GeometricHash, bool> {
-    let mut query_symmetry_map = HashMap::with_capacity(query_set.len());
+    let mut query_symmetry_map = HashMap::default();
     query_set.iter().for_each(|hash| {
         let symmetry = hash.is_symmetric();
         query_symmetry_map.insert(hash.clone(), symmetry);
@@ -535,8 +540,8 @@ fn get_hash_symmetry_map(query_set: &HashSet<GeometricHash>) -> HashMap<Geometri
 }
 
 pub fn prefilter_amino_acid(query_set: &HashSet<GeometricHash>, _hash_type: HashType, compact: &CompactStructure) -> (BTreeSet<usize>, BTreeSet<usize>) {
-    let mut observed_aa1: HashSet<u8> = HashSet::with_capacity(20);
-    let mut observed_aa2: HashSet<u8> = HashSet::with_capacity(20);
+    let mut observed_aa1: HashSet<u8> = HashSet::default();
+    let mut observed_aa2: HashSet<u8> = HashSet::default();
     let mut index_vec1 = BTreeSet::new();
     let mut index_vec2 = BTreeSet::new();
     // If query_set is too large, just return empty sets

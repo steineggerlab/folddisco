@@ -2,7 +2,8 @@
 
 use rayon::prelude::*;  // Import rayon for parallel iterators
 
-use std::collections::HashMap;
+// use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 use crate::index::indextable::FolddiscoIndex;
 use crate::prelude::GeometricHash;
@@ -435,7 +436,7 @@ fn build_node_groups(
     sampled_queries: &[GeometricHash],
     query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
 ) -> HashMap<usize, Vec<((usize, usize), GeometricHash)>> {
-    let mut node_groups: HashMap<usize, Vec<((usize, usize), GeometricHash)>> = HashMap::new();
+    let mut node_groups: HashMap<usize, Vec<((usize, usize), GeometricHash)>> = HashMap::default();
 
     for &query in sampled_queries {
         if let Some(((e0, e1), _)) = query_map.get(&query) {

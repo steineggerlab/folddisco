@@ -8,7 +8,7 @@ use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
 
 use crate::cli::config::read_index_config_from_file;
-use crate::utils::benchmark::{compare_target_answer_neutral_set, measure_up_to_k_fp, measure_up_to_k_fp_with_neutral};
+use crate::utils::benchmark::{compare_target_answer_neutral_vec, compare_target_answer_vec, measure_up_to_k_fp_vec, measure_up_to_k_fp_with_neutral_vec};
 
 // usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f tsv
 // usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f default
@@ -24,6 +24,28 @@ use crate::utils::benchmark::{compare_target_answer_neutral_set, measure_up_to_k
 // 0,A49L A143V A77C A103F A136R,A49L A143V A77C A103F A136R,0.002,0,d1iapa_,
 // ,matched_motif,similar_motif_found,RMSD,n_mutations,PDB_ID,header_description
 // 0,A360L A397N A365G A363E A400I A391R A402G A388G A413K,A360L A397N A365G A363E A400I A391R A402G A388G A413K,0.005,0,d6c3ma3,
+
+pub const HELP_BENCHMARK: &str = "\
+usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> [options]
+
+input:
+    -r, --result <FILE>          Path to result file (tsv or csv)
+    -a, --answer <FILE>          Path to answer file (tsv or csv)
+    -i, --index <INDEX_PREFIX>   Path to index prefix
+    -n, --neutral <FILE>         Path to neutral file (tsv or csv) [optional]
+    --input <FILE>               Path to input file containing result and answer file paths [optional]
+    
+options:
+    --fp <int>                   Measure up to k false positives [optional]
+    --afdb-to-uniprot            Parse AFDB IDs to UniProt IDs to match answer IDs
+    --column-result <int>        Column index for result IDs (default: 0)
+    --column-answer <int>        Column index for answer IDs (default: 0)
+    --column-neutral <int>       Column index for neutral IDs (default: 0)
+    --header-result              Whether result file has header (default: false)
+    --header-answer              Whether answer file has header (default: false)
+    --header-neutral             Whether neutral file has header (default: false)
+";
+
 
 pub fn benchmark(env: AppArgs) {
     match env {
@@ -47,6 +69,7 @@ pub fn benchmark(env: AppArgs) {
             if input.is_none() {
                 if result.is_none() || answer.is_none() || index.is_none() {
                     print_log_msg(FAIL, "Result, answer, and index files must be provided");
+                    eprintln!("{}", HELP_BENCHMARK);
                     std::process::exit(1);
                 }
             }
@@ -87,9 +110,9 @@ pub fn benchmark(env: AppArgs) {
             let config_path = format!("{}.type", index_path);
             let format = format.as_str();
             let raw_lookup = load_lookup_from_file(&lookup_path);
-            let raw_lookup = raw_lookup.into_iter().map(|(id, _, _, _, _)| id).collect::<HashSet<_>>();
-            let mut lookup = HashSet::with_capacity(raw_lookup.len());
-            parse_path_set_as_set(&raw_lookup, &mut lookup, afdb_to_uniprot);
+            let raw_lookup = raw_lookup.into_iter().map(|(id, _, _, _, _)| id).collect::<Vec<_>>();
+            let mut lookup = Vec::with_capacity(raw_lookup.len());
+            parse_path_vector_as_vec(&raw_lookup, &mut lookup, afdb_to_uniprot);
             let config = read_index_config_from_file(&config_path);
 
             input_vector.par_iter().for_each(|(result_path, answer_path, neutral)| {
@@ -98,25 +121,24 @@ pub fn benchmark(env: AppArgs) {
                 let mut result = Vec::with_capacity(raw_result.len());
                 parse_path_vector_as_vec(&raw_result, &mut result, afdb_to_uniprot);
 
-                let raw_answer = read_one_column_as_set(&answer_path, column_answer, header_answer);
-                let mut answer = HashSet::with_capacity(raw_answer.len());
-                parse_path_set_as_set(&raw_answer, &mut answer, afdb_to_uniprot);
+                let raw_answer = read_one_column_as_vec(&answer_path, column_answer, header_answer);
+                let mut answer = Vec::with_capacity(raw_answer.len());
+                parse_path_vector_as_vec(&raw_answer, &mut answer, afdb_to_uniprot);
 
-                let result_set = HashSet::from_iter(result.iter().cloned());
                 let metric = if let Some(neutral) = neutral {
-                    let raw_neutral = read_one_column_as_set(neutral, column_neutral, header_neutral);
-                    let mut neutral = HashSet::with_capacity(raw_neutral.len());
-                    parse_path_set_as_set(&raw_neutral, &mut neutral, afdb_to_uniprot);
+                    let raw_neutral = read_one_column_as_vec(&neutral, column_neutral, header_neutral);
+                    let mut neutral = Vec::with_capacity(raw_neutral.len());
+                    parse_path_vector_as_vec(&raw_neutral, &mut neutral, afdb_to_uniprot);
                     if let Some(fp) = fp {
-                        measure_up_to_k_fp_with_neutral(&result, &answer, &neutral, &lookup, fp)
+                        measure_up_to_k_fp_with_neutral_vec(&result, &answer, &neutral, &lookup, fp)
                     } else {
-                        compare_target_answer_neutral_set(&result_set, &answer, &neutral, &lookup)
+                        compare_target_answer_neutral_vec(&result, &answer, &neutral, &lookup)
                     }
                 } else {
                     if let Some(fp) = fp {
-                        measure_up_to_k_fp(&result, &answer, &lookup, fp)
+                        measure_up_to_k_fp_vec(&result, &answer, &lookup, fp)
                     } else {
-                        compare_target_answer_set(&result_set, &answer, &lookup)
+                        compare_target_answer_vec(&result, &answer, &lookup)
                     }
                 };
 
@@ -175,28 +197,10 @@ pub fn benchmark(env: AppArgs) {
 
         }
         _ => {
-            eprintln!("Invalid subcommand");
+            eprintln!("{}", HELP_BENCHMARK);
             std::process::exit(1);
         }
     }
-}
-
-fn read_one_column_as_set(file: &str, col_index: usize, header: bool) -> HashSet<String> {
-    let mut set = HashSet::new();
-    // Check the extencion of the file
-    let sep = get_sep_character_from_filename(file);
-    // Open file and get specific column
-    let file = std::fs::File::open(file).expect(
-        &log_msg(FAIL, &format!("Failed to open tsv file: {}", file))
-    );
-    let reader = std::io::BufReader::new(file);
-    let lines = reader.lines().skip(if header { 1 } else { 0 });
-    for line in lines {
-        let line = line.expect(&log_msg(FAIL, "Failed to read line"));
-        let row = line.split(sep).collect::<Vec<_>>();
-        set.insert(row[col_index].to_string());
-    }
-    set
 }
 
 fn read_one_column_as_vec(file: &str, col_index: usize, header: bool) -> Vec<String> {
@@ -220,6 +224,7 @@ fn read_one_column_as_vec(file: &str, col_index: usize, header: bool) -> Vec<Str
             seen.insert(value);
         }
     }
+
     vec
 }
 
@@ -262,20 +267,6 @@ fn parse_path_vector_as_vec<'a>(path_vector: &'a Vec<String>, parsed_vector: &mu
             }
         } else {
             parsed_vector.push(parse_path(path));
-        }
-    }
-}
-fn parse_path_set_as_set<'a>(path_set: &'a HashSet<String>, parsed_set: &mut HashSet<&'a str>, afdb_to_uniprot: bool) {
-    for path in path_set {
-        if afdb_to_uniprot {
-            let split = parse_path(path).split("-").collect::<Vec<_>>();
-            if split.len() >= 2 {
-                parsed_set.insert(split[1]);
-            } else {
-                parsed_set.insert(parse_path(path));
-            }
-        } else {
-            parsed_set.insert(parse_path(path));
         }
     }
 }

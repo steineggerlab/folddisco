@@ -116,7 +116,7 @@ folddisco query -i <INDEX> -p <QUERY_PDB> [-q <QUERY_RESIDUES> -d <DISTANCE_THRE
 
 **Important parameter:**
 - `-d`: Distance threshold in Å increase sensitivity during the prefilter (default: 0.5)
-- `-a`: Angle threshold in degrees, increase sensitivity during the prefilter (default: 20)
+- `-a`: Angle threshold in degrees, increase sensitivity during the prefilter (default: 5)
 - `--skip-match`: Skips residue matching and RMSD calculation (prefilter only, much faster with same ranking)
 - `--top`: Only report top N hits from the prefilter (controls speed and size of result)
 - `-t`: Threads used for search

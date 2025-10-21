@@ -1,7 +1,7 @@
 # Folddisco
 
 Folddisco is tool for searching discontinuous motifs in protein structures.
-It is designed to handle large-scale protein databases with efficiently, enabling the detection of structural motifs across thousands of proteomes or millions of structures.
+It is designed to handle large-scale protein databases with efficiency, enabling the detection of structural motifs across thousands of proteomes or millions of structures.
 
 ## Publications
 [Kim H, Kim RS, Mirdita M, Steinegger M. Structural motif search across the protein-universe with Folddisco. bioRxiv, doi: 10.1101/2025.07.06.663357  (2025)](https://www.biorxiv.org/content/10.1101/2025.07.06.663357v1)

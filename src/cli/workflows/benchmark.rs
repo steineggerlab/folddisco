@@ -110,25 +110,20 @@ pub fn benchmark(env: AppArgs) {
             let config_path = format!("{}.type", index_path);
             let format = format.as_str();
             let raw_lookup = load_lookup_from_file(&lookup_path);
-            let raw_lookup = raw_lookup.into_iter().map(|(id, _, _, _, _)| id).collect::<Vec<_>>();
-            let mut lookup = Vec::with_capacity(raw_lookup.len());
-            parse_path_vector_as_vec(&raw_lookup, &mut lookup, afdb_to_uniprot);
+            let mut lookup = raw_lookup.into_iter().map(|(id, _, _, _, _)| parse_path(&id, afdb_to_uniprot).to_string()).collect::<Vec<_>>();
+            lookup.sort();
+            lookup.dedup();
             let config = read_index_config_from_file(&config_path);
 
             input_vector.par_iter().for_each(|(result_path, answer_path, neutral)| {
                 // Parse path by id type
-                let raw_result = read_one_column_as_vec(&result_path, column_result, header_result);
-                let mut result = Vec::with_capacity(raw_result.len());
-                parse_path_vector_as_vec(&raw_result, &mut result, afdb_to_uniprot);
+                let result = read_one_column_as_vec(&result_path, column_result, header_result, afdb_to_uniprot);
 
-                let raw_answer = read_one_column_as_vec(&answer_path, column_answer, header_answer);
-                let mut answer = Vec::with_capacity(raw_answer.len());
-                parse_path_vector_as_vec(&raw_answer, &mut answer, afdb_to_uniprot);
+                let answer = read_one_column_as_vec(&answer_path, column_answer, header_answer, afdb_to_uniprot);
 
                 let metric = if let Some(neutral) = neutral {
-                    let raw_neutral = read_one_column_as_vec(&neutral, column_neutral, header_neutral);
-                    let mut neutral = Vec::with_capacity(raw_neutral.len());
-                    parse_path_vector_as_vec(&raw_neutral, &mut neutral, afdb_to_uniprot);
+                    let neutral = read_one_column_as_vec(&neutral, column_neutral, header_neutral, afdb_to_uniprot);
+
                     if let Some(fp) = fp {
                         measure_up_to_k_fp_with_neutral_vec(&result, &answer, &neutral, &lookup, fp)
                     } else {
@@ -203,7 +198,7 @@ pub fn benchmark(env: AppArgs) {
     }
 }
 
-fn read_one_column_as_vec(file: &str, col_index: usize, header: bool) -> Vec<String> {
+fn read_one_column_as_vec(file: &str, col_index: usize, header: bool, afdb_to_uniprot: bool) -> Vec<String> {
     let mut vec = Vec::new();
     let mut seen = HashSet::new();
     let sep = get_sep_character_from_filename(file);
@@ -218,10 +213,11 @@ fn read_one_column_as_vec(file: &str, col_index: usize, header: bool) -> Vec<Str
     for line in lines {
         let line = line.expect(&log_msg(FAIL, "Failed to read line"));
         let row = line.split(sep).collect::<Vec<_>>();
-        let value = row[col_index].to_string();
-        if !seen.contains(&value) {
-            vec.push(value.clone());
-            seen.insert(value);
+        let value = row[col_index];
+        let parsed_value = parse_path(value, afdb_to_uniprot);
+        if !seen.contains(parsed_value) {
+            vec.push(parsed_value.to_string());
+            seen.insert(parsed_value.to_string());
         }
     }
 
@@ -242,9 +238,9 @@ fn get_sep_character_from_filename(file: &str) -> char {
 }
 
 #[inline]
-fn parse_path(path: &str) -> &str {
+fn parse_path(path: &str, afdb_to_uniprot: bool) -> &str {
     let path = path.split('/').last().unwrap();
-    if path.ends_with(".pdb") || path.ends_with(".cif") || path.ends_with(".fcz") || path.ends_with(".ent") {
+    let path = if path.ends_with(".pdb") || path.ends_with(".cif") || path.ends_with(".fcz") || path.ends_with(".ent") {
         // Return slice of string from start to end-4
         &path[..path.len()-4]
     } else if path.ends_with(".pdb.gz") || path.ends_with(".cif.gz") || path.ends_with(".fcz.gz") || path.ends_with(".ent.gz") {
@@ -252,24 +248,19 @@ fn parse_path(path: &str) -> &str {
         &path[..path.len()-7]
     } else {
         path
+    };
+    if afdb_to_uniprot {
+        let split = path.split("-").collect::<Vec<_>>();
+        if split.len() >= 2 {
+            split[1]
+        } else {
+            path
+        }
+    } else {
+        path
     }
 }
 
-fn parse_path_vector_as_vec<'a>(path_vector: &'a Vec<String>, parsed_vector: &mut Vec<&'a str>, afdb_to_uniprot: bool) {
-    // parallel
-    for path in path_vector {
-        if afdb_to_uniprot {
-            let split = parse_path(path).split("-").collect::<Vec<_>>();
-            if split.len() >= 2 {
-                parsed_vector.push(split[1]);
-            } else {
-                parsed_vector.push(parse_path(path));
-            }
-        } else {
-            parsed_vector.push(parse_path(path));
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -282,7 +273,7 @@ mod tests {
             result: Some("data/zinc_folddisco.tsv".to_string()),
             answer: Some("data/zinc_answer.tsv".to_string()),
             neutral: None,
-            index: Some("analysis/h_sapiens/d16a4/index_id".to_string()),
+            index: Some("index/h_sapiens_folddisco".to_string()),
             input: None,
             format: "tsv".to_string(),
             fp: None,

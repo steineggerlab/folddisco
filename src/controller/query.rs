@@ -432,7 +432,7 @@ mod tests {
     
     #[test]
     fn test_add_shifted_hashes() {
-        let mut hash_collection = HashMap::new();
+        let mut hash_collection = HashMap::default();
         let feature = vec![1.0, 2.0, 10.5, 15.2, 0.8, 1.2, 2.1, 0.0, 0.0]; // PDBTrRosetta feature
         let hash_type = HashType::PDBTrRosetta;
         
@@ -444,7 +444,7 @@ mod tests {
         println!("Added {} shifted hash variants", hash_collection.len());
         
         // Test that no hashes are added for other hash types
-        let mut hash_collection_other = HashMap::new();
+        let mut hash_collection_other = HashMap::default();
         add_shifted_hashes(&feature, &mut hash_collection_other, 0, 1, HashType::TrRosetta);
         assert_eq!(hash_collection_other.len(), 0);
     }

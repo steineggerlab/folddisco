@@ -7,6 +7,7 @@ use rayon::slice::ParallelSliceMut;
 use crate::measure_time;
 use crate::prelude::{log_msg, print_log_msg, FAIL, INFO};
 use crate::structure::coordinate::Coordinate;
+use crate::structure::metrics::StructureMetrics;
 
 use super::ResidueMatch;
 
@@ -25,8 +26,8 @@ pub struct StructureResult<'a> {
     pub idf: f32,
     pub nres: usize,
     pub plddt: f32,
-    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with connected components
-    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, // Match with c-alpha distances
+    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, // Match with connected components
+    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, // Match with c-alpha distances
     pub max_matching_node_count: usize,
     pub min_rmsd_with_max_match: f32,
 }
@@ -55,18 +56,18 @@ impl<'a> StructureResult<'a> {
 
     pub fn into_match_query_results(&self, skip_ca_dist: bool) -> Vec<MatchResult> {
         match skip_ca_dist {
-            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates))| {
+            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
                     self.id, i, self.idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
                 )
             }).collect(),
-            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates))| {
+            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
                     self.id, i, self.idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
                 )
             }).collect(),
         }
@@ -94,7 +95,7 @@ impl<'a> fmt::Display for StructureResult<'a> {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
                 // Join with comma
-                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         // Convert u8 to char
                         Some((a, b)) => format!("{}{}", *a as char, b),
@@ -119,7 +120,7 @@ impl<'a> fmt::Debug for StructureResult<'a> {
         } else {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
-                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
@@ -143,7 +144,7 @@ impl<'a> StructureResult<'a> {
         } else {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
-                |(x, y, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
@@ -171,12 +172,14 @@ pub struct MatchResult<'a> {
     pub u_matrix: [[f32; 3]; 3],
     pub t_matrix: [f32; 3],
     pub matching_coordinates: Vec<Coordinate>,
+    pub metrics: StructureMetrics,
 }
 
 impl<'a> MatchResult<'a> {
     pub fn new(
         id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
-        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize
+        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize,
+        metrics: StructureMetrics,
     ) -> Self {
         //
         let node_count = matching_residues.iter().map(|x| {
@@ -196,6 +199,7 @@ impl<'a> MatchResult<'a> {
             u_matrix,
             t_matrix,
             matching_coordinates,
+            metrics,
         }
     }
     
@@ -220,15 +224,15 @@ impl<'a> MatchResult<'a> {
             }).collect::<Vec<String>>().join(",");
             // Return
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}",
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}",
                 self.id, self.node_count, self.idf, self.rmsd,
-                matching_residues, u_string, t_string, matching_coordinates, self.db_key
+                matching_residues, u_string, t_string, matching_coordinates, self.db_key, self.metrics
             )
         } else {
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}", 
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}",
                 self.id, self.node_count, self.idf, self.rmsd,
-                matching_residues, self.db_key
+                matching_residues, self.db_key, self.metrics
             )
         }
     }

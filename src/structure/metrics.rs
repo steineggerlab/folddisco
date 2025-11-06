@@ -33,6 +33,8 @@
 // let rmsd = rmsd_fast(&distances);
 // ```
 
+use core::fmt;
+
 /// Pre-computed distances for efficient metric calculation
 /// 
 /// This struct stores pre-calculated distances to avoid redundant computations
@@ -272,8 +274,8 @@ pub fn rmsd(distances: &PrecomputedDistances) -> f32 {
 
 
 /// Structure similarity metrics calculator
+#[derive(Debug, Clone, Default, PartialEq, Copy)]
 pub struct StructureMetrics {
-    pub precomputed: PrecomputedDistances,
     pub tm_score: f32,
     pub tm_score_strict: f32,
     pub gdt_ts: f32,
@@ -297,12 +299,8 @@ impl StructureMetrics {
     ///
     /// # Returns
     /// StructureMetrics containing all calculated metrics
-    pub fn new(reference_coords: &[[f32; 3]], coords: &[[f32; 3]]) -> Self {
-        
-        let distances = PrecomputedDistances::new(reference_coords, coords);
-        
+    pub fn new() -> Self {      
         Self {
-            precomputed: distances,
             tm_score: 0.0,
             tm_score_strict: 0.0,
             gdt_ts: 0.0,
@@ -313,49 +311,49 @@ impl StructureMetrics {
             rmsd: 0.0,
         }
     }
-    
-    pub fn calculate_tm_score(&self) -> f32 {
-        tm_score(&self.precomputed, None)
+
+    pub fn calculate_tm_score(&self, precomputed: &PrecomputedDistances) -> f32 {
+        tm_score(precomputed, None)
     }
 
-    pub fn calculate_tm_score_strict(&self) -> f32 {
+    pub fn calculate_tm_score_strict(&self, precomputed: &PrecomputedDistances) -> f32 {
         // Using d0 = 0.168 which is used for searching in TM-score source
-        tm_score(&self.precomputed, Some(0.168))
+        tm_score(precomputed, Some(0.168))
     }
 
-    pub fn calculate_gdt_ts(&self) -> f32 {
-        gdt_ts(&self.precomputed)
+    pub fn calculate_gdt_ts(&self, precomputed: &PrecomputedDistances) -> f32 {
+        gdt_ts(precomputed)
     }
 
-    pub fn calculate_gdt_ha(&self) -> f32 {
-        gdt_ha(&self.precomputed)
+    pub fn calculate_gdt_ha(&self, precomputed: &PrecomputedDistances) -> f32 {
+        gdt_ha(precomputed)
     }
     
-    pub fn calculate_gdt_strict(&self) -> f32 {
-        gdt_strict(&self.precomputed)
+    pub fn calculate_gdt_strict(&self, precomputed: &PrecomputedDistances) -> f32 {
+        gdt_strict(precomputed)
     }
 
-    pub fn calculate_chamfer_distance(&self) -> f32 {
-        chamfer_distance(&self.precomputed)
+    pub fn calculate_chamfer_distance(&self, precomputed: &PrecomputedDistances) -> f32 {
+        chamfer_distance(precomputed)
     }
 
-    pub fn calculate_hausdorff_distance(&self) -> f32 {
-        hausdorff_distance(&self.precomputed)
+    pub fn calculate_hausdorff_distance(&self, precomputed: &PrecomputedDistances) -> f32 {
+        hausdorff_distance(precomputed)
     }
-    
-    pub fn calculate_rmsd(&self) -> f32 {
-        rmsd(&self.precomputed)
+
+    pub fn calculate_rmsd(&self, precomputed: &PrecomputedDistances) -> f32 {
+        rmsd(precomputed)
     }
-    
-    pub fn calculate_all(&mut self) {
-        self.tm_score = self.calculate_tm_score();
-        self.tm_score_strict = self.calculate_tm_score_strict();
-        self.gdt_ts = self.calculate_gdt_ts();
-        self.gdt_ha = self.calculate_gdt_ha();
-        self.gdt_strict = self.calculate_gdt_strict();
-        self.chamfer_distance = self.calculate_chamfer_distance();
-        self.hausdorff_distance = self.calculate_hausdorff_distance();
-        self.rmsd = self.calculate_rmsd();
+
+    pub fn calculate_all(&mut self, precomputed: &PrecomputedDistances) {
+        self.tm_score = self.calculate_tm_score(precomputed);
+        self.tm_score_strict = self.calculate_tm_score_strict(precomputed);
+        self.gdt_ts = self.calculate_gdt_ts(precomputed);
+        self.gdt_ha = self.calculate_gdt_ha(precomputed);
+        self.gdt_strict = self.calculate_gdt_strict(precomputed);
+        self.chamfer_distance = self.calculate_chamfer_distance(precomputed);
+        self.hausdorff_distance = self.calculate_hausdorff_distance(precomputed);
+        self.rmsd = self.calculate_rmsd(precomputed);
     }
     
     /// Print metrics in a formatted way
@@ -369,6 +367,24 @@ impl StructureMetrics {
         println!("  RMSD:               {:.4} Å", self.rmsd);
         println!("  Chamfer Distance:   {:.4} Å", self.chamfer_distance);
         println!("  Hausdorff Distance: {:.4} Å", self.hausdorff_distance);
+    }
+}
+
+impl fmt::Display for StructureMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Print all metrics in a tab-separated format with 4 decimal places
+        write!(
+            f,
+            "{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}",
+            self.tm_score,
+            self.tm_score_strict,
+            self.gdt_ts,
+            self.gdt_ha,
+            self.gdt_strict,
+            self.rmsd,
+            self.chamfer_distance,
+            self.hausdorff_distance
+        )
     }
 }
 
@@ -386,9 +402,9 @@ mod tests {
             [0.0, 1.0, 0.0],
             [0.0, 0.0, 1.0],
         ];
-        
-        let mut metrics = StructureMetrics::new(&coords, &coords);
-        metrics.calculate_all();
+        let precomputed = PrecomputedDistances::new(&coords, &coords);
+        let mut metrics = StructureMetrics::new();
+        metrics.calculate_all(&precomputed);
 
         assert!((metrics.tm_score - 1.0).abs() < 1e-6);
         assert!((metrics.tm_score_strict - 1.0).abs() < 1e-6);
@@ -456,10 +472,13 @@ mod tests {
 
         kabsch.set_atoms(&reference_coords, &target_coords);
         kabsch.run();
-    
-        let mut metrics = StructureMetrics::new(&kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap());
-        metrics.calculate_all();
-                
+
+        let precomputed = PrecomputedDistances::new(
+            &kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap()
+        );
+        let mut metrics = StructureMetrics::new();
+        metrics.calculate_all(&precomputed);
+
         metrics.print_in_a_formatted_way();
         
     }
@@ -512,10 +531,13 @@ mod tests {
 
         kabsch.set_atoms(&reference_coords, &target_coords);
         kabsch.run();
-    
-        let mut metrics = StructureMetrics::new(&kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap());
-        metrics.calculate_all();
-                
+
+        let precomputed = PrecomputedDistances::new(
+            &kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap()
+        );
+        let mut metrics = StructureMetrics::new();
+        metrics.calculate_all(&precomputed);
+
         metrics.print_in_a_formatted_way();
         
     }
@@ -572,10 +594,13 @@ mod tests {
         let mut kabsch = LmsQcpSuperimposer::new();
         kabsch.set_atoms(&reference_coords, &target_coords);
         kabsch.run();
-    
-        let mut metrics = StructureMetrics::new(&kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap());
-        metrics.calculate_all();
-                
+
+        let precomputed = PrecomputedDistances::new(
+            &kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap()
+        );
+        let mut metrics = StructureMetrics::new();
+        metrics.calculate_all(&precomputed);
+
         metrics.print_in_a_formatted_way();
         
     }

@@ -7,6 +7,7 @@ use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::structure::lms_qcp::LmsQcpSuperimposer;
+use crate::structure::metrics::{PrecomputedDistances, StructureMetrics};
 use crate::utils::convert::{map_aa_to_u8, map_u8_to_aa}; 
 use crate::prelude::*; 
 use crate::structure::{coordinate::Coordinate, core::CompactStructure, kabsch::KabschSuperimposer}; 
@@ -162,8 +163,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
     ca_distance_cutoff: f32, partial_fit: bool,
     foldcomp_db_reader: &FoldcompDbReader,
-) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
-      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
+) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, 
+      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, usize, f32) {
     let compact = foldcomp_db_reader.read_single_structure_by_id(db_key).expect("Error reading structure from foldcomp db");
     let compact = compact.to_compact();
 
@@ -200,8 +201,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     // Parallel
-    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, 
-                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)> = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics, 
+                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -302,30 +303,30 @@ pub fn retrieval_wrapper_for_foldcompdb(
             }
         });
 
-        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
+        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash) = rmsd_with_calpha_and_rottran(
             query_structure, &compact, &query_indices, &retrieved_indices, partial_fit
         );
         
-        let (rmsd, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
-            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
+        let (rmsd, u_mat, t_mat, ca_coords, metrics) = if res_vec == res_vec_from_hash {
+            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone(), metrics_from_hash.clone())
         } else {
             rmsd_with_calpha_and_rottran(
                 query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned, partial_fit
             )
         };
         
-        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, 
-         res_vec, rmsd, u_mat, t_mat, ca_coords)
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash,
+         res_vec, rmsd, u_mat, t_mat, ca_coords, metrics)
     }).collect();
-    // Split 
-    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
-        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j)| {
-        ((a, b, c, d, e), (f, g, h, i, j))
+    // Split
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>,
+        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j, k, l)| {
+        ((a, b, c, d, e, f), (g, h, i, j, k, l))
     }).unzip();
     // In result, find the maximum matching node count and minimum RMSD with max match
     let mut max_matching_node_count = 0;
     let mut min_rmsd_with_max_match = 0.0;
-    result.iter().for_each(|(res_vec, rmsd, _, _, _)| {
+    result.iter().for_each(|(res_vec, rmsd, _, _, _, _)| {
         // Count number of Some in res_vec
         let count = res_vec.iter().filter(|&x| x.is_some()).count();
         if count > max_matching_node_count {
@@ -354,8 +355,8 @@ pub fn retrieval_wrapper(
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
     ca_distance_cutoff: f32, partial_fit: bool,
-) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
-      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
+) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, 
+      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, usize, f32) {
     // Load structure to retrieve motif
     let compact = read_structure_from_path(&path).expect("Error reading structure from path");
     let compact = compact.to_compact();
@@ -394,8 +395,8 @@ pub fn retrieval_wrapper(
 
     // Parallel
 // Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>
-    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, 
-                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)> = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics, 
+                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -495,29 +496,29 @@ pub fn retrieval_wrapper(
             }
         });
 
-        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
+        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash) = rmsd_with_calpha_and_rottran(
             query_structure, &compact, &query_indices, &retrieved_indices, partial_fit
         );
         
-        let (rmsd, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
-            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
+        let (rmsd, u_mat, t_mat, ca_coords, metrics) = if res_vec == res_vec_from_hash {
+            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone(), metrics_from_hash.clone())
         } else {
             rmsd_with_calpha_and_rottran(
                 query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned, partial_fit
             )
         };
-                
-        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, res_vec, rmsd, u_mat, t_mat, ca_coords)
+
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash, res_vec, rmsd, u_mat, t_mat, ca_coords, metrics)
         }).collect();
     // Split 
-    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
-        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j)| {
-        ((a, b, c, d, e), (f, g, h, i, j))
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, 
+        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j, k, l)| {
+        ((a, b, c, d, e, f), (g, h, i, j, k, l))
     }).unzip();
     // In result, find the maximum matching node count and minimum RMSD with max match
     let mut max_matching_node_count = 0;
     let mut min_rmsd_with_max_match = 0.0;
-    result.iter().for_each(|(res_vec, rmsd, _, _, _)| {
+    result.iter().for_each(|(res_vec, rmsd, _, _, _, _)| {
         // Count number of Some in res_vec
         let count = res_vec.iter().filter(|&x| x.is_some()).count();
         if count > max_matching_node_count {
@@ -715,7 +716,7 @@ pub fn rmsd_for_matched(
 pub fn rmsd_with_calpha_and_rottran(
     compact1: &CompactStructure, compact2: &CompactStructure, 
     index1: &Vec<usize>, index2: &Vec<usize>, lms: bool
-) -> (f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>) {
+) -> (f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics) {
 
     let coord_vec1: Vec<Coordinate> = index1.iter().map(
         |&i| (compact1.ca_vector.get_coord(i).unwrap(), compact1.cb_vector.get_coord(i).unwrap())
@@ -735,19 +736,59 @@ pub fn rmsd_with_calpha_and_rottran(
                 let mut superposer = KabschSuperimposer::new();
                 superposer.set_atoms(&coord_vec1, &coord_vec2);
                 superposer.run();
-                (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+
+                // Calculate target metrics
+                let target_metrics = match (&superposer.reference_coords, &superposer.transformed_coords) {
+                    (Some(ref_coords), Some(trans_coords)) => {
+                        let precomputed_distances = PrecomputedDistances::new(
+                            &ref_coords, &trans_coords
+                        );
+                        let mut metrics = StructureMetrics::new();
+                        metrics.calculate_all(&precomputed_distances);
+                        metrics
+                    },
+                    _ => StructureMetrics::new(),
+                };
+
+                (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha, target_metrics)
             } else {
                 let mut superposer = LmsQcpSuperimposer::new();
                 superposer.set_atoms(&coord_vec1, &coord_vec2);
                 superposer.run();
-                (superposer.get_rms_inliers(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+                
+                // Calculate target metrics
+                let target_metrics = match (&superposer.reference_coords, &superposer.transformed_coords) {
+                    (Some(ref_coords), Some(trans_coords)) => {
+                        let precomputed_distances = PrecomputedDistances::new(
+                            &ref_coords, &trans_coords
+                        );
+                        let mut metrics = StructureMetrics::new();
+                        metrics.calculate_all(&precomputed_distances);
+                        metrics
+                    },
+                    _ => StructureMetrics::new(),
+                };
+                
+                (superposer.get_rms_inliers(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha, target_metrics)
             }
         }
         false => {
             let mut superposer = KabschSuperimposer::new();
             superposer.set_atoms(&coord_vec1, &coord_vec2);
             superposer.run();
-            (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+            // Calculate target metrics
+            let target_metrics = match (&superposer.reference_coords, &superposer.transformed_coords) {
+                (Some(ref_coords), Some(trans_coords)) => {
+                    let precomputed_distances = PrecomputedDistances::new(
+                        &ref_coords, &trans_coords
+                    );
+                    let mut metrics = StructureMetrics::new();
+                    metrics.calculate_all(&precomputed_distances);
+                    metrics
+                },
+                _ => StructureMetrics::new(),
+            };
+            (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha, target_metrics)
         }
     }
 }

@@ -81,7 +81,7 @@ pub fn get_single_feature(
                 return false;
             }
         },
-        HashType::PDBTrRosetta => {
+        HashType::PDBTrRosetta | HashType::FolddiscoAngle | HashType::FolddiscoDist => {
             let feature = structure.get_pdb_tr_feature(i, j, dist_cutoff);
             if feature.is_some() {
                 let feature = feature.unwrap();

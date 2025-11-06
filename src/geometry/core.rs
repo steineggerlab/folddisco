@@ -15,6 +15,8 @@ pub enum HashType {
     PointPairFeature,
     TertiaryInteraction,
     Hybrid,
+    FolddiscoAngle,
+    FolddiscoDist,
     // append new hash type here
     Other,
 }
@@ -30,6 +32,8 @@ impl HashType {
             4 => HashType::PointPairFeature,
             5 => HashType::TertiaryInteraction,
             6 => HashType::Hybrid,
+            7 => HashType::FolddiscoAngle,
+            8 => HashType::FolddiscoDist,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -44,6 +48,8 @@ impl HashType {
             "4" | "PointPairFeature" | "ppf" => HashType::PointPairFeature,
             "5" | "TertiaryInteraction" | "tertiary" | "3di" => HashType::TertiaryInteraction,
             "6" | "Hybrid" | "hybrid" => HashType::Hybrid,
+            "7" | "FolddiscoAngle"| "angle" | "folddisco_angle" => HashType::FolddiscoAngle,
+            "8" | "FolddiscoDist" | "distance" | "dist" | "folddisco_dist" => HashType::FolddiscoDist,
             // append new hash type here
             _ => HashType::Other,
         }
@@ -58,6 +64,8 @@ impl HashType {
             HashType::PointPairFeature => "PointPairFeature".to_string(),
             HashType::TertiaryInteraction => "TertiaryInteraction".to_string(),
             HashType::Hybrid => "Hybrid".to_string(),
+            HashType::FolddiscoAngle => "FolddiscoAngle".to_string(),
+            HashType::FolddiscoDist => "FolddiscoDist".to_string(),
             // append new hash type here
             HashType::Other => "Other".to_string(),
         }
@@ -77,6 +85,8 @@ impl HashType {
             HashType::PointPairFeature => 32usize,
             HashType::TertiaryInteraction => 29usize,
             HashType::Hybrid => 32usize,
+            HashType::FolddiscoAngle => 32usize,
+            HashType::FolddiscoDist => 32usize,
             // append new hash type here
             HashType::Other => 32usize,
         }
@@ -101,6 +111,8 @@ impl HashType {
                 "PointPairFeature" => HashType::PointPairFeature,
                 "TertiaryInteraction" => HashType::TertiaryInteraction,
                 "Hybrid" => HashType::Hybrid,
+                "FolddiscoAngle" => HashType::FolddiscoAngle,
+                "FolddiscoDist" => HashType::FolddiscoDist,
                 // append new hash type here
                 _ => HashType::Other,
             };
@@ -123,6 +135,8 @@ mod tests {
             HashType::PointPairFeature,
             HashType::TertiaryInteraction,
             HashType::Hybrid,
+            HashType::FolddiscoAngle,
+            HashType::FolddiscoDist,
             // append new hash type here
         ];
         for hash_type in hash_type_vec {
@@ -142,6 +156,8 @@ pub enum GeometricHash {
     PointPairFeature(super::ppf::HashValue),
     TertiaryInteraction(super::tertiary_interaction::HashValue),
     Hybrid(super::hybrid::HashValue),
+    FolddiscoAngle(super::folddisco_angle::HashValue),
+    FolddiscoDist(super::folddisco_dist::HashValue),
     // append new hash type here
 }
 
@@ -157,6 +173,8 @@ impl GeometricHash {
             HashType::PointPairFeature => super::ppf::HashValue::perfect_hash_default(feature),
             HashType::TertiaryInteraction => super::tertiary_interaction::HashValue::perfect_hash_default(feature),
             HashType::Hybrid => super::hybrid::HashValue::perfect_hash_default(feature),
+            HashType::FolddiscoAngle => super::folddisco_angle::HashValue::perfect_hash_default(feature),
+            HashType::FolddiscoDist => super::folddisco_dist::HashValue::perfect_hash_default(feature),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -185,6 +203,12 @@ impl GeometricHash {
                 feature, nbin_dist, nbin_angle
             ),
             HashType::Hybrid => super::hybrid::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            HashType::FolddiscoAngle => super::folddisco_angle::HashValue::perfect_hash(
+                feature, nbin_dist, nbin_angle
+            ),
+            HashType::FolddiscoDist => super::folddisco_dist::HashValue::perfect_hash(
                 feature, nbin_dist, nbin_angle
             ),
             // append new hash type here
@@ -238,6 +262,16 @@ impl GeometricHash {
                     super::hybrid::HashValue::perfect_hash_default(feature)
                 )
             ),
+            HashType::FolddiscoAngle => GeometricHash::FolddiscoAngle(
+                super::folddisco_angle::HashValue(
+                    super::folddisco_angle::HashValue::perfect_hash_default(feature)
+                )
+            ),
+            HashType::FolddiscoDist => GeometricHash::FolddiscoDist(
+                super::folddisco_dist::HashValue(
+                    super::folddisco_dist::HashValue::perfect_hash_default(feature)
+                )
+            ),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -280,6 +314,16 @@ impl GeometricHash {
             HashType::Hybrid => GeometricHash::Hybrid(
                 super::hybrid::HashValue(
                     super::hybrid::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
+            HashType::FolddiscoAngle => GeometricHash::FolddiscoAngle(
+                super::folddisco_angle::HashValue(
+                    super::folddisco_angle::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
+                )
+            ),
+            HashType::FolddiscoDist => GeometricHash::FolddiscoDist(
+                super::folddisco_dist::HashValue(
+                    super::folddisco_dist::HashValue::perfect_hash(feature, nbin_dist, nbin_angle)
                 )
             ),
             // append new hash type here
@@ -326,6 +370,18 @@ impl GeometricHash {
                 }
             },
             GeometricHash::Hybrid(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::FolddiscoAngle(hash) => {
+                let reversed = hash.reverse_hash_default();
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::FolddiscoDist(hash) => {
                 let reversed = hash.reverse_hash_default();
                 for i in 0..reversed.len() {
                     output[i] = reversed[i];
@@ -381,6 +437,18 @@ impl GeometricHash {
                     output[i] = reversed[i];
                 }
             },
+            GeometricHash::FolddiscoAngle(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
+            GeometricHash::FolddiscoDist(hash) => {
+                let reversed = hash.reverse_hash(nbin_dist, nbin_angle);
+                for i in 0..reversed.len() {
+                    output[i] = reversed[i];
+                }
+            },
             // append new hash type here
             // _ => panic!("Invalid hash type"),
         }
@@ -396,6 +464,8 @@ impl GeometricHash {
             GeometricHash::PDBTrRosetta(hash) => hash.hash_type(),
             GeometricHash::TertiaryInteraction(hash) => hash.hash_type(),
             GeometricHash::Hybrid(hash) => hash.hash_type(),
+            GeometricHash::FolddiscoAngle(hash) => hash.hash_type(),
+            GeometricHash::FolddiscoDist(hash) => hash.hash_type(),
             // append new hash type here
             // _ => panic!("Invalid hash type"),
         }
@@ -425,6 +495,12 @@ impl GeometricHash {
             HashType::Hybrid => GeometricHash::Hybrid(
                 super::hybrid::HashValue::from_u32(hashvalue)
             ),
+            HashType::FolddiscoAngle => GeometricHash::FolddiscoAngle(
+                super::folddisco_angle::HashValue::from_u32(hashvalue)
+            ),
+            HashType::FolddiscoDist => GeometricHash::FolddiscoDist(
+                super::folddisco_dist::HashValue::from_u32(hashvalue)
+            ),
             // append new hash type here if it is encoded as u32
             _ => panic!("Invalid hash type"),
         }
@@ -453,6 +529,12 @@ impl GeometricHash {
             HashType::Hybrid => GeometricHash::Hybrid(
                 super::hybrid::HashValue::from_u64(hashvalue)
             ),
+            HashType::FolddiscoAngle => GeometricHash::FolddiscoAngle(
+                super::folddisco_angle::HashValue::from_u64(hashvalue)
+            ),
+            HashType::FolddiscoDist => GeometricHash::FolddiscoDist(
+                super::folddisco_dist::HashValue::from_u64(hashvalue)
+            ),
             // append new hash type here
             _ => panic!("Invalid hash type"),
         }
@@ -467,6 +549,8 @@ impl GeometricHash {
             GeometricHash::PointPairFeature(hash) => hash.as_u32(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u32(),
             GeometricHash::Hybrid(hash) => hash.as_u32(),
+            GeometricHash::FolddiscoAngle(hash) => hash.as_u32(),
+            GeometricHash::FolddiscoDist(hash) => hash.as_u32(),
             // append new hash type here
         }
     }
@@ -479,6 +563,8 @@ impl GeometricHash {
             GeometricHash::PointPairFeature(hash) => hash.as_u64(),
             GeometricHash::TertiaryInteraction(hash) => hash.as_u64(),
             GeometricHash::Hybrid(hash) => hash.as_u64(),
+            GeometricHash::FolddiscoAngle(hash) => hash.as_u64(),
+            GeometricHash::FolddiscoDist(hash) => hash.as_u64(),
             // append new hash type here
         }
     }
@@ -492,6 +578,8 @@ impl GeometricHash {
             GeometricHash::PointPairFeature(hash) => hash.is_symmetric(),
             GeometricHash::TertiaryInteraction(hash) => hash.is_symmetric(),
             GeometricHash::Hybrid(hash) => hash.is_symmetric(),
+            GeometricHash::FolddiscoAngle(hash) => hash.is_symmetric(),
+            GeometricHash::FolddiscoDist(hash) => hash.is_symmetric(),
             // append new hash type here
         }
     }
@@ -538,6 +626,18 @@ impl GeometricHash {
             _ => panic!("Invalid hash type"),
         }
     }
+    pub fn downcast_folddisco_angle(&self) -> super::folddisco_angle::HashValue {
+        match self {
+            GeometricHash::FolddiscoAngle(hash) => hash.clone(),
+            _ => panic!("Invalid hash type"),
+        }
+    }
+    pub fn downcast_folddisco_dist(&self) -> super::folddisco_dist::HashValue {
+        match self {
+            GeometricHash::FolddiscoDist(hash) => hash.clone(),
+            _ => panic!("Invalid hash type"),
+        }
+    }
     // append the downcast method for new hash type here
 
 }
@@ -566,6 +666,12 @@ impl fmt::Debug for GeometricHash {
             GeometricHash::Hybrid(hash) => {
                 write!(f, "Hybrid({:?})", hash)
             },
+            GeometricHash::FolddiscoAngle(hash) => {
+                write!(f, "FolddiscoAngle({:?})", hash)
+            },
+            GeometricHash::FolddiscoDist(hash) => {
+                write!(f, "FolddiscoDist({:?})", hash)
+            },  
             // append new hash type here
             // _ => panic!("Invalid hash type"),
         }
@@ -595,6 +701,12 @@ impl fmt::Display for GeometricHash {
             },
             GeometricHash::Hybrid(hash) => {
                 write!(f, "Hybrid\t{:?}", hash)
+            },
+            GeometricHash::FolddiscoAngle(hash) => {
+                write!(f, "FolddiscoAngle\t{:?}", hash)
+            },
+            GeometricHash::FolddiscoDist(hash) => {
+                write!(f, "FolddiscoDist\t{:?}", hash)
             },
             // append new hash type here
             // _ => panic!("Invalid hash type"),

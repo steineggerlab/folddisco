@@ -451,8 +451,8 @@ mod tests {
         ];
         println!("Target coords: {:?}", target_coords);
         
-        // let mut kabsch = KabschSuperimposer::new();
-        let mut kabsch = LmsQcpSuperimposer::new();
+        let mut kabsch = KabschSuperimposer::new();
+        // let mut kabsch = LmsQcpSuperimposer::new();
 
         kabsch.set_atoms(&reference_coords, &target_coords);
         kabsch.run();

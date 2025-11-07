@@ -380,7 +380,8 @@ fn sample_query_idmode(
                 }
             }).filter(|(_, hash_count)| *hash_count > 0).collect::<Vec<_>>();
             sampled_queries.sort_by(|a, b| a.1.cmp(&b.1));
-            sampled_queries.truncate((sampling_ratio * sampled_queries.len() as f32).ceil() as usize);
+            let sample_query_size: usize = sampled_queries.len();
+            sampled_queries.truncate(((sampling_ratio * sample_query_size as f32).ceil()) as usize);
             sampled_queries.into_iter().map(|(query, _)| *query).collect()
         },
         (None, Some(sampling_count)) => {
@@ -414,7 +415,8 @@ fn sample_query_bigmode(
                 (query, hash_count)
             }).collect::<Vec<_>>();
             sampled_queries.sort_by(|a, b| a.1.cmp(&b.1));
-            sampled_queries.truncate((sampling_ratio * sampled_queries.len() as f32).ceil() as usize);
+            let sample_query_size: usize = sampled_queries.len();
+            sampled_queries.truncate((sampling_ratio * sample_query_size as f32).ceil() as usize);
             sampled_queries.into_iter().map(|(query, _)| *query).collect()
         },
         (None, Some(sampling_count)) => {

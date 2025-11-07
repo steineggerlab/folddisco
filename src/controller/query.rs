@@ -261,9 +261,10 @@ pub fn make_query_map(
             );
 
             // Add shifted hashes for boundary coverage
-            add_shifted_hashes(
-                &feature, &mut hash_collection, indices[i], indices[j], hash_type
-            );
+            // This is not enabled for now. 
+            // add_shifted_hashes(
+            //     &feature, &mut hash_collection, indices[i], indices[j], hash_type
+            // );
 
             // Apply substitutions
             if let Some(aa_indices) = hash_type.amino_acid_index() {

@@ -9,7 +9,7 @@ use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
 use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 use crate::utils::convert::*;
 
-pub const NBIN_DIST: f32 = 64.0;
+pub const NBIN_DIST: f32 = 32.0;
 pub const MIN_ANGLE_RAD: f32 = -std::f32::consts::PI;
 pub const MAX_ANGLE_RAD: f32 = std::f32::consts::PI;
 pub const NBIN_ANGLE_180: f32 = 8.0;
@@ -57,8 +57,8 @@ impl HashValue {
             feature[6], MIN_ANGLE_RAD, MAX_ANGLE_RAD, nbin_angle
         );
 
-        // Bit map: 9 for residue pairs, 6 for ca_dist, 6 for cb_dist, 3 for ca-cb angle, 4 for phi1, 4 for phi2            
-        let hashvalue = res_pair << 23 | ca_dist << 17 | cb_dist << 11 
+        // Bit map: 9 for residue pairs, 5 for ca_dist, 5 for cb_dist, 3 for ca-cb angle, 4 for phi1, 4 for phi2            
+        let hashvalue = res_pair << 21 | ca_dist << 16 | cb_dist << 11 
             | ca_cb_angle << 8 | phi1 << 4 | phi2;
         hashvalue
     }
@@ -72,15 +72,15 @@ impl HashValue {
     }
     
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 7] {
-        let res_pair = ((self.0 >> 23) & BITMASK32_9BIT) as u32;
+        let res_pair = ((self.0 >> 21) & BITMASK32_9BIT) as u32;
         let (res1, res2) = map_u32_to_aa_u32_pair(res_pair);
 
         let ca_dist = continuize_value(
-            (self.0 >> 17) & BITMASK32_6BIT as u32, 
+            (self.0 >> 16) & BITMASK32_5BIT as u32,
             MIN_DIST, MAX_DIST, nbin_dist as f32
         );
         let cb_dist = continuize_value(
-            (self.0 >> 11) & BITMASK32_6BIT as u32,
+            (self.0 >> 11) & BITMASK32_5BIT as u32,
             MIN_DIST, MAX_DIST, nbin_dist as f32
         );
         let ca_cb_angle = continuize_value(

@@ -14,7 +14,7 @@ pub struct HashValue(pub u32);
 
 pub const NBIN_DIST: f32 = 8.0; // Limited to 8 because 3 bits are assigned
 pub const NBIN_ANGLE_180: f32 = 32.0; // 5 bits
-pub const NBIN_ANGLE_360: f32 = 64.0; // 6 bits
+pub const NBIN_ANGLE_360: f32 = 32.0; // 5 bits
 
 // 
 pub const MIN_ANGLE_RAD: f32 = -std::f32::consts::PI;
@@ -64,9 +64,9 @@ impl HashValue {
             feature[6], MIN_ANGLE_RAD, MAX_ANGLE_RAD, nbin_angle
         );
 
-        // Bit map: 9 for residue pairs, 3 for ca_dist, 3 for cb_dist, 5 for ca-cb angle, 6 for phi1, 6 for phi2        
-        let hashvalue = res_pair << 23 | ca_dist << 20 | cb_dist << 17 
-            | ca_cb_angle << 12 | phi1 << 6 | phi2;
+        // Bit map: 9 for residue pairs, 3 for ca_dist, 3 for cb_dist, 5 for ca-cb angle, 5 for phi1, 5 for phi2        
+        let hashvalue = res_pair << 21 | ca_dist << 18 | cb_dist << 15 
+            | ca_cb_angle << 10 | phi1 << 5 | phi2;
         hashvalue
     }
     
@@ -79,34 +79,34 @@ impl HashValue {
     }
     
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 7] {
-        let res_pair = ((self.0 >> 23) & BITMASK32_9BIT) as u32;
+        let res_pair = ((self.0 >> 21) & BITMASK32_9BIT) as u32;
         let (res1, res2) = map_u32_to_aa_u32_pair(res_pair);
 
         let ca_dist = continuize_value(
-            (self.0 >> 20) & BITMASK32_3BIT as u32, 
+            (self.0 >> 18) & BITMASK32_3BIT as u32, 
             MIN_DIST, MAX_DIST, nbin_dist as f32
         );
         let cb_dist = continuize_value(
-            (self.0 >> 17) & BITMASK32_3BIT as u32,
+            (self.0 >> 15) & BITMASK32_3BIT as u32,
             MIN_DIST, MAX_DIST, nbin_dist as f32
         );
     
         let ca_cb_angle = continuize_value(
-            (self.0 >> 12) & BITMASK32_5BIT as u32,
+            (self.0 >> 10) & BITMASK32_5BIT as u32,
             0.0, MAX_ANGLE_RAD, (nbin_angle as f32).min(NBIN_ANGLE_180)
         );
         let phi1 = continuize_value(
-            (self.0 >> 6) & BITMASK32_6BIT as u32,
+            (self.0 >> 5) & BITMASK32_5BIT as u32,
             MIN_ANGLE_RAD, MAX_ANGLE_RAD, nbin_angle as f32
         );
         let phi2 = continuize_value(
-            self.0 & BITMASK32_6BIT as u32,
+            self.0 & BITMASK32_5BIT as u32,
             MIN_ANGLE_RAD, MAX_ANGLE_RAD, nbin_angle as f32
         );
         let ca_cb_angle = ca_cb_angle.to_degrees();
         let phi1 = phi1.to_degrees();
         let phi2 = phi2.to_degrees();
-        
+
         [res1 as f32, res2 as f32, ca_dist, cb_dist, ca_cb_angle, phi1, phi2]
     }
     

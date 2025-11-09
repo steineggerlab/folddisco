@@ -71,6 +71,14 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             num_res_cutoff: args.value_from_str("--num-residue").unwrap_or(50000),
             plddt_cutoff: args.value_from_str("--plddt").unwrap_or(0.0),
             rmsd_cutoff: args.value_from_str("--rmsd").unwrap_or(0.0),
+            // Structure similarity metric filters
+            tm_score_cutoff: args.value_from_str("--tm-score").unwrap_or(0.0),
+            tm_score_strict_cutoff: args.value_from_str("--tm-score-strict").unwrap_or(0.0),
+            gdt_ts_cutoff: args.value_from_str("--gdt-ts").unwrap_or(0.0),
+            gdt_ha_cutoff: args.value_from_str("--gdt-ha").unwrap_or(0.0),
+            gdt_strict_cutoff: args.value_from_str("--gdt-strict").unwrap_or(0.0),
+            chamfer_distance_cutoff: args.value_from_str("--chamfer").unwrap_or(0.0),
+            hausdorff_distance_cutoff: args.value_from_str("--hausdorff").unwrap_or(0.0),
             top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
             web_mode: args.contains("--web"), // Web mode for output
             // Query filtering

@@ -57,6 +57,14 @@ pub enum AppArgs {
         connected_node_count: usize,
         connected_node_ratio: f32,
         rmsd_cutoff: f32,
+        // Structure similarity metric filters (MatchQueryResult)
+        tm_score_cutoff: f32,
+        tm_score_strict_cutoff: f32,
+        gdt_ts_cutoff: f32,
+        gdt_ha_cutoff: f32,
+        gdt_strict_cutoff: f32,
+        chamfer_distance_cutoff: f32,
+        hausdorff_distance_cutoff: f32,
         // top N filtering
         top_n: usize,
         web_mode: bool,

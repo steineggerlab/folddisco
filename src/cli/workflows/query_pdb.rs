@@ -76,7 +76,15 @@ filtering options:
  --connected-node-ratio <FLOAT>   Filter out structures/matches with connected node count smaller than given ratio [0.0]
  --num-residue <INT>              Number of residues cutoff [50000]
  --plddt <FLOAT>                  pLDDT cutoff [0.0]
- --top <INT>                      Limit output to top N structures [all]
+ --rmsd <FLOAT>                   Maximum RMSD cutoff [no limit]
+ --tm-score <FLOAT>               Minimum TM-score cutoff [0.0]
+ --tm-score-strict <FLOAT>        Minimum TM-score (strict) cutoff. This is a custom TM-score with min d0 as 0.168Å [0.0]
+ --gdt-ts <FLOAT>                 Minimum GDT-TS cutoff. Thresholds: 1.0Å, 2.0Å, 4.0Å, 8.0Å [0.0]
+ --gdt-ha <FLOAT>                 Minimum GDT-HA cutoff. Thresholds: 0.5Å, 1.0Å, 2.0Å, 4.0Å [0.0]
+ --gdt-strict <FLOAT>             Minimum GDT (strict) cutoff. This is a custom GDT score with 0.25Å, 0.5Å, 1.0Å, 2.0Å thresholds [0.0]
+ --chamfer <FLOAT>                Maximum Chamfer distance cutoff. Chamfer distance is mean of nearest neighbor distances between two point clouds [no limit]
+ --hausdorff <FLOAT>              Maximum Hausdorff distance cutoff. Hausdorff distance is maximum of nearest neighbor distances between two point clouds [no limit]
+ --top <INT>                      Limit output to top N structures based on IDF score [all]
 
 display options:
  --header                         Print header in output
@@ -107,14 +115,14 @@ examples:
 # Search with default settings. This will print out matching motifs sorted by node count then RMSD.
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
 
-# Print top 100 structures sorted by TM-score
-folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --sort-by \"node_count,tm_score\"
+# Print matches sorted by node count and TM-score
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --sort-by node_count,tm_score
 
 # Print per-structure results sorted by max node count and IDF score
-folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by \"max_node_count,idf\"
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --per-structure --sort-by max_node_count,idf
 
 # Print per-structure results sorted by IDF only
-folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --per-structure --sort-by \"idf\"
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --per-structure --sort-by idf
 
 # Query file given as separate text file
 folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 5
@@ -157,6 +165,13 @@ pub fn query_pdb(env: AppArgs) {
             num_res_cutoff,
             plddt_cutoff,
             rmsd_cutoff,
+            tm_score_cutoff,
+            tm_score_strict_cutoff,
+            gdt_ts_cutoff,
+            gdt_ha_cutoff,
+            gdt_strict_cutoff,
+            chamfer_distance_cutoff,
+            hausdorff_distance_cutoff,
             top_n,
             web_mode,
             sampling_count,
@@ -621,6 +636,9 @@ pub fn query_pdb(env: AppArgs) {
                 drop(query_residues);
                 let match_filter= MatchFilter::new(
                     connected_node_count, connected_node_ratio, idf_score_cutoff,
+                    tm_score_cutoff, tm_score_strict_cutoff,
+                    gdt_ts_cutoff, gdt_ha_cutoff, gdt_strict_cutoff,
+                    chamfer_distance_cutoff, hausdorff_distance_cutoff,
                     rmsd_cutoff, _residue_count,
                 );
 
@@ -715,6 +733,13 @@ mod tests {
             num_res_cutoff: 3000,
             plddt_cutoff: 0.0,
             rmsd_cutoff: 1.0,
+            tm_score_cutoff: 0.0,
+            tm_score_strict_cutoff: 0.0,
+            gdt_ts_cutoff: 0.0,
+            gdt_ha_cutoff: 0.0,
+            gdt_strict_cutoff: 0.0,
+            chamfer_distance_cutoff: 0.0,
+            hausdorff_distance_cutoff: 0.0,
             top_n: 1000,
             web_mode: false,
             sampling_count: None,
@@ -763,6 +788,13 @@ mod tests {
                 num_res_cutoff: 3000,
                 plddt_cutoff: 0.0,
                 rmsd_cutoff: 1.0,
+                tm_score_cutoff: 0.0,
+                tm_score_strict_cutoff: 0.0,
+                gdt_ts_cutoff: 0.0,
+                gdt_ha_cutoff: 0.0,
+                gdt_strict_cutoff: 0.0,
+                chamfer_distance_cutoff: 0.0,
+                hausdorff_distance_cutoff: 0.0,
                 top_n: 1000,
                 web_mode: false,
                 sampling_count: None,
@@ -812,13 +844,20 @@ mod tests {
             num_res_cutoff: 3000,
             plddt_cutoff: 0.0,
             rmsd_cutoff: 1.0,
+            tm_score_cutoff: 0.0,
+            tm_score_strict_cutoff: 0.0,
+            gdt_ts_cutoff: 0.0,
+            gdt_ha_cutoff: 0.0,
+            gdt_strict_cutoff: 0.0,
+            chamfer_distance_cutoff: 0.0,
+            hausdorff_distance_cutoff: 0.0,
             top_n: 1000,
             web_mode: false,
             sampling_count: None,
             sampling_ratio: None,
             freq_filter: None,
             length_penalty: None,
-            sort_by: String::from("node_count,idf"),
+            sort_by: String::from("node_count,rmsd"),
             output_per_structure: true,
             output_per_match: false,
             output_with_superpose: true,

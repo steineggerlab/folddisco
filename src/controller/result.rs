@@ -7,7 +7,7 @@ use rayon::slice::ParallelSliceMut;
 use crate::measure_time;
 use crate::prelude::{log_msg, print_log_msg, FAIL, INFO};
 use crate::structure::coordinate::Coordinate;
-use crate::structure::metrics::MotifMatchMetrics;
+use crate::structure::metrics::StructureSimilarityMetrics;
 
 use super::ResidueMatch;
 use super::sort::{MatchSortStrategy, StructureSortStrategy};
@@ -27,8 +27,8 @@ pub struct StructureResult<'a> {
     pub idf: f32,
     pub nres: usize,
     pub plddt: f32,
-    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, MotifMatchMetrics)>, // Match with connected components
-    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, MotifMatchMetrics)>, // Match with c-alpha distances
+    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, // Match with connected components
+    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, // Match with c-alpha distances
     pub max_matching_node_count: usize,
     pub min_rmsd_with_max_match: f32,
 }
@@ -173,14 +173,14 @@ pub struct MatchResult<'a> {
     pub u_matrix: [[f32; 3]; 3],
     pub t_matrix: [f32; 3],
     pub matching_coordinates: Vec<Coordinate>,
-    pub metrics: MotifMatchMetrics,
+    pub metrics: StructureSimilarityMetrics,
 }
 
 impl<'a> MatchResult<'a> {
     pub fn new(
         id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
         u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize,
-        metrics: MotifMatchMetrics,
+        metrics: StructureSimilarityMetrics,
     ) -> Self {
         //
         let node_count = matching_residues.iter().map(|x| {

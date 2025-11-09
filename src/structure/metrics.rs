@@ -275,7 +275,7 @@ pub fn rmsd(distances: &PrecomputedDistances) -> f32 {
 
 /// Structure similarity metrics calculator
 #[derive(Debug, Clone, Default, PartialEq, Copy)]
-pub struct MotifMatchMetrics {
+pub struct StructureSimilarityMetrics {
     pub tm_score: f32,
     pub tm_score_strict: f32,
     pub gdt_ts: f32,
@@ -286,7 +286,7 @@ pub struct MotifMatchMetrics {
     pub rmsd: f32,
 }
 
-impl MotifMatchMetrics {
+impl StructureSimilarityMetrics {
     
     /// Calculate all metrics efficiently using precomputed distances
     /// 
@@ -370,7 +370,7 @@ impl MotifMatchMetrics {
     }
 }
 
-impl fmt::Display for MotifMatchMetrics {
+impl fmt::Display for StructureSimilarityMetrics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Print all metrics in a tab-separated format with 4 decimal places
         write!(
@@ -403,7 +403,7 @@ mod tests {
             [0.0, 0.0, 1.0],
         ];
         let precomputed = PrecomputedDistances::new(&coords, &coords);
-        let mut metrics = MotifMatchMetrics::new();
+        let mut metrics = StructureSimilarityMetrics::new();
         metrics.calculate_all(&precomputed);
 
         assert!((metrics.tm_score - 1.0).abs() < 1e-6);
@@ -476,7 +476,7 @@ mod tests {
         let precomputed = PrecomputedDistances::new(
             &kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap()
         );
-        let mut metrics = MotifMatchMetrics::new();
+        let mut metrics = StructureSimilarityMetrics::new();
         metrics.calculate_all(&precomputed);
 
         metrics.print_in_a_formatted_way();
@@ -535,7 +535,7 @@ mod tests {
         let precomputed = PrecomputedDistances::new(
             &kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap()
         );
-        let mut metrics = MotifMatchMetrics::new();
+        let mut metrics = StructureSimilarityMetrics::new();
         metrics.calculate_all(&precomputed);
 
         metrics.print_in_a_formatted_way();
@@ -598,7 +598,7 @@ mod tests {
         let precomputed = PrecomputedDistances::new(
             &kabsch.reference_coords.unwrap(), &kabsch.transformed_coords.unwrap()
         );
-        let mut metrics = MotifMatchMetrics::new();
+        let mut metrics = StructureSimilarityMetrics::new();
         metrics.calculate_all(&precomputed);
 
         metrics.print_in_a_formatted_way();

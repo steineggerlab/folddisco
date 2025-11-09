@@ -522,7 +522,7 @@ impl std::fmt::Display for StructureSortStrategy {
 
 #[cfg(test)]
 mod tests {
-    use crate::structure::metrics::MotifMatchMetrics;
+    use crate::structure::metrics::StructureSimilarityMetrics;
 
     use super::*;
 
@@ -589,7 +589,7 @@ mod tests {
             u_matrix: [[0.0; 3]; 3],
             t_matrix: [0.0; 3], 
             matching_coordinates: vec![],
-            metrics: MotifMatchMetrics {
+            metrics: StructureSimilarityMetrics {
                 tm_score: 0.9,
                 tm_score_strict: 0.65,
                 gdt_ts: 0.8,
@@ -611,7 +611,7 @@ mod tests {
             u_matrix: [[0.0; 3]; 3],
             t_matrix: [0.0; 3], 
             matching_coordinates: vec![],
-            metrics: MotifMatchMetrics {
+            metrics: StructureSimilarityMetrics {
                 tm_score: 0.75,
                 tm_score_strict: 0.65,
                 gdt_ts: 0.9,
@@ -633,7 +633,7 @@ mod tests {
             u_matrix: [[0.0; 3]; 3],
             t_matrix: [0.0; 3], 
             matching_coordinates: vec![],
-            metrics: MotifMatchMetrics {
+            metrics: StructureSimilarityMetrics {
                 tm_score: 0.96,
                 tm_score_strict: 0.79,
                 gdt_ts: 0.3,

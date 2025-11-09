@@ -65,9 +65,8 @@ pub enum AppArgs {
         sampling_ratio: Option<f32>,
         freq_filter: Option<f32>,
         length_penalty: Option<f32>,
-        // sorting mode
-        sort_by_rmsd: bool,
-        sort_by_score: bool,
+        // sorting strategy
+        sort_by: String,
         // output mode
         output_per_structure: bool,
         output_per_match: bool,

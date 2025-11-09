@@ -15,6 +15,7 @@ pub mod retrieve;
 pub mod count_query;
 pub mod map;
 pub mod mode;
+pub mod sort;
 
 use std::cell::UnsafeCell;
 use std::io::Write;

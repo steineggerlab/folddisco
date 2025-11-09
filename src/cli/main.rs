@@ -78,9 +78,8 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             sampling_ratio: args.opt_value_from_str("--sampling-ratio")?,
             freq_filter: args.opt_value_from_str("--freq-filter")?,
             length_penalty: args.opt_value_from_str("--length-penalty")?,
-            // Sorting mode
-            sort_by_rmsd: args.contains("--sort-by-rmsd"),
-            sort_by_score: args.contains("--sort-by-score"),
+            // Sorting strategy (comma-separated keys)
+            sort_by: args.value_from_str("--sort-by").unwrap_or("node_count,rmsd".into()),
             // Output mode
             output_per_structure: args.contains("--per-structure"),
             output_per_match: args.contains("--per-match"),

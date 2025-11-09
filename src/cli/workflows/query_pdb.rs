@@ -16,6 +16,7 @@ use crate::cli::config::{read_index_config_from_file, IndexConfig};
 use crate::controller::filter::{MatchFilter, StructureFilter};
 use crate::controller::map::SimpleHashMap;
 use crate::controller::mode::{IndexMode, QueryMode};
+use crate::controller::sort::{MatchSortStrategy, StructureSortStrategy};
 use crate::cli::*;
 use crate::controller::io::{
     read_compact_structure, read_u16_vector, 
@@ -82,8 +83,18 @@ display options:
  --web                            Print output for web
  --per-structure                  Print output per structure
  --per-match                      Print output per match. Not working with --skip-match
- --sort-by-score                  Sort output by score
- --sort-by-rmsd                   Sort output by RMSD. Not working with --skip-match
+ --sort-by <KEYS>                 Sorting strategy (comma-separated keys with optional order)
+                                  Format: \"key1,key2\" or \"key1:order1,key2:order2\"
+                                  
+                                  For per-match output (default):
+                                    Valid keys: node_count, idf, rmsd, tm_score, gdt_ts, etc.
+                                  For per-structure output:
+                                    Valid keys: max_node_count, node_count, idf, min_rmsd, etc.
+                                  
+                                  Valid orders: asc, desc (default order used if not specified)
+                                  Examples: \"node_count,tm_score,rmsd\"
+                                           \"max_node_count:desc,idf:desc\" (for --per-structure)
+                                           \"tm_score\" [node_count,rmsd]
  --skip-ca-match                  Print matching residues before C-alpha distance check
  --partial-fit                    Superposition will find the best aligning substructure using LMS (Least Median of Squares)
  --superpose                      Print U, T, CA of matching residues
@@ -93,11 +104,17 @@ general options:
  -h, --help                       Print this help menu
 
 examples:
-# Search with default settings. This will print out matching motifs with sorting by RMSD.
+# Search with default settings. This will print out matching motifs sorted by node count then RMSD.
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
 
-# Print top 100 structures with sorting by score
-folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by-score
+# Print top 100 structures sorted by TM-score
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --sort-by \"node_count,tm_score\"
+
+# Print per-structure results sorted by max node count and IDF score
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by \"max_node_count,idf\"
+
+# Print per-structure results sorted by IDF only
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --per-structure --sort-by \"idf\"
 
 # Query file given as separate text file
 folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 5
@@ -146,8 +163,7 @@ pub fn query_pdb(env: AppArgs) {
             sampling_ratio,
             freq_filter,
             length_penalty,
-            sort_by_rmsd,
-            sort_by_score,
+            sort_by,
             output_per_structure,
             output_per_match,
             output_with_superpose,
@@ -167,26 +183,56 @@ pub fn query_pdb(env: AppArgs) {
                 std::process::exit(1);
             }
             
+            // Determine query mode first to decide which sorting strategy to use
             let query_mode = QueryMode::from_flags(
-                skip_match, web_mode, output_per_structure, output_per_match,
-                sort_by_rmsd, sort_by_score
+                skip_match, web_mode, output_per_structure, output_per_match
             );
+            
             // Error handling
-            match query_mode {
-                QueryMode::ContradictoryPrintError => {
-                    print_log_msg(FAIL, 
-                        "Cannot print output per structure and per match at the same time. Use either --per-structure or --per-match"
-                    );
-                    std::process::exit(1);
-                }
-                QueryMode::ContradictorySortError => {
-                    print_log_msg(FAIL, 
-                        "Cannot sort result by RMSD and score at the same time. Use either --sort-by-rmsd or --sort-by-score"
-                    );
-                }
-                _ => {}
+            if query_mode == QueryMode::ContradictoryPrintError {
+                print_log_msg(FAIL, 
+                    "Cannot print output per structure and per match at the same time. Use either --per-structure or --per-match"
+                );
+                std::process::exit(1);
             }
+            
+            // Parse the appropriate sorting strategy based on query mode
+            // For per-structure output modes, use StructureSortStrategy
+            // For per-match output modes, use MatchSortStrategy
+            let use_structure_sort = matches!(
+                query_mode,
+                QueryMode::PerStructure | QueryMode::SkipMatch
+            );
+            
+            let match_sort_strategy = if !use_structure_sort {
+                MatchSortStrategy::from_str(&sort_by)
+                    .unwrap_or_else(|e| {
+                        print_log_msg(FAIL, &format!("Error parsing --sort-by: {}", e));
+                        std::process::exit(1);
+                    })
+            } else {
+                MatchSortStrategy::default()
+            };
+            
+            let structure_sort_strategy = if use_structure_sort {
+                StructureSortStrategy::from_str(&sort_by)
+                    .unwrap_or_else(|e| {
+                        print_log_msg(FAIL, &format!("Error parsing --sort-by: {}", e));
+                        std::process::exit(1);
+                    })
+            } else {
+                StructureSortStrategy::default()
+            };
 
+            // Print query mode and sorting strategy
+            if verbose  {
+                if use_structure_sort {
+                    print_log_msg(INFO, &format!("Printing results {} sorting with {}", query_mode, structure_sort_strategy));
+                } else {
+                    print_log_msg(INFO, &format!("Printing results {} sorting with {}", query_mode, match_sort_strategy));
+                }
+            }
+            
             // Print query information
             if verbose {
                 // If pdb_path is empty
@@ -579,7 +625,7 @@ pub fn query_pdb(env: AppArgs) {
                 );
 
                 match query_mode {
-                    QueryMode::PerMatchDefault => {
+                    QueryMode::PerMatch => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
                             &queried_from_indices, skip_ca_match
                         );
@@ -587,18 +633,7 @@ pub fn query_pdb(env: AppArgs) {
                         sort_and_print_match_query_result(
                             &mut match_results, top_n, 
                             &output_path, &query_string, output_with_superpose, header, verbose,
-                            true,
-                        );
-                    }
-                    QueryMode::PerMatchSortByScore => {
-                        let mut match_results = convert_structure_query_result_to_match_query_results(
-                            &queried_from_indices, skip_ca_match
-                        );
-                        match_results.retain(|(_, v)| match_filter.filter(v));
-                        sort_and_print_match_query_result(
-                            &mut match_results, top_n, 
-                            &output_path, &query_string, output_with_superpose, header, verbose,
-                            false,
+                            match_sort_strategy.clone(),
                         );
                     }
                     QueryMode::Web => {
@@ -610,22 +645,20 @@ pub fn query_pdb(env: AppArgs) {
                         sort_and_print_match_query_result(
                             &mut match_results, MAX_NUM_LINES_FOR_WEB,
                             &output_path, &query_string, true, header, verbose,
-                            true,
+                            match_sort_strategy.clone(),
                         );
                     }
-                    QueryMode::PerStructureSortByRmsd => {
+                    QueryMode::PerStructure | QueryMode::SkipMatch => {
                         sort_and_print_structure_query_result(
-                            &mut queried_from_indices,  true, &output_path, 
-                            &query_string, header, verbose
+                            &mut queried_from_indices, &output_path, 
+                            &query_string, header, verbose, structure_sort_strategy.clone()
                         );
                     }
-                    QueryMode::PerStructureSortByScore | QueryMode::SkipMatch => {
-                        sort_and_print_structure_query_result(
-                            &mut queried_from_indices, false, &output_path, 
-                            &query_string, header, verbose
-                        );
+                    QueryMode::ContradictoryPrintError => {
+                        // This should have been caught earlier, but handle it just in case
+                        print_log_msg(FAIL, "Invalid query mode");
+                        std::process::exit(1);
                     }
-                    _ => {}
                 }
                 drop(queried_from_indices);
                 drop(query_structure);
@@ -688,8 +721,7 @@ mod tests {
             sampling_ratio: None,
             freq_filter: None,
             length_penalty: None,
-            sort_by_rmsd: true,
-            sort_by_score: false,
+            sort_by: String::from("node_count,rmsd"),
             output_per_structure: false,
             output_per_match: true,
             output_with_superpose: false,
@@ -786,8 +818,7 @@ mod tests {
             sampling_ratio: None,
             freq_filter: None,
             length_penalty: None,
-            sort_by_rmsd: false,
-            sort_by_score: true,
+            sort_by: String::from("node_count,idf"),
             output_per_structure: true,
             output_per_match: false,
             output_with_superpose: true,

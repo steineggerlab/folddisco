@@ -7,9 +7,10 @@ use rayon::slice::ParallelSliceMut;
 use crate::measure_time;
 use crate::prelude::{log_msg, print_log_msg, FAIL, INFO};
 use crate::structure::coordinate::Coordinate;
-use crate::structure::metrics::StructureMetrics;
+use crate::structure::metrics::MotifMatchMetrics;
 
 use super::ResidueMatch;
+use super::sort::{MatchSortStrategy, StructureSortStrategy};
 
 
 pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tkey\tquery_residues";
@@ -26,8 +27,8 @@ pub struct StructureResult<'a> {
     pub idf: f32,
     pub nres: usize,
     pub plddt: f32,
-    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, // Match with connected components
-    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureMetrics)>, // Match with c-alpha distances
+    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, MotifMatchMetrics)>, // Match with connected components
+    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, MotifMatchMetrics)>, // Match with c-alpha distances
     pub max_matching_node_count: usize,
     pub min_rmsd_with_max_match: f32,
 }
@@ -172,14 +173,14 @@ pub struct MatchResult<'a> {
     pub u_matrix: [[f32; 3]; 3],
     pub t_matrix: [f32; 3],
     pub matching_coordinates: Vec<Coordinate>,
-    pub metrics: StructureMetrics,
+    pub metrics: MotifMatchMetrics,
 }
 
 impl<'a> MatchResult<'a> {
     pub fn new(
         id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
         u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize,
-        metrics: StructureMetrics,
+        metrics: MotifMatchMetrics,
     ) -> Self {
         //
         let node_count = matching_residues.iter().map(|x| {
@@ -288,29 +289,19 @@ impl<'a> MatchResult<'a> {
 }
 
 pub fn sort_and_print_structure_query_result(
-    results: &mut Vec<(usize, StructureResult)>, do_sort_by_rmsd: bool, 
+    results: &mut Vec<(usize, StructureResult)>, 
     output_path: &str, query_string: &str, header: bool, verbose: bool,
+    sort_strategy: StructureSortStrategy,
 ) {
-    if do_sort_by_rmsd {
-        if verbose {
-            measure_time!(results.par_sort_by(|a, b| {
-                // Primary by max_matching_node_count, secondary by min_rmsd
-                if a.1.max_matching_node_count != b.1.max_matching_node_count {
-                    b.1.max_matching_node_count.partial_cmp(&a.1.max_matching_node_count).unwrap()
-                } else {
-                    a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
-                }
-            }));
-        } else {
-            results.par_sort_by(|a, b| {
-                // Primary by max_matching_node_count, secondary by min_rmsd
-                if a.1.max_matching_node_count != b.1.max_matching_node_count {
-                    b.1.max_matching_node_count.partial_cmp(&a.1.max_matching_node_count).unwrap()
-                } else {
-                    a.1.min_rmsd_with_max_match.partial_cmp(&b.1.min_rmsd_with_max_match).unwrap()
-                }
-            });
-        }
+    // Sort using the strategy
+    if verbose {
+        measure_time!(results.par_sort_by(|a, b| {
+            sort_strategy.compare(&a.1, &b.1)
+        }));
+    } else {
+        results.par_sort_by(|a, b| {
+            sort_strategy.compare(&a.1, &b.1)
+        });
     }
 
     // If output path is not empty, write to file
@@ -344,36 +335,16 @@ pub fn sort_and_print_structure_query_result(
 pub fn sort_and_print_match_query_result(
     results: &mut Vec<(usize, MatchResult)>, top_n: usize, 
     output_path: &str, query_string: &str, superpose: bool, header: bool, verbose: bool,
-    do_sort_by_rmsd: bool,
+    sort_strategy: MatchSortStrategy,
 ) {
-    // Sort query_count_vec by rmsd
+    // Sort using the strategy
     if verbose {
         measure_time!(results.par_sort_by(|a, b| {
-            // Primary by max_matching_node_count, secondary by min_rmsd
-            if a.1.node_count != b.1.node_count {
-                b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
-            } else {
-                if do_sort_by_rmsd {
-                    a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
-                } else {
-                    // If not sorting by rmsd, sort by idf
-                    b.1.idf.partial_cmp(&a.1.idf).unwrap()
-                }
-            }
+            sort_strategy.compare(&a.1, &b.1)
         }));
     } else {
         results.par_sort_by(|a, b| {
-            // Primary by max_matching_node_count, secondary by min_rmsd
-            if a.1.node_count != b.1.node_count {
-                b.1.node_count.partial_cmp(&a.1.node_count).unwrap()
-            } else {
-                if do_sort_by_rmsd {
-                    a.1.rmsd.partial_cmp(&b.1.rmsd).unwrap()
-                } else {
-                    // If not sorting by rmsd, sort by idf
-                    b.1.idf.partial_cmp(&a.1.idf).unwrap()
-                }
-            }
+            sort_strategy.compare(&a.1, &b.1)
         });
     }
     // Apply top N filter if top_n is not usize::MAX

@@ -83,7 +83,7 @@ impl Default for CompactEntry {
 
 pub fn count_query_idmode<'a>(
     queries: &[GeometricHash],
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     offset_table: &SimpleHashMap,
     value_vec: &[u16],
     lookup: &'a [(String, usize, usize, f32, usize)],
@@ -226,7 +226,7 @@ pub fn count_query_idmode<'a>(
 }
 
 pub fn count_query_bigmode<'a>(
-    queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     big_index: &FolddiscoIndex, lookup: &'a Vec<(String, usize, usize, f32, usize)>, 
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
     freq_filter: Option<f32>, length_penalty_power: Option<f32>,
@@ -436,12 +436,12 @@ fn sample_query_bigmode(
 // Shared function to build node groups from queries
 fn build_node_groups(
     sampled_queries: &[GeometricHash],
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
 ) -> HashMap<usize, Vec<((usize, usize), GeometricHash)>> {
     let mut node_groups: HashMap<usize, Vec<((usize, usize), GeometricHash)>> = HashMap::default();
 
     for &query in sampled_queries {
-        if let Some(((e0, e1), _)) = query_map.get(&query) {
+        if let Some(((e0, e1), _, _)) = query_map.get(&query) {
             let edge = (*e0, *e1);
             node_groups.entry(edge.0).or_insert_with(Vec::new).push((edge, query));
         }

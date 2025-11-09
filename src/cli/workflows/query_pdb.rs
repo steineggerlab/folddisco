@@ -392,17 +392,37 @@ pub fn query_pdb(env: AppArgs) {
                         let mode = config.mode;
                         let dist_cutoff = config.grid_width;
                         let multiple_bin = &config.multiple_bin;
+                        let total_structures = lookup.len() as f32;
                         let (pdb_query_map, query_indices, aa_dist_map ) = if verbose { 
-                            measure_time!(make_query_map(
-                                &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
-                                &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
-                            ))
+                            if use_big_index {
+                                measure_time!(make_query_map(
+                                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
+                                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
+                                    &None, &Some(&big_index), total_structures
+                                ))
+                            } else {
+                                measure_time!(make_query_map(
+                                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
+                                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
+                                    &Some(offset_table), &None, total_structures
+                                ))
+                            }
                         } else {
-                            make_query_map(
-                                &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
-                                &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
-                            )
+                            if use_big_index {
+                                make_query_map(
+                                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
+                                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
+                                    &None, &Some(&big_index), total_structures
+                                )
+                            } else {
+                                make_query_map(
+                                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
+                                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
+                                    &Some(offset_table), &None, total_structures
+                                )
+                            }
                         };
+
                         let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
                         // Make filters out of filtering parameters
                         let structure_filter = StructureFilter::new(

@@ -27,8 +27,8 @@ pub struct StructureResult<'a> {
     pub idf: f32,
     pub nres: usize,
     pub plddt: f32,
-    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, // Match with connected components
-    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, // Match with c-alpha distances
+    pub matching_residues: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, // Match with connected components, with subgraph IDF
+    pub matching_residues_processed: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, // Match with c-alpha distances, with subgraph IDF
     pub max_matching_node_count: usize,
     pub min_rmsd_with_max_match: f32,
 }
@@ -57,17 +57,17 @@ impl<'a> StructureResult<'a> {
 
     pub fn into_match_query_results(&self, skip_ca_dist: bool) -> Vec<MatchResult> {
         match skip_ca_dist {
-            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics))| {
+            false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
-                    self.id, i, self.idf, residues.clone(), *rmsd,
+                    self.id, i, *subgraph_idf, residues.clone(), *rmsd,
                     *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
                 )
             }).collect(),
-            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics))| {
+            true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
-                    self.id, i, self.idf, residues.clone(), *rmsd,
+                    self.id, i, *subgraph_idf, residues.clone(), *rmsd,
                     *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
                 )
             }).collect(),
@@ -96,7 +96,7 @@ impl<'a> fmt::Display for StructureResult<'a> {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
                 // Join with comma
-                |(x, y, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         // Convert u8 to char
                         Some((a, b)) => format!("{}{}", *a as char, b),
@@ -121,7 +121,7 @@ impl<'a> fmt::Debug for StructureResult<'a> {
         } else {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
-                |(x, y, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
@@ -145,7 +145,7 @@ impl<'a> StructureResult<'a> {
         } else {
             self.matching_residues_processed.iter().map(
                 // Only print score with 4 decimal places
-                |(x, y, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()

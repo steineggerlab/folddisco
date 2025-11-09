@@ -158,13 +158,13 @@ pub fn retrieval_wrapper_for_foldcompdb(
     db_key: usize, node_count: usize, query_vector: &Vec<GeometricHash>,
     _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize,
     multiple_bin: &Option<Vec<(usize, usize)>>, dist_cutoff: f32,
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
     ca_distance_cutoff: f32, partial_fit: bool,
     foldcomp_db_reader: &FoldcompDbReader,
-) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, 
-      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, usize, f32) {
+) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, 
+      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, usize, f32) {
     let compact = foldcomp_db_reader.read_single_structure_by_id(db_key).expect("Error reading structure from foldcomp db");
     let compact = compact.to_compact();
 
@@ -201,8 +201,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     // Parallel
-    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, 
-                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)> = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32,
+                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -215,6 +215,10 @@ pub fn retrieval_wrapper_for_foldcompdb(
             |_, edge| Some(*edge)
         );
         let node_count = subgraph.node_count();
+        
+        // Calculate IDF for this subgraph
+        let subgraph_idf = calculate_subgraph_idf(&subgraph, query_map);
+        
         // Find mapping between query residues and retrieved residues
         let (query_indices, retrieved_indices) = map_query_and_retrieved_residues(
             &subgraph, query_map, node_count, &query_symmetry_map,
@@ -315,18 +319,18 @@ pub fn retrieval_wrapper_for_foldcompdb(
             )
         };
         
-        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash,
-         res_vec, rmsd, u_mat, t_mat, ca_coords, metrics)
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash, subgraph_idf,
+         res_vec, rmsd, u_mat, t_mat, ca_coords, metrics, subgraph_idf)
     }).collect();
     // Split
-    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>,
-        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j, k, l)| {
-        ((a, b, c, d, e, f), (g, h, i, j, k, l))
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>,
+        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j, k, l, m, n)| {
+        ((a, b, c, d, e, f, g), (h, i, j, k, l, m, n))
     }).unzip();
     // In result, find the maximum matching node count and minimum RMSD with max match
     let mut max_matching_node_count = 0;
     let mut min_rmsd_with_max_match = 0.0;
-    result.iter().for_each(|(res_vec, rmsd, _, _, _, _)| {
+    result.iter().for_each(|(res_vec, rmsd, _, _, _, _, _)| {
         // Count number of Some in res_vec
         let count = res_vec.iter().filter(|&x| x.is_some()).count();
         if count > max_matching_node_count {
@@ -351,12 +355,12 @@ pub fn retrieval_wrapper(
     path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
     _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize, 
     multiple_bin: &Option<Vec<(usize, usize)>>, dist_cutoff: f32,
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
     ca_distance_cutoff: f32, partial_fit: bool,
-) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, 
-      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, usize, f32) {
+) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, 
+      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, usize, f32) {
     // Load structure to retrieve motif
     let compact = read_structure_from_path(&path).expect("Error reading structure from path");
     let compact = compact.to_compact();
@@ -395,8 +399,8 @@ pub fn retrieval_wrapper(
 
     // Parallel
 // Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>
-    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, 
-                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)> = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32,
+                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -408,7 +412,12 @@ pub fn retrieval_wrapper(
             },
             |_, edge| Some(*edge)
         );
+        
         let node_count = subgraph.node_count();
+        
+        // Calculate IDF for this subgraph
+        let subgraph_idf = calculate_subgraph_idf(&subgraph, query_map);
+        
         // Find mapping between query residues and retrieved residues
         let (query_indices, retrieved_indices) = map_query_and_retrieved_residues(
             &subgraph, query_map, node_count, &query_symmetry_map,
@@ -508,17 +517,18 @@ pub fn retrieval_wrapper(
             )
         };
 
-        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash, res_vec, rmsd, u_mat, t_mat, ca_coords, metrics)
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash, subgraph_idf,
+         res_vec, rmsd, u_mat, t_mat, ca_coords, metrics, subgraph_idf)
         }).collect();
     // Split 
-    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>, 
-        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j, k, l)| {
-        ((a, b, c, d, e, f), (g, h, i, j, k, l))
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, 
+        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j, k, l, m, n)| {
+        ((a, b, c, d, e, f, g), (h, i, j, k, l, m, n))
     }).unzip();
     // In result, find the maximum matching node count and minimum RMSD with max match
     let mut max_matching_node_count = 0;
     let mut min_rmsd_with_max_match = 0.0;
-    result.iter().for_each(|(res_vec, rmsd, _, _, _, _)| {
+    result.iter().for_each(|(res_vec, rmsd, _, _, _, _, _)| {
         // Count number of Some in res_vec
         let count = res_vec.iter().filter(|&x| x.is_some()).count();
         if count > max_matching_node_count {
@@ -583,7 +593,7 @@ pub fn prefilter_amino_acid(query_set: &HashSet<GeometricHash>, _hash_type: Hash
 
 pub fn map_query_and_retrieved_residues(
     retrieved: &Graph<usize, GeometricHash>, 
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     node_count: usize,
     query_symmetry_map: &HashMap<GeometricHash, bool>,
 ) -> (Vec<usize>, Vec<usize>) {
@@ -591,7 +601,7 @@ pub fn map_query_and_retrieved_residues(
     let mut retrieved_indices: Vec<usize> = Vec::with_capacity(node_count);
 
     // Find max indices to allocate fixed-size arrays
-    let max_query_idx = query_map.values().map(|((i, j), _)| (*i).max(*j)).max().unwrap_or(0);
+    let max_query_idx = query_map.values().map(|((i, j), _, _)| (*i).max(*j)).max().unwrap_or(0);
     let max_retrieved_idx = retrieved.node_weights().max().copied().unwrap_or(0);
     
     // Pre-allocate vectors for O(1) lookups 
@@ -606,7 +616,7 @@ pub fn map_query_and_retrieved_residues(
         let (i, j) = retrieved.edge_endpoints(edge).unwrap();
         let hash = retrieved[edge];
         
-        if let Some(&((query_i, query_j), _)) = query_map.get(&hash) {
+        if let Some(&((query_i, query_j), _, _)) = query_map.get(&hash) {
             let is_symmetric = *query_symmetry_map.get(&hash).unwrap();
             
             if is_symmetric {
@@ -676,6 +686,23 @@ pub fn map_query_and_retrieved_residues(
     }
     
     (query_indices, retrieved_indices)
+}
+
+/// Calculate total IDF score for a subgraph by summing IDFs of all edges
+pub fn calculate_subgraph_idf(
+    subgraph: &Graph<usize, GeometricHash>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
+) -> f32 {
+    let mut total_idf = 0.0f32;
+    
+    for edge in subgraph.edge_indices() {
+        let hash = subgraph[edge];
+        if let Some(&(_, _, idf)) = query_map.get(&hash) {
+            total_idf += idf;
+        }
+    }
+    
+    total_idf
 }
 
 pub fn rmsd_for_matched(
@@ -812,7 +839,8 @@ mod tests {
         let dist_cutoff = 20.0;
         let (query_map, query_indices, aa_dist_map ) = make_query_map(
             &path, &query_residues, hash_type, nbin_dist, nbin_angle, &None,
-            &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, false
+            &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, false,
+            &None, &None, 1000.0
         );
         let queries: Vec<GeometricHash> = query_map.keys().cloned().collect();
         let compact = read_structure_from_path(&path).expect("Error reading structure from path");

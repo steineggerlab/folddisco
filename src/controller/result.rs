@@ -14,7 +14,8 @@ use super::sort::{MatchSortStrategy, StructureSortStrategy};
 
 
 pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tkey\tquery_residues";
-pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tkey\tquery_residues";
+// pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tkey\tquery_residues";
+pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score_per_match\trmsd\tmatching_residues\tkey\ttm_score\ttm_score_strict\tgdt_ts\tgdt_ha\tgdt_strict\trmsd\tchamfer_distance\thausdorff_distance\tquery_residues";
 pub const MATCH_QUERY_RESULT_SUPERPOSE_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tu_vector\tt_vector\ttarget_ca_coords\tkey\tquery_residues";
 
 pub struct StructureResult<'a> {

@@ -31,7 +31,7 @@ use crate::controller::result::{
     sort_and_print_match_query_result, sort_and_print_structure_query_result, StructureResult
 };
 use crate::controller::retrieve::retrieval_wrapper;
-use crate::index::indextable::{load_big_index, FolddiscoIndex};
+use crate::index::indextable::{FolddiscoIndex, SparseIndex, load_big_index, load_sparse_index};
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
 
@@ -277,9 +277,12 @@ pub fn query_pdb(env: AppArgs) {
             
             let index_prefix = index_paths[0].clone();
             let (big_index, big_offset_mmap) = if use_big_index {
-                load_big_index(&index_prefix)
+                // load_big_index(&index_prefix)
+                load_sparse_index(&index_prefix)
             } else {
-                (FolddiscoIndex::new(0, "".to_string(), false),
+                // (FolddiscoIndex::new(0, "".to_string(), false),
+                //  MmapMut::map_anon(0).unwrap().make_read_only().unwrap())
+                (SparseIndex::new(0, "".to_string(), false),
                  MmapMut::map_anon(0).unwrap().make_read_only().unwrap())
             };
 

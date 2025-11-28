@@ -6,6 +6,7 @@
 // use std::collections::HashMap;
 use rustc_hash::FxHashMap as HashMap;
 use crate::geometry::core::{GeometricHash, HashType};
+use crate::index::indextable::FolddiscoIndex;
 use crate::utils::convert::{is_aa_group_char, map_one_letter_to_u8_vec};
 use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
@@ -18,7 +19,7 @@ pub fn calculate_idf_for_hash(
     hash: &GeometricHash,
     offset_table: &Option<&super::map::SimpleHashMap>,
     // big_index: &Option<&crate::index::indextable::FolddiscoIndex>,
-    big_index: &Option<&crate::index::indextable::SparseIndex>,
+    big_index: &Option<&FolddiscoIndex>,
     total_structures: f32,
 ) -> f32 {
     // Try idmode first (offset_table)
@@ -220,7 +221,7 @@ pub fn make_query_map(
     amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32, serial_query: bool,
     offset_table: &Option<&super::map::SimpleHashMap>,
     // big_index: &Option<&crate::index::indextable::FolddiscoIndex>,
-    big_index: &Option<&crate::index::indextable::SparseIndex>,
+    big_index: &Option<&FolddiscoIndex>,
     total_structures: f32,
 ) -> (HashMap<GeometricHash, ((usize, usize), bool, f32)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
 

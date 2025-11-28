@@ -5,7 +5,7 @@ use rayon::prelude::*;  // Import rayon for parallel iterators
 // use std::collections::HashMap;
 use rustc_hash::FxHashMap as HashMap;
 
-use crate::index::indextable::{FolddiscoIndex, SparseIndex};
+use crate::index::indextable::FolddiscoIndex;
 use crate::prelude::GeometricHash;
 
 use super::io::get_values_with_offset_u16;
@@ -228,7 +228,7 @@ pub fn count_query_idmode<'a>(
 pub fn count_query_bigmode<'a>(
     queries: &Vec<GeometricHash>, query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     // big_index: &FolddiscoIndex,
-    big_index: &SparseIndex,
+    big_index: &FolddiscoIndex,
     lookup: &'a Vec<(String, usize, usize, f32, usize)>, 
     sampling_ratio: Option<f32>, sampling_count: Option<usize>,
     freq_filter: Option<f32>, length_penalty_power: Option<f32>,
@@ -407,7 +407,7 @@ fn sample_query_idmode(
 fn sample_query_bigmode(
     queries: &Vec<GeometricHash>, 
     // big_index: &FolddiscoIndex, 
-    big_index: &SparseIndex,
+    big_index: &FolddiscoIndex,
     sampling_ratio: Option<f32>, 
     sampling_count: Option<usize>,
 ) -> Vec<GeometricHash> {

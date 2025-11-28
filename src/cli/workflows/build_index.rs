@@ -230,21 +230,25 @@ pub fn build_index(env: AppArgs) {
                             print_log_msg(INFO, &format!("Hashes collected"));
                             measure_time!(folddisco.fold_disco_index.allocate_entries());
                             measure_time!(folddisco.add_entries());
-                            measure_time!(folddisco.fold_disco_index.finish_index());
+                            measure_time!(folddisco.fold_disco_index.wrapup_offset_and_save_entries());
                             // TESTING here
-                            let pruned_index = measure_time!(folddisco.fold_disco_index.prune_to_sparse());
+                            measure_time!(folddisco.fold_disco_index.prune_to_sparse());
+                            measure_time!(folddisco.fold_disco_index.save_offset_to_file());
+                            // let pruned_index = measure_time!(folddisco.fold_disco_index.prune_to_sparse());
                             // measure_time!(folddisco.fold_disco_index.save_offset_to_file());
-                            measure_time!(pruned_index.save_offset_to_file());
+                            // measure_time!(pruned_index.save_offset_to_file());
                             
                         } else {
                             folddisco.collect_and_count();
                             folddisco.fold_disco_index.allocate_entries();
                             folddisco.add_entries();
-                            folddisco.fold_disco_index.finish_index();
+                            folddisco.fold_disco_index.wrapup_offset_and_save_entries();
                             // TESTING here
-                            let pruned_index = folddisco.fold_disco_index.prune_to_sparse();
+                            measure_time!(folddisco.fold_disco_index.prune_to_sparse());
+                            folddisco.fold_disco_index.save_offset_to_file();
+                            // let pruned_index = folddisco.fold_disco_index.prune_to_sparse();
                             // folddisco.fold_disco_index.save_offset_to_file();
-                            pruned_index.save_offset_to_file();
+                            // pruned_index.save_offset_to_file();
                         }
                     }
                 }

@@ -1,25 +1,20 @@
 // QueryResult struct and its implementation
 
 use std::fmt;
-use std::io::Write;
 use rayon::slice::ParallelSliceMut;
 
 use crate::measure_time;
 use crate::prelude::{log_msg, print_log_msg, FAIL, INFO};
 use crate::structure::coordinate::Coordinate;
 use crate::structure::metrics::StructureSimilarityMetrics;
+use crate::utils::formatter::{Column, TsvFormatter, Value, DEFAULT_FLOAT_PRECISION};
+use rustc_hash::FxHashMap as HashMap;
 
 use super::ResidueMatch;
 use super::sort::{MatchSortStrategy, StructureSortStrategy};
 
-
-pub const STRUCTURE_QUERY_RESULT_HEADER: &str = "id\tidf_score\ttotal_match_count\tnode_count\tedge_count\tmax_node_cov\tmin_rmsd\tnres\tplddt\tmatching_residues\tkey\tquery_residues";
-// pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tkey\tquery_residues";
-pub const MATCH_QUERY_RESULT_HEADER: &str = "id\tnode_count\tidf_score_per_match\trmsd\tmatching_residues\tkey\ttm_score\ttm_score_strict\tgdt_ts\tgdt_ha\tgdt_strict\trmsd\tchamfer_distance\thausdorff_distance\tquery_residues";
-pub const MATCH_QUERY_RESULT_SUPERPOSE_HEADER: &str = "id\tnode_count\tidf_score\trmsd\tmatching_residues\tu_vector\tt_vector\ttarget_ca_coords\tkey\tquery_residues";
-
 pub struct StructureResult<'a> {
-    pub id: &'a str,
+    pub tid: &'a str,
     pub nid: usize,
     pub db_key: usize, // Database key for the structure
     pub total_match_count: usize,
@@ -36,11 +31,11 @@ pub struct StructureResult<'a> {
 
 impl<'a> StructureResult<'a> {
     pub fn new(
-        id: &'a str, nid: usize, total_match_count: usize, node_count: usize, edge_count: usize,
+        tid: &'a str, nid: usize, total_match_count: usize, node_count: usize, edge_count: usize,
         idf: f32, nres: usize, plddt: f32, db_key: usize
     ) -> Self {
         Self {
-            id,
+            tid,
             nid,
             db_key,
             total_match_count,
@@ -59,16 +54,14 @@ impl<'a> StructureResult<'a> {
     pub fn into_match_query_results(&self, skip_ca_dist: bool) -> Vec<MatchResult> {
         match skip_ca_dist {
             false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
-                // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
-                    self.id, i, *subgraph_idf, residues.clone(), *rmsd,
+                    self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
                     *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
                 )
             }).collect(),
             true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
-                // WARNING: NOTE: Thinking of getting the match specific idf by saving the idf for each edge
                 MatchResult::new(
-                    self.id, i, *subgraph_idf, residues.clone(), *rmsd,
+                    self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
                     *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
                 )
             }).collect(),
@@ -91,15 +84,13 @@ pub fn convert_structure_query_result_to_match_query_results<'a>(
 
 impl<'a> fmt::Display for StructureResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
+        // Use the default formatter logic inline for Display
+        let matching_residues_str = if self.matching_residues_processed.is_empty() {
             "NA".to_string()
         } else {
             self.matching_residues_processed.iter().map(
-                // Only print score with 4 decimal places
-                // Join with comma
                 |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
-                        // Convert u8 to char
                         Some((a, b)) => format!("{}{}", *a as char, b),
                         None => "_".to_string()
                     }
@@ -108,63 +99,21 @@ impl<'a> fmt::Display for StructureResult<'a> {
         };
         write!(
             f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
-            self.id, self.idf, self.total_match_count, self.node_count, self.edge_count,
+            self.tid, self.idf, self.total_match_count, self.node_count, self.edge_count,
             self.max_matching_node_count, self.min_rmsd_with_max_match,
-            self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
+            self.nres, self.plddt, matching_residues_str, self.db_key
         )
     }
 }
 
 impl<'a> fmt::Debug for StructureResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
-            "NA".to_string()
-        } else {
-            self.matching_residues_processed.iter().map(
-                // Only print score with 4 decimal places
-                |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
-                    match x {
-                        Some((a, b)) => format!("{}{}", *a as char, b),
-                        None => "_".to_string()
-                    }
-                }).collect::<Vec<String>>().join(","), y)
-            ).collect::<Vec<String>>().join(";")
-        };
-        write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
-            self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
-            self.max_matching_node_count, self.min_rmsd_with_max_match,
-            self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
-        )
-    }
-}
-// write_fmt
-impl<'a> StructureResult<'a> {
-    pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let matching_residues_processed_with_score = if self.matching_residues_processed.len() == 0 {
-            "NA".to_string()
-        } else {
-            self.matching_residues_processed.iter().map(
-                // Only print score with 4 decimal places
-                |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
-                    match x {
-                        Some((a, b)) => format!("{}{}", *a as char, b),
-                        None => "_".to_string()
-                    }
-                }).collect::<Vec<String>>().join(","), y)
-            ).collect::<Vec<String>>().join(";")
-        };
-        write!(
-            f, "{}\t{:.4}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{:.4}\t{}\t{}", 
-            self.id ,self.idf, self.total_match_count, self.node_count, self.edge_count,
-            self.max_matching_node_count, self.min_rmsd_with_max_match,
-            self.nres, self.plddt, matching_residues_processed_with_score, self.db_key
-        )
+        fmt::Display::fmt(self, f)
     }
 }
 
 pub struct MatchResult<'a> {
-    pub id: &'a str,
+    pub tid: &'a str,
     pub nid: usize,
     pub db_key: usize, // Database key for the structure
     pub node_count: usize,
@@ -179,7 +128,7 @@ pub struct MatchResult<'a> {
 
 impl<'a> MatchResult<'a> {
     pub fn new(
-        id: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
+        tid: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
         u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize,
         metrics: StructureSimilarityMetrics,
     ) -> Self {
@@ -191,7 +140,7 @@ impl<'a> MatchResult<'a> {
             }
         }).sum();
         Self {
-            id,
+            tid,
             nid,
             db_key,
             node_count,
@@ -227,13 +176,13 @@ impl<'a> MatchResult<'a> {
             // Return
             format!(
                 "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}",
-                self.id, self.node_count, self.idf, self.rmsd,
+                self.tid, self.node_count, self.idf, self.rmsd,
                 matching_residues, u_string, t_string, matching_coordinates, self.db_key, self.metrics
             )
         } else {
             format!(
                 "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}",
-                self.id, self.node_count, self.idf, self.rmsd,
+                self.tid, self.node_count, self.idf, self.rmsd,
                 matching_residues, self.db_key, self.metrics
             )
         }
@@ -244,7 +193,7 @@ impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}",
-            self.id, self.node_count, self.idf, self.rmsd,
+            self.tid, self.node_count, self.idf, self.rmsd,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
@@ -258,40 +207,165 @@ impl<'a> fmt::Display for MatchResult<'a> {
 
 impl<'a> fmt::Debug for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}",
-            self.id, self.node_count, self.idf, self.rmsd,
-            self.matching_residues.iter().map(|x| {
-                match x {
-                    Some((a, b)) => format!("{}{}", *a as char, b),
-                    None => "_".to_string()
-                }
-            }).collect::<Vec<String>>().join(","),
-            self.db_key
-        )
+        fmt::Display::fmt(self, f)
     }
 }
 
-// write_fmt
-impl<'a> MatchResult<'a> {
-    pub fn write_fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}",
-            self.id, self.node_count, self.idf, self.rmsd,
-            self.matching_residues.iter().map(|x| {
+
+
+// Column registries and defaults
+
+
+/// Build all available columns for StructureResult
+fn build_structure_result_columns<'a>(qid: String, query_residues: String) -> HashMap<&'static str, Column<StructureResult<'a>>> {
+    vec![
+        Column::new("qid", "Query structure ID", move |_r: &StructureResult| qid.clone().into()),
+        Column::new("tid", "Target structure ID", |r: &StructureResult| r.tid.into()),
+        Column::new("nid", "Numeric ID", |r: &StructureResult| (r.nid as u64).into()),
+        Column::new("db_key", "Database key", |r: &StructureResult| (r.db_key as u64).into()),
+        Column::new("total_match_count", "Total match count", |r: &StructureResult| (r.total_match_count as u64).into()),
+        Column::new("node_count", "Node count", |r: &StructureResult| (r.node_count as u64).into()),
+        Column::new("edge_count", "Edge count", |r: &StructureResult| (r.edge_count as u64).into()),
+        Column::new("idf", "IDF score", |r: &StructureResult| Value::Float(r.idf, DEFAULT_FLOAT_PRECISION)),
+        Column::new("nres", "Number of residues", |r: &StructureResult| (r.nres as u64).into()),
+        Column::new("plddt", "pLDDT score", |r: &StructureResult| Value::Float(r.plddt, 2)),
+        Column::new("max_node_cov", "Max node coverage", |r: &StructureResult| (r.max_matching_node_count as u64).into()),
+        Column::new("min_rmsd", "Min RMSD", |r: &StructureResult| Value::Float(r.min_rmsd_with_max_match, DEFAULT_FLOAT_PRECISION)),
+        Column::new("matching_residues", "Matching residues with RMSD", |r: &StructureResult| {
+            if r.matching_residues_processed.is_empty() {
+                "NA".into()
+            } else {
+                r.matching_residues_processed.iter().map(
+                    |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
+                        match x {
+                            Some((a, b)) => format!("{}{}", *a as char, b),
+                            None => "_".to_string()
+                        }
+                    }).collect::<Vec<String>>().join(","), y)
+                ).collect::<Vec<String>>().join(";").into()
+            }
+        }),
+        Column::new("query_residues", "Query residues", move |_r: &StructureResult| {
+            query_residues.clone().into()
+        }),
+    ].into_iter().map(|col| (col.key, col)).collect()
+}
+
+/// Build all available columns for MatchResult
+fn build_match_result_columns<'a>(qid: String, query_residues: String) -> HashMap<&'static str, Column<MatchResult<'a>>> {
+    vec![
+        Column::new("qid", "Query structure ID", move |_r: &MatchResult| qid.clone().into()),
+        Column::new("tid", "Target structure ID", |r: &MatchResult| r.tid.into()),
+        Column::new("nid", "Numeric ID", |r: &MatchResult| (r.nid as i64).into()),
+        Column::new("db_key", "Database key", |r: &MatchResult| (r.db_key as u64).into()),
+        Column::new("node_count", "Node count", |r: &MatchResult| (r.node_count as u64).into()),
+        Column::new("idf", "IDF score", |r: &MatchResult| Value::Float(r.idf, DEFAULT_FLOAT_PRECISION)),
+        Column::new("rmsd", "RMSD", |r: &MatchResult| Value::Float(r.rmsd, DEFAULT_FLOAT_PRECISION)),
+        Column::new("u_matrix", "Rotation matrix", |r: &MatchResult| Value::Float3DMatrix(r.u_matrix, DEFAULT_FLOAT_PRECISION, ",")),
+        Column::new("t_vector", "Translation vector", |r: &MatchResult| Value::Float3DVector(r.t_matrix, DEFAULT_FLOAT_PRECISION, ",")),
+        Column::new("matching_residues", "Matching residues", |r: &MatchResult| {
+            r.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
                     None => "_".to_string()
                 }
-            }).collect::<Vec<String>>().join(","),
-            self.db_key
-        )
-    }
+            }).collect::<Vec<String>>().join(",").into()
+        }),
+        Column::new("matching_coordinates", "Matching C-alpha coordinates", |r: &MatchResult| {
+            Value::FloatVector(
+                r.matching_coordinates.iter().flat_map(|c| vec![c.x, c.y, c.z]).collect(),
+                4,
+                ","
+            )
+        }),
+        Column::new("query_residues", "Query residues", move |_r: &MatchResult| {
+            query_residues.clone().into()
+        }),
+        Column::new("tm_score", "TM-score", |r: &MatchResult| Value::Float(r.metrics.tm_score, DEFAULT_FLOAT_PRECISION)),
+        Column::new("gdt_ts", "GDT-TS", |r: &MatchResult| Value::Float(r.metrics.gdt_ts, DEFAULT_FLOAT_PRECISION)),
+        Column::new("gdt_ha", "GDT-HA", |r: &MatchResult| Value::Float(r.metrics.gdt_ha, DEFAULT_FLOAT_PRECISION)),
+        Column::new("chamfer_distance", "Chamfer distance", |r: &MatchResult| Value::Float(r.metrics.chamfer_distance, DEFAULT_FLOAT_PRECISION)),
+        Column::new("hausdorff_distance", "Hausdorff distance", |r: &MatchResult| Value::Float(r.metrics.hausdorff_distance, DEFAULT_FLOAT_PRECISION)),
+    ].into_iter().map(|col| (col.key, col)).collect()
+}
+
+
+/// Default column keys for StructureResult output
+pub const STRUCTURE_RESULT_DEFAULT_COLUMNS: &[&str] = &[
+    "tid",
+    "idf",
+    "total_match_count",
+    "node_count",
+    "edge_count",
+    "max_node_cov",
+    "min_rmsd",
+    "nres",
+    "plddt",
+    "matching_residues",
+    "db_key",
+    "query_residues",
+];
+
+/// Create a TsvFormatter for StructureResult with specified column keys
+pub fn structure_result_formatter<'a>(column_keys: &[&str], qid: &str, query_residues: &str) -> TsvFormatter<StructureResult<'a>> {
+    let registry = build_structure_result_columns(qid.to_string(), query_residues.to_string());
+    let columns: Vec<Column<StructureResult>> = column_keys.iter()
+        .filter_map(|&key| registry.get(key).cloned())
+        .collect();
+    TsvFormatter::new(columns)
+}
+
+/// Create a TsvFormatter for StructureResult with default columns
+pub fn structure_result_default_formatter<'a>(qid: &str, query_residues: &str) -> TsvFormatter<StructureResult<'a>> {
+    structure_result_formatter(STRUCTURE_RESULT_DEFAULT_COLUMNS, qid, query_residues)
+}
+
+/// Default column keys for MatchResult output
+pub const MATCH_RESULT_DEFAULT_COLUMNS: &[&str] = &[
+    "tid",
+    "node_count",
+    "idf",
+    "rmsd",
+    "matching_residues",
+    "query_residues",
+];
+
+/// Column keys for MatchResult output with superpose/web mode
+pub const MATCH_RESULT_SUPERPOSE_COLUMNS: &[&str] = &[
+    "tid",
+    "node_count",
+    "idf",
+    "rmsd",
+    "matching_residues",
+    "u_matrix",
+    "t_vector",
+    "matching_coordinates",
+    "db_key",
+    "query_residues",
+];
+
+/// Create a TsvFormatter for MatchResult with specified column keys
+pub fn match_result_formatter<'a>(column_keys: &[&str], qid: &str, query_residues: &str) -> TsvFormatter<MatchResult<'a>> {
+    let registry = build_match_result_columns(qid.to_string(), query_residues.to_string());
+    let columns: Vec<Column<MatchResult>> = column_keys.iter()
+        .filter_map(|&key| registry.get(key).cloned())
+        .collect();
+    TsvFormatter::new(columns)
+}
+
+/// Create a TsvFormatter for MatchResult with default columns
+pub fn match_result_default_formatter<'a>(qid: &str, query_residues: &str) -> TsvFormatter<MatchResult<'a>> {
+    match_result_formatter(MATCH_RESULT_DEFAULT_COLUMNS, qid, query_residues)
+}
+
+/// Create a TsvFormatter for MatchResult with superpose columns
+pub fn match_result_superpose_formatter<'a>(qid: &str, query_residues: &str) -> TsvFormatter<MatchResult<'a>> {
+    match_result_formatter(MATCH_RESULT_SUPERPOSE_COLUMNS, qid, query_residues)
 }
 
 pub fn sort_and_print_structure_query_result(
     results: &mut Vec<(usize, StructureResult)>, 
-    output_path: &str, query_string: &str, header: bool, verbose: bool,
+    output_path: &str, qid: &str, query_residues: &str, columns: Option<&[&str]>, header: bool, verbose: bool,
     sort_strategy: StructureSortStrategy,
 ) {
     // Sort using the strategy
@@ -305,6 +379,11 @@ pub fn sort_and_print_structure_query_result(
         });
     }
 
+    let formatter = match columns {
+        Some(cols) => structure_result_formatter(cols, qid, query_residues),
+        None => structure_result_default_formatter(qid, query_residues),
+    };
+
     // If output path is not empty, write to file
     if !output_path.is_empty() {
         // Create file
@@ -313,29 +392,30 @@ pub fn sort_and_print_structure_query_result(
         );
         let mut writer = std::io::BufWriter::new(file);
         if header {
-            writer.write_all(format!("{}\n", STRUCTURE_QUERY_RESULT_HEADER).as_bytes()).expect(
-                &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
+            formatter.write_header(&mut writer).expect(
+                &log_msg(FAIL, &format!("Failed to write header to file: {}", &output_path))
             );
         }
         for (_k, v) in results.iter() {
-            writer.write_all(format!("{:?}\t{}\n", v, query_string).as_bytes()).expect(
+            formatter.write_record(&mut writer, v).expect(
                 &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
             );
         }
     } else {
         if header {
-            println!("{}", STRUCTURE_QUERY_RESULT_HEADER);
+            let mut stdout = std::io::stdout();
+            formatter.write_header(&mut stdout).expect("Failed to write header to stdout");
         }
-        // let mut id_container = String::new();
         for (_k, v) in results.iter() {
-            println!("{:?}\t{}", v, query_string);
+            let mut stdout = std::io::stdout();
+            formatter.write_record(&mut stdout, v).expect("Failed to write to stdout");
         }
     }
 }
 
 pub fn sort_and_print_match_query_result(
     results: &mut Vec<(usize, MatchResult)>, top_n: usize, 
-    output_path: &str, query_string: &str, superpose: bool, header: bool, verbose: bool,
+    output_path: &str, qid: &str, query_residues: &str, columns: Option<&[&str]>, superpose: bool, header: bool, verbose: bool,
     sort_strategy: MatchSortStrategy,
 ) {
     // Sort using the strategy
@@ -356,6 +436,17 @@ pub fn sort_and_print_match_query_result(
         results.truncate(top_n);
     }
 
+    let formatter = match columns {
+        Some(cols) => match_result_formatter(cols, qid, query_residues),
+        None => {
+            if superpose {
+                match_result_superpose_formatter(qid, query_residues)
+            } else {
+                match_result_default_formatter(qid, query_residues)
+            }
+        }
+    };
+
     // If output path is not empty, write to file
     if !output_path.is_empty() {
         // Create file
@@ -364,29 +455,23 @@ pub fn sort_and_print_match_query_result(
         );
         let mut writer = std::io::BufWriter::new(file);
         if header {
-            // Print header based on superpose
-            if superpose {
-                writer.write_all(format!("{}\n", MATCH_QUERY_RESULT_SUPERPOSE_HEADER).as_bytes()).expect(
-                    &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
-                );
-            } else {
-                writer.write_all(format!("{}\n", MATCH_QUERY_RESULT_HEADER).as_bytes()).expect(
-                    &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
-                );
-            }
+            formatter.write_header(&mut writer).expect(
+                &log_msg(FAIL, &format!("Failed to write header to file: {}", &output_path))
+            );
         }
         for (_k, v) in results.iter() {
-            writer.write_all(format!("{}\t{}\n", v.to_string(superpose), query_string).as_bytes()).expect(
+            formatter.write_record(&mut writer, v).expect(
                 &log_msg(FAIL, &format!("Failed to write to file: {}", &output_path))
             );
         }
     } else {
         if header {
-            println!("{}", MATCH_QUERY_RESULT_HEADER);
+            let mut stdout = std::io::stdout();
+            formatter.write_header(&mut stdout).expect("Failed to write header to stdout");
         }
-        // let mut id_container = String::new();
         for (_k, v) in results.iter() {
-            println!("{}\t{}", v.to_string(superpose), query_string);
+            let mut stdout = std::io::stdout();
+            formatter.write_record(&mut stdout, v).expect("Failed to write to stdout");
         }
     }
 }

@@ -121,39 +121,34 @@ pub struct MatchFilter {
     pub node_count: usize,
     pub node_ratio: f32,
     pub avg_idf: f32,
+    pub rmsd: f32,
     // Metrics from StructureSimilarityMetrics
     pub tm_score: f32,
-    pub tm_score_strict: f32,
     pub gdt_ts: f32,
     pub gdt_ha: f32,
-    pub gdt_strict: f32,
     pub chamfer_distance: f32,
     pub hausdorff_distance: f32,
-    pub rmsd: f32,
     // Expected number of nodes
     pub expected_node_count: usize,
 }
 
 impl MatchFilter {
     pub fn new(
-        node_count: usize, node_ratio: f32, avg_idf: f32, 
-        tm_score: f32, tm_score_strict: f32,
-        gdt_ts: f32, gdt_ha: f32, gdt_strict: f32,
-        chamfer_distance: f32, hausdorff_distance: f32, rmsd: f32,
+        node_count: usize, node_ratio: f32, avg_idf: f32, rmsd: f32,
+        tm_score: f32, gdt_ts: f32, gdt_ha: f32,
+        chamfer_distance: f32, hausdorff_distance: f32, 
         expected_node_count: usize
     ) -> Self {
         MatchFilter {
             node_count,
             node_ratio,
             avg_idf,
+            rmsd,
             tm_score,
-            tm_score_strict,
             gdt_ts,
             gdt_ha,
-            gdt_strict,
             chamfer_distance,
             hausdorff_distance,
-            rmsd,
             expected_node_count,
         }
     }
@@ -164,14 +159,12 @@ impl MatchFilter {
             node_count: 0,
             node_ratio: 0.0,
             avg_idf: 0.0,
+            rmsd: 0.0,
             tm_score: 0.0,
-            tm_score_strict: 0.0,
             gdt_ts: 0.0,
             gdt_ha: 0.0,
-            gdt_strict: 0.0,
             chamfer_distance: 0.0,
             hausdorff_distance: 0.0,
-            rmsd: 0.0,
             expected_node_count: 0,
         }
     }
@@ -181,14 +174,12 @@ impl MatchFilter {
             node_count: 0,
             node_ratio: 0.8,
             avg_idf: 0.0,
+            rmsd: 1.0, // Default at 1.0
             tm_score: 0.0,
-            tm_score_strict: 0.0,
             gdt_ts: 0.0,
             gdt_ha: 0.0,
-            gdt_strict: 0.0,
             chamfer_distance: 0.0,
             hausdorff_distance: 0.0,
-            rmsd: 1.0, // Default at 1.0
             expected_node_count: node_count,
         }
     }
@@ -209,23 +200,20 @@ impl MatchFilter {
         if self.avg_idf > 0.0 {
             pass = pass && result.idf >= self.avg_idf;
         }
+        if self.rmsd > 0.0 {
+            pass = pass && result.rmsd <= self.rmsd;
+        }
         
         // Metrics-based filters (using StructureSimilarityMetrics)
         // Higher is better metrics (>=)
         if self.tm_score > 0.0 {
             pass = pass && result.metrics.tm_score >= self.tm_score;
         }
-        if self.tm_score_strict > 0.0 {
-            pass = pass && result.metrics.tm_score_strict >= self.tm_score_strict;
-        }
         if self.gdt_ts > 0.0 {
             pass = pass && result.metrics.gdt_ts >= self.gdt_ts;
         }
         if self.gdt_ha > 0.0 {
             pass = pass && result.metrics.gdt_ha >= self.gdt_ha;
-        }
-        if self.gdt_strict > 0.0 {
-            pass = pass && result.metrics.gdt_strict >= self.gdt_strict;
         }
         
         // Lower is better metrics (<=)
@@ -235,10 +223,7 @@ impl MatchFilter {
         if self.hausdorff_distance > 0.0 {
             pass = pass && result.metrics.hausdorff_distance <= self.hausdorff_distance;
         }
-        if self.rmsd > 0.0 {
-            pass = pass && result.metrics.rmsd <= self.rmsd;
-        }
-        
+
         pass
     }
 }

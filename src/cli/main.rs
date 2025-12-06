@@ -73,10 +73,8 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             rmsd_cutoff: args.value_from_str("--rmsd").unwrap_or(0.0),
             // Structure similarity metric filters
             tm_score_cutoff: args.value_from_str("--tm-score").unwrap_or(0.0),
-            tm_score_strict_cutoff: args.value_from_str("--tm-score-strict").unwrap_or(0.0),
             gdt_ts_cutoff: args.value_from_str("--gdt-ts").unwrap_or(0.0),
             gdt_ha_cutoff: args.value_from_str("--gdt-ha").unwrap_or(0.0),
-            gdt_strict_cutoff: args.value_from_str("--gdt-strict").unwrap_or(0.0),
             chamfer_distance_cutoff: args.value_from_str("--chamfer").unwrap_or(0.0),
             hausdorff_distance_cutoff: args.value_from_str("--hausdorff").unwrap_or(0.0),
             top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
@@ -88,6 +86,8 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             length_penalty: args.opt_value_from_str("--length-penalty")?,
             // Sorting strategy (comma-separated keys)
             sort_by: args.value_from_str("--sort-by").unwrap_or("node_count,rmsd".into()),
+            // Output format (comma-separated column names)
+            format_output: args.opt_value_from_str("--format-output")?,
             // Output mode
             output_per_structure: args.contains("--per-structure"),
             output_per_match: args.contains("--per-match"),

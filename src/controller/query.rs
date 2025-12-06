@@ -3,7 +3,6 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-// use std::collections::HashMap;
 use rustc_hash::FxHashMap as HashMap;
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::index::indextable::FolddiscoIndex;
@@ -164,7 +163,7 @@ fn apply_substitutions(
     }
 }
 
-fn add_shifted_hashes(
+fn _add_shifted_hashes(
     feature: &Vec<f32>,
     hash_collection: &mut HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     i_idx: usize, j_idx: usize, hash_type: HashType, idf: f32,
@@ -483,7 +482,7 @@ mod tests {
         let idf = 5.0; // Example IDF value
         
         // Test that shifted hashes are added for PDBTrRosetta
-        add_shifted_hashes(&feature, &mut hash_collection, 0, 1, hash_type, idf);
+        _add_shifted_hashes(&feature, &mut hash_collection, 0, 1, hash_type, idf);
         
         // Should have added multiple shifted hash variants
         assert!(hash_collection.len() > 0);
@@ -491,7 +490,7 @@ mod tests {
         
         // Test that no hashes are added for other hash types
         let mut hash_collection_other = HashMap::default();
-        add_shifted_hashes(&feature, &mut hash_collection_other, 0, 1, HashType::TrRosetta, idf);
+        _add_shifted_hashes(&feature, &mut hash_collection_other, 0, 1, HashType::TrRosetta, idf);
         assert_eq!(hash_collection_other.len(), 0);
     }
 }

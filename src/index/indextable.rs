@@ -52,11 +52,6 @@ impl FolddiscoIndex {
     }
     
     pub fn get_raw_entries(&self, hash: u32) -> &[u8] {
-        let hashes = if self.loaded_hashes.is_empty() {
-            unsafe { &*self.hashes.get() }
-        } else {
-            &self.loaded_hashes
-        };
         let offsets = if self.loaded_offsets.is_empty() {
             unsafe { &*self.offsets.get() }
         } else {

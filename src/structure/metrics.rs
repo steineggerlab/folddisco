@@ -185,10 +185,10 @@ pub fn gdt_ha(distances: &PrecomputedDistances) -> f32 {
 }
 
 /// Fast GDT-strict using precomputed distances
-pub fn gdt_strict(distances: &PrecomputedDistances) -> f32 {
-    const CUTOFFS: [f64; 4] = [0.25, 0.5, 1.0, 2.0];
-    gdt_generic(distances, &CUTOFFS)
-}
+// pub fn gdt_strict(distances: &PrecomputedDistances) -> f32 {
+//     const CUTOFFS: [f64; 4] = [0.25, 0.5, 1.0, 2.0];
+//     gdt_generic(distances, &CUTOFFS)
+// }
 
 
 /// Calculate Chamfer Distance between two point sets
@@ -277,13 +277,10 @@ pub fn rmsd(distances: &PrecomputedDistances) -> f32 {
 #[derive(Debug, Clone, Default, PartialEq, Copy)]
 pub struct StructureSimilarityMetrics {
     pub tm_score: f32,
-    pub tm_score_strict: f32,
     pub gdt_ts: f32,
     pub gdt_ha: f32,
-    pub gdt_strict: f32,
     pub chamfer_distance: f32,
     pub hausdorff_distance: f32,
-    pub rmsd: f32,
 }
 
 impl StructureSimilarityMetrics {
@@ -302,23 +299,15 @@ impl StructureSimilarityMetrics {
     pub fn new() -> Self {      
         Self {
             tm_score: 0.0,
-            tm_score_strict: 0.0,
             gdt_ts: 0.0,
             gdt_ha: 0.0,
-            gdt_strict: 0.0,
             chamfer_distance: 0.0,
             hausdorff_distance: 0.0,
-            rmsd: 0.0,
         }
     }
 
     pub fn calculate_tm_score(&self, precomputed: &PrecomputedDistances) -> f32 {
         tm_score(precomputed, None)
-    }
-
-    pub fn calculate_tm_score_strict(&self, precomputed: &PrecomputedDistances) -> f32 {
-        // Using d0 = 0.168 which is used for searching in TM-score source
-        tm_score(precomputed, Some(0.168))
     }
 
     pub fn calculate_gdt_ts(&self, precomputed: &PrecomputedDistances) -> f32 {
@@ -327,10 +316,6 @@ impl StructureSimilarityMetrics {
 
     pub fn calculate_gdt_ha(&self, precomputed: &PrecomputedDistances) -> f32 {
         gdt_ha(precomputed)
-    }
-    
-    pub fn calculate_gdt_strict(&self, precomputed: &PrecomputedDistances) -> f32 {
-        gdt_strict(precomputed)
     }
 
     pub fn calculate_chamfer_distance(&self, precomputed: &PrecomputedDistances) -> f32 {
@@ -341,30 +326,20 @@ impl StructureSimilarityMetrics {
         hausdorff_distance(precomputed)
     }
 
-    pub fn calculate_rmsd(&self, precomputed: &PrecomputedDistances) -> f32 {
-        rmsd(precomputed)
-    }
-
     pub fn calculate_all(&mut self, precomputed: &PrecomputedDistances) {
         self.tm_score = self.calculate_tm_score(precomputed);
-        self.tm_score_strict = self.calculate_tm_score_strict(precomputed);
         self.gdt_ts = self.calculate_gdt_ts(precomputed);
         self.gdt_ha = self.calculate_gdt_ha(precomputed);
-        self.gdt_strict = self.calculate_gdt_strict(precomputed);
         self.chamfer_distance = self.calculate_chamfer_distance(precomputed);
         self.hausdorff_distance = self.calculate_hausdorff_distance(precomputed);
-        self.rmsd = self.calculate_rmsd(precomputed);
     }
     
     /// Print metrics in a formatted way
     pub fn print_in_a_formatted_way(&self) {
         println!("Structure Similarity Metrics:");
         println!("  TM-score:           {:.4}", self.tm_score);
-        println!("  TM-score (strict):  {:.4}", self.tm_score_strict);
         println!("  GDT-TS:             {:.4}", self.gdt_ts);
         println!("  GDT-HA:             {:.4}", self.gdt_ha);
-        println!("  GDT-strict:         {:.4}", self.gdt_strict);
-        println!("  RMSD:               {:.4} Å", self.rmsd);
         println!("  Chamfer Distance:   {:.4} Å", self.chamfer_distance);
         println!("  Hausdorff Distance: {:.4} Å", self.hausdorff_distance);
     }
@@ -375,13 +350,10 @@ impl fmt::Display for StructureSimilarityMetrics {
         // Print all metrics in a tab-separated format with 4 decimal places
         write!(
             f,
-            "{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}",
+            "{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}",
             self.tm_score,
-            self.tm_score_strict,
             self.gdt_ts,
             self.gdt_ha,
-            self.gdt_strict,
-            self.rmsd,
             self.chamfer_distance,
             self.hausdorff_distance
         )
@@ -407,13 +379,10 @@ mod tests {
         metrics.calculate_all(&precomputed);
 
         assert!((metrics.tm_score - 1.0).abs() < 1e-6);
-        assert!((metrics.tm_score_strict - 1.0).abs() < 1e-6);
         assert!((metrics.gdt_ts - 1.0).abs() < 1e-6);
         assert!((metrics.gdt_ha - 1.0).abs() < 1e-6);
-        assert!((metrics.gdt_strict - 1.0).abs() < 1e-6);
         assert!(metrics.chamfer_distance.abs() < 1e-6);
         assert!(metrics.hausdorff_distance.abs() < 1e-6);
-        assert!(metrics.rmsd.abs() < 1e-6);
         
         metrics.print_in_a_formatted_way();
     }

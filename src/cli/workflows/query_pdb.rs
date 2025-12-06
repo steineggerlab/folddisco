@@ -78,10 +78,8 @@ filtering options:
  --plddt <FLOAT>                  pLDDT cutoff [0.0]
  --rmsd <FLOAT>                   Maximum RMSD cutoff [no limit]
  --tm-score <FLOAT>               Minimum TM-score cutoff [0.0]
- --tm-score-strict <FLOAT>        Minimum TM-score (strict) cutoff. This is a custom TM-score with min d0 as 0.168Å [0.0]
  --gdt-ts <FLOAT>                 Minimum GDT-TS cutoff. Thresholds: 1.0Å, 2.0Å, 4.0Å, 8.0Å [0.0]
  --gdt-ha <FLOAT>                 Minimum GDT-HA cutoff. Thresholds: 0.5Å, 1.0Å, 2.0Å, 4.0Å [0.0]
- --gdt-strict <FLOAT>             Minimum GDT (strict) cutoff. This is a custom GDT score with 0.25Å, 0.5Å, 1.0Å, 2.0Å thresholds [0.0]
  --chamfer <FLOAT>                Maximum Chamfer distance cutoff. Chamfer distance is mean of nearest neighbor distances between two point clouds [no limit]
  --hausdorff <FLOAT>              Maximum Hausdorff distance cutoff. Hausdorff distance is maximum of nearest neighbor distances between two point clouds [no limit]
  --top <INT>                      Limit output to top N structures based on IDF score [all]
@@ -91,18 +89,16 @@ display options:
  --web                            Print output for web
  --per-structure                  Print output per structure
  --per-match                      Print output per match. Not working with --skip-match
- --sort-by <KEYS>                 Sorting strategy (comma-separated keys with optional order)
-                                  Format: \"key1,key2\" or \"key1:order1,key2:order2\"
-                                  
-                                  For per-match output (default):
-                                    Valid keys: node_count, idf, rmsd, tm_score, gdt_ts, etc.
-                                  For per-structure output:
-                                    Valid keys: max_node_count, node_count, idf, min_rmsd, etc.
-                                  
-                                  Valid orders: asc, desc (default order used if not specified)
-                                  Examples: \"node_count,tm_score,rmsd\"
-                                           \"max_node_count:desc,idf:desc\" (for --per-structure)
-                                           \"tm_score\" [node_count,rmsd]
+ --format-output <KEYS>           Comma-separated column names to output
+                                  - Per-match: qid, tid, nid, db_key, node_count, idf, rmsd, matching_residues, u_matrix, t_vector,
+                                    matching_coordinates, query_residues, tm_score, gdt_ts, gdt_ha, chamfer_distance, hausdorff_distance
+                                  - Per-structure: qid, tid, nid, db_key, total_match_count, node_count, edge_count, idf, nres, plddt,
+                                    max_node_cov, min_rmsd, matching_residues, query_residues
+                                  - Example: --format-output tid,idf,rmsd,tm_score
+ --sort-by <KEYS>                 Comma-separated sort keys with optional :asc or :desc [default: node_count:desc,rmsd:asc]
+                                  - Per-match: node_count, idf, rmsd, tm_score, gdt_ts, gdt_ha, chamfer_distance, hausdorff_distance
+                                  - Per-structure: max_node_count, node_count, idf, min_rmsd, total_match_count, edge_count, nres, plddt
+                                  - Example: --sort-by tm_score,rmsd or --sort-by idf:desc
  --skip-ca-match                  Print matching residues before C-alpha distance check
  --partial-fit                    Superposition will find the best aligning substructure using LMS (Least Median of Squares)
  --superpose                      Print U, T, CA of matching residues
@@ -114,6 +110,9 @@ general options:
 examples:
 # Search with default settings. This will print out matching motifs sorted by node count then RMSD.
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
+
+# Print custom columns (tid, idf, RMSD, and TM-score only)
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --format-output tid,idf,rmsd,tm_score
 
 # Print matches sorted by node count and TM-score
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --sort-by node_count,tm_score
@@ -166,10 +165,8 @@ pub fn query_pdb(env: AppArgs) {
             plddt_cutoff,
             rmsd_cutoff,
             tm_score_cutoff,
-            tm_score_strict_cutoff,
             gdt_ts_cutoff,
             gdt_ha_cutoff,
-            gdt_strict_cutoff,
             chamfer_distance_cutoff,
             hausdorff_distance_cutoff,
             top_n,
@@ -179,6 +176,7 @@ pub fn query_pdb(env: AppArgs) {
             freq_filter,
             length_penalty,
             sort_by,
+            format_output,
             output_per_structure,
             output_per_match,
             output_with_superpose,
@@ -238,6 +236,14 @@ pub fn query_pdb(env: AppArgs) {
             } else {
                 StructureSortStrategy::default()
             };
+            
+            // Parse format_output if provided
+            let parsed_columns: Option<Vec<String>> = format_output.map(|cols| {
+                cols.split(',').map(|s| s.trim().to_string()).collect()
+            });
+            let column_refs: Option<Vec<&str>> = parsed_columns.as_ref().map(|cols| {
+                cols.iter().map(|s| s.as_str()).collect()
+            });
 
             // Print query mode and sorting strategy
             if verbose  {
@@ -477,7 +483,7 @@ pub fn query_pdb(env: AppArgs) {
                                         measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
                                             #[cfg(not(feature = "foldcomp"))]
                                             let retrieval_result = retrieval_wrapper(
-                                                &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, ca_dist_threshold, partial_fit
@@ -493,7 +499,7 @@ pub fn query_pdb(env: AppArgs) {
                                                 )
                                             } else {
                                                 retrieval_wrapper(
-                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                     hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold, partial_fit
@@ -508,7 +514,7 @@ pub fn query_pdb(env: AppArgs) {
                                         query_count_vec.par_iter_mut().for_each(|(_, v)| {
                                             #[cfg(not(feature = "foldcomp"))]
                                             let retrieval_result = retrieval_wrapper(
-                                                &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, ca_dist_threshold, partial_fit,
@@ -524,7 +530,7 @@ pub fn query_pdb(env: AppArgs) {
                                                 )
                                             } else {
                                                 retrieval_wrapper(
-                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                     hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold, partial_fit,
@@ -584,7 +590,7 @@ pub fn query_pdb(env: AppArgs) {
                                         measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
                                             #[cfg(not(feature = "foldcomp"))]
                                             let retrieval_result = retrieval_wrapper(
-                                                &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, ca_dist_threshold, partial_fit
@@ -600,7 +606,7 @@ pub fn query_pdb(env: AppArgs) {
                                                 )
                                             } else {
                                                 retrieval_wrapper(
-                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                     hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold, partial_fit,
@@ -615,7 +621,7 @@ pub fn query_pdb(env: AppArgs) {
                                         query_count_vec.par_iter_mut().for_each(|(_, v)| {
                                             #[cfg(not(feature = "foldcomp"))]
                                             let retrieval_result = retrieval_wrapper(
-                                                &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                 hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                 &pdb_query_map, &query_structure, &query_indices,
                                                 &aa_dist_map, ca_dist_threshold, partial_fit,
@@ -631,7 +637,7 @@ pub fn query_pdb(env: AppArgs) {
                                                 )
                                             } else {
                                                 retrieval_wrapper(
-                                                    &v.id, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                                    &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                                     hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                                     &pdb_query_map, &query_structure, &query_indices,
                                                     &aa_dist_map, ca_dist_threshold, partial_fit,
@@ -657,12 +663,12 @@ pub fn query_pdb(env: AppArgs) {
                     acc
                 });
                 drop(query_residues);
+                
                 let match_filter= MatchFilter::new(
-                    connected_node_count, connected_node_ratio, idf_score_cutoff,
-                    tm_score_cutoff, tm_score_strict_cutoff,
-                    gdt_ts_cutoff, gdt_ha_cutoff, gdt_strict_cutoff,
+                    connected_node_count, connected_node_ratio, idf_score_cutoff, rmsd_cutoff,
+                    tm_score_cutoff, gdt_ts_cutoff, gdt_ha_cutoff, 
                     chamfer_distance_cutoff, hausdorff_distance_cutoff,
-                    rmsd_cutoff, _residue_count,
+                    _residue_count,
                 );
 
                 match query_mode {
@@ -673,7 +679,8 @@ pub fn query_pdb(env: AppArgs) {
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
                             &mut match_results, top_n, 
-                            &output_path, &query_string, output_with_superpose, header, verbose,
+                            &output_path, &pdb_path, &query_string, 
+                            column_refs.as_deref(), output_with_superpose, header, verbose,
                             match_sort_strategy.clone(),
                         );
                     }
@@ -685,14 +692,15 @@ pub fn query_pdb(env: AppArgs) {
                         // If web, set superpose to true.
                         sort_and_print_match_query_result(
                             &mut match_results, MAX_NUM_LINES_FOR_WEB,
-                            &output_path, &query_string, true, header, verbose,
+                            &output_path, &pdb_path, &query_string, 
+                            column_refs.as_deref(), true, header, verbose,
                             match_sort_strategy.clone(),
                         );
                     }
                     QueryMode::PerStructure | QueryMode::SkipMatch => {
                         sort_and_print_structure_query_result(
                             &mut queried_from_indices, &output_path, 
-                            &query_string, header, verbose, structure_sort_strategy.clone()
+                            &pdb_path, &query_string, column_refs.as_deref(), header, verbose, structure_sort_strategy.clone()
                         );
                     }
                     QueryMode::ContradictoryPrintError => {
@@ -757,10 +765,8 @@ mod tests {
             plddt_cutoff: 0.0,
             rmsd_cutoff: 1.0,
             tm_score_cutoff: 0.0,
-            tm_score_strict_cutoff: 0.0,
             gdt_ts_cutoff: 0.0,
             gdt_ha_cutoff: 0.0,
-            gdt_strict_cutoff: 0.0,
             chamfer_distance_cutoff: 0.0,
             hausdorff_distance_cutoff: 0.0,
             top_n: 1000,
@@ -770,6 +776,7 @@ mod tests {
             freq_filter: None,
             length_penalty: None,
             sort_by: String::from("node_count,rmsd"),
+            format_output: None,
             output_per_structure: false,
             output_per_match: true,
             output_with_superpose: false,
@@ -812,10 +819,8 @@ mod tests {
                 plddt_cutoff: 0.0,
                 rmsd_cutoff: 1.0,
                 tm_score_cutoff: 0.0,
-                tm_score_strict_cutoff: 0.0,
                 gdt_ts_cutoff: 0.0,
                 gdt_ha_cutoff: 0.0,
-                gdt_strict_cutoff: 0.0,
                 chamfer_distance_cutoff: 0.0,
                 hausdorff_distance_cutoff: 0.0,
                 top_n: 1000,
@@ -824,8 +829,8 @@ mod tests {
                 sampling_ratio: None,
                 freq_filter: None,
                 length_penalty: None,
-                sort_by_rmsd: false,
-                sort_by_score: true,
+                sort_by: String::from("node_count,rmsd"),
+                format_output: None,
                 output_per_structure: true,
                 output_per_match: false,
                 output_with_superpose: true,
@@ -868,10 +873,8 @@ mod tests {
             plddt_cutoff: 0.0,
             rmsd_cutoff: 1.0,
             tm_score_cutoff: 0.0,
-            tm_score_strict_cutoff: 0.0,
             gdt_ts_cutoff: 0.0,
             gdt_ha_cutoff: 0.0,
-            gdt_strict_cutoff: 0.0,
             chamfer_distance_cutoff: 0.0,
             hausdorff_distance_cutoff: 0.0,
             top_n: 1000,
@@ -881,6 +884,7 @@ mod tests {
             freq_filter: None,
             length_penalty: None,
             sort_by: String::from("node_count,rmsd"),
+            format_output: None,
             output_per_structure: true,
             output_per_match: false,
             output_with_superpose: true,

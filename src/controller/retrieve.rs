@@ -1,6 +1,7 @@
-// 
-// use std::collections::{BTreeSet, HashMap, HashSet};
-use std::collections::{BTreeSet, BinaryHeap};
+///! Module for retrieval functions
+///! Contains functions for retrieving target residues containing the motif
+
+use std::collections::BTreeSet;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use petgraph::Graph;

@@ -59,10 +59,8 @@ pub enum AppArgs {
         rmsd_cutoff: f32,
         // Structure similarity metric filters (MatchQueryResult)
         tm_score_cutoff: f32,
-        tm_score_strict_cutoff: f32,
         gdt_ts_cutoff: f32,
         gdt_ha_cutoff: f32,
-        gdt_strict_cutoff: f32,
         chamfer_distance_cutoff: f32,
         hausdorff_distance_cutoff: f32,
         // top N filtering
@@ -75,6 +73,8 @@ pub enum AppArgs {
         length_penalty: Option<f32>,
         // sorting strategy
         sort_by: String,
+        // output format (comma-separated column names)
+        format_output: Option<String>,
         // output mode
         output_per_structure: bool,
         output_per_match: bool,

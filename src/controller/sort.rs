@@ -20,14 +20,10 @@ pub enum SortKey {
     Rmsd,
     /// TM-score
     TmScore,
-    /// TM-score strict
-    TmScoreStrict,
     /// GDT-TS (Global Distance Test - Total Score)
     GdtTs,
     /// GDT-HA (Global Distance Test - High Accuracy)
     GdtHa,
-    /// GDT-strict
-    GdtStrict,
     /// Chamfer distance
     ChamferDistance,
     /// Hausdorff distance
@@ -54,10 +50,8 @@ impl SortKey {
             "idf" | "score" => Ok(Self::Idf),
             "rmsd" => Ok(Self::Rmsd),
             "tm_score" | "tm-score" | "tmscore" | "tm" => Ok(Self::TmScore),
-            "tm_score_strict" | "tmscore_strict" | "tm-score-strict" | "tmscore-strict" | "tm_strict" | "tm-strict" => Ok(Self::TmScoreStrict),
             "gdt_ts" | "gdt-ts" | "gdtts" | "gdt" => Ok(Self::GdtTs),
             "gdt_ha" | "gdt-ha" | "gdtha" => Ok(Self::GdtHa),
-            "gdt_strict" | "gdt-strict" | "gdtstrict" => Ok(Self::GdtStrict),
             "chamfer" | "chamfer-distance" | "chamfer_distance" => Ok(Self::ChamferDistance),
             "hausdorff" | "hausdorff-distance" | "hausdorff_distance" => Ok(Self::HausdorffDistance),
             _ => Err(format!(
@@ -80,8 +74,7 @@ impl SortKey {
     pub fn default_order(&self) -> SortOrder {
         match self {
             // Descending order for NodeCount, IDF, TM-score, GDT scores
-            Self::NodeCount | Self::Idf | Self::TmScore | Self::TmScoreStrict | 
-            Self::GdtTs | Self::GdtHa | Self::GdtStrict => SortOrder::Desc,
+            Self::NodeCount | Self::Idf | Self::TmScore | Self::GdtTs | Self::GdtHa => SortOrder::Desc,
             // Ascending order for distance metrics: RMSD, Chamfer, Hausdorff
             Self::Rmsd | Self::ChamferDistance | Self::HausdorffDistance => SortOrder::Asc,
         }
@@ -94,10 +87,8 @@ impl SortKey {
             Self::Idf => result.idf,
             Self::Rmsd => result.rmsd,
             Self::TmScore => result.metrics.tm_score,
-            Self::TmScoreStrict => result.metrics.tm_score_strict,
             Self::GdtTs => result.metrics.gdt_ts,
             Self::GdtHa => result.metrics.gdt_ha,
-            Self::GdtStrict => result.metrics.gdt_strict,
             Self::ChamferDistance => result.metrics.chamfer_distance,
             Self::HausdorffDistance => result.metrics.hausdorff_distance,
         }
@@ -579,7 +570,7 @@ mod tests {
     #[test]
     fn test_strategy_with_dummy_data() {
         let result_a = MatchResult {
-            id: "toyA",
+            tid: "toyA",
             nid: 1,
             db_key: 1,
             node_count: 10,
@@ -591,17 +582,14 @@ mod tests {
             matching_coordinates: vec![],
             metrics: StructureSimilarityMetrics {
                 tm_score: 0.9,
-                tm_score_strict: 0.65,
                 gdt_ts: 0.8,
                 gdt_ha: 0.4,
-                gdt_strict: 0.2,
-                rmsd: 0.1,
                 chamfer_distance: 1.2,
                 hausdorff_distance: 2.5,
             },
         };
         let result_b = MatchResult {
-            id: "toyB",
+            tid: "toyB",
             nid: 2,
             db_key: 2,
             node_count: 8,
@@ -613,17 +601,14 @@ mod tests {
             matching_coordinates: vec![],
             metrics: StructureSimilarityMetrics {
                 tm_score: 0.75,
-                tm_score_strict: 0.65,
                 gdt_ts: 0.9,
                 gdt_ha: 0.3,
-                gdt_strict: 0.1,
-                rmsd: 0.24,
                 chamfer_distance: 2.9,
                 hausdorff_distance: 3.0,
             },
         };
         let result_c = MatchResult {
-            id: "toyC",
+            tid: "toyC",
             nid: 3,
             db_key: 3,
             node_count: 7,
@@ -635,11 +620,8 @@ mod tests {
             matching_coordinates: vec![],
             metrics: StructureSimilarityMetrics {
                 tm_score: 0.96,
-                tm_score_strict: 0.79,
                 gdt_ts: 0.3,
                 gdt_ha: 0.1,
-                gdt_strict: 0.04,
-                rmsd: 5.9,
                 chamfer_distance: 1.2,
                 hausdorff_distance: 8.0,
             },
@@ -730,7 +712,7 @@ mod tests {
     #[test]
     fn test_structure_strategy_with_dummy_data() {
         let result_a = StructureResult {
-            id: "structA",
+            tid: "structA",
             nid: 1,
             db_key: 1,
             total_match_count: 100,
@@ -746,7 +728,7 @@ mod tests {
         };
 
         let result_b = StructureResult {
-            id: "structB",
+            tid: "structB",
             nid: 2,
             db_key: 2,
             total_match_count: 120,
@@ -762,7 +744,7 @@ mod tests {
         };
 
         let result_c = StructureResult {
-            id: "structC",
+            tid: "structC",
             nid: 3,
             db_key: 3,
             total_match_count: 80,

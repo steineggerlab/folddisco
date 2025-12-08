@@ -380,23 +380,13 @@ pub fn read_structure_from_path(path: &str) -> Option<Structure> {
 
 
 // Functions to load index files
-pub fn get_offset_value_lookup_type(index_path: String) -> (String, String, String, String) {
-    let offset_path = format!("{}.offset", index_path.clone());
-    let lookup_path = format!("{}.lookup", index_path.clone());
-    let hash_type_path = format!("{}.type", index_path.clone());
+pub fn get_lookup_and_type(index_path: &str) -> (String, String) {
+    let lookup_path = format!("{}.lookup", index_path.to_string());
+    let hash_type_path = format!("{}.type", index_path.to_string());
 
-    // Check for new format (no extension) first, then fall back to .value extension
-    let value_path = if std::path::Path::new(&index_path).is_file() {
-        index_path.clone()  // New format: no extension
-    } else {
-        format!("{}.value", index_path.clone())  // Old format: with .value extension
-    };
-
-    assert!(std::path::Path::new(&offset_path).is_file());
-    assert!(std::path::Path::new(&value_path).is_file());
     assert!(std::path::Path::new(&lookup_path).is_file());
     assert!(std::path::Path::new(&hash_type_path).is_file());
-    (offset_path, value_path, lookup_path, hash_type_path)
+    (lookup_path, hash_type_path)
 }
 
 // Functions to load index files

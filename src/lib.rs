@@ -43,7 +43,7 @@ pub mod prelude {
     pub use crate::HashableSync;
     pub use crate::measure_time;
 
-    pub use crate::controller::FoldDisco;
+    pub use crate::controller::Folddisco;
     pub use crate::controller::io::{read_offset_map, save_offset_map, write_usize_vector};
     pub use crate::controller::query::{make_query_map, parse_query_string};
 

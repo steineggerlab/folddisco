@@ -102,8 +102,8 @@ pub fn benchmark(env: AppArgs) {
             };
             
             // TODO: Add false list (3rd column), neutral list (4th column)
+            let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
             
-            let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
             
             let index_path = index.unwrap();
             let lookup_path = format!("{}.lookup", index_path);
@@ -114,82 +114,83 @@ pub fn benchmark(env: AppArgs) {
             lookup.sort();
             lookup.dedup();
             let config = read_index_config_from_file(&config_path);
+            
+            pool.install(|| {
+                input_vector.par_iter().for_each(|(result_path, answer_path, neutral)| {
+                    // Parse path by id type
+                    let result = read_one_column_as_vec(&result_path, column_result, header_result, afdb_to_uniprot);
 
-            input_vector.par_iter().for_each(|(result_path, answer_path, neutral)| {
-                // Parse path by id type
-                let result = read_one_column_as_vec(&result_path, column_result, header_result, afdb_to_uniprot);
+                    let answer = read_one_column_as_vec(&answer_path, column_answer, header_answer, afdb_to_uniprot);
 
-                let answer = read_one_column_as_vec(&answer_path, column_answer, header_answer, afdb_to_uniprot);
+                    let metric = if let Some(neutral) = neutral {
+                        let neutral = read_one_column_as_vec(&neutral, column_neutral, header_neutral, afdb_to_uniprot);
 
-                let metric = if let Some(neutral) = neutral {
-                    let neutral = read_one_column_as_vec(&neutral, column_neutral, header_neutral, afdb_to_uniprot);
-
-                    if let Some(fp) = fp {
-                        measure_up_to_k_fp_with_neutral_vec(&result, &answer, &neutral, &lookup, fp)
+                        if let Some(fp) = fp {
+                            measure_up_to_k_fp_with_neutral_vec(&result, &answer, &neutral, &lookup, fp)
+                        } else {
+                            compare_target_answer_neutral_vec(&result, &answer, &neutral, &lookup)
+                        }
                     } else {
-                        compare_target_answer_neutral_vec(&result, &answer, &neutral, &lookup)
-                    }
-                } else {
-                    if let Some(fp) = fp {
-                        measure_up_to_k_fp_vec(&result, &answer, &lookup, fp)
-                    } else {
-                        compare_target_answer_vec(&result, &answer, &lookup)
-                    }
-                };
+                        if let Some(fp) = fp {
+                            measure_up_to_k_fp_vec(&result, &answer, &lookup, fp)
+                        } else {
+                            compare_target_answer_vec(&result, &answer, &lookup)
+                        }
+                    };
 
-                match format {
-                    "tsv" => {
-                        // lookup, result, answer, lookup_len, result_len, answer_len,
-                        // hash_type, num_bin_dist, num_bin_angle,
-                        // true_pos, true_neg, false_pos, false_neg, precision, recall, accuracy, f1_score, 
-                        println!(
-                            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}",
-                            index_path,
-                            result_path,
-                            answer_path,
-                            lookup.len(),
-                            result.len(),
-                            answer.len(),
-                            config.hash_type.to_string(),
-                            config.num_bin_dist,
-                            config.num_bin_angle,
-                            metric.true_pos,
-                            metric.true_neg,
-                            metric.false_pos,
-                            metric.false_neg,
-                            metric.precision(),
-                            metric.recall(),
-                            metric.accuracy(),
-                            metric.f1_score(),
-                        );
+                    match format {
+                        "tsv" => {
+                            // lookup, result, answer, lookup_len, result_len, answer_len,
+                            // hash_type, num_bin_dist, num_bin_angle,
+                            // true_pos, true_neg, false_pos, false_neg, precision, recall, accuracy, f1_score, 
+                            println!(
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}",
+                                index_path,
+                                result_path,
+                                answer_path,
+                                lookup.len(),
+                                result.len(),
+                                answer.len(),
+                                config.hash_type.to_string(),
+                                config.num_bin_dist,
+                                config.num_bin_angle,
+                                metric.true_pos,
+                                metric.true_neg,
+                                metric.false_pos,
+                                metric.false_neg,
+                                metric.precision(),
+                                metric.recall(),
+                                metric.accuracy(),
+                                metric.f1_score(),
+                            );
+                        }
+                        "default" => {
+                            println!("Index: {}", lookup_path);
+                            println!("Result: {}", result_path);
+                            println!("Answer: {}", answer_path);
+                            println!("Total ids: {}", lookup.len());
+                            println!("Result length: {}", result.len());
+                            println!("Answer length: {}", answer.len());
+                            println!("Hash type: {}", config.hash_type.to_string());
+                            println!("Number of distance bins: {}", config.num_bin_dist);
+                            println!("Number of angle bins: {}", config.num_bin_angle);
+                            println!("TP: {}", metric.true_pos);
+                            println!("TN: {}", metric.true_neg);
+                            println!("FP: {}", metric.false_pos);
+                            println!("FN: {}", metric.false_neg);
+                            // Print float with 4 decimal places
+                            println!("Precision: {:.4}", metric.precision());
+                            println!("Recall: {:.4}", metric.recall());
+                            println!("Accuracy: {:.4}", metric.accuracy());
+                            println!("F1 score: {:.4}", metric.f1_score());
+                        }
+                        _ => {
+                            print_log_msg(FAIL, "Invalid format");
+                            std::process::exit(1);
+                        }
                     }
-                    "default" => {
-                        println!("Index: {}", lookup_path);
-                        println!("Result: {}", result_path);
-                        println!("Answer: {}", answer_path);
-                        println!("Total ids: {}", lookup.len());
-                        println!("Result length: {}", result.len());
-                        println!("Answer length: {}", answer.len());
-                        println!("Hash type: {}", config.hash_type.to_string());
-                        println!("Number of distance bins: {}", config.num_bin_dist);
-                        println!("Number of angle bins: {}", config.num_bin_angle);
-                        println!("TP: {}", metric.true_pos);
-                        println!("TN: {}", metric.true_neg);
-                        println!("FP: {}", metric.false_pos);
-                        println!("FN: {}", metric.false_neg);
-                        // Print float with 4 decimal places
-                        println!("Precision: {:.4}", metric.precision());
-                        println!("Recall: {:.4}", metric.recall());
-                        println!("Accuracy: {:.4}", metric.accuracy());
-                        println!("F1 score: {:.4}", metric.f1_score());
-                    }
-                    _ => {
-                        print_log_msg(FAIL, "Invalid format");
-                        std::process::exit(1);
-                    }
-                }
+                });
             });
-
         }
         _ => {
             eprintln!("{}", HELP_BENCHMARK);

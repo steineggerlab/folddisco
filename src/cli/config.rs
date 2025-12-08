@@ -2,7 +2,6 @@
 use std::{fs, io::{BufRead, Write}};
 use crate::prelude::{HashType, log_msg, FAIL};
 use toml::map::Map;
-use crate::controller::mode::IndexMode;
 use crate::structure::io::StructureFileFormat;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -10,7 +9,6 @@ pub struct IndexConfig {
     pub hash_type: HashType,
     pub num_bin_dist: usize,
     pub num_bin_angle: usize,
-    pub mode: IndexMode,
     pub grid_width: f32,
     pub chunk_size: usize,
     pub max_residue: usize,
@@ -22,7 +20,7 @@ pub struct IndexConfig {
 impl IndexConfig {
     pub fn new(
         hash_type: HashType, num_bin_dist: usize, num_bin_angle: usize,
-        mode: IndexMode, grid_width: f32, chunk_size: usize, max_residue: usize,
+        grid_width: f32, chunk_size: usize, max_residue: usize,
         input_format: StructureFileFormat, foldcomp_db: Option<String>,
         multiple_bin: Option<Vec<(usize, usize)>>,
     ) -> Self {
@@ -30,7 +28,6 @@ impl IndexConfig {
             hash_type,
             num_bin_dist,
             num_bin_angle,
-            mode,
             grid_width,
             chunk_size,
             max_residue,
@@ -43,8 +40,6 @@ impl IndexConfig {
         let hash_type = toml["hash_type"].as_str().unwrap();
         let num_bin_dist = toml["num_bin_dist"].as_integer().unwrap() as usize;
         let num_bin_angle = toml["num_bin_angle"].as_integer().unwrap() as usize;
-        let mode = toml["mode"].as_str().unwrap();
-        let mode = IndexMode::get_with_str(mode);
         let grid_width = toml["grid_width"].as_float().unwrap() as f32;
         let chunk_size = toml["chunk_size"].as_integer().unwrap() as usize;
         let max_residue = toml["max_residue"].as_integer().unwrap() as usize;
@@ -60,7 +55,6 @@ impl IndexConfig {
             hash_type: HashType::get_with_str(hash_type),
             num_bin_dist,
             num_bin_angle,
-            mode,
             grid_width,
             chunk_size,
             max_residue,
@@ -74,7 +68,6 @@ impl IndexConfig {
         map.insert("hash_type".to_string(), toml::Value::String(self.hash_type.to_string()));
         map.insert("num_bin_dist".to_string(), toml::Value::Integer(self.num_bin_dist as i64));
         map.insert("num_bin_angle".to_string(), toml::Value::Integer(self.num_bin_angle as i64));
-        map.insert("mode".to_string(), toml::Value::String(self.mode.to_string()));
         map.insert("grid_width".to_string(), toml::Value::Float(self.grid_width as f64));
         map.insert("chunk_size".to_string(), toml::Value::Integer(self.chunk_size as i64));
         map.insert("max_residue".to_string(), toml::Value::Integer(self.max_residue as i64));
@@ -243,7 +236,7 @@ mod tests {
         let index_config = Some(
             IndexConfig::new(
                 HashType::PDBTrRosetta, 10, 10,
-                IndexMode::Id, 30.0, 65535, 4000,
+                30.0, 65535, 4000,
                 StructureFileFormat::PDB, None, None
             )
         );
@@ -261,7 +254,7 @@ mod tests {
         let path = "data/index_config.toml";
         let index_config = IndexConfig::new(
             HashType::PDBTrRosetta, 10, 10,
-            IndexMode::Big, 30.0, 65535, 4000,
+            30.0, 65535, 4000,
             StructureFileFormat::FCZDB, Some("data/foldcomp_db".to_string()),
             Some(vec![(16, 4), (8, 3)])
         );

@@ -22,7 +22,6 @@ use std::io::Write;
 use std::sync::Arc;
 use feature::get_geometric_hash_as_u32_from_structure;
 use io::read_structure_from_path;
-use mode::IndexMode;
 // External imports
 use rayon::prelude::*;
 
@@ -44,10 +43,10 @@ const DEFAULT_DIST_CUTOFF: f32 = 20.0;
 // Module specific types
 pub type ResidueMatch = Option<(u8, u64)>;
 
-unsafe impl Send for FoldDisco {}
-unsafe impl Sync for FoldDisco {}
+unsafe impl Send for Folddisco {}
+unsafe impl Sync for Folddisco {}
 
-pub struct FoldDisco {
+pub struct Folddisco {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
     pub numeric_db_key_vec: Vec<usize>,
@@ -62,7 +61,6 @@ pub struct FoldDisco {
     pub output_path: String,
     pub max_residue: usize,
     pub dist_cutoff: f32,
-    pub index_mode: IndexMode,
     pub fold_disco_index: FolddiscoIndex,
     pub foldcomp_db_path: String,
     #[cfg(not(feature = "foldcomp"))]
@@ -72,11 +70,12 @@ pub struct FoldDisco {
     pub is_foldcomp_enabled: bool,
 }
 
-impl FoldDisco {
+impl Folddisco {
     // Constructors
-    pub fn create_with_hash_type(path_vec: Vec<String>, hash_type: HashType) -> FoldDisco {
+    pub fn create_with_hash_type(path_vec: Vec<String>, hash_type: HashType) -> Folddisco {
         let length = path_vec.len();
-        FoldDisco {
+        let total_hashes = 2usize.pow(hash_type.encoding_bits() as u32);
+        Folddisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::with_capacity(length),
             numeric_db_key_vec: Vec::new(),
@@ -91,8 +90,7 @@ impl FoldDisco {
             output_path: String::new(),
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: DEFAULT_DIST_CUTOFF,
-            index_mode: IndexMode::Id,
-            fold_disco_index: FolddiscoIndex::new(0usize, String::new(), false),
+            fold_disco_index: FolddiscoIndex::new(total_hashes, String::new(), false),
             foldcomp_db_path: String::new(),
             #[cfg(not(feature = "foldcomp"))]
             foldcomp_db_reader: false,
@@ -105,15 +103,12 @@ impl FoldDisco {
     pub fn new(
         path_vec: Vec<String>, hash_type: HashType, num_threads: usize,
         num_bin_dist: usize, num_bin_angle: usize, output_path: String,
-        dist_cutoff: f32, index_mode: IndexMode, multiple_bins: Option<Vec<(usize, usize)>>,
+        dist_cutoff: f32, multiple_bins: Option<Vec<(usize, usize)>>,
         mmap_on_disk: bool,
-    ) -> FoldDisco {
+    ) -> Folddisco {
         let length = path_vec.len();
-        let total_hashes = match index_mode {
-            IndexMode::Id => 0,
-            IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
-        };
-        FoldDisco {
+        let total_hashes = 2usize.pow(hash_type.encoding_bits() as u32);
+        Folddisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::with_capacity(length),
             numeric_db_key_vec: Vec::new(),
@@ -128,7 +123,6 @@ impl FoldDisco {
             output_path: output_path.clone(),
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: dist_cutoff,
-            index_mode: index_mode,
             fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone(), mmap_on_disk),
             foldcomp_db_path: String::new(),
             #[cfg(not(feature = "foldcomp"))]
@@ -143,18 +137,15 @@ impl FoldDisco {
     pub fn new_with_foldcomp_db(
         path_vec: Vec<String>, hash_type: HashType, num_threads: usize,
         num_bin_dist: usize, num_bin_angle: usize, output_path: String,
-        dist_cutoff: f32, index_mode: IndexMode, foldcomp_db_path: &'static str,
+        dist_cutoff: f32, foldcomp_db_path: &'static str,
         multiple_bins: Option<Vec<(usize, usize)>>,
         mmap_on_disk: bool,
-    ) -> FoldDisco {
+    ) -> Folddisco {
         let length = path_vec.len();
-        let total_hashes = match index_mode {
-            IndexMode::Id => 0,
-            IndexMode::Big => 2usize.pow(hash_type.encoding_bits() as u32),
-        };
+        let total_hashes = 2usize.pow(hash_type.encoding_bits() as u32);
         let foldcomp_db_reader = FoldcompDbReader::new(&foldcomp_db_path);
         
-        FoldDisco {
+        Folddisco {
             path_vec: path_vec,
             numeric_id_vec: Vec::with_capacity(length),
             numeric_db_key_vec: foldcomp_db_reader.get_db_key_vector(),
@@ -169,7 +160,6 @@ impl FoldDisco {
             output_path: output_path.clone(),
             max_residue: DEFAULT_MAX_RESIDUE,
             dist_cutoff: dist_cutoff,
-            index_mode: index_mode,
             fold_disco_index: FolddiscoIndex::new(total_hashes, output_path.clone(), mmap_on_disk),
             foldcomp_db_path: foldcomp_db_path.to_string(),
             foldcomp_db_reader: foldcomp_db_reader,

@@ -13,12 +13,11 @@ use super::feature::get_single_feature;
 use super::io::read_compact_structure;
 
 /// Calculate IDF (Inverse Document Frequency) for a given GeometricHash
-/// Uses offset_table (idmode) or big_index (bigmode) to determine hash count
+/// Uses index to determine hash count
 pub fn calculate_idf_for_hash(
     hash: &GeometricHash,
     offset_table: &Option<&super::map::SimpleHashMap>,
-    // big_index: &Option<&crate::index::indextable::FolddiscoIndex>,
-    big_index: &Option<&FolddiscoIndex>,
+    index: &Option<&FolddiscoIndex>,
     total_structures: f32,
 ) -> f32 {
     // Try idmode first (offset_table)
@@ -27,9 +26,9 @@ pub fn calculate_idf_for_hash(
             return (total_structures / (*hc as f32)).log2();
         }
     }
-    // Try bigmode (big_index)
-    if let Some(ref index) = big_index {
-        let entries = index.get_entries(hash.as_u32());
+    // Use index to get hash counts
+    if let Some(ref idx) = index {
+        let entries = idx.get_entries(hash.as_u32());
         let hash_count = entries.len();
         if hash_count > 0 {
             return (total_structures / (hash_count as f32)).log2();
@@ -219,8 +218,7 @@ pub fn make_query_map(
     dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
     amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32, serial_query: bool,
     offset_table: &Option<&super::map::SimpleHashMap>,
-    // big_index: &Option<&crate::index::indextable::FolddiscoIndex>,
-    big_index: &Option<&FolddiscoIndex>,
+    index: &Option<&FolddiscoIndex>,
     total_structures: f32,
 ) -> (HashMap<GeometricHash, ((usize, usize), bool, f32)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
 
@@ -295,7 +293,7 @@ pub fn make_query_map(
             } else {
                 GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle)
             };
-            let idf = calculate_idf_for_hash(&observed_hash, offset_table, big_index, total_structures);
+            let idf = calculate_idf_for_hash(&observed_hash, offset_table, index, total_structures);
             
             insert_binned_hash(
                 &mut hash_collection, &feature, (indices[i], indices[j]), 

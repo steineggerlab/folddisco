@@ -219,41 +219,6 @@ pub fn parse_path_set_by_id_type(path_set: &HashSet<String>, id_type: &IdType) -
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IndexMode {
-    Id,
-    Big,
-}
-
-impl IndexMode {
-    pub fn get_with_str(mode: &str) -> Self {
-        match mode {
-            "Id" | "id" | "ID" => Self::Id,
-            "Big" | "big" | "BIG" => Self::Big,
-            _ => Self::Id,
-        }
-    }
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::Id => "id".to_string(),
-            Self::Big => "big".to_string(),
-        }
-    }
-    pub fn get_with_u8(mode: u8) -> Self {
-        match mode {
-            0 => Self::Id,
-            1 => Self::Big,
-            _ => Self::Id,
-        }
-    }
-    pub fn to_u8(&self) -> u8 {
-        match self {
-            Self::Id => 0,
-            Self::Big => 1,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryMode {
     PerMatch,      // Default mode: print per match with residue matching
     PerStructure,  // Print per structure (aggregated results)
@@ -317,15 +282,6 @@ mod tests {
         assert_eq!(id_type.to_u8(), 0);
         assert_eq!(IdType::get_with_u8(0), IdType::Pdb);
         assert_eq!(IdType::get_with_str("pdb"), IdType::Pdb);
-    }
-
-    #[test]
-    fn test_index_mode() {
-        let index_mode = IndexMode::Id;
-        assert_eq!(index_mode.to_string(), "id");
-        assert_eq!(index_mode.to_u8(), 0);
-        assert_eq!(IndexMode::get_with_u8(0), IndexMode::Id);
-        assert_eq!(IndexMode::get_with_str("id"), IndexMode::Id);
     }
 
     #[test]

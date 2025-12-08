@@ -7,31 +7,28 @@
 // When querying PDB files, we need index table and query file.
 
 use std::io::BufRead;
-use std::path::PathBuf;
 
-use memmap2::{Mmap, MmapMut};
 use rayon::prelude::*;
 
-use crate::cli::config::{read_index_config_from_file, IndexConfig};
+use crate::cli::config::read_index_config_from_file;
 use crate::controller::filter::{MatchFilter, StructureFilter};
-use crate::controller::map::SimpleHashMap;
-use crate::controller::mode::{IndexMode, QueryMode};
+use crate::controller::mode::QueryMode;
 use crate::controller::sort::{MatchSortStrategy, StructureSortStrategy};
 use crate::cli::*;
 use crate::controller::io::{
-    read_compact_structure, read_u16_vector, 
-    check_and_get_indices, get_offset_value_lookup_type,
+    read_compact_structure, 
+    check_and_get_indices, get_lookup_and_type,
 };
 use crate::controller::query::{
     make_query_map, parse_threshold_string
 };
-use crate::controller::count_query::{count_query_bigmode, count_query_idmode};
+use crate::controller::count_query::count_query;
 use crate::controller::result::{
     convert_structure_query_result_to_match_query_results, 
     sort_and_print_match_query_result, sort_and_print_structure_query_result, StructureResult
 };
 use crate::controller::retrieve::retrieval_wrapper;
-use crate::index::indextable::{FolddiscoIndex, load_folddisco_index};
+use crate::index::indextable::load_folddisco_index;
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
 
@@ -209,6 +206,7 @@ pub fn query_pdb(env: AppArgs) {
                 std::process::exit(1);
             }
             
+            
             // Parse the appropriate sorting strategy based on query mode
             // For per-structure output modes, use StructureSortStrategy
             // For per-match output modes, use MatchSortStrategy
@@ -264,36 +262,25 @@ pub fn query_pdb(env: AppArgs) {
                 }
                 // NOTE: If needed, print filter information
             }
+            
+            // Set thread pool if there's no global thread pool yet
+            rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
+            
             // Get index paths
             let index_paths = check_and_get_indices(index_path.clone(), verbose);
             if verbose {
                 print_log_msg(INFO, &format!("Found {} index file(s). Querying with {} threads", index_paths.len(), threads));
             }
             
-            let mut use_big_index = false;
-            if index_paths.len() == 1 {
-                // Check index mode is Big
-                let (_, _, _, hash_type_path) = get_offset_value_lookup_type(index_paths[0].clone());
-                let config = read_index_config_from_file(&hash_type_path);
-                if config.mode == IndexMode::Big {
-                    use_big_index = true;
-                }
-            }
-            // Load big index here
-            
+            // Always use big index
             let index_prefix = index_paths[0].clone();
-            let (big_index, big_offset_mmap) = if use_big_index {
-                // load_big_index(&index_prefix)
-                load_folddisco_index(&index_prefix)
-            } else {
-                // (FolddiscoIndex::new(0, "".to_string(), false),
-                //  MmapMut::map_anon(0).unwrap().make_read_only().unwrap())
-                (FolddiscoIndex::new(0, "".to_string(), false),
-                 MmapMut::map_anon(0).unwrap().make_read_only().unwrap())
-            };
+            let (index, offset_mmap) = measure_time!(load_folddisco_index(&index_prefix), verbose);
+            
+            // Load lookup and config
+            let (lookup_path, hash_type_path) = get_lookup_and_type(&index_prefix);
+            let config = read_index_config_from_file(&hash_type_path);
+            let lookup = measure_time!(load_lookup_from_file(&lookup_path), verbose);
 
-            // Set thread pool
-            let _pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().unwrap();
             
             let queries = if query_string.ends_with(".txt") || query_string.ends_with(".tsv") {
                 // Read file and get path, query, output by line
@@ -318,29 +305,7 @@ pub fn query_pdb(env: AppArgs) {
             let dist_thresholds = parse_threshold_string(Some(dist_threshold.clone()));
             let angle_thresholds = parse_threshold_string(Some(angle_threshold.clone()));
     
-            let loaded_index_vec = index_paths.into_par_iter().map(|index_path| {
-                let (offset_path, value_path, lookup_path, hash_type_path) = get_offset_value_lookup_type(index_path);
-                let config = read_index_config_from_file(&hash_type_path);
-                let (offset_table, offset_mmap) = if verbose && !use_big_index { measure_time!(
-                    SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
-                ) } else if !use_big_index {
-                    SimpleHashMap::load_from_disk(&PathBuf::from(&offset_path))
-                } else {
-                    let anon_mmap: Mmap = MmapMut::map_anon(0).unwrap().make_read_only().unwrap();
-                    (Ok(SimpleHashMap::new(0)), anon_mmap)
-                };
-                let offset_table = offset_table.unwrap();
-                let lookup = if verbose {
-                    measure_time!(load_lookup_from_file(&lookup_path))
-                } else {
-                    load_lookup_from_file(&lookup_path)
-                };
-                (offset_table, offset_mmap, lookup, config, value_path)
-            }).collect::<Vec<(SimpleHashMap, Mmap, Vec<(String, usize, usize, f32, usize)>, IndexConfig, String)>>();
-            
             // Load foldcomp db 
-            #[cfg(feature = "foldcomp")]
-            let config = &loaded_index_vec[0].3;
             #[cfg(feature = "foldcomp")]
             let using_foldcomp = config.foldcomp_db.is_some() && config.input_format == StructureFileFormat::FCZDB;
 
@@ -356,11 +321,7 @@ pub fn query_pdb(env: AppArgs) {
                                 foldcomp_db_path = local_foldcomp_db_path.unwrap();
                             }
                         }
-                        if verbose {
-                            measure_time!(FoldcompDbReader::new(foldcomp_db_path.as_str()))
-                        } else {
-                            FoldcompDbReader::new(foldcomp_db_path.as_str())
-                        }
+                        measure_time!(FoldcompDbReader::new(foldcomp_db_path.as_str()), verbose)
                     } else {
                         FoldcompDbReader::empty()
                     }
@@ -392,276 +353,88 @@ pub fn query_pdb(env: AppArgs) {
                     res_chain_to_string(&query_residues)
                 };
 
-                // Get query map for each query in all indices
-                let mut queried_from_indices: Vec<(usize, StructureResult)> = loaded_index_vec.par_iter().map(
-                    |(offset_table, _offset_mmap, lookup, config, value_path)| {
-                        let hash_type = config.hash_type;
-                        let num_bin_dist = config.num_bin_dist;
-                        let num_bin_angle = config.num_bin_angle;
-                        let mode = config.mode;
-                        let dist_cutoff = config.grid_width;
-                        let multiple_bin = &config.multiple_bin;
-                        let total_structures = lookup.len() as f32;
-                        let (pdb_query_map, query_indices, aa_dist_map ) = if verbose { 
-                            if use_big_index {
-                                measure_time!(make_query_map(
-                                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
-                                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
-                                    &None, &Some(&big_index), total_structures
-                                ))
-                            } else {
-                                measure_time!(make_query_map(
-                                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
-                                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
-                                    &Some(offset_table), &None, total_structures
-                                ))
-                            }
-                        } else {
-                            if use_big_index {
-                                make_query_map(
-                                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
-                                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
-                                    &None, &Some(&big_index), total_structures
-                                )
-                            } else {
-                                make_query_map(
-                                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
-                                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
-                                    &Some(offset_table), &None, total_structures
-                                )
-                            }
-                        };
+                // Get query map for the index
+                let hash_type = config.hash_type;
+                let num_bin_dist = config.num_bin_dist;
+                let num_bin_angle = config.num_bin_angle;
+                let dist_cutoff = config.grid_width;
+                let multiple_bin = &config.multiple_bin;
+                let total_structures = lookup.len() as f32;
+                        
+                let (pdb_query_map, query_indices, aa_dist_map ) = measure_time!(make_query_map(
+                    &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
+                    &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
+                    &None, &Some(&index), total_structures
+                ), verbose);
 
-                        let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
-                        // Make filters out of filtering parameters
-                        let structure_filter = StructureFilter::new(
-                            total_match_count, covered_node_count, covered_node_ratio,
-                            idf_score_cutoff, num_res_cutoff, plddt_cutoff, 
-                            max_matching_node_count, max_matching_node_ratio, rmsd_cutoff,
-                            _residue_count,
-                        );
+                let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();
+                // Make filters out of filtering parameters
+                let structure_filter = StructureFilter::new(
+                    total_match_count, covered_node_count, covered_node_ratio,
+                    idf_score_cutoff, num_res_cutoff, plddt_cutoff, 
+                    max_matching_node_count, max_matching_node_ratio, rmsd_cutoff,
+                    _residue_count,
+                );
 
-                        match mode {
-                            IndexMode::Id => {
-                                let (value_mmap, value_vec) = if verbose { measure_time!(read_u16_vector(&value_path).expect(
-                                    &log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path))
-                                )) } else {
-                                    read_u16_vector(&value_path).expect(&log_msg(FAIL, &format!("Failed to load value vector: {}", &value_path)))
-                                };
-                                let query_count_map = if verbose { measure_time!(count_query_idmode(
-                                    &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup, 
-                                    sampling_ratio, sampling_count, freq_filter, length_penalty
-                                ))} else {
-                                    count_query_idmode(
-                                        &pdb_query, &pdb_query_map, &offset_table, value_vec, &lookup,
-                                        sampling_ratio, sampling_count, freq_filter, length_penalty
-                                    )
-                                };
+                let query_count_map = measure_time!(count_query(
+                    &pdb_query, &pdb_query_map, &index, &lookup,
+                    sampling_ratio, sampling_count, freq_filter, length_penalty
+                ), verbose);
+                let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
+                    structure_filter.filter_before_matching(v)
+                }).collect();
 
-                                let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
-                                    structure_filter.filter_before_matching(v)
-                                }).collect();
-                                if verbose {
-                                    print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
-                                }
-                                // 
-                                if verbose {
-                                    measure_time!(query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
-                                } else {
-                                    query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap());
-                                }
-                                // Apply top N filter if top_n is not usize::MAX
-                                if top_n != usize::MAX {
-                                    if verbose {
-                                        print_log_msg(INFO, &format!("Limiting result to top {} structures", top_n));
-                                    }
-                                    query_count_vec.truncate(top_n);
-                                }
-                                // IF retrieve is true, retrieve matching residues
-                                if !skip_match {
-                                    if verbose {
-                                        measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
-                                            #[cfg(not(feature = "foldcomp"))]
-                                            let retrieval_result = retrieval_wrapper(
-                                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map, ca_dist_threshold, partial_fit
-                                            );
-                                            #[cfg(feature = "foldcomp")]
-                                            let retrieval_result = if using_foldcomp {
-                                                retrieval_wrapper_for_foldcompdb(
-                                                    v.db_key, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                    &pdb_query_map, &query_structure, &query_indices,
-                                                    &aa_dist_map, ca_dist_threshold, partial_fit,
-                                                    &foldcomp_db_reader
-                                                )
-                                            } else {
-                                                retrieval_wrapper(
-                                                    &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                    &pdb_query_map, &query_structure, &query_indices,
-                                                    &aa_dist_map, ca_dist_threshold, partial_fit
-                                                )
-                                            };
-                                            v.matching_residues = retrieval_result.0;
-                                            v.matching_residues_processed = retrieval_result.1;
-                                            v.max_matching_node_count = retrieval_result.2;
-                                            v.min_rmsd_with_max_match = retrieval_result.3;
-                                        }));
-                                    } else {
-                                        query_count_vec.par_iter_mut().for_each(|(_, v)| {
-                                            #[cfg(not(feature = "foldcomp"))]
-                                            let retrieval_result = retrieval_wrapper(
-                                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map, ca_dist_threshold, partial_fit,
-                                            );
-                                            #[cfg(feature = "foldcomp")]
-                                            let retrieval_result = if using_foldcomp {
-                                                retrieval_wrapper_for_foldcompdb(
-                                                    v.db_key, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                    &pdb_query_map, &query_structure, &query_indices,
-                                                    &aa_dist_map, ca_dist_threshold, partial_fit,
-                                                    &foldcomp_db_reader
-                                                )
-                                            } else {
-                                                retrieval_wrapper(
-                                                    &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                    &pdb_query_map, &query_structure, &query_indices,
-                                                    &aa_dist_map, ca_dist_threshold, partial_fit,
-                                                )
-                                            };
-                                            v.matching_residues = retrieval_result.0;
-                                            v.matching_residues_processed = retrieval_result.1;
-                                            v.max_matching_node_count = retrieval_result.2;
-                                            v.min_rmsd_with_max_match = retrieval_result.3;
-                                        });
-                                    }
-                                    
-                                    // Filter query_count_vec with reasonable retrieval results
-                                    query_count_vec.retain(|(_, v)| structure_filter.filter_after_matching(v));
-                                    drop(value_mmap);
-                                    return query_count_vec;
-                                }
-                                drop(value_mmap);
-                                query_count_vec
-                            },
-                            IndexMode::Big => {
+                if verbose {
+                    print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
+                }
 
-                                let query_count_map = if verbose { measure_time!(count_query_bigmode(
-                                    &pdb_query, &pdb_query_map, &big_index, &lookup, 
-                                    sampling_ratio, sampling_count, freq_filter, length_penalty
-                                )) } else {
-                                    count_query_bigmode(
-                                        &pdb_query, &pdb_query_map, &big_index, &lookup,
-                                        sampling_ratio, sampling_count, freq_filter, length_penalty
-                                    )
-                                };
-                                let mut query_count_vec: Vec<(usize, StructureResult)> = query_count_map.into_par_iter().filter(|(_k, v)| {
-                                    structure_filter.filter_before_matching(v)
-                                }).collect();
-
-                                if verbose {
-                                    print_log_msg(INFO, &format!("Found {} structures from inverted index", query_count_vec.len()));
-                                }
-
-                                // 
-                                if verbose {
-                                    measure_time!(query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()));
-                                } else {
-                                    query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap());
-                                }
-                                // Apply top N filter if top_n is not usize::MAX
-                                if top_n != usize::MAX {
-                                    if verbose {
-                                        print_log_msg(INFO, &format!("Limiting result to top {} structures", top_n));
-                                    }
-                                    query_count_vec.truncate(top_n);
-                                }
-                                
-                                // IF retrieve is true, retrieve matching residues
-                                if !skip_match {
-                                    if verbose {
-                                        measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
-                                            #[cfg(not(feature = "foldcomp"))]
-                                            let retrieval_result = retrieval_wrapper(
-                                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map, ca_dist_threshold, partial_fit
-                                            );
-                                            #[cfg(feature = "foldcomp")]
-                                            let retrieval_result = if using_foldcomp {
-                                                retrieval_wrapper_for_foldcompdb(
-                                                    v.db_key, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                    &pdb_query_map, &query_structure, &query_indices,
-                                                    &aa_dist_map, ca_dist_threshold, partial_fit,
-                                                    &foldcomp_db_reader
-                                                )
-                                            } else {
-                                                retrieval_wrapper(
-                                                    &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                    &pdb_query_map, &query_structure, &query_indices,
-                                                    &aa_dist_map, ca_dist_threshold, partial_fit,
-                                                )
-                                            };
-                                            v.matching_residues = retrieval_result.0;
-                                            v.matching_residues_processed = retrieval_result.1;
-                                            v.max_matching_node_count = retrieval_result.2;
-                                            v.min_rmsd_with_max_match = retrieval_result.3;
-                                        }));
-                                    } else {
-                                        query_count_vec.par_iter_mut().for_each(|(_, v)| {
-                                            #[cfg(not(feature = "foldcomp"))]
-                                            let retrieval_result = retrieval_wrapper(
-                                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                &pdb_query_map, &query_structure, &query_indices,
-                                                &aa_dist_map, ca_dist_threshold, partial_fit,
-                                            );
-                                            #[cfg(feature = "foldcomp")]
-                                            let retrieval_result = if using_foldcomp {
-                                                retrieval_wrapper_for_foldcompdb(
-                                                    v.db_key, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                    &pdb_query_map, &query_structure, &query_indices,
-                                                    &aa_dist_map, ca_dist_threshold, partial_fit,
-                                                    &foldcomp_db_reader
-                                                )
-                                            } else {
-                                                retrieval_wrapper(
-                                                    &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
-                                                    hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
-                                                    &pdb_query_map, &query_structure, &query_indices,
-                                                    &aa_dist_map, ca_dist_threshold, partial_fit,
-                                                )
-                                            };
-                                            v.matching_residues = retrieval_result.0;
-                                            v.matching_residues_processed = retrieval_result.1;
-                                            v.max_matching_node_count = retrieval_result.2;
-                                            v.min_rmsd_with_max_match = retrieval_result.3;
-                                        });
-                                    }
-
-                                    // Filter query_count_vec with reasonable retrieval results
-                                    query_count_vec.retain(|(_, v)| structure_filter.filter_after_matching(v));
-                                    return query_count_vec;
-                                }
-                                query_count_vec
-                            },
-                        } // match mode
+                        // 
+                measure_time!(query_count_vec.par_sort_by(|a, b| b.1.idf.partial_cmp(&a.1.idf).unwrap()), verbose);
+                // Apply top N filter if top_n is not usize::MAX
+                if top_n != usize::MAX {
+                    if verbose {
+                        print_log_msg(INFO, &format!("Limiting result to top {} structures", top_n));
                     }
-                ).reduce(|| Vec::new(), |mut acc, x| {
-                    acc.extend(x);
-                    acc
-                });
+                    query_count_vec.truncate(top_n);
+                }
+                        
+                // IF retrieve is true, retrieve matching residues
+                if !skip_match {
+                    measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                        #[cfg(not(feature = "foldcomp"))]
+                        let retrieval_result = retrieval_wrapper(
+                            &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                            hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
+                            &pdb_query_map, &query_structure, &query_indices,
+                            &aa_dist_map, ca_dist_threshold, partial_fit
+                        );
+                        #[cfg(feature = "foldcomp")]
+                        let retrieval_result = if using_foldcomp {
+                            retrieval_wrapper_for_foldcompdb(
+                                v.db_key, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
+                                &pdb_query_map, &query_structure, &query_indices,
+                                &aa_dist_map, ca_dist_threshold, partial_fit,
+                                &foldcomp_db_reader
+                            )
+                        } else {
+                            retrieval_wrapper(
+                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
+                                &pdb_query_map, &query_structure, &query_indices,
+                                &aa_dist_map, ca_dist_threshold, partial_fit,
+                            )
+                        };
+                        v.matching_residues = retrieval_result.0;
+                        v.matching_residues_processed = retrieval_result.1;
+                        v.max_matching_node_count = retrieval_result.2;
+                        v.min_rmsd_with_max_match = retrieval_result.3;
+                    }), verbose);
+
+                    // Filter query_count_vec with reasonable retrieval results
+                    query_count_vec.retain(|(_, v)| structure_filter.filter_after_matching(v));
+                }
+                let mut queried_from_indices = query_count_vec;
                 drop(query_residues);
                 
                 let match_filter= MatchFilter::new(
@@ -712,9 +485,9 @@ pub fn query_pdb(env: AppArgs) {
                 drop(queried_from_indices);
                 drop(query_structure);
             }); // queries
-            drop(loaded_index_vec);
-            drop(big_offset_mmap);
-            drop(big_index);
+            drop(lookup);
+            drop(offset_mmap);
+            drop(index);
         }, // AppArgs::Query
         _ => {
             eprintln!("{}", HELP_QUERY);

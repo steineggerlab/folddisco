@@ -364,7 +364,7 @@ pub fn query_pdb(env: AppArgs) {
                 let (pdb_query_map, query_indices, aa_dist_map ) = measure_time!(make_query_map(
                     &pdb_path, &query_residues, hash_type, num_bin_dist, num_bin_angle, multiple_bin,
                     &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, serial_query,
-                    &None, &Some(&index), total_structures
+                    &Some(&index), total_structures
                 ), verbose);
 
                 let pdb_query = pdb_query_map.keys().cloned().collect::<Vec<_>>();

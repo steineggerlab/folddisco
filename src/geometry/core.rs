@@ -4,7 +4,7 @@
 
 use std::{fmt, io::{BufRead, Write}};
 
-use crate::HashableSync;
+use crate::utils::traits::HashableSync;
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum HashType {

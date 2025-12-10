@@ -16,16 +16,9 @@ use super::io::read_compact_structure;
 /// Uses index to determine hash count
 pub fn calculate_idf_for_hash(
     hash: &GeometricHash,
-    offset_table: &Option<&super::map::SimpleHashMap>,
     index: &Option<&FolddiscoIndex>,
     total_structures: f32,
 ) -> f32 {
-    // Try idmode first (offset_table)
-    if let Some(ref table) = offset_table {
-        if let Some((_, hc)) = table.get(hash) {
-            return (total_structures / (*hc as f32)).log2();
-        }
-    }
     // Use index to get hash counts
     if let Some(ref idx) = index {
         let entries = idx.get_entries(hash.as_u32());
@@ -217,7 +210,6 @@ pub fn make_query_map(
     nbin_dist: usize, nbin_angle: usize, multiple_bin: &Option<Vec<(usize, usize)>>,
     dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
     amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32, serial_query: bool,
-    offset_table: &Option<&super::map::SimpleHashMap>,
     index: &Option<&FolddiscoIndex>,
     total_structures: f32,
 ) -> (HashMap<GeometricHash, ((usize, usize), bool, f32)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
@@ -293,7 +285,7 @@ pub fn make_query_map(
             } else {
                 GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle)
             };
-            let idf = calculate_idf_for_hash(&observed_hash, offset_table, index, total_structures);
+            let idf = calculate_idf_for_hash(&observed_hash, index, total_structures);
             
             insert_binned_hash(
                 &mut hash_collection, &feature, (indices[i], indices[j]), 
@@ -413,7 +405,7 @@ mod tests {
         let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
             &path, &query_residues, hash_type, 16, 4, &None,
             &vec![0.0], &vec![0.0], &amino_acid_substitutions, 20.0, false,
-            &None, &None, 1000.0
+            &None, 1000.0
         );
         let hash_key = hash_collection.keys().cloned().collect::<Vec<GeometricHash>>();
         println!("{}", hash_collection.len());

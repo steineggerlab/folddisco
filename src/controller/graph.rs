@@ -1,7 +1,10 @@
+// File: graph.rs
+// Created: 2025-01-16 20:00:46
+// Author: Hyunbin Kim (khb7840@gmail.com)
+// Copyright © 2025 Hyunbin Kim, All rights reserved
+
 // Graph representation of residue indices to match positions in the structure
-//
-// 2024-05-09 13:40:20
-// Current naive implementation:
+// Current implementation:
 // Find both strong and weakly connected components with same node count as query graph
 
 use std::collections::HashMap;

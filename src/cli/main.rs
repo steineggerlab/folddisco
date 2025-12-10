@@ -3,7 +3,7 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
-//! Main entry point for FoldDisco CLI
+//! Main entry point for Folddisco CLI
 
 // use crate::*;
 use folddisco::cli::{workflows::{build_index, benchmark, query_pdb}, *};

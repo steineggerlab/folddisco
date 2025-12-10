@@ -14,6 +14,7 @@ use crate::cli::*;
 use crate::controller::io::default_index_path;
 use crate::prelude::*;
 use crate::structure::io::StructureFileFormat;
+use crate::utils::cli::parse_distance_angle_pairs;
 
 #[cfg(feature = "foldcomp")]
 use std::path::PathBuf;
@@ -52,7 +53,7 @@ examples:
 # Default. h_sapiens directory or foldcomp database is indexed with default parameters
 folddisco index -p h_sapiens -i index/h_sapiens -t 12
 
-# Indexing big protein dataset
+# Indexing protein dataset
 folddisco index -p swissprot -i index/swissprot -t 64 -v
 
 # Indexing with custom hash type and parameters
@@ -128,9 +129,6 @@ pub fn build_index(env: AppArgs) {
                 std::process::exit(1);
             };
             
-            if verbose {
-                print_log_msg(INFO, "Indexing in Big mode.");
-            }
             // Always use Big mode - set chunk_size to total number of files
             let chunk_size = pdb_path_vec.len();
             let num_chunks = if pdb_path_vec.len() <= chunk_size { 1 } else { (pdb_path_vec.len() as f64 / chunk_size as f64).ceil() as usize };
@@ -149,7 +147,7 @@ pub fn build_index(env: AppArgs) {
             let id_type = IdType::get_with_str(id_type.as_str());
             
             let multiple_bins = if let Some(multiple_bins) = multiple_bins {
-                Some(parse_pairs(&multiple_bins))
+                Some(parse_distance_angle_pairs(&multiple_bins))
             } else {
                 None
             };
@@ -157,10 +155,8 @@ pub fn build_index(env: AppArgs) {
             pdb_path_chunks.into_iter().enumerate().for_each(|(i, pdb_path_vec)| {
                 // let pdb_container_name_inner: &'static str = pdb_container_name.clone();
                 let index_path = if num_chunks == 1 {
-                    if verbose { print_log_msg(INFO, "Indexing all PDB files in one chunk"); }
                     index_path.clone()
                 } else {
-                    if verbose { print_log_msg(INFO, &format!("Indexing chunk {}", i)); }
                     format!("{}_{}", index_path, i)
                 };
 
@@ -188,7 +184,7 @@ pub fn build_index(env: AppArgs) {
                     )
                 };
                 
-                // Always use Big mode indexing
+                // Indexing
                 if verbose {
                     print_log_msg(INFO, "Collecting ids of the structures");
                 }
@@ -244,22 +240,7 @@ pub fn build_index(env: AppArgs) {
     }
 }
 
-fn parse_pairs(input: &str) -> Vec<(usize, usize)> {
-    input
-        .split(',')
-        .filter_map(|pair_str| {
-            let parts: Vec<_> = pair_str.trim().split('-').collect();
-            if parts.len() == 2 {
-                match (parts[0].parse(), parts[1].parse()) {
-                    (Ok(a), Ok(b)) => Some((a, b)),
-                    _ => None,
-                }
-            } else {
-                None
-            }
-        })
-        .collect()
-}
+
 
 
 #[cfg(test)]

@@ -844,7 +844,7 @@ mod tests {
         let (query_map, query_indices, aa_dist_map ) = make_query_map(
             &path, &query_residues, hash_type, nbin_dist, nbin_angle, &None,
             &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, false,
-            &None, &None, 1000.0
+            &None, 1000.0
         );
         let queries: Vec<GeometricHash> = query_map.keys().cloned().collect();
         let compact = read_structure_from_path(&path).expect("Error reading structure from path");

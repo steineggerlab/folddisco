@@ -13,7 +13,6 @@ pub mod query;
 pub mod result;
 pub mod retrieve;
 pub mod count_query;
-pub mod map;
 pub mod mode;
 pub mod sort;
 

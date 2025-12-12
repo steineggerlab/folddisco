@@ -120,6 +120,7 @@ pub struct MatchResult<'a> {
     pub idf: f32,
     pub matching_residues: Vec<ResidueMatch>,
     pub rmsd: f32,
+    pub evalue: f32,
     pub u_matrix: [[f32; 3]; 3],
     pub t_matrix: [f32; 3],
     pub matching_coordinates: Vec<Coordinate>,
@@ -139,6 +140,7 @@ impl<'a> MatchResult<'a> {
                 None => 0
             }
         }).sum();
+        let evalue = evalue_fitting(avg_idf, index_size, residue_length = 9);
         Self {
             tid,
             nid,
@@ -147,6 +149,7 @@ impl<'a> MatchResult<'a> {
             idf: avg_idf,
             matching_residues,
             rmsd,
+            evalue,
             u_matrix,
             t_matrix,
             matching_coordinates,
@@ -326,6 +329,7 @@ pub const MATCH_RESULT_DEFAULT_COLUMNS: &[&str] = &[
     "node_count",
     "idf",
     "rmsd",
+    "evalue",
     "matching_residues",
     "query_residues",
 ];
@@ -336,6 +340,7 @@ pub const MATCH_RESULT_SUPERPOSE_COLUMNS: &[&str] = &[
     "node_count",
     "idf",
     "rmsd",
+    "evalue",
     "matching_residues",
     "u_matrix",
     "t_vector",
@@ -343,6 +348,26 @@ pub const MATCH_RESULT_SUPERPOSE_COLUMNS: &[&str] = &[
     "db_key",
     "query_residues",
 ];
+
+//Create a evalue fitting function to compute evalues based on IDF score
+pub fn evalue_fitting(x: f32, m: f32, l: f32) -> f32 {
+    // x: score, m: index size, l: query residue length 
+    let x_d = x as f64;
+    let m_d = m as f64;
+    let l_d = l as f64;
+
+    let mu = 10.09;
+    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    
+    let y = lam * (x_d - mu);
+
+    let t = (-y).exp();
+    let p_val = 1.0 - (-t).exp();
+    
+    let e_val = p_val * m_d;
+
+    e_val as f32
+}
 
 /// Create a TsvFormatter for MatchResult with specified column keys
 pub fn match_result_formatter<'a>(column_keys: &[&str], qid: &str, query_residues: &str) -> TsvFormatter<MatchResult<'a>> {

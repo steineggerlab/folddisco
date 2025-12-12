@@ -56,7 +56,7 @@ impl<'a> StructureResult<'a> {
             false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
                     self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone(), index_size
                 )
             }).collect(),
             true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
@@ -75,7 +75,7 @@ pub fn convert_structure_query_result_to_match_query_results<'a>(
     results
         .iter()
         .flat_map(|(k, v)| {
-            v.into_match_query_results(skip_ca_dist)
+            v.into_match_query_results(skip_ca_dist, index_size)
              .into_iter()
              .map(|x| (*k, x))
         })
@@ -131,7 +131,7 @@ impl<'a> MatchResult<'a> {
     pub fn new(
         tid: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
         u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize,
-        metrics: StructureSimilarityMetrics,
+        metrics: StructureSimilarityMetrics, index_size: usize,
     ) -> Self {
         //
         let node_count = matching_residues.iter().map(|x| {
@@ -140,7 +140,8 @@ impl<'a> MatchResult<'a> {
                 None => 0
             }
         }).sum();
-        let evalue = evalue_fitting(avg_idf, index_size, residue_length = 9);
+        let evalue = evalue_fitting(avg_idf, index_size as f32, 9.0);
+        //Arbitary value for query residue length (9.0)
         Self {
             tid,
             nid,
@@ -195,8 +196,8 @@ impl<'a> MatchResult<'a> {
 impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}",
-            self.tid, self.node_count, self.idf, self.rmsd,
+            f, "{}\t{}\t{:.4}\t{:.4}\t{:.4e}\t{}\t{}",
+            self.tid, self.node_count, self.idf, self.rmsd, self.evalue,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
@@ -264,6 +265,7 @@ fn build_match_result_columns<'a>(qid: String, query_residues: String) -> HashMa
         Column::new("node_count", "Node count", |r: &MatchResult| (r.node_count as u64).into()),
         Column::new("idf", "IDF score", |r: &MatchResult| Value::Float(r.idf, DEFAULT_FLOAT_PRECISION)),
         Column::new("rmsd", "RMSD", |r: &MatchResult| Value::Float(r.rmsd, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue", "E-value", |r: &MatchResult| Value::Float(r.evalue, DEFAULT_FLOAT_PRECISION)),
         Column::new("u_matrix", "Rotation matrix", |r: &MatchResult| Value::Float3DMatrix(r.u_matrix, DEFAULT_FLOAT_PRECISION, ",")),
         Column::new("t_vector", "Translation vector", |r: &MatchResult| Value::Float3DVector(r.t_matrix, DEFAULT_FLOAT_PRECISION, ",")),
         Column::new("matching_residues", "Matching residues", |r: &MatchResult| {

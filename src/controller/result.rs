@@ -56,13 +56,13 @@ impl<'a> StructureResult<'a> {
             false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
                     self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone(), index_size
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
                 )
             }).collect(),
             true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
                     self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone(), index_size
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
                 )
             }).collect(),
         }
@@ -70,12 +70,12 @@ impl<'a> StructureResult<'a> {
 }
 
 pub fn convert_structure_query_result_to_match_query_results<'a>(
-    results: &'a [(usize, StructureResult<'a>)], skip_ca_dist: bool, index_size: usize
+    results: &'a [(usize, StructureResult<'a>)], skip_ca_dist: bool
 ) -> Vec<(usize, MatchResult<'a>)> {
     results
         .iter()
         .flat_map(|(k, v)| {
-            v.into_match_query_results(skip_ca_dist, index_size)
+            v.into_match_query_results(skip_ca_dist)
              .into_iter()
              .map(|x| (*k, x))
         })
@@ -131,7 +131,7 @@ impl<'a> MatchResult<'a> {
     pub fn new(
         tid: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
         u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize,
-        metrics: StructureSimilarityMetrics, index_size: usize,
+        metrics: StructureSimilarityMetrics
     ) -> Self {
         //
         let node_count = matching_residues.iter().map(|x| {
@@ -140,6 +140,7 @@ impl<'a> MatchResult<'a> {
                 None => 0
             }
         }).sum();
+        let index_size = 1_000_000;
         let evalue = evalue_fitting(avg_idf, index_size as f32, 9.0);
         //Arbitary value for query residue length (9.0)
         Self {

@@ -51,7 +51,7 @@ impl<'a> StructureResult<'a> {
         }
     }
 
-    pub fn into_match_query_results(&self, skip_ca_dist: bool) -> Vec<MatchResult> {
+    pub fn into_match_query_results(&self, skip_ca_dist: bool, index_size: usize) -> Vec<MatchResult> {
         match skip_ca_dist {
             false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
@@ -62,7 +62,7 @@ impl<'a> StructureResult<'a> {
             true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
                     self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone()
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone(), index_size
                 )
             }).collect(),
         }
@@ -70,7 +70,7 @@ impl<'a> StructureResult<'a> {
 }
 
 pub fn convert_structure_query_result_to_match_query_results<'a>(
-    results: &'a [(usize, StructureResult<'a>)], skip_ca_dist: bool
+    results: &'a [(usize, StructureResult<'a>)], skip_ca_dist: bool, index_size: usize
 ) -> Vec<(usize, MatchResult<'a>)> {
     results
         .iter()

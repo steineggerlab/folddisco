@@ -447,7 +447,7 @@ pub fn query_pdb(env: AppArgs) {
                 match query_mode {
                     QueryMode::PerMatch => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
-                            &queried_from_indices, skip_ca_match, lookup.len()
+                            &queried_from_indices, skip_ca_match, total_structures as usize
                         );
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
@@ -459,7 +459,7 @@ pub fn query_pdb(env: AppArgs) {
                     }
                     QueryMode::Web => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
-                            &queried_from_indices, skip_ca_match, lookup.len()
+                            &queried_from_indices, skip_ca_match, total_structures as usize
                         );
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         // If web, set superpose to true.

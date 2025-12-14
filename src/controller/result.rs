@@ -56,13 +56,13 @@ impl<'a> StructureResult<'a> {
             false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
                     self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone(), index_size
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, index_size, metrics.clone()
                 )
             }).collect(),
             true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
                     self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, metrics.clone(), index_size
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, index_size, metrics.clone()
                 )
             }).collect(),
         }
@@ -130,8 +130,8 @@ pub struct MatchResult<'a> {
 impl<'a> MatchResult<'a> {
     pub fn new(
         tid: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
-        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize,
-        metrics: StructureSimilarityMetrics, index_size: usize,
+        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize, index_size: usize,
+        metrics: StructureSimilarityMetrics,
     ) -> Self {
         //
         let node_count = matching_residues.iter().map(|x| {
@@ -141,7 +141,6 @@ impl<'a> MatchResult<'a> {
             }
         }).sum();
         let evalue = evalue_fitting(avg_idf, index_size as f32, 9.0);
-        //Arbitary value for query residue length (9.0)
         Self {
             tid,
             nid,
@@ -179,14 +178,14 @@ impl<'a> MatchResult<'a> {
             }).collect::<Vec<String>>().join(",");
             // Return
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}",
-                self.tid, self.node_count, self.idf, self.rmsd,
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{:.4}\t{}\t{}\t{}\t{}\t{}",
+                self.tid, self.node_count, self.idf, self.rmsd, self.evalue,
                 matching_residues, u_string, t_string, matching_coordinates, self.db_key, self.metrics
             )
         } else {
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}",
-                self.tid, self.node_count, self.idf, self.rmsd,
+                "{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{}",
+                self.tid, self.node_count, self.idf, self.rmsd, self.evalue,
                 matching_residues, self.db_key, self.metrics
             )
         }
@@ -196,7 +195,7 @@ impl<'a> MatchResult<'a> {
 impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{:.4e}\t{}\t{}",
+            f, "{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}",
             self.tid, self.node_count, self.idf, self.rmsd, self.evalue,
             self.matching_residues.iter().map(|x| {
                 match x {

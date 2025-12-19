@@ -402,7 +402,7 @@ pub fn evalue_fitting_exp(x: f32, m: f32, l: f32) -> f32 {
     let l_d = l as f64;
 
     let mu = 10.09;
-    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    let lam = 0.2796 * (-0.016101 * l_d).exp();
     
     let y = lam * (x_d - mu);
 
@@ -422,7 +422,7 @@ pub fn evalue_fitting_frag(x: f32, m: f32, l: f32) -> f32 {
     let l_d = l as f64;
 
     let mu = 10.09;
-    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    let lam = 0.763223/l_d + 0.158273;
     
     let y = lam * (x_d - mu);
 
@@ -442,7 +442,7 @@ pub fn evalue_fitting_pow(x: f32, m: f32, l: f32) -> f32 {
     let l_d = l as f64;
 
     let mu = 10.09;
-    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    let lam = 0.36442 * l_d.powf(-0.25744);
     
     let y = lam * (x_d - mu);
 
@@ -462,7 +462,7 @@ pub fn evalue_fitting_log(x: f32, m: f32, l: f32) -> f32 {
     let l_d = l as f64;
 
     let mu = 10.09;
-    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    let lam = -0.05564 * l_d.ln() + 0.34483;
     
     let y = lam * (x_d - mu);
 

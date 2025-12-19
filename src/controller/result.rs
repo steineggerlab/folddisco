@@ -51,18 +51,18 @@ impl<'a> StructureResult<'a> {
         }
     }
 
-    pub fn into_match_query_results(&self, skip_ca_dist: bool, index_size: usize) -> Vec<MatchResult> {
+    pub fn into_match_query_results(&self, skip_ca_dist: bool, index_size: usize, residue_len: usize,) -> Vec<MatchResult> {
         match skip_ca_dist {
             false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
                     self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, index_size, metrics.clone()
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, index_size, residue_len, metrics.clone()
                 )
             }).collect(),
             true => self.matching_residues.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(
                     self.tid, i, *subgraph_idf, residues.clone(), *rmsd,
-                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, index_size, metrics.clone()
+                    *u_matrix, *t_matrix, matching_coordinates.clone(), self.db_key, index_size, residue_len, metrics.clone()
                 )
             }).collect(),
         }
@@ -70,12 +70,12 @@ impl<'a> StructureResult<'a> {
 }
 
 pub fn convert_structure_query_result_to_match_query_results<'a>(
-    results: &'a [(usize, StructureResult<'a>)], skip_ca_dist: bool, index_size: usize
+    results: &'a [(usize, StructureResult<'a>)], skip_ca_dist: bool, index_size: usize, residue_len: usize
 ) -> Vec<(usize, MatchResult<'a>)> {
     results
         .iter()
         .flat_map(|(k, v)| {
-            v.into_match_query_results(skip_ca_dist, index_size)
+            v.into_match_query_results(skip_ca_dist, index_size, residue_len)
              .into_iter()
              .map(|x| (*k, x))
         })
@@ -134,7 +134,7 @@ pub struct MatchResult<'a> {
 impl<'a> MatchResult<'a> {
     pub fn new(
         tid: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
-        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize, index_size: usize,
+        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize, index_size: usize, residue_len: usize,
         metrics: StructureSimilarityMetrics,
     ) -> Self {
         //
@@ -144,11 +144,11 @@ impl<'a> MatchResult<'a> {
                 None => 0
             }
         }).sum();
-        let evalue_lin = evalue_fitting_lin(avg_idf, index_size as f32, 9.0);
-        let evalue_exp = evalue_fitting_exp(avg_idf, index_size as f32, 9.0);
-        let evalue_frac = evalue_fitting_frac(avg_idf, index_size as f32, 9.0);
-        let evalue_log = evalue_fitting_log(avg_idf, index_size as f32, 9.0);
-        let evalue_pow = evalue_fitting_pow(avg_idf, index_size as f32, 9.0);
+        let evalue_lin = evalue_fitting_lin(avg_idf, index_size as f32, residue_len);
+        let evalue_exp = evalue_fitting_exp(avg_idf, index_size as f32, residue_len);
+        let evalue_frac = evalue_fitting_frac(avg_idf, index_size as f32, residue_len);
+        let evalue_log = evalue_fitting_log(avg_idf, index_size as f32, residue_len);
+        let evalue_pow = evalue_fitting_pow(avg_idf, index_size as f32, residue_len);
         Self {
             tid,
             nid,

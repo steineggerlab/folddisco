@@ -132,7 +132,7 @@ pub struct MatchResult<'a> {
 impl<'a> MatchResult<'a> {
     pub fn new(
         tid: &'a str, nid: usize, avg_idf: f32, matching_residues: Vec<ResidueMatch>, rmsd: f32,
-        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize, index_size: usize
+        u_matrix: [[f32; 3]; 3], t_matrix: [f32; 3], matching_coordinates: Vec<Coordinate>, db_key: usize, index_size: usize,
         metrics: StructureSimilarityMetrics,
     ) -> Self {
         //
@@ -184,13 +184,13 @@ impl<'a> MatchResult<'a> {
             }).collect::<Vec<String>>().join(",");
             // Return
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{}\t{}\t{}\t{}",
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{}\t{}",
                 self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_exp, self.evalue_frac,
                 matching_residues, u_string, t_string, matching_coordinates, self.db_key, self.metrics
             )
         } else {
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}",
                 self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_exp, self.evalue_frac,
                 matching_residues, self.db_key, self.metrics
             )
@@ -201,7 +201,7 @@ impl<'a> MatchResult<'a> {
 impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}",
             self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_exp, self.evalue_frac,
             self.matching_residues.iter().map(|x| {
                 match x {

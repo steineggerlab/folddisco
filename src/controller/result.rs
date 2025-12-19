@@ -120,7 +120,11 @@ pub struct MatchResult<'a> {
     pub idf: f32,
     pub matching_residues: Vec<ResidueMatch>,
     pub rmsd: f32,
-    pub evalue: f32,
+    pub evalue_lin: f32,
+    pub evalue_exp: f32,
+    pub evalue_frac: f32,
+    pub evalue_log: f32,
+    pub evalue_pow: f32,
     pub u_matrix: [[f32; 3]; 3],
     pub t_matrix: [f32; 3],
     pub matching_coordinates: Vec<Coordinate>,
@@ -140,7 +144,11 @@ impl<'a> MatchResult<'a> {
                 None => 0
             }
         }).sum();
-        let evalue = evalue_fitting(avg_idf, index_size as f32, 9.0);
+        let evalue_lin = evalue_fitting_lin(avg_idf, index_size as f32, 9.0);
+        let evalue_exp = evalue_fitting_exp(avg_idf, index_size as f32, 9.0);
+        let evalue_frac = evalue_fitting_frac(avg_idf, index_size as f32, 9.0);
+        let evalue_log = evalue_fitting_log(avg_idf, index_size as f32, 9.0);
+        let evalue_pow = evalue_fitting_pow(avg_idf, index_size as f32, 9.0);
         Self {
             tid,
             nid,
@@ -149,7 +157,11 @@ impl<'a> MatchResult<'a> {
             idf: avg_idf,
             matching_residues,
             rmsd,
-            evalue,
+            evalue_lin,
+            evalue_exp,
+            evalue_frac,
+            evalue_log,
+            evalue_pow,
             u_matrix,
             t_matrix,
             matching_coordinates,
@@ -178,14 +190,14 @@ impl<'a> MatchResult<'a> {
             }).collect::<Vec<String>>().join(",");
             // Return
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{:.4}\t{}\t{}\t{}\t{}\t{}",
-                self.tid, self.node_count, self.idf, self.rmsd, self.evalue,
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{}\t{}\t{}\t{}",
+                self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_exp, self.evalue_frac, self.evalue_log, self.evalue_pow,
                 matching_residues, u_string, t_string, matching_coordinates, self.db_key, self.metrics
             )
         } else {
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{}",
-                self.tid, self.node_count, self.idf, self.rmsd, self.evalue,
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_exp, self.evalue_frac, self.evalue_log, self.evalue_pow,
                 matching_residues, self.db_key, self.metrics
             )
         }
@@ -195,8 +207,8 @@ impl<'a> MatchResult<'a> {
 impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}",
-            self.tid, self.node_count, self.idf, self.rmsd, self.evalue,
+            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_exp, self.evalue_frac, self.evalue_log, self.evalue_pow,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
@@ -264,7 +276,11 @@ fn build_match_result_columns<'a>(qid: String, query_residues: String) -> HashMa
         Column::new("node_count", "Node count", |r: &MatchResult| (r.node_count as u64).into()),
         Column::new("idf", "IDF score", |r: &MatchResult| Value::Float(r.idf, DEFAULT_FLOAT_PRECISION)),
         Column::new("rmsd", "RMSD", |r: &MatchResult| Value::Float(r.rmsd, DEFAULT_FLOAT_PRECISION)),
-        Column::new("evalue", "E-value", |r: &MatchResult| Value::Float(r.evalue, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue_lin", "E-value_lin", |r: &MatchResult| Value::Float(r.evalue_lin, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue_exp", "E-value_exp", |r: &MatchResult| Value::Float(r.evalue_exp, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue_frag", "E-value_frag", |r: &MatchResult| Value::Float(r.evalue_frag, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue_log", "E-value_log", |r: &MatchResult| Value::Float(r.evalue_log, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue_pow", "E-value_pow", |r: &MatchResult| Value::Float(r.evalue_pow, DEFAULT_FLOAT_PRECISION)),
         Column::new("u_matrix", "Rotation matrix", |r: &MatchResult| Value::Float3DMatrix(r.u_matrix, DEFAULT_FLOAT_PRECISION, ",")),
         Column::new("t_vector", "Translation vector", |r: &MatchResult| Value::Float3DVector(r.t_matrix, DEFAULT_FLOAT_PRECISION, ",")),
         Column::new("matching_residues", "Matching residues", |r: &MatchResult| {
@@ -330,7 +346,11 @@ pub const MATCH_RESULT_DEFAULT_COLUMNS: &[&str] = &[
     "node_count",
     "idf",
     "rmsd",
-    "evalue",
+    "evalue_lin",
+    "evalue_exp",
+    "evalue_frag",
+    "evalue_pow",
+    "evalue_log",
     "matching_residues",
     "query_residues",
 ];
@@ -341,7 +361,11 @@ pub const MATCH_RESULT_SUPERPOSE_COLUMNS: &[&str] = &[
     "node_count",
     "idf",
     "rmsd",
-    "evalue",
+    "evalue_lin",
+    "evalue_exp",
+    "evalue_frag",
+    "evalue_pow",
+    "evalue_log",
     "matching_residues",
     "u_matrix",
     "t_vector",
@@ -351,7 +375,87 @@ pub const MATCH_RESULT_SUPERPOSE_COLUMNS: &[&str] = &[
 ];
 
 //Create a evalue fitting function to compute evalues based on IDF score
-pub fn evalue_fitting(x: f32, m: f32, l: f32) -> f32 {
+pub fn evalue_fitting_lin(x: f32, m: f32, l: f32) -> f32 {
+    // x: score, m: index size, l: query residue length 
+    let x_d = x as f64;
+    let m_d = m as f64;
+    let l_d = l as f64;
+
+    let mu = 10.09;
+    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    
+    let y = lam * (x_d - mu);
+
+    let t = (-y).exp();
+    let p_val = 1.0 - (-t).exp();
+    
+    let e_val = p_val * m_d;
+
+    e_val as f32
+}
+
+//Create a evalue fitting function to compute evalues based on IDF score
+pub fn evalue_fitting_exp(x: f32, m: f32, l: f32) -> f32 {
+    // x: score, m: index size, l: query residue length 
+    let x_d = x as f64;
+    let m_d = m as f64;
+    let l_d = l as f64;
+
+    let mu = 10.09;
+    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    
+    let y = lam * (x_d - mu);
+
+    let t = (-y).exp();
+    let p_val = 1.0 - (-t).exp();
+    
+    let e_val = p_val * m_d;
+
+    e_val as f32
+}
+
+//Create a evalue fitting function to compute evalues based on IDF score
+pub fn evalue_fitting_frag(x: f32, m: f32, l: f32) -> f32 {
+    // x: score, m: index size, l: query residue length 
+    let x_d = x as f64;
+    let m_d = m as f64;
+    let l_d = l as f64;
+
+    let mu = 10.09;
+    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    
+    let y = lam * (x_d - mu);
+
+    let t = (-y).exp();
+    let p_val = 1.0 - (-t).exp();
+    
+    let e_val = p_val * m_d;
+
+    e_val as f32
+}
+
+//Create a evalue fitting function to compute evalues based on IDF score
+pub fn evalue_fitting_pow(x: f32, m: f32, l: f32) -> f32 {
+    // x: score, m: index size, l: query residue length 
+    let x_d = x as f64;
+    let m_d = m as f64;
+    let l_d = l as f64;
+
+    let mu = 10.09;
+    let lam = -0.0034101279543267884 * l_d + 0.2727158726147608;
+    
+    let y = lam * (x_d - mu);
+
+    let t = (-y).exp();
+    let p_val = 1.0 - (-t).exp();
+    
+    let e_val = p_val * m_d;
+
+    e_val as f32
+}
+
+//Create a evalue fitting function to compute evalues based on IDF score
+pub fn evalue_fitting_log(x: f32, m: f32, l: f32) -> f32 {
     // x: score, m: index size, l: query residue length 
     let x_d = x as f64;
     let m_d = m as f64;

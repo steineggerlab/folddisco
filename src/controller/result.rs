@@ -278,7 +278,7 @@ fn build_match_result_columns<'a>(qid: String, query_residues: String) -> HashMa
         Column::new("rmsd", "RMSD", |r: &MatchResult| Value::Float(r.rmsd, DEFAULT_FLOAT_PRECISION)),
         Column::new("evalue_lin", "E-value_lin", |r: &MatchResult| Value::Float(r.evalue_lin, DEFAULT_FLOAT_PRECISION)),
         Column::new("evalue_exp", "E-value_exp", |r: &MatchResult| Value::Float(r.evalue_exp, DEFAULT_FLOAT_PRECISION)),
-        Column::new("evalue_frag", "E-value_frag", |r: &MatchResult| Value::Float(r.evalue_frag, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue_frac", "E-value_frac", |r: &MatchResult| Value::Float(r.evalue_frac, DEFAULT_FLOAT_PRECISION)),
         Column::new("evalue_log", "E-value_log", |r: &MatchResult| Value::Float(r.evalue_log, DEFAULT_FLOAT_PRECISION)),
         Column::new("evalue_pow", "E-value_pow", |r: &MatchResult| Value::Float(r.evalue_pow, DEFAULT_FLOAT_PRECISION)),
         Column::new("u_matrix", "Rotation matrix", |r: &MatchResult| Value::Float3DMatrix(r.u_matrix, DEFAULT_FLOAT_PRECISION, ",")),
@@ -348,7 +348,7 @@ pub const MATCH_RESULT_DEFAULT_COLUMNS: &[&str] = &[
     "rmsd",
     "evalue_lin",
     "evalue_exp",
-    "evalue_frag",
+    "evalue_frac",
     "evalue_pow",
     "evalue_log",
     "matching_residues",
@@ -363,7 +363,7 @@ pub const MATCH_RESULT_SUPERPOSE_COLUMNS: &[&str] = &[
     "rmsd",
     "evalue_lin",
     "evalue_exp",
-    "evalue_frag",
+    "evalue_frac",
     "evalue_pow",
     "evalue_log",
     "matching_residues",
@@ -415,7 +415,7 @@ pub fn evalue_fitting_exp(x: f32, m: f32, l: f32) -> f32 {
 }
 
 //Create a evalue fitting function to compute evalues based on IDF score
-pub fn evalue_fitting_frag(x: f32, m: f32, l: f32) -> f32 {
+pub fn evalue_fitting_frac(x: f32, m: f32, l: f32) -> f32 {
     // x: score, m: index size, l: query residue length 
     let x_d = x as f64;
     let m_d = m as f64;
@@ -442,7 +442,7 @@ pub fn evalue_fitting_pow(x: f32, m: f32, l: f32) -> f32 {
     let l_d = l as f64;
 
     let mu = 10.09;
-    let lam = 0.36442 * l_d.powf(-0.25744);
+    let lam = 0.36442 * l_d.powf(-0.25774);
     
     let y = lam * (x_d - mu);
 

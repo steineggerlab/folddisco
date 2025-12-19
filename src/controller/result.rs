@@ -144,11 +144,11 @@ impl<'a> MatchResult<'a> {
                 None => 0
             }
         }).sum();
-        let evalue_lin = evalue_fitting_lin(avg_idf, index_size as f32, residue_len);
-        let evalue_exp = evalue_fitting_exp(avg_idf, index_size as f32, residue_len);
-        let evalue_frac = evalue_fitting_frac(avg_idf, index_size as f32, residue_len);
-        let evalue_log = evalue_fitting_log(avg_idf, index_size as f32, residue_len);
-        let evalue_pow = evalue_fitting_pow(avg_idf, index_size as f32, residue_len);
+        let evalue_lin = evalue_fitting_lin(avg_idf, index_size as f32, residue_len as f32);
+        let evalue_exp = evalue_fitting_exp(avg_idf, index_size as f32, residue_len as f32);
+        let evalue_frac = evalue_fitting_frac(avg_idf, index_size as f32, residue_len as f32);
+        let evalue_log = evalue_fitting_log(avg_idf, index_size as f32, residue_len as f32);
+        let evalue_pow = evalue_fitting_pow(avg_idf, index_size as f32, residue_len as f32);
         Self {
             tid,
             nid,

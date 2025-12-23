@@ -389,7 +389,7 @@ pub fn evalue_fitting_frac(x: f32, m: f32, l: f32) -> f32 {
     let m_d = m as f64;
     let l_d = l as f64;
 
-    let mu = 11.5 - 4/l_d;
+    let mu = 11.5 - 4.0/l_d;
     let lam = 0.763223/l_d + 0.158273;
     
     let y = lam * (x_d - mu);

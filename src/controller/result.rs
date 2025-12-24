@@ -409,13 +409,8 @@ pub fn evalue_fitting_new(x: f32, m: f32, l: f32) -> f32 {
     let m_d = m as f64;
     let l_d = l as f64;
 
-    let mu_init = 16.83651996;
-    let mu_slope = 0.41059299;
-    let lam_a = 1.05693759;
-    let lam_b = -0.51121604;
-
-    let mu = mu_slope * l_d + mu_init;
-    let lam = lam_a * l_d.powf(lam_b);
+    let mu = 0.01115566 * l_d.powi(2) + 0.06267775 * l_d + 18.8132141;
+    let lam = 0.67754035 * (-0.05775654 * l_d).exp();
     
     let y = lam * (x_d - mu);
 

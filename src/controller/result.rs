@@ -412,12 +412,12 @@ pub fn evalue_fitting_new(x: f32, m: f32, l: f32) -> f32 {
     let mu = 0.01115566 * l_d.powi(2) + 0.06267775 * l_d + 18.8132141;
     let lam = 0.67754035 * (-0.05775654 * l_d).exp();
     
-    let y = lam * (x_d - mu);
+    let ref_db_size = 25000.0; 
+    let search_space_ref = l_d * ref_db_size;
 
-    let t = (-y).exp();
-    let p_val = 1.0 - (-t).exp();
-    
-    let e_val = p_val * m_d;
+    let k_val = (lam * mu).exp() / search_space_ref;
+    let real_search_space = l_d * m_d;
+    let e_val = k_val * real_search_space * (-lam * x_d).exp();
 
     e_val as f32
 }

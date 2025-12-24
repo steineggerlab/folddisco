@@ -7,11 +7,8 @@
 
 // use crate::*;
 use folddisco::cli::{workflows::{build_index, benchmark, query_pdb}, *};
-use git_version::git_version;
 
-const VERSION_STRING: &str = git_version!(
-    args = ["--abbrev=40", "--always"], fallback = "unknown"
-);
+const VERSION_STRING: &str = env!("FOLDDISCO_BUILD_VERSION");
 const HELP: &str = "\
 usage: folddisco <command> [<args>]
 
@@ -131,8 +128,6 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
 }
 
 fn main() {
-
-
     let parsed_args = parse_arg().unwrap_or_else(|e| {
         eprintln!("Error: {}", e);
         std::process::exit(1);

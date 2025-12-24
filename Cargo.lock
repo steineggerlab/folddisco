@@ -192,14 +192,13 @@ dependencies = [
 
 [[package]]
 name = "folddisco"
-version = "1.0.0"
+version = "2.0.0"
 dependencies = [
  "bindgen",
  "byteorder",
  "cmake",
  "dashmap",
  "flate2",
- "git-version",
  "libc",
  "memmap2",
  "pdbtbx-cif",
@@ -222,26 +221,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
-]
-
-[[package]]
-name = "git-version"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ad568aa3db0fcbc81f2f116137f263d7304f512a1209b35b85150d3ef88ad19"
-dependencies = [
- "git-version-macro",
-]
-
-[[package]]
-name = "git-version-macro"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53010ccb100b96a67bc32c0175f0ed1426b31b655d562898e57325f81c023ac0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

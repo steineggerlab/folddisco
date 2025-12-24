@@ -1,6 +1,6 @@
 [package]
 name = "folddisco"
-version = "1.0.0"
+version = "2.0.0"
 edition = "2021"
 authors = ["Hyunbin Kim <khb7840@gmail.com>", "Rachel Kim <seamustard52@gmail.com>", "Milot Mirdita <milot@mirdita.de>"]
 description = "A bioinformatics tool for finding discontinuous motifs in protein structures"
@@ -33,7 +33,6 @@ regex = "1.10.4"
 petgraph = "0.6.4"
 libc = "0.2.155"
 dashmap = { version = "6.1.0", features = ["rayon"] }
-git-version = "0.3.9"
 
 
 [build-dependencies]
@@ -42,5 +41,5 @@ cmake = { version = "0.1.50", optional = true }
 
 
 [features]
-# default = ["foldcomp"]
+default = ["foldcomp"]
 foldcomp = ["bindgen", "cmake"]

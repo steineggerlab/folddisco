@@ -272,7 +272,7 @@ fn build_match_result_columns<'a>(qid: String, query_residues: String) -> HashMa
         Column::new("rmsd", "RMSD", |r: &MatchResult| Value::Float(r.rmsd, DEFAULT_FLOAT_PRECISION)),
         Column::new("evalue_lin", "E-value_lin", |r: &MatchResult| Value::Float(r.evalue_lin, DEFAULT_FLOAT_PRECISION)),
         Column::new("evalue_frac", "E-value_frac", |r: &MatchResult| Value::Float(r.evalue_frac, DEFAULT_FLOAT_PRECISION)),
-        Column::new("evalue_new", "E-value_new", |r: &MatchResult| Value::Float(r.evalue_frac, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue_new", "E-value_new", |r: &MatchResult| Value::Float(r.evalue_new, DEFAULT_FLOAT_PRECISION)),
         Column::new("u_matrix", "Rotation matrix", |r: &MatchResult| Value::Float3DMatrix(r.u_matrix, DEFAULT_FLOAT_PRECISION, ",")),
         Column::new("t_vector", "Translation vector", |r: &MatchResult| Value::Float3DVector(r.t_matrix, DEFAULT_FLOAT_PRECISION, ",")),
         Column::new("matching_residues", "Matching residues", |r: &MatchResult| {

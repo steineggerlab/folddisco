@@ -16,6 +16,7 @@ subcommands:
   index     Create a new index table from multiple protein structures
   query     Query a motif from an index table
   benchmark Benchmark the performance of folddisco
+  analyze   Analyze the distribution of encodings in the index
   version   Print version information
 
 options:
@@ -112,6 +113,14 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             header_answer: args.contains("--header-answer"),
             header_neutral: args.contains("--header-neutral"),
         }),
+        Some("analyze") => Ok(AppArgs::Analyze {
+            index_path: args.opt_value_from_str(["-i", "--index"])?,
+            pdb_container: args.opt_value_from_str(["-p", "--pdbs"])?,
+            output: args.opt_value_from_str(["-o", "--output"])?,
+            threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            verbose: args.contains(["-v", "--verbose"]),
+            help: args.contains(["-h", "--help"]),
+        }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,
             verbose: args.contains(["-v", "--verbose"]),
@@ -155,6 +164,14 @@ fn main() {
         }
         AppArgs::Benchmark { .. } => {
             benchmark::benchmark(parsed_args);
+        }
+        AppArgs::Analyze { help, .. } => {
+            if help {
+                print_logo();
+                eprintln!("{}", workflows::analyze::HELP_ANALYZE);
+            } else {
+                workflows::analyze::analyze(parsed_args);
+            }
         }
         AppArgs::Test { .. } => {
             println!("Testing");

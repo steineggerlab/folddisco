@@ -106,6 +106,17 @@ pub enum AppArgs {
         header_answer: bool,
         header_neutral: bool,
     },
+    Analyze {
+        // Required 
+        index_path: Option<String>,
+        // Optional
+        pdb_container: Option<String>,
+        output: Option<String>,
+        // other general options
+        threads: usize,        
+        verbose: bool,
+        help: bool,        
+    },
     Test {
         index_path: String,
         verbose: bool,

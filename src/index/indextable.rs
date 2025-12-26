@@ -10,9 +10,9 @@ pub struct FolddiscoIndex {
     hashes: UnsafeCell<Vec<u32>>, // This is deduplicated hash list
     offsets: UnsafeCell<Vec<usize>>,
     last_id: UnsafeCell<Vec<usize>>,
-    loaded_hashes: ManuallyDrop<Vec<u32>>,
-    loaded_offsets: ManuallyDrop<Vec<usize>>,
-    total_hashes: usize,
+    pub loaded_hashes: ManuallyDrop<Vec<u32>>,
+    pub loaded_offsets: ManuallyDrop<Vec<usize>>,
+    pub total_hashes: usize,
     entries: UnsafeCell<MmapMut>,
     index_path: String,
     mmap_on_disk: bool,

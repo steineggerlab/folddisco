@@ -2,7 +2,7 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Description: Core geometric hash enum and types
 
-use std::{fmt, io::{BufRead, Write}};
+use std::{fmt, hash::Hash, io::{BufRead, Write}};
 
 use crate::utils::traits::HashableSync;
 
@@ -119,6 +119,35 @@ impl HashType {
         }
         hash_type
     }
+    
+    pub fn default_dist_bin(&self) -> usize {
+        match self {
+            HashType::PDBMotif => super::pdb_motif::NBIN_DIST as usize,
+            HashType::PDBMotifSinCos | HashType::TrRosetta | HashType::PointPairFeature |
+            HashType::TertiaryInteraction => crate::utils::convert::NBIN_DIST as usize,
+            HashType::PDBTrRosetta => super::pdb_tr::PDBTR_NBIN_DIST as usize,
+            HashType::Hybrid => super::hybrid::HYBRID_NBIN_DIST as usize,
+            HashType::FolddiscoAngle => super::folddisco_angle::NBIN_DIST as usize,
+            HashType::FolddiscoDist => super::folddisco_dist::NBIN_DIST as usize,
+            // append new hash type here
+            HashType::Other => 0,
+        }
+    }
+    
+    pub fn default_angle_bin(&self) -> usize {
+        match self {
+            HashType::PDBMotif => super::pdb_motif::NBIN_ANGLE as usize,
+            HashType::PDBMotifSinCos | HashType::TrRosetta | HashType::PointPairFeature |
+            HashType::TertiaryInteraction => crate::utils::convert::NBIN_SIN_COS as usize,
+            HashType::PDBTrRosetta => super::pdb_tr::PDBTR_NBIN_SIN_COS as usize,
+            HashType::Hybrid => super::hybrid::HYBRID_NBIN_SIN_COS as usize,
+            HashType::FolddiscoAngle => super::folddisco_angle::NBIN_ANGLE_360 as usize,
+            HashType::FolddiscoDist => super::folddisco_dist::NBIN_ANGLE_360 as usize,
+            // append new hash type here
+            HashType::Other => 0,
+        }
+    }
+    
 }
 
 #[cfg(test)]

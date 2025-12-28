@@ -11,52 +11,79 @@ use memmap2::Mmap;
 
 pub struct EncodingStat {
     pub hash_type: HashType,
-    pub num_bin_dist: usize,
-    pub num_bin_angle: usize,
+    pub dist_bin_given: usize,
+    pub angle_bin_given: usize,
     pub total_encodings: usize,
-    
+    pub total_possible_encodings: usize,
+    pub total_empty_encodings: usize,
+    pub total_nonempty_encodings: usize,
+    pub encoding_density: f32,
+    pub aa_pair_counts: [[usize; 20]; 20],
+    pub dist_bin_counts: Vec<usize>,
+    pub angle_bin_counts: Vec<usize>,
 }
 
 impl EncodingStat {
     pub fn new(
-        hash_type: HashType, num_bin_dist: usize, num_bin_angle: usize,
+        hash_type: HashType, dist_bin_given: usize, angle_bin_given: usize,
         index: &FolddiscoIndex,
     ) -> Self {
         let total_encodings = index.total_hashes;
+        let aa_pair_counts = [[0usize; 20]; 20];
+        let total_dist_bins = match hash_type.dist_bins(dist_bin_given) {
+            Some(b) => b,
+            None => 1,
+        };
+        let total_angle_bins = match hash_type.angle_bins(angle_bin_given) {
+            Some(b) => b,
+            None => 1,
+        };
+        let total_possible = total_possible_encodings(
+            hash_type,
+            dist_bin_given,
+            angle_bin_given,
+        );
+        let empty_encodings = total_possible - total_encodings;
+        let density = (total_encodings as f64 / total_possible as f64 * 100.0) as f32;
+
+        let dist_bin_counts = vec![0usize; total_dist_bins];
+        let angle_bin_counts = vec![0usize; total_angle_bins];
+
         Self {
             hash_type,
-            num_bin_dist,
-            num_bin_angle,
+            dist_bin_given,
+            angle_bin_given,
             total_encodings,
+            total_possible_encodings: total_possible,
+            total_empty_encodings: empty_encodings,
+            total_nonempty_encodings: total_encodings,
+            encoding_density: density,
+            aa_pair_counts,
+            dist_bin_counts,
+            angle_bin_counts,
         }
     }
 
     pub fn empty() -> Self {
         Self {
             hash_type: HashType::PDBTrRosetta,
-            num_bin_dist: 0,
-            num_bin_angle: 0,
+            dist_bin_given: 0,
+            angle_bin_given: 0,
             total_encodings: 0,
+            total_possible_encodings: 0,
+            total_empty_encodings: 0,
+            total_nonempty_encodings: 0,
+            encoding_density: 0.0,
+            aa_pair_counts: [[0usize; 20]; 20],
+            dist_bin_counts: vec![],
+            angle_bin_counts: vec![],
         }
-    }
-    
-    fn total_possible_encodings(&self) -> usize {
-        todo!("Recalclate with num_bin_dist and num_bin_angle & hash_type");
-        2_usize.pow(self.hash_type.encoding_bits() as u32)
     }
 
-    fn total_empty_encodings(&self) -> usize {
-        self.total_possible_encodings() - self.total_encodings
-    }
-    
-    fn encoding_density(&self, percentage: bool) -> f32 {
-        let density = self.total_encodings as f32 / self.total_possible_encodings() as f32;
-        if percentage {
-            density * 100.0
-        } else {
-            density
-        }
-    }
+}
+
+pub fn total_possible_encodings(hash_type: HashType, dist_bin_given: usize, angle_bin_given: usize) -> usize {
+    hash_type.total_bins(dist_bin_given, angle_bin_given)
 }
 
 pub fn count_encodings(
@@ -67,23 +94,26 @@ pub fn count_encodings(
     if verbose {
         print_log_msg("INFO", "Counting encodings in the index");
     }
-
-    // 
-    todo!("Calculate total, empty, non-empty encodings, density, etc.");
-    
-    todo!("Count features: AA pairs, counts per bin (distance, angle)");
-    
-    todo!("If doable, calculate secondary structure distribution of encodings by defining boundaries for secondary structures");
-    
-    todo!("Top N frequent encodings. sort by frequency");
-    
-    
-    EncodingStat::new(
+    // todo!("Calculate total, empty, non-empty encodings, density, etc.");
+    let mut stats = EncodingStat::new(
         hash_type,
         nbin_dist,
         nbin_angle,
         index,
-    )
+    );
+
+    println!("Total encodings: {}", stats.total_encodings);
+    println!("Total possible encodings: {}", stats.total_possible_encodings);
+    println!("Total empty encodings: {}", stats.total_empty_encodings);
+    println!("Encoding density: {:.4}%", stats.encoding_density);
+    
+    // todo!("Count features: AA pairs, counts per bin (distance, angle)");
+    
+    // todo!("If doable, calculate secondary structure distribution of encodings by defining boundaries for secondary structures");
+    
+    // todo!("Top N frequent encodings. sort by frequency");
+    
+    stats
 }
 
 pub fn save_summary(encoding_stat: &EncodingStat, output_prefix: &str, verbose: bool) {
@@ -121,4 +151,27 @@ pub fn save_enrichment_result(
     verbose: bool
 ) {
     todo!("Save enrichment analysis result to output files");
+}
+
+mod tests {
+    use super::*;
+    #[test]
+    fn test_encoding_stat() {
+        // 
+        todo!("Test with real index");
+        let stat = EncodingStat {
+            hash_type: HashType::PDBTrRosetta,
+            dist_bin_given: 16,
+            angle_bin_given: 4,
+            total_encodings: 1000,
+            total_possible_encodings: 100000,
+            total_empty_encodings: 99000,
+            total_nonempty_encodings: 1000,
+            encoding_density: 1.0,
+            aa_pair_counts: [[0usize; 20]; 20],
+            dist_bin_counts: vec![0usize; 16],
+            angle_bin_counts: vec![0usize; 4],
+        };
+        println!("EncodingStat: total_encodings = {}", stat.total_encodings);
+    }
 }

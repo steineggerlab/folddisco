@@ -7,11 +7,11 @@
 //! If only index is given, it summarizes the overall distribution of the hash values in the index.
 //! If PDB files or query motifs are also given, it analyzes the distribution of matches for
 
-use core::hash;
 
 use crate::cli::config::read_index_config_from_file;
 use crate::cli::{AppArgs, print_logo};
 use crate::controller::io::{check_and_get_indices, get_lookup_and_type};
+use crate::controller::summary::count_encodings;
 use crate::{index, prelude::*};
 
 pub const HELP_ANALYZE: &str = "\
@@ -101,7 +101,11 @@ pub fn analyze(env: AppArgs) {
                 // todo!("save_enrichment_result(&analysis_result, &output_prefix, verbose)");
             } else {
                 // let summary =
-                todo!("count_encodings(&index, &offset_mmap, pdb_container, verbose)");
+                // todo!("count_encodings(&index, &offset_mmap, pdb_container, verbose)");
+                count_encodings(
+                    &index, &offset_mmap, hash_type,
+                    nbin_dist, nbin_angle, verbose
+                );
                 // todo!("save_summary(&summary, &output_prefix, verbose)");                
             }
 

@@ -3,6 +3,8 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
+use std::hash::Hash;
+
 use crate::utils::convert::{map_aa_to_u8, map_aa_to_u8_group};
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};
@@ -260,14 +262,16 @@ impl HashType {
     pub fn amino_acid_index(&self) -> Option<Vec<usize>> {
         match self {
             HashType::PDBMotif | HashType::PDBMotifSinCos | 
-            HashType::TrRosetta | HashType::PointPairFeature | HashType::PDBTrRosetta => Some(vec![0, 1]), 
+            HashType::TrRosetta | HashType::PointPairFeature | HashType::PDBTrRosetta |
+            HashType::FolddiscoAngle | HashType::FolddiscoDist => Some(vec![0, 1]), 
             _ => None
         }
     }
 
     pub fn dist_index(&self) -> Option<Vec<usize>> {
         match self {
-            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBTrRosetta | HashType::Hybrid  => Some(vec![2, 3]),
+            HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBTrRosetta | 
+            HashType::Hybrid | HashType::FolddiscoAngle | HashType::FolddiscoDist => Some(vec![2, 3]),
             HashType::TrRosetta | HashType::PointPairFeature => Some(vec![2]),
             HashType::TertiaryInteraction => Some(vec![7]),
             _ => None
@@ -279,12 +283,69 @@ impl HashType {
             HashType::PDBMotif | HashType::PDBMotifSinCos => Some(vec![4]),
             HashType::TrRosetta => Some(vec![3, 4, 5, 6, 7]),
             HashType::PointPairFeature => Some(vec![3, 4, 5]),
-            HashType::PDBTrRosetta => Some(vec![4, 5, 6]), 
+            HashType::PDBTrRosetta | HashType::FolddiscoAngle | HashType::FolddiscoDist => Some(vec![4, 5, 6]), 
             HashType::TertiaryInteraction => Some(vec![0, 1, 2, 3, 4, 5, 6]),
             HashType::Hybrid => Some(vec![4, 5, 6, 7, 8]),
             _ => None
         }
     }
+    
+    pub fn dist_bins(&self, nbin_dist: usize) -> Option<usize> {
+        let nbin_dist = if nbin_dist == 0 {
+            self.default_dist_bin()
+        } else {
+            nbin_dist
+        };
+        match self.dist_index() {
+            Some(_) => Some(nbin_dist.pow(self.dist_index().unwrap().len() as u32)),
+            None => None,
+        }
+    }
+    
+    pub fn angle_bins(&self, nbin_angle: usize) -> Option<usize> {
+        let nbin_angle = if nbin_angle == 0 {
+            self.default_angle_bin()
+        } else {
+            nbin_angle
+        };
+        match self {
+            HashType::PDBMotif| HashType::FolddiscoAngle => {
+                // Angles are encoded with radian values.
+                Some(nbin_angle.pow(self.angle_index().unwrap().len() as u32))
+            }
+            HashType::FolddiscoDist => {
+                if nbin_angle == 16 {
+                    // hard code: 8 * 16 * 16 = 2048
+                    Some(2048)
+                } else {
+                    Some(nbin_angle.pow(self.angle_index().unwrap().len() as u32))
+                }
+            }
+            HashType::PDBMotifSinCos | HashType::TrRosetta | HashType::PointPairFeature |
+            HashType::PDBTrRosetta | HashType::TertiaryInteraction | HashType::Hybrid => {
+                // Angles are encoded with sin-cos values.
+                Some((nbin_angle * nbin_angle).pow(self.angle_index().unwrap().len() as u32))
+            }
+            _ => None
+        }
+    }
+    
+    pub fn total_bins(&self, nbin_dist: usize, nbin_angle: usize) -> usize {
+        let angle_bins = match self.angle_bins(nbin_angle) {
+            Some(num_bins) => num_bins,
+            None => 1,
+        };
+        let dist_bins = match self.dist_bins(nbin_dist) {
+            Some(num_bins) => num_bins,
+            None => 1,
+        };
+        let aa_bins = match self.amino_acid_index() {
+            Some(_) => 20 * 20,
+            None => 1,
+        };
+        dist_bins * angle_bins * aa_bins
+    }
+
 }
 
 #[cfg(test)]

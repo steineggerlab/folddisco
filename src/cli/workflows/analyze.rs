@@ -23,7 +23,10 @@ input:
 
 output:
     -o, --output <OUTPUT_PATH>   Path to save analysis results (optional)
-    
+
+options:
+    --top <INT>                  Limit output to top N encodings by frequency [default: 10]
+
 general options:
     -t, --threads <INT>          Number of threads to use [default: 1]
     -v, --verbose                Print verbose messages
@@ -36,6 +39,7 @@ pub fn analyze(env: AppArgs) {
             index_path,
             pdb_container,
             output,
+            top_n,
             threads,
             verbose,
             help: _,
@@ -103,10 +107,9 @@ pub fn analyze(env: AppArgs) {
                 // let summary =
                 // todo!("count_encodings(&index, &offset_mmap, pdb_container, verbose)");
                 count_encodings(
-                    &index, &offset_mmap, hash_type,
-                    nbin_dist, nbin_angle, verbose
+                    &index, hash_type, nbin_dist, nbin_angle, top_n, verbose
                 );
-                // todo!("save_summary(&summary, &output_prefix, verbose)");                
+                // todo!("save_summary(&summary, &output_prefix, verbose)");
             }
 
         }

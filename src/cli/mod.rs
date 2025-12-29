@@ -112,6 +112,7 @@ pub enum AppArgs {
         // Optional
         pdb_container: Option<String>,
         output: Option<String>,
+        top_n: usize,
         // other general options
         threads: usize,        
         verbose: bool,

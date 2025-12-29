@@ -5,9 +5,12 @@
 
 use crate::geometry::core::HashType;
 use crate::index::indextable::FolddiscoIndex;
+use crate::prelude::GeometricHash;
 use crate::utils::log::{print_log_msg, log_msg};
 
 use memmap2::Mmap;
+use rayon::slice::ParallelSliceMut;
+use rayon::vec;
 
 pub struct EncodingStat {
     pub hash_type: HashType,
@@ -21,6 +24,7 @@ pub struct EncodingStat {
     pub aa_pair_counts: [[usize; 20]; 20],
     pub dist_bin_counts: Vec<usize>,
     pub angle_bin_counts: Vec<usize>,
+    pub hash_count_vec: Vec<(u32, usize)>,
 }
 
 impl EncodingStat {
@@ -48,7 +52,9 @@ impl EncodingStat {
 
         let dist_bin_counts = vec![0usize; total_dist_bins];
         let angle_bin_counts = vec![0usize; total_angle_bins];
-
+        
+        let hash_count_vec = get_hash_count_vec(index);
+        
         Self {
             hash_type,
             dist_bin_given,
@@ -61,6 +67,7 @@ impl EncodingStat {
             aa_pair_counts,
             dist_bin_counts,
             angle_bin_counts,
+            hash_count_vec,
         }
     }
 
@@ -77,6 +84,7 @@ impl EncodingStat {
             aa_pair_counts: [[0usize; 20]; 20],
             dist_bin_counts: vec![],
             angle_bin_counts: vec![],
+            hash_count_vec: vec![],
         }
     }
 
@@ -87,9 +95,8 @@ pub fn total_possible_encodings(hash_type: HashType, dist_bin_given: usize, angl
 }
 
 pub fn count_encodings(
-    index: &FolddiscoIndex, offset_mmap: &Mmap,
-    hash_type: HashType, nbin_dist: usize, nbin_angle: usize,
-    verbose: bool
+    index: &FolddiscoIndex, hash_type: HashType, nbin_dist: usize, nbin_angle: usize, 
+    top_n: usize, verbose: bool
 ) -> EncodingStat {
     if verbose {
         print_log_msg("INFO", "Counting encodings in the index");
@@ -102,16 +109,31 @@ pub fn count_encodings(
         index,
     );
 
+    // stats.hash_count_vec.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
+    stats.hash_count_vec.par_sort_by(|a, b| b.1.cmp(&a.1)); // Descending order by count
+    println!("Hash count vector loaded: {} entries", stats.hash_count_vec.len());
+    
+    // TODO: this only counts total encodings
     println!("Total encodings: {}", stats.total_encodings);
     println!("Total possible encodings: {}", stats.total_possible_encodings);
     println!("Total empty encodings: {}", stats.total_empty_encodings);
     println!("Encoding density: {:.4}%", stats.encoding_density);
+    let mut feature_container = vec![0.0f32; 7];
+    for (i, (hash, count)) in stats.hash_count_vec.iter().take(top_n).enumerate() {
+        let geometric_hash = GeometricHash::from_u32(*hash, hash_type);
+        println!("Top {}: Hash: {}, Count: {}", i + 1, hash, count);
+        GeometricHash::reverse_hash(
+            &geometric_hash, 16, 4, &mut feature_container
+        );
+        println!("Feature: {:?}", &feature_container);
+    }
+    // todo!("Top N frequent encodings. sort by frequency");
+    
     
     // todo!("Count features: AA pairs, counts per bin (distance, angle)");
     
     // todo!("If doable, calculate secondary structure distribution of encodings by defining boundaries for secondary structures");
     
-    // todo!("Top N frequent encodings. sort by frequency");
     
     stats
 }
@@ -153,6 +175,20 @@ pub fn save_enrichment_result(
     todo!("Save enrichment analysis result to output files");
 }
 
+pub fn get_hash_count_vec(
+    index: &FolddiscoIndex,
+) -> Vec<(u32, usize)> {
+    let mut hash_count_vec: Vec<(u32, usize)> = Vec::with_capacity(index.total_hashes);
+    for i in 0..index.total_hashes {
+        let hash = index.loaded_hashes[i];
+        let count = index.loaded_offsets[i + 1] - index.loaded_offsets[i];
+        hash_count_vec.push((hash, count));
+    }
+    hash_count_vec
+}
+
+
+
 mod tests {
     use super::*;
     #[test]
@@ -171,6 +207,7 @@ mod tests {
             aa_pair_counts: [[0usize; 20]; 20],
             dist_bin_counts: vec![0usize; 16],
             angle_bin_counts: vec![0usize; 4],
+            hash_count_vec: vec![],
         };
         println!("EncodingStat: total_encodings = {}", stat.total_encodings);
     }

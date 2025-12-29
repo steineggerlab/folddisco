@@ -117,6 +117,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             index_path: args.opt_value_from_str(["-i", "--index"])?,
             pdb_container: args.opt_value_from_str(["-p", "--pdbs"])?,
             output: args.opt_value_from_str(["-o", "--output"])?,
+            top_n: args.value_from_str("--top").unwrap_or(10),
             threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
             verbose: args.contains(["-v", "--verbose"]),
             help: args.contains(["-h", "--help"]),

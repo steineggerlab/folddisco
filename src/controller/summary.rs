@@ -3,14 +3,26 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2025 Hyunbin Kim, All rights reserved
 
+use std::cell::UnsafeCell;
+use std::sync::atomic::AtomicUsize;
+
 use crate::geometry::core::HashType;
 use crate::index::indextable::FolddiscoIndex;
 use crate::prelude::GeometricHash;
 use crate::utils::log::{print_log_msg, log_msg};
 
 use memmap2::Mmap;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator as _};
 use rayon::slice::ParallelSliceMut;
 use rayon::vec;
+
+
+
+struct AAPairCounts {
+    pub counts: Vec<Vec<AtomicUsize>>,
+}
+unsafe impl Send for AAPairCounts {}
+unsafe impl Sync for AAPairCounts {}
 
 pub struct EncodingStat {
     pub hash_type: HashType,
@@ -21,7 +33,7 @@ pub struct EncodingStat {
     pub total_empty_encodings: usize,
     pub total_nonempty_encodings: usize,
     pub encoding_density: f32,
-    pub aa_pair_counts: [[usize; 20]; 20],
+    pub aa_pair_counts: AAPairCounts,
     pub dist_bin_counts: Vec<usize>,
     pub angle_bin_counts: Vec<usize>,
     pub hash_count_vec: Vec<(u32, usize)>,
@@ -33,7 +45,11 @@ impl EncodingStat {
         index: &FolddiscoIndex,
     ) -> Self {
         let total_encodings = index.total_hashes;
-        let aa_pair_counts = [[0usize; 20]; 20];
+        let aa_pair_counts = AAPairCounts {
+            counts: (0..20)
+                .map(|_| (0..20).map(|_| AtomicUsize::new(0)).collect())
+                .collect(),
+        };
         let total_dist_bins = match hash_type.dist_bins(dist_bin_given) {
             Some(b) => b,
             None => 1,
@@ -72,6 +88,11 @@ impl EncodingStat {
     }
 
     pub fn empty() -> Self {
+        let aa_pair_counts = AAPairCounts {
+            counts: (0..20)
+                .map(|_| (0..20).map(|_| AtomicUsize::new(0)).collect())
+                .collect(),
+        };
         Self {
             hash_type: HashType::PDBTrRosetta,
             dist_bin_given: 0,
@@ -81,7 +102,7 @@ impl EncodingStat {
             total_empty_encodings: 0,
             total_nonempty_encodings: 0,
             encoding_density: 0.0,
-            aa_pair_counts: [[0usize; 20]; 20],
+            aa_pair_counts: aa_pair_counts,
             dist_bin_counts: vec![],
             angle_bin_counts: vec![],
             hash_count_vec: vec![],
@@ -118,6 +139,9 @@ pub fn count_encodings(
     println!("Total possible encodings: {}", stats.total_possible_encodings);
     println!("Total empty encodings: {}", stats.total_empty_encodings);
     println!("Encoding density: {:.4}%", stats.encoding_density);
+
+    // todo!("Top N frequent encodings. sort by frequency");
+    // TODO: This is temporary code to print top N frequent encodings
     let mut feature_container = vec![0.0f32; 7];
     for (i, (hash, count)) in stats.hash_count_vec.iter().take(top_n).enumerate() {
         let geometric_hash = GeometricHash::from_u32(*hash, hash_type);
@@ -127,11 +151,41 @@ pub fn count_encodings(
         );
         println!("Feature: {:?}", &feature_container);
     }
-    // todo!("Top N frequent encodings. sort by frequency");
-    
     
     // todo!("Count features: AA pairs, counts per bin (distance, angle)");
+    // DONE: naively count AA pairs from hash_count_vec
+    // TODO: Count dist_bin_counts and angle_bin_counts
+    stats.hash_count_vec.par_iter().for_each(|(hash, count)| {
+        let mut feature_container = vec![0.0f32; 7];
+        let geometric_hash = GeometricHash::from_u32(*hash, hash_type);
+        // Decode features
+        GeometricHash::reverse_hash(
+            &geometric_hash, nbin_dist, nbin_angle, &mut feature_container
+        );
+        let aa1 = feature_container[0] as usize;
+        let aa2 = feature_container[1] as usize;
+        // Update AA pair counts
+        stats.aa_pair_counts.counts[aa1][aa2].fetch_add(
+            *count, std::sync::atomic::Ordering::Relaxed
+        );
+    });
     
+    // TODO: need better printing
+    // Print count matrix for AA pairs comma separated.
+    println!("Amino Acid Pair Counts:");
+    print!("AA1\\AA2");
+    for aa2 in 0..20 {
+        print!(",{}", aa2);
+    }
+    println!();
+    for aa1 in 0..20 {
+        print!("{}", aa1);
+        for aa2 in 0..20 {
+            let count = stats.aa_pair_counts.counts[aa1][aa2].load(std::sync::atomic::Ordering::Relaxed);
+            print!(",{}", count);
+        }
+        println!();
+    }
     // todo!("If doable, calculate secondary structure distribution of encodings by defining boundaries for secondary structures");
     
     
@@ -189,12 +243,18 @@ pub fn get_hash_count_vec(
 
 
 
+
 mod tests {
     use super::*;
     #[test]
     fn test_encoding_stat() {
         // 
         todo!("Test with real index");
+        let aa_pair_counts = AAPairCounts {
+            counts: (0..20)
+                .map(|_| (0..20).map(|_| AtomicUsize::new(0)).collect())
+                .collect(),
+        };
         let stat = EncodingStat {
             hash_type: HashType::PDBTrRosetta,
             dist_bin_given: 16,
@@ -204,7 +264,7 @@ mod tests {
             total_empty_encodings: 99000,
             total_nonempty_encodings: 1000,
             encoding_density: 1.0,
-            aa_pair_counts: [[0usize; 20]; 20],
+            aa_pair_counts: aa_pair_counts,
             dist_bin_counts: vec![0usize; 16],
             angle_bin_counts: vec![0usize; 4],
             hash_count_vec: vec![],

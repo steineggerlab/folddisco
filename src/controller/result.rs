@@ -123,6 +123,7 @@ pub struct MatchResult<'a> {
     pub evalue_lin: f32,
     pub evalue_frac: f32,
     pub evalue_new: f32,
+    pub evalue_new_sat: f32,
     pub u_matrix: [[f32; 3]; 3],
     pub t_matrix: [f32; 3],
     pub matching_coordinates: Vec<Coordinate>,
@@ -145,6 +146,7 @@ impl<'a> MatchResult<'a> {
         let evalue_lin = evalue_fitting_lin(avg_idf, index_size as f32, node_count as f32);
         let evalue_frac = evalue_fitting_frac(avg_idf, index_size as f32, node_count as f32);
         let evalue_new = evalue_fitting_new(avg_idf, index_size as f32, node_count as f32);
+        let evalue_new_sat = evalue_fitting_new_sat(avg_idf, index_size as f32, node_count as f32);
         Self {
             tid,
             nid,
@@ -156,6 +158,7 @@ impl<'a> MatchResult<'a> {
             evalue_lin,
             evalue_frac,
             evalue_new,
+            evalue_new_sat,
             u_matrix,
             t_matrix,
             matching_coordinates,
@@ -184,14 +187,14 @@ impl<'a> MatchResult<'a> {
             }).collect::<Vec<String>>().join(",");
             // Return
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{}\t{}",
-                self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_frac, self.evalue_new,
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{}\t{}\t{}",
+                self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_frac, self.evalue_new, self.evalue_new_sat,
                 matching_residues, u_string, t_string, matching_coordinates, self.db_key, self.metrics
             )
         } else {
             format!(
-                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}",
-                self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_frac, self.evalue_new,
+                "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_frac, self.evalue_new, self.evalue_new_sat,
                 matching_residues, self.db_key, self.metrics
             )
         }
@@ -201,8 +204,8 @@ impl<'a> MatchResult<'a> {
 impl<'a> fmt::Display for MatchResult<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
-            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}",
-            self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_frac, self.evalue_new,
+            f, "{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}",
+            self.tid, self.node_count, self.idf, self.rmsd, self.evalue_lin, self.evalue_frac, self.evalue_new, self.evalue_new_sat,
             self.matching_residues.iter().map(|x| {
                 match x {
                     Some((a, b)) => format!("{}{}", *a as char, b),
@@ -273,6 +276,7 @@ fn build_match_result_columns<'a>(qid: String, query_residues: String) -> HashMa
         Column::new("evalue_lin", "E-value_lin", |r: &MatchResult| Value::Float(r.evalue_lin, DEFAULT_FLOAT_PRECISION)),
         Column::new("evalue_frac", "E-value_frac", |r: &MatchResult| Value::Float(r.evalue_frac, DEFAULT_FLOAT_PRECISION)),
         Column::new("evalue_new", "E-value_new", |r: &MatchResult| Value::Float(r.evalue_new, DEFAULT_FLOAT_PRECISION)),
+        Column::new("evalue_new_sat", "E-value_new_sat", |r: &MatchResult| Value::Float(r.evalue_new_sat, DEFAULT_FLOAT_PRECISION)),
         Column::new("u_matrix", "Rotation matrix", |r: &MatchResult| Value::Float3DMatrix(r.u_matrix, DEFAULT_FLOAT_PRECISION, ",")),
         Column::new("t_vector", "Translation vector", |r: &MatchResult| Value::Float3DVector(r.t_matrix, DEFAULT_FLOAT_PRECISION, ",")),
         Column::new("matching_residues", "Matching residues", |r: &MatchResult| {
@@ -341,6 +345,7 @@ pub const MATCH_RESULT_DEFAULT_COLUMNS: &[&str] = &[
     "evalue_lin",
     "evalue_frac",
     "evalue_new",
+    "evalue_new_sat",
     "matching_residues",
     "query_residues",
 ];
@@ -354,6 +359,7 @@ pub const MATCH_RESULT_SUPERPOSE_COLUMNS: &[&str] = &[
     "evalue_lin",
     "evalue_frac",
     "evalue_new",
+    "evalue_new_sat",
     "matching_residues",
     "u_matrix",
     "t_vector",
@@ -422,6 +428,27 @@ pub fn evalue_fitting_new(x: f32, m: f32, l: f32) -> f32 {
     e_val as f32
 }
 
+//Create a evalue fitting function to compute evalues based on IDF score
+pub fn evalue_fitting_new_sat(x: f32, m: f32, l: f32) -> f32 {
+    // x: score, m: index size, l: query residue length 
+    let x_d = x as f64;
+    let m_d = m as f64;
+    let l_d = l as f64;
+
+    let mu = 0.01115566 * l_d.powi(2) + 0.06267775 * l_d + 18.8132141;
+    let lam = 0.67754035 * (-0.05775654 * l_d).exp();
+    
+    let ref_db_size = 10547.0; 
+    let search_space_ref = l_d * ref_db_size;
+
+    let k_val = (lam * mu).exp() / search_space_ref;
+    let real_search_space = m_d;
+    let e_val_raw = k_val * real_search_space * (-lam * x_d).exp();
+
+    let e_val = (e_val_raw * real_search_space) / (e_val_raw + real_search_space);
+
+    e_val as f32
+}
 
 /// Create a TsvFormatter for MatchResult with specified column keys
 pub fn match_result_formatter<'a>(column_keys: &[&str], qid: &str, query_residues: &str) -> TsvFormatter<MatchResult<'a>> {

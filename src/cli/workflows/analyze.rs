@@ -11,8 +11,8 @@
 use crate::cli::config::read_index_config_from_file;
 use crate::cli::{AppArgs, print_logo};
 use crate::controller::io::{check_and_get_indices, get_lookup_and_type};
-use crate::controller::summary::count_encodings;
-use crate::{index, prelude::*};
+use crate::controller::summary::{count_encodings, save_summary};
+use crate::prelude::*;
 
 pub const HELP_ANALYZE: &str = "\
 usage: folddisco analyze -i <index> [options]
@@ -73,12 +73,12 @@ pub fn analyze(env: AppArgs) {
             
             if verbose {
                 if compare_with_pdbs {
-                    print_log_msg("INFO", &format!(
+                    print_log_msg(INFO, &format!(
                         "Comparing encoding distribution of {:?} against {}",
                         pdb_container.as_ref().unwrap(), &index_path
                     ));
                 } else {
-                    print_log_msg("INFO", &format!(
+                    print_log_msg(INFO, &format!(
                         "Summarizing encoding distribution of index {:?}", &index_path
                     ));
                 }
@@ -104,12 +104,17 @@ pub fn analyze(env: AppArgs) {
                 todo!("analyze_enrichment(&index, &offset_mmap, pdb_container.unwrap(), verbose)");
                 // todo!("save_enrichment_result(&analysis_result, &output_prefix, verbose)");
             } else {
-                // let summary =
-                // todo!("count_encodings(&index, &offset_mmap, pdb_container, verbose)");
-                count_encodings(
-                    &index, hash_type, nbin_dist, nbin_angle, top_n, verbose
+                let summary = count_encodings(
+                    &index, hash_type, nbin_dist, nbin_angle, verbose
                 );
-                // todo!("save_summary(&summary, &output_prefix, verbose)");
+                let saved = save_summary(
+                    &summary, &output_prefix, top_n, verbose
+                );
+                if saved.is_err() {
+                    print_log_msg(FAIL, &format!(
+                        "Failed to save summary result to {}*", &output_prefix
+                    ));
+                }
             }
 
         }

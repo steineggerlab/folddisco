@@ -11,7 +11,6 @@ use crate::utils::log::{print_log_msg, INFO};
 
 use std::sync::atomic::AtomicUsize;
 
-use memmap2::Mmap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator as _};
 use rayon::slice::ParallelSliceMut;
 
@@ -248,38 +247,38 @@ pub fn save_summary(
     Ok(())
 }
 
-pub fn analyze_enrichment(
-    index: &FolddiscoIndex, offset_mmap: &Mmap,
-    pdb_container: &str,
-    verbose: bool
-) {
-    if verbose {
-        print_log_msg(INFO, &format!(
-            "Analyzing enrichment of encodings in PDB container {}",
-            pdb_container
-        ));
-    }
+// pub fn analyze_enrichment(
+//     index: &FolddiscoIndex, offset_mmap: &Mmap,
+//     pdb_container: &str,
+//     verbose: bool
+// ) {
+//     if verbose {
+//         print_log_msg(INFO, &format!(
+//             "Analyzing enrichment of encodings in PDB container {}",
+//             pdb_container
+//         ));
+//     }
     
-    // Load PDBs from container
-    todo!("Load PDBs from the given container (directory or compressed file)");
+//     // Load PDBs from container
+//     todo!("Load PDBs from the given container (directory or compressed file)");
     
-    // For each PDB, compute encoding distribution
-    todo!("For each PDB structure, compute its encoding distribution");
+//     // For each PDB, compute encoding distribution
+//     todo!("For each PDB structure, compute its encoding distribution");
     
-    // Compare with index encoding distribution
-    todo!("Compare the encoding distribution of PDBs with that of the index");
+//     // Compare with index encoding distribution
+//     todo!("Compare the encoding distribution of PDBs with that of the index");
     
-    // Calculate enrichment statistics
-    todo!("Calculate enrichment statistics for encodings present in PDBs vs index");
-}
+//     // Calculate enrichment statistics
+//     todo!("Calculate enrichment statistics for encodings present in PDBs vs index");
+// }
 
-pub fn save_enrichment_result(
-    // analysis_result: &EnrichmentResult,
-    output_prefix: &str,
-    verbose: bool
-) {
-    todo!("Save enrichment analysis result to output files");
-}
+// pub fn save_enrichment_result(
+//     // analysis_result: &EnrichmentResult,
+//     output_prefix: &str,
+//     verbose: bool
+// ) {
+//     todo!("Save enrichment analysis result to output files");
+// }
 
 pub fn get_hash_count_vec(
     index: &FolddiscoIndex,
@@ -334,32 +333,4 @@ pub fn get_counts_from_hash_count_vec(
     counts
 }
 
-
-mod tests {
-    use super::*;
-    #[test]
-    fn test_encoding_stat() {
-        // 
-        todo!("Test with real index");
-        let aa_pair_counts = AAPairCounts {
-            counts: (0..20)
-                .map(|_| (0..20).map(|_| AtomicUsize::new(0)).collect())
-                .collect(),
-        };
-        let stat = EncodingStat {
-            hash_type: HashType::PDBTrRosetta,
-            dist_bin_given: 16,
-            angle_bin_given: 4,
-            total_encodings: 1000,
-            total_possible_encodings: 100000,
-            total_empty_encodings: 99000,
-            total_nonempty_encodings: 1000,
-            encoding_density: 1.0,
-            aa_pair_counts: aa_pair_counts,
-            dist_bin_counts: vec![0usize; 16],
-            angle_bin_counts: vec![0usize; 4],
-            hash_count_vec: vec![],
-        };
-        println!("EncodingStat: total_encodings = {}", stat.total_encodings);
-    }
-}
+// TODO: unit tests with a real index

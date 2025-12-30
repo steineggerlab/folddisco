@@ -3,8 +3,6 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-use std::hash::Hash;
-
 use crate::utils::convert::{map_aa_to_u8, map_aa_to_u8_group};
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};

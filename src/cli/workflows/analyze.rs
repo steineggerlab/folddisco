@@ -10,7 +10,7 @@
 
 use crate::cli::config::read_index_config_from_file;
 use crate::cli::{AppArgs, print_logo};
-use crate::controller::io::{check_and_get_indices, get_lookup_and_type};
+use crate::controller::io::get_lookup_and_type;
 use crate::controller::summary::{count_encodings, save_summary};
 use crate::prelude::*;
 
@@ -88,7 +88,7 @@ pub fn analyze(env: AppArgs) {
                 &log_msg(FAIL, "Failed to build thread pool")
             );
             // Load index
-            let (index, offset_mmap) = measure_time!(
+            let (index, _offset_mmap) = measure_time!(
                 load_folddisco_index(&index_path), verbose
             );
             // Load lookup and config

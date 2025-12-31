@@ -416,7 +416,7 @@ pub fn evalue_fitting_new(x: f32, m: f32, l: f32) -> f32 {
     let l_d = l as f64;
 
     let mu = 0.01115566 * l_d.powi(2) + 0.06267775 * l_d + 18.8132141;
-    let lam = 0.60 * (-0.050 * l_d).exp();
+    let lam = 0.53 * (-0.045 * l_d).exp();
     
     let ref_db_size = 10547.0; 
     let search_space_ref = ref_db_size;

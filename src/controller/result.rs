@@ -439,7 +439,8 @@ pub fn evalue_fitting_new_sat(x: f32, m: f32, l: f32) -> f32 {
     let lam = 0.67754035 * (-0.05775654 * l_d).exp();
     
     let ref_db_size = 10547.0; 
-    let search_space_ref = ref_db_size;
+    let param = 42.0
+    let search_space_ref = ref_db_size * (param - l_d);
 
     let k_val = (lam * mu).exp() / search_space_ref;
     let real_search_space = m_d;

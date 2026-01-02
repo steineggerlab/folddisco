@@ -167,7 +167,7 @@ impl MatchSortStrategy {
     ///
     /// # Examples
     /// ```
-    /// use motifsearch::controller::sort::MatchSortStrategy;
+    /// use folddisco::controller::sort::MatchSortStrategy;
     ///
     /// // Default orders
     /// let strategy = MatchSortStrategy::from_str("node_count,tm_score,rmsd").unwrap();
@@ -410,7 +410,7 @@ impl StructureSortStrategy {
     ///
     /// # Examples
     /// ```
-    /// use motifsearch::controller::sort::StructureSortStrategy;
+    /// use folddisco::controller::sort::StructureSortStrategy;
     ///
     /// // Default orders
     /// let strategy = StructureSortStrategy::from_str("max_node_count,min_rmsd").unwrap();

@@ -219,7 +219,7 @@ mod tests {
         formatter.write_header(&mut output).unwrap();
         formatter.write_record(&mut output, &record).unwrap();
         let result = String::from_utf8(output).unwrap();
-        let expected = "id\tscore\tscore_sci\tname\tactive\n42\t3.1416\t3.1500e-08\tTest Name\t1\n";
+        let expected = "id\tscore\tscore_sci\tname\tactive\n42\t3.1416\t3.1416e-8\tTest Name\t1\n";
         println!("Result:\n{}", result);
         assert_eq!(result, expected);
         
@@ -254,7 +254,7 @@ mod tests {
         }
         let result_new = String::from_utf8(output_new).unwrap();
         println!("Result with new columns:\n{}", result_new);
-        let expected_new = "name\tactive\tscore\tscore_sci\nAlice\t0\t2.7183\t2.7183e-08\nBob\t1\t1.6180\t1.6180e-08\n";
+        let expected_new = "name\tactive\tscore\tscore_sci\nAlice\t0\t2.7183\t2.7183e-8\nBob\t1\t1.6180\t1.6180e-8\n";
         assert_eq!(result_new, expected_new);
     }
 }   

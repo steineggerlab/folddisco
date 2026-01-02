@@ -271,25 +271,19 @@ impl FolddiscoIndex {
         // Collect only hashes where data exists
         let mut hashes = Vec::with_capacity(self.total_hashes);
         let mut sparse_offsets = Vec::with_capacity(self.total_hashes);
-        
 
-        // Find first non-empty hash
-        let first_non_empty_hash = (0..self.total_hashes).find(|&hash| offsets[hash] < offsets[hash + 1]);
         sparse_offsets.push(0); // Initial offset is always 0
         
-        // Add
-        if let Some(first_hash) = first_non_empty_hash {
-            hashes.push(first_hash as u32);
-            sparse_offsets.push(offsets[first_hash]);
-        }
-        
         // Find all hashes with data and their corresponding offsets
-        for hash in (first_non_empty_hash.unwrap_or(0) + 1)..self.total_hashes {
-            if offsets[hash] < offsets[hash + 1] {
+        for hash in 0..self.total_hashes {
+            let start = offsets[hash];
+            let end = offsets[hash + 1];
+            
+            if start < end {
                 // This hash has data
                 hashes.push(hash as u32);
-                // Store start offset
-                sparse_offsets.push(offsets[hash + 1]);
+                // Store the cumulative end offset
+                sparse_offsets.push(end);
             }
         }
         
@@ -505,7 +499,8 @@ mod tests {
         println!("Indexing time: {:?}", elapsed);
         // Print offsets
         let offsets = unsafe { &*index.offsets.get() };
-        for i in 0..total_hashes+1 {
+        println!("Offsets length: {}", offsets.len());
+        for i in 0..offsets.len() {
             println!("offsets[{}]: {}", i, offsets[i]);
         }
         let entries = unsafe { &*index.entries.get() };

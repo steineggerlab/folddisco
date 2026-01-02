@@ -186,7 +186,7 @@ mod tests {
         let hash = HashValue::perfect_hash_default(&raw_feature);
         let hash = GeometricHash::FolddiscoAngle(HashValue::from_u32(hash));
         match hash {
-            GeometricHash::PDBTrRosetta(hash) => {
+            GeometricHash::FolddiscoAngle(hash) => {
                 println!("{:?}", hash);
             },
             _ => panic!("Invalid hash type"),

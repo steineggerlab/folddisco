@@ -3,6 +3,8 @@
 Folddisco is tool for searching discontinuous motifs in protein structures.
 It is designed to handle large-scale protein databases with efficiency, enabling the detection of structural motifs across thousands of proteomes or millions of structures.
 
+> **⚠️ Important Notice:** This release introduces a new index format that is **not compatible** with indices created by previous versions. Please rebuild your indices using the new version or download the updated pre-built indices (coming soon).
+
 ## Publications
 [Kim H, Kim RS, Mirdita M, Steinegger M. Structural motif search across the protein-universe with Folddisco. bioRxiv, doi: 10.1101/2025.07.06.663357  (2025)](https://www.biorxiv.org/content/10.1101/2025.07.06.663357v1)
 
@@ -52,6 +54,7 @@ cd ..
 ```
 
 #### Pre-built Indices
+
 Download pre-built index files:
 - [Human proteome](https://opendata.mmseqs.org/folddisco/h_sapiens_folddisco.tar.gz)
 - [E. coli proteome](https://opendata.mmseqs.org/folddisco/e_coli_folddisco.tar.gz)
@@ -158,6 +161,9 @@ folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --cov
 # Print top 100 structures with sorting by score
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by-score
 folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 4 --top 100 --sort-by-score --per-structure --skip-match
+
+# Comprehensive filtering with multiple criteria
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 10.0 --ca-distance 1.0 --covered-node-ratio 0.3 --max-node-ratio 0.35 --rmsd 5.0 --tm-score 0.2 --gdt-ts 0.25 --gdt-ha 0.15 --chamfer-distance 5.5 --hausdorff-distance 12.0 --sort-by node_count,gdt_ts,rmsd,idf --format-output tid,node_count,gdt_ts,rmsd,idf,matching_residues,query_residues
 ```
 
 ### Indexing
@@ -193,35 +199,34 @@ folddisco index -p h_sapiens -i index/h_sapiens_pdbtype -t 12 --type pdb -d 8 -a
 ### Match Result
 Default output which prints out one matching motif per line
 ```
-id	node_count	idf_score	rmsd	matching_residues	key	query_residues
-data/serine_peptidases/4cha.pdb	3	0.6138	0.0000	B57,B102,C195	4	B57,B102,C195
-data/serine_peptidases/4cha.pdb	3	0.6138	0.0874	F57,F102,G195	4	B57,B102,C195
-data/serine_peptidases/1pq5.pdb	3	0.4869	0.2609	A56,A99,A195	3	B57,B102,C195
-data/serine_peptidases/1ju3.pdb	2	0.0617	0.7792	_,A223,A234	1	B57,B102,C195
-data/serine_peptidases/1l7a.pdb	2	0.0584	0.7883	_,A146,A127	2	B57,B102,C195
-data/serine_peptidases/1l7a.pdb	2	0.0584	0.8078	_,B146,B127	2	B57,B102,C195
-data/serine_peptidases/1azw.pdb	2	0.1856	0.9234	A179,_,B176	0	B57,B102,C195
+tid	node_count	idf	rmsd	matching_residues	query_residues
+data/serine_peptidases/4cha.pdb	3	8.7616	0.0000	B57,B102,C195	B57,B102,C195
+data/serine_peptidases/4cha.pdb	3	8.7616	0.0874	F57,F102,G195	B57,B102,C195
+data/serine_peptidases/1pq5.pdb	3	4.1178	0.2609	A56,A99,A195	B57,B102,C195
+data/serine_peptidases/1ju3.pdb	2	1.4739	0.7792	_,A223,A234	B57,B102,C195
+data/serine_peptidases/1l7a.pdb	2	1.4739	0.7883	_,A146,A127	B57,B102,C195
+data/serine_peptidases/1l7a.pdb	2	1.4739	0.8078	_,B146,B127	B57,B102,C195
+data/serine_peptidases/1azw.pdb	2	4.6439	0.9234	A179,_,B176	B57,B102,C195
 ```
-- `id`: Identifier of the protein structure
+- `tid`: Identifier of the target protein structure
 - `node_count`: Number of nodes in the match
-- `idf_score`: Inverse document frequency score of matched structure
+- `idf`: Inverse document frequency score of matched structure
 - `rmsd`: Root mean square deviation
 - `matching_residues`: Residue indices in the match (comma-separated, _ for no match)
-- `key`: Numeric identifier of the structure
 - `query_residues`: Residue indices in the query (comma-separated)
 
 ### Structure Result
 Output with one structure per line (`--per-structure`)
 ```
-id	idf_score	total_match_count	node_count	edge_count	max_node_cov	min_rmsd	nres	plddt	matching_residues	key	query_residues
+tid	idf	total_match_count	node_count	edge_count	max_node_cov	min_rmsd	nres	plddt	matching_residues	db_key	query_residues
 data/serine_peptidases/4cha.pdb	0.6138	8	3	6	3	0.0000	477	13.5404	B57,B102,C195:0.0000;F57,F102,G195:0.0874	4	B57,B102,C195
 data/serine_peptidases/1pq5.pdb	0.4869	4	3	4	3	0.2609	224	5.1340	A56,A99,A195:0.2609	3	B57,B102,C195
 data/serine_peptidases/1ju3.pdb	0.0617	2	2	2	2	0.7792	570	19.4881	_,A223,A234:0.7792	1	B57,B102,C195
 data/serine_peptidases/1l7a.pdb	0.0584	2	2	2	2	0.7883	636	11.7037	_,A146,A127:0.7883;_,B146,B127:0.8078	2	B57,B102,C195
 data/serine_peptidases/1azw.pdb	0.1856	2	2	2	2	0.9234	626	34.2399	A179,_,B176:0.9234	0	B57,B102,C195
 ```
-- `id`: Identifier of the protein structure
-- `idf_score`: Inverse document frequency score with length penalty; Higher score indicates more matches within smaller structures
+- `tid`: Identifier of the target protein structure
+- `idf`: Inverse document frequency score with length penalty; Higher score indicates more matches within smaller structures
 - `total_match_count`: Total number of matches
 - `node_count`: Number of nodes in the structure
 - `edge_count`: Number of edges in the structure
@@ -236,8 +241,8 @@ data/serine_peptidases/1azw.pdb	0.1856	2	2	2	2	0.9234	626	34.2399	A179,_,B176:0.
 ### Display Options
 - `--per-structure`: Outputs results per structure.
 - `--per-match`: Outputs results per match.
-- `--sort-by-score`: Sorts by score.
-- `--sort-by-rmsd`: Sorts by RMSD.
+- `--sort-by`: Sorts results by given columns (comma-separated).
+- `--format-output`: Custom output format using column names.
 - `--top <N>`: Outputs top N results.
 - `--header`: Outputs header for the result.
 

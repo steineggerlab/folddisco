@@ -10,10 +10,12 @@ mod common;
 use common::loader;
 
 #[test]
-fn test_folddisco_pdbmotifsincos() {
+fn test_folddisco_integration() {
+    // Indexing
     // Test if the default hashing schemes are working
     let pdb_paths = loader::load_path("data/serine_peptidases");
-    let mut fold_disco = FoldDisco::create_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
+    
+    let mut fold_disco = Folddisco::create_with_hash_type(pdb_paths, HashType::PDBMotifSinCos);
     measure_time!(fold_disco.collect_hash_vec());
     fold_disco.fill_numeric_id_vec();
     let mut hashes = fold_disco.hash_id_vec.clone();
@@ -22,6 +24,8 @@ fn test_folddisco_pdbmotifsincos() {
     let _total_size = std::mem::size_of_val(&hashes[0]) * hashes.len();
     // sort hashes
     measure_time!(hashes.par_sort_by(|a, b| a.0.cmp(&b.0)));
-    let (_offset, _values) = measure_time!(convert_sorted_pairs_to_offset_and_values_vec(hashes));
+
+
+    // Querying
 }
 

@@ -3,15 +3,12 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
-//! Main entry point for FoldDisco CLI
+//! Main entry point for Folddisco CLI
 
 // use crate::*;
 use folddisco::cli::{workflows::{build_index, benchmark, query_pdb}, *};
-use git_version::git_version;
 
-const VERSION_STRING: &str = git_version!(
-    args = ["--abbrev=40", "--always"], fallback = "unknown"
-);
+const VERSION_STRING: &str = env!("FOLDDISCO_BUILD_VERSION");
 const HELP: &str = "\
 usage: folddisco <command> [<args>]
 
@@ -19,6 +16,7 @@ subcommands:
   index     Create a new index table from multiple protein structures
   query     Query a motif from an index table
   benchmark Benchmark the performance of folddisco
+  analyze   Analyze the distribution of encodings in the index
   version   Print version information
 
 options:
@@ -37,12 +35,10 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             hash_type: args.value_from_str(["-y", "--type"]).unwrap_or("default".into()),
             index_path: args.value_from_str(["-i", "--index"]).unwrap_or("".into()),
             num_threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
-            mode: args.value_from_str(["-m", "--mode"]).unwrap_or("id".into()),
             num_bin_dist: args.value_from_str(["-d", "--distance"]).unwrap_or(0),
             num_bin_angle: args.value_from_str(["-a", "--angle"]).unwrap_or(0),
             multiple_bins: args.opt_value_from_str("--multiple-bins")?,
             grid_width: args.value_from_str(["-g", "--grid"]).unwrap_or(20.0),
-            chunk_size: args.value_from_str(["-c", "--chunk"]).unwrap_or(65536),
             max_residue: args.value_from_str(["-n", "--residue"]).unwrap_or(50000),
             recursive: args.contains(["-r", "--recursive"]),
             mmap_on_disk: args.contains("--mmap-on-disk"),
@@ -71,6 +67,12 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             num_res_cutoff: args.value_from_str("--num-residue").unwrap_or(50000),
             plddt_cutoff: args.value_from_str("--plddt").unwrap_or(0.0),
             rmsd_cutoff: args.value_from_str("--rmsd").unwrap_or(0.0),
+            // Structure similarity metric filters
+            tm_score_cutoff: args.value_from_str("--tm-score").unwrap_or(0.0),
+            gdt_ts_cutoff: args.value_from_str("--gdt-ts").unwrap_or(0.0),
+            gdt_ha_cutoff: args.value_from_str("--gdt-ha").unwrap_or(0.0),
+            chamfer_distance_cutoff: args.value_from_str("--chamfer").unwrap_or(0.0),
+            hausdorff_distance_cutoff: args.value_from_str("--hausdorff").unwrap_or(0.0),
             top_n: args.value_from_str("--top").unwrap_or(usize::MAX),
             web_mode: args.contains("--web"), // Web mode for output
             // Query filtering
@@ -78,9 +80,10 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             sampling_ratio: args.opt_value_from_str("--sampling-ratio")?,
             freq_filter: args.opt_value_from_str("--freq-filter")?,
             length_penalty: args.opt_value_from_str("--length-penalty")?,
-            // Sorting mode
-            sort_by_rmsd: args.contains("--sort-by-rmsd"),
-            sort_by_score: args.contains("--sort-by-score"),
+            // Sorting strategy (comma-separated keys)
+            sort_by: args.value_from_str("--sort-by").unwrap_or("node_count,rmsd".into()),
+            // Output format (comma-separated column names)
+            format_output: args.opt_value_from_str("--format-output")?,
             // Output mode
             output_per_structure: args.contains("--per-structure"),
             output_per_match: args.contains("--per-match"),
@@ -110,6 +113,15 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             header_answer: args.contains("--header-answer"),
             header_neutral: args.contains("--header-neutral"),
         }),
+        Some("analyze") => Ok(AppArgs::Analyze {
+            index_path: args.opt_value_from_str(["-i", "--index"])?,
+            pdb_container: args.opt_value_from_str(["-p", "--pdbs"])?,
+            output: args.opt_value_from_str(["-o", "--output"])?,
+            top_n: args.value_from_str("--top").unwrap_or(10),
+            threads: args.value_from_str(["-t", "--threads"]).unwrap_or(1),
+            verbose: args.contains(["-v", "--verbose"]),
+            help: args.contains(["-h", "--help"]),
+        }),
         Some("test") => Ok(AppArgs::Test {
             index_path: args.value_from_str(["-i", "--index"])?,
             verbose: args.contains(["-v", "--verbose"]),
@@ -126,8 +138,6 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
 }
 
 fn main() {
-
-
     let parsed_args = parse_arg().unwrap_or_else(|e| {
         eprintln!("Error: {}", e);
         std::process::exit(1);
@@ -155,6 +165,14 @@ fn main() {
         }
         AppArgs::Benchmark { .. } => {
             benchmark::benchmark(parsed_args);
+        }
+        AppArgs::Analyze { help, .. } => {
+            if help {
+                print_logo();
+                eprintln!("{}", workflows::analyze::HELP_ANALYZE);
+            } else {
+                workflows::analyze::analyze(parsed_args);
+            }
         }
         AppArgs::Test { .. } => {
             println!("Testing");

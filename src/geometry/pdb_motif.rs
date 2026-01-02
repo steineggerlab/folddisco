@@ -10,14 +10,14 @@ use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 
 // Residue 1: 5 bits; Residue 2: 5 bits; Distances: 16 bins 4 bits; 
 // Angle: 32 bins 5 bits; total: 23 bits
-const MIN_DIST: f32 = 2.0;
-const MAX_DIST: f32 = 20.0;
-const NBIN_DIST: f32 = 18.0;
-const MIN_ANGLE: f32 = 0.0;
-const MAX_ANGLE: f32 = 180.0;
-const NBIN_ANGLE: f32 = 9.0;
+pub const MIN_DIST: f32 = 2.0;
+pub const MAX_DIST: f32 = 20.0;
+pub const NBIN_DIST: f32 = 18.0;
+pub const MIN_ANGLE: f32 = 0.0;
+pub const MAX_ANGLE: f32 = 180.0;
+pub const NBIN_ANGLE: f32 = 9.0;
 // Bitmasks
-const BITMASK32_5BIT: u32 = 0x0000001F;
+pub const BITMASK32_5BIT: u32 = 0x0000001F;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);

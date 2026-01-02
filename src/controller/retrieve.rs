@@ -1,5 +1,6 @@
-// 
-// use std::collections::{BTreeSet, HashMap, HashSet};
+///! Module for retrieval functions
+///! Contains functions for retrieving target residues containing the motif
+
 use std::collections::BTreeSet;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
@@ -7,6 +8,7 @@ use petgraph::Graph;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::structure::lms_qcp::LmsQcpSuperimposer;
+use crate::structure::metrics::{PrecomputedDistances, StructureSimilarityMetrics};
 use crate::utils::convert::{map_aa_to_u8, map_u8_to_aa}; 
 use crate::prelude::*; 
 use crate::structure::{coordinate::Coordinate, core::CompactStructure, kabsch::KabschSuperimposer}; 
@@ -157,13 +159,13 @@ pub fn retrieval_wrapper_for_foldcompdb(
     db_key: usize, node_count: usize, query_vector: &Vec<GeometricHash>,
     _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize,
     multiple_bin: &Option<Vec<(usize, usize)>>, dist_cutoff: f32,
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
     ca_distance_cutoff: f32, partial_fit: bool,
     foldcomp_db_reader: &FoldcompDbReader,
-) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
-      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
+) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, 
+      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, usize, f32) {
     let compact = foldcomp_db_reader.read_single_structure_by_id(db_key).expect("Error reading structure from foldcomp db");
     let compact = compact.to_compact();
 
@@ -200,8 +202,8 @@ pub fn retrieval_wrapper_for_foldcompdb(
     let connected = connected_components_with_given_node_count(&graph, node_count);
     
     // Parallel
-    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, 
-                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)> = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32,
+                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -214,6 +216,10 @@ pub fn retrieval_wrapper_for_foldcompdb(
             |_, edge| Some(*edge)
         );
         let node_count = subgraph.node_count();
+        
+        // Calculate IDF for this subgraph
+        let subgraph_idf = calculate_subgraph_idf(&subgraph, query_map);
+        
         // Find mapping between query residues and retrieved residues
         let (query_indices, retrieved_indices) = map_query_and_retrieved_residues(
             &subgraph, query_map, node_count, &query_symmetry_map,
@@ -302,30 +308,30 @@ pub fn retrieval_wrapper_for_foldcompdb(
             }
         });
 
-        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
+        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash) = rmsd_with_calpha_and_rottran(
             query_structure, &compact, &query_indices, &retrieved_indices, partial_fit
         );
         
-        let (rmsd, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
-            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
+        let (rmsd, u_mat, t_mat, ca_coords, metrics) = if res_vec == res_vec_from_hash {
+            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone(), metrics_from_hash.clone())
         } else {
             rmsd_with_calpha_and_rottran(
                 query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned, partial_fit
             )
         };
         
-        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, 
-         res_vec, rmsd, u_mat, t_mat, ca_coords)
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash, subgraph_idf,
+         res_vec, rmsd, u_mat, t_mat, ca_coords, metrics, subgraph_idf)
     }).collect();
-    // Split 
-    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
-        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j)| {
-        ((a, b, c, d, e), (f, g, h, i, j))
+    // Split
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>,
+        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j, k, l, m, n)| {
+        ((a, b, c, d, e, f, g), (h, i, j, k, l, m, n))
     }).unzip();
     // In result, find the maximum matching node count and minimum RMSD with max match
     let mut max_matching_node_count = 0;
     let mut min_rmsd_with_max_match = 0.0;
-    result.iter().for_each(|(res_vec, rmsd, _, _, _)| {
+    result.iter().for_each(|(res_vec, rmsd, _, _, _, _, _)| {
         // Count number of Some in res_vec
         let count = res_vec.iter().filter(|&x| x.is_some()).count();
         if count > max_matching_node_count {
@@ -350,12 +356,12 @@ pub fn retrieval_wrapper(
     path: &str, node_count: usize, query_vector: &Vec<GeometricHash>,
     _hash_type: HashType, _nbin_dist: usize, _nbin_angle: usize, 
     multiple_bin: &Option<Vec<(usize, usize)>>, dist_cutoff: f32,
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     query_structure: &CompactStructure, all_query_indices: &Vec<usize>,
     aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
     ca_distance_cutoff: f32, partial_fit: bool,
-) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
-      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, usize, f32) {
+) -> (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, 
+      Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, usize, f32) {
     // Load structure to retrieve motif
     let compact = read_structure_from_path(&path).expect("Error reading structure from path");
     let compact = compact.to_compact();
@@ -394,8 +400,8 @@ pub fn retrieval_wrapper(
 
     // Parallel
 // Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>
-    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, 
-                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)> = connected.par_iter().map(|component| {
+    let output: Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32,
+                     Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)> = connected.par_iter().map(|component| {
         // Filter graph to get subgraph with component
         let subgraph: Graph<usize, GeometricHash> = graph.filter_map(
             |node, _| {
@@ -407,7 +413,12 @@ pub fn retrieval_wrapper(
             },
             |_, edge| Some(*edge)
         );
+        
         let node_count = subgraph.node_count();
+        
+        // Calculate IDF for this subgraph
+        let subgraph_idf = calculate_subgraph_idf(&subgraph, query_map);
+        
         // Find mapping between query residues and retrieved residues
         let (query_indices, retrieved_indices) = map_query_and_retrieved_residues(
             &subgraph, query_map, node_count, &query_symmetry_map,
@@ -495,29 +506,30 @@ pub fn retrieval_wrapper(
             }
         });
 
-        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash) = rmsd_with_calpha_and_rottran(
+        let (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash) = rmsd_with_calpha_and_rottran(
             query_structure, &compact, &query_indices, &retrieved_indices, partial_fit
         );
         
-        let (rmsd, u_mat, t_mat, ca_coords) = if res_vec == res_vec_from_hash {
-            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone())
+        let (rmsd, u_mat, t_mat, ca_coords, metrics) = if res_vec == res_vec_from_hash {
+            (rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash.clone(), metrics_from_hash.clone())
         } else {
             rmsd_with_calpha_and_rottran(
                 query_structure, &compact, &query_indices_scanned, &retrieved_indices_scanned, partial_fit
             )
         };
-                
-        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, res_vec, rmsd, u_mat, t_mat, ca_coords)
+
+        (res_vec_from_hash, rmsd_from_hash, u_mat_from_hash, t_mat_from_hash, ca_coords_from_hash, metrics_from_hash, subgraph_idf,
+         res_vec, rmsd, u_mat, t_mat, ca_coords, metrics, subgraph_idf)
         }).collect();
     // Split 
-    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>, 
-        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j)| {
-        ((a, b, c, d, e), (f, g, h, i, j))
+    let (result_from_hash, result): (Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>, 
+        Vec<(Vec<ResidueMatch>, f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics, f32)>) = output.into_iter().map(|(a, b, c, d, e, f, g, h, i, j, k, l, m, n)| {
+        ((a, b, c, d, e, f, g), (h, i, j, k, l, m, n))
     }).unzip();
     // In result, find the maximum matching node count and minimum RMSD with max match
     let mut max_matching_node_count = 0;
     let mut min_rmsd_with_max_match = 0.0;
-    result.iter().for_each(|(res_vec, rmsd, _, _, _)| {
+    result.iter().for_each(|(res_vec, rmsd, _, _, _, _, _)| {
         // Count number of Some in res_vec
         let count = res_vec.iter().filter(|&x| x.is_some()).count();
         if count > max_matching_node_count {
@@ -582,34 +594,39 @@ pub fn prefilter_amino_acid(query_set: &HashSet<GeometricHash>, _hash_type: Hash
 
 pub fn map_query_and_retrieved_residues(
     retrieved: &Graph<usize, GeometricHash>, 
-    query_map: &HashMap<GeometricHash, ((usize, usize), bool)>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
     node_count: usize,
     query_symmetry_map: &HashMap<GeometricHash, bool>,
 ) -> (Vec<usize>, Vec<usize>) {
-    let mut query_indices: Vec<usize> = Vec::with_capacity(node_count);
-    let mut retrieved_indices: Vec<usize> = Vec::with_capacity(node_count);
-
-    // Find max indices to allocate fixed-size arrays
-    let max_query_idx = query_map.values().map(|((i, j), _)| (*i).max(*j)).max().unwrap_or(0);
+    // Find max indices
+    let max_query_idx = query_map.values().map(|((i, j), _, _)| (*i).max(*j)).max().unwrap_or(0);
     let max_retrieved_idx = retrieved.node_weights().max().copied().unwrap_or(0);
     
-    // Pre-allocate vectors for O(1) lookups 
-    let mut query_used = vec![false; max_query_idx + 1];
-    let mut retrieved_used = vec![false; max_retrieved_idx + 1];
+    let q_size = max_query_idx + 1;
+    let r_size = max_retrieved_idx + 1;
     
-    // Count observations first pass - using arrays
-    let mut query_to_retrieved_counts = vec![vec![0u8; max_retrieved_idx + 1]; max_query_idx + 1];
+    // Flat array for counts
+    let mut counts = vec![0u8; q_size * r_size];
     
-    // First pass: count all observations
+    // Track best match per query: (count, retrieved_idx)
+    let mut best_match: Vec<(u8, usize)> = vec![(0, 0); q_size];
+    
+    // Helper macro for flat array access
+    macro_rules! count_at {
+        ($q:expr, $r:expr) => {
+            counts[$q * r_size + $r]
+        };
+    }
+    
+    // Single pass: count votes and track best per query
     for edge in retrieved.edge_indices() {
         let (i, j) = retrieved.edge_endpoints(edge).unwrap();
         let hash = retrieved[edge];
         
-        if let Some(&((query_i, query_j), _)) = query_map.get(&hash) {
+        if let Some(&((query_i, query_j), _, _)) = query_map.get(&hash) {
             let is_symmetric = *query_symmetry_map.get(&hash).unwrap();
             
-            if is_symmetric {
-                // Handle symmetric pairs with proper ordering
+            let pairs = if is_symmetric {
                 let (q1, q2, r1, r2) = if query_i < query_j {
                     if retrieved[i] < retrieved[j] {
                         (query_i, query_j, retrieved[i], retrieved[j])
@@ -623,58 +640,73 @@ pub fn map_query_and_retrieved_residues(
                         (query_j, query_i, retrieved[j], retrieved[i])
                     }
                 };
-                
-                // Increment counts (saturating at 255)
-                query_to_retrieved_counts[q1][r1] = query_to_retrieved_counts[q1][r1].saturating_add(1);
-                query_to_retrieved_counts[q2][r2] = query_to_retrieved_counts[q2][r2].saturating_add(1);
+                [(q1, r1), (q2, r2)]
             } else {
-                // Handle asymmetric pairs
-                query_to_retrieved_counts[query_i][retrieved[i]] = query_to_retrieved_counts[query_i][retrieved[i]].saturating_add(1);
-                query_to_retrieved_counts[query_j][retrieved[j]] = query_to_retrieved_counts[query_j][retrieved[j]].saturating_add(1);
+                [(query_i, retrieved[i]), (query_j, retrieved[j])]
+            };
+            
+            for (q, r) in pairs {
+                count_at!(q, r) = count_at!(q, r).saturating_add(1);
+                let new_count = count_at!(q, r);
+                
+                // Update best match for this query if this is better
+                if new_count > best_match[q].0  || (new_count == best_match[q].0 && r < best_match[q].1) {
+                    best_match[q] = (new_count, r);
+                }
             }
         }
     }
     
-    // Second pass: find best mappings using pre-computed counts
-    // Create candidates list without heap allocations
-    let mut candidates: Vec<(u8, usize, usize)> = Vec::with_capacity(node_count * 2); // (count, query_idx, retrieved_idx)
+    // Bucket sort by count
+    const MAX_BUCKETS: usize = 256;
+    let mut buckets: Vec<Vec<(usize, usize)>> = vec![Vec::new(); MAX_BUCKETS];
     
-    for query_idx in 0..=max_query_idx {
-        let mut max_count = 0u8;
-        let mut best_retrieved = 0;
-        
-        // Find the retrieved index with maximum count for this query
-        for retrieved_idx in 0..=max_retrieved_idx {
-            let count = query_to_retrieved_counts[query_idx][retrieved_idx];
-            if count > max_count {
-                max_count = count;
-                best_retrieved = retrieved_idx;
-            }
-        }
-        
-        if max_count > 0 {
-            candidates.push((max_count, query_idx, best_retrieved));
+    for (q, &(count, r)) in best_match.iter().enumerate() {
+        if count > 0 {
+            let bucket_idx = (count as usize).min(MAX_BUCKETS - 1);
+            buckets[bucket_idx].push((q, r));
         }
     }
     
-    // Sort candidates by count (descending), then by indices for determinism
-    candidates.sort_unstable_by(|a, b| {
-        b.0.cmp(&a.0) // Count descending
-            .then_with(|| a.1.cmp(&b.1)) // Query index ascending
-            .then_with(|| a.2.cmp(&b.2)) // Retrieved index ascending
-    });
+    // Greedy assignment from highest to lowest count
+    let mut query_indices: Vec<usize> = Vec::with_capacity(node_count);
+    let mut retrieved_indices: Vec<usize> = Vec::with_capacity(node_count);
+    let mut query_used = vec![false; q_size];
+    let mut retrieved_used = vec![false; r_size];
     
-    // Select non-conflicting mappings
-    for (count, query_idx, retrieved_idx) in candidates {
-        if count > 0 && !query_used[query_idx] && !retrieved_used[retrieved_idx] {
-            query_indices.push(query_idx);
-            retrieved_indices.push(retrieved_idx);
-            query_used[query_idx] = true;
-            retrieved_used[retrieved_idx] = true;
+    for bucket in buckets.iter().rev() {
+        for &(q, r) in bucket {
+            if !query_used[q] && !retrieved_used[r] {
+                query_indices.push(q);
+                retrieved_indices.push(r);
+                query_used[q] = true;
+                retrieved_used[r] = true;
+                
+                if query_indices.len() == node_count {
+                    return (query_indices, retrieved_indices);
+                }
+            }
         }
     }
     
     (query_indices, retrieved_indices)
+}
+
+/// Calculate total IDF score for a subgraph by summing IDFs of all edges
+pub fn calculate_subgraph_idf(
+    subgraph: &Graph<usize, GeometricHash>,
+    query_map: &HashMap<GeometricHash, ((usize, usize), bool, f32)>,
+) -> f32 {
+    let mut total_idf = 0.0f32;
+    
+    for edge in subgraph.edge_indices() {
+        let hash = subgraph[edge];
+        if let Some(&(_, _, idf)) = query_map.get(&hash) {
+            total_idf += idf;
+        }
+    }
+    
+    total_idf
 }
 
 pub fn rmsd_for_matched(
@@ -715,7 +747,7 @@ pub fn rmsd_for_matched(
 pub fn rmsd_with_calpha_and_rottran(
     compact1: &CompactStructure, compact2: &CompactStructure, 
     index1: &Vec<usize>, index2: &Vec<usize>, lms: bool
-) -> (f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>) {
+) -> (f32, [[f32; 3]; 3], [f32; 3], Vec<Coordinate>, StructureSimilarityMetrics) {
 
     let coord_vec1: Vec<Coordinate> = index1.iter().map(
         |&i| (compact1.ca_vector.get_coord(i).unwrap(), compact1.cb_vector.get_coord(i).unwrap())
@@ -735,19 +767,59 @@ pub fn rmsd_with_calpha_and_rottran(
                 let mut superposer = KabschSuperimposer::new();
                 superposer.set_atoms(&coord_vec1, &coord_vec2);
                 superposer.run();
-                (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+
+                // Calculate target metrics
+                let target_metrics = match (&superposer.reference_coords, &superposer.transformed_coords) {
+                    (Some(ref_coords), Some(trans_coords)) => {
+                        let precomputed_distances = PrecomputedDistances::new(
+                            &ref_coords, &trans_coords
+                        );
+                        let mut metrics = StructureSimilarityMetrics::new();
+                        metrics.calculate_all(&precomputed_distances);
+                        metrics
+                    },
+                    _ => StructureSimilarityMetrics::new(),
+                };
+
+                (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha, target_metrics)
             } else {
                 let mut superposer = LmsQcpSuperimposer::new();
                 superposer.set_atoms(&coord_vec1, &coord_vec2);
                 superposer.run();
-                (superposer.get_rms_inliers(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+                
+                // Calculate target metrics
+                let target_metrics = match (&superposer.reference_coords, &superposer.transformed_coords) {
+                    (Some(ref_coords), Some(trans_coords)) => {
+                        let precomputed_distances = PrecomputedDistances::new(
+                            &ref_coords, &trans_coords
+                        );
+                        let mut metrics = StructureSimilarityMetrics::new();
+                        metrics.calculate_all(&precomputed_distances);
+                        metrics
+                    },
+                    _ => StructureSimilarityMetrics::new(),
+                };
+                
+                (superposer.get_rms_inliers(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha, target_metrics)
             }
         }
         false => {
             let mut superposer = KabschSuperimposer::new();
             superposer.set_atoms(&coord_vec1, &coord_vec2);
             superposer.run();
-            (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha)
+            // Calculate target metrics
+            let target_metrics = match (&superposer.reference_coords, &superposer.transformed_coords) {
+                (Some(ref_coords), Some(trans_coords)) => {
+                    let precomputed_distances = PrecomputedDistances::new(
+                        &ref_coords, &trans_coords
+                    );
+                    let mut metrics = StructureSimilarityMetrics::new();
+                    metrics.calculate_all(&precomputed_distances);
+                    metrics
+                },
+                _ => StructureSimilarityMetrics::new(),
+            };
+            (superposer.get_rms(), superposer.rot.unwrap(), superposer.tran.unwrap(), target_calpha, target_metrics)
         }
     }
 }
@@ -771,7 +843,8 @@ mod tests {
         let dist_cutoff = 20.0;
         let (query_map, query_indices, aa_dist_map ) = make_query_map(
             &path, &query_residues, hash_type, nbin_dist, nbin_angle, &None,
-            &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, false
+            &dist_thresholds, &angle_thresholds, &aa_substitutions, dist_cutoff, false,
+            &None, 1000.0
         );
         let queries: Vec<GeometricHash> = query_map.keys().cloned().collect();
         let compact = read_structure_from_path(&path).expect("Error reading structure from path");

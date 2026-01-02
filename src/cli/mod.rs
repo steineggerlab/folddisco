@@ -18,13 +18,11 @@ pub enum AppArgs {
         pdb_container: Option<String>,
         hash_type: String,
         index_path: String,
-        mode: String,
         num_threads: usize,
         num_bin_dist: usize,
         num_bin_angle: usize,
         multiple_bins: Option<String>,
         grid_width: f32,
-        chunk_size: usize,
         max_residue: usize,
         recursive: bool,
         mmap_on_disk: bool,
@@ -57,6 +55,12 @@ pub enum AppArgs {
         connected_node_count: usize,
         connected_node_ratio: f32,
         rmsd_cutoff: f32,
+        // Structure similarity metric filters (MatchQueryResult)
+        tm_score_cutoff: f32,
+        gdt_ts_cutoff: f32,
+        gdt_ha_cutoff: f32,
+        chamfer_distance_cutoff: f32,
+        hausdorff_distance_cutoff: f32,
         // top N filtering
         top_n: usize,
         web_mode: bool,
@@ -65,9 +69,10 @@ pub enum AppArgs {
         sampling_ratio: Option<f32>,
         freq_filter: Option<f32>,
         length_penalty: Option<f32>,
-        // sorting mode
-        sort_by_rmsd: bool,
-        sort_by_score: bool,
+        // sorting strategy
+        sort_by: String,
+        // output format (comma-separated column names)
+        format_output: Option<String>,
         // output mode
         output_per_structure: bool,
         output_per_match: bool,
@@ -100,6 +105,18 @@ pub enum AppArgs {
         header_result: bool,
         header_answer: bool,
         header_neutral: bool,
+    },
+    Analyze {
+        // Required 
+        index_path: Option<String>,
+        // Optional
+        pdb_container: Option<String>,
+        output: Option<String>,
+        top_n: usize,
+        // other general options
+        threads: usize,        
+        verbose: bool,
+        help: bool,        
     },
     Test {
         index_path: String,

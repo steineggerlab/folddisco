@@ -219,71 +219,52 @@ pub fn parse_path_set_by_id_type(path_set: &HashSet<String>, id_type: &IdType) -
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IndexMode {
-    Id,
-    Big,
-}
-
-impl IndexMode {
-    pub fn get_with_str(mode: &str) -> Self {
-        match mode {
-            "Id" | "id" | "ID" => Self::Id,
-            "Big" | "big" | "BIG" => Self::Big,
-            _ => Self::Id,
-        }
-    }
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::Id => "id".to_string(),
-            Self::Big => "big".to_string(),
-        }
-    }
-    pub fn get_with_u8(mode: u8) -> Self {
-        match mode {
-            0 => Self::Id,
-            1 => Self::Big,
-            _ => Self::Id,
-        }
-    }
-    pub fn to_u8(&self) -> u8 {
-        match self {
-            Self::Id => 0,
-            Self::Big => 1,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryMode {
-    PerMatchDefault, // Default mode, print per match, residue matching, sort by rmsd.
-    SkipMatch, // No residue matching, just sort by score only. print per structure.
-    Web, // Web mode. Top N matches applied.
-    PerStructureSortByScore,
-    PerStructureSortByRmsd,
-    PerMatchSortByScore, // This needs per match score calculation
-    ContradictoryPrintError,
-    ContradictorySortError,
+    PerMatch,      // Default mode: print per match with residue matching
+    PerStructure,  // Print per structure (aggregated results)
+    SkipMatch,     // No residue matching, print per structure
+    Web,           // Web mode with top N matches applied
+    ContradictoryPrintError, // Error: both per-structure and per-match specified
 }
 
 impl QueryMode {
     pub fn from_flags(
-        skip_match: bool, is_web: bool,
-        per_structure: bool, per_match: bool,
-        sort_by_rmsd: bool, sort_by_score: bool, 
+        skip_match: bool, 
+        is_web: bool,
+        per_structure: bool, 
+        per_match: bool,
     ) -> Self {
-        match (skip_match, is_web, per_structure, per_match, sort_by_rmsd, sort_by_score) {
+        match (skip_match, is_web, per_structure, per_match) {
             // Cannot print per match and per structure at the same time -> error
-            (_, _, true, true, _, _) => Self::ContradictoryPrintError, // 16
-            // Cannot print sort by rmsd and sort by score at the same time -> error
-            (_, _, _, _, true, true) => Self::ContradictorySortError, // (64 - 16) / 4 = 12
-            // Skip match
-            (_, true, _, _, _, _) => Self::Web, // (64 - 28) / 2 = 18
-            (true, _, _, _, _, _) => Self::SkipMatch, // (64 - 46) / 2 = 9
-            // Checking remaining cases
-            (false, false, false, _, _, false) => Self::PerMatchDefault, 
-            (false, false, false, _, false, true) => Self::PerMatchSortByScore, 
-            (false, false, true, false, _, false) => Self::PerStructureSortByRmsd, 
-            (false, false, true, false, false, true) => Self::PerStructureSortByScore,
+            (_, _, true, true) => Self::ContradictoryPrintError,
+            // Special modes
+            (_, true, _, _) => Self::Web,
+            (true, _, _, _) => Self::SkipMatch,
+            // Normal modes
+            (false, false, true, false) => Self::PerStructure,
+            (false, false, false, _) => Self::PerMatch, // Default or explicit per-match
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            QueryMode::PerMatch => "per match".to_string(),
+            QueryMode::PerStructure => "per structure".to_string(),
+            QueryMode::SkipMatch => "per structure skipping match".to_string(),
+            QueryMode::Web => "for web".to_string(),
+            QueryMode::ContradictoryPrintError => "contradictory print error".to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for QueryMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QueryMode::PerMatch => write!(f, "per match"),
+            QueryMode::PerStructure => write!(f, "per structure"),
+            QueryMode::SkipMatch => write!(f, "per structure skipping match"),
+            QueryMode::Web => write!(f, "for web"),
+            QueryMode::ContradictoryPrintError => write!(f, "contradictory print error"),
         }
     }
 }
@@ -301,15 +282,6 @@ mod tests {
         assert_eq!(id_type.to_u8(), 0);
         assert_eq!(IdType::get_with_u8(0), IdType::Pdb);
         assert_eq!(IdType::get_with_str("pdb"), IdType::Pdb);
-    }
-
-    #[test]
-    fn test_index_mode() {
-        let index_mode = IndexMode::Id;
-        assert_eq!(index_mode.to_string(), "id");
-        assert_eq!(index_mode.to_u8(), 0);
-        assert_eq!(IndexMode::get_with_u8(0), IndexMode::Id);
-        assert_eq!(IndexMode::get_with_str("id"), IndexMode::Id);
     }
 
     #[test]

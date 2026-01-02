@@ -241,6 +241,7 @@ impl LmsQcpSuperimposer {
         // q_report over ALL pairs (select quantile of squared residuals, then sqrt)
         let q = self.params.q_report.clamp(0.0, 1.0);
         let mut res_sq: Vec<f32> = (0..movs.len()).map(|i| dist2(apply(r, t, movs[i]), refs[i])).collect();
+
         let qsq = select_quantile_squared(&mut res_sq, q);
         self.q_report_residual_all = Some(qsq.sqrt());
 
@@ -251,16 +252,16 @@ impl LmsQcpSuperimposer {
 
 // ====== Running stats for incremental QCP ======
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct RunningStats {
     n: usize,
-    sum_x: [f32; 3],
-    sum_y: [f32; 3],
+    sum_x: [f64; 3],
+    sum_y: [f64; 3],
     // squared norms sums
-    sxx: f32, // Σ ||x||^2
-    syy: f32, // Σ ||y||^2
+    sxx: f64, // Σ ||x||^2
+    syy: f64, // Σ ||y||^2
     // cross outer sum: Σ y x^T (row-major)
-    syx: [[f32; 3]; 3],
+    syx: [[f64; 3]; 3],
 }
 
 impl RunningStats {
@@ -277,7 +278,9 @@ impl RunningStats {
     }
     #[inline(always)]
     fn add(&mut self, i: usize, movs: &[[f32; 3]], refs: &[[f32; 3]]) {
-        let x = movs[i]; let y = refs[i];
+        // Convert to f64 for internal calculations
+        let x = [movs[i][0] as f64, movs[i][1] as f64, movs[i][2] as f64];
+        let y = [refs[i][0] as f64, refs[i][1] as f64, refs[i][2] as f64];
         self.n += 1;
         self.sum_x[0] += x[0]; self.sum_x[1] += x[1]; self.sum_x[2] += x[2];
         self.sum_y[0] += y[0]; self.sum_y[1] += y[1]; self.sum_y[2] += y[2];
@@ -289,8 +292,8 @@ impl RunningStats {
         self.syx[2][0] += y[2]*x[0]; self.syx[2][1] += y[2]*x[1]; self.syx[2][2] += y[2]*x[2];
     }
     #[inline(always)]
-    fn means(&self) -> ([f32; 3], [f32; 3]) {
-        let inv = 1.0f32 / self.n as f32;
+    fn means(&self) -> ([f64; 3], [f64; 3]) {
+        let inv = 1.0f64 / self.n as f64;
         ([self.sum_x[0]*inv, self.sum_x[1]*inv, self.sum_x[2]*inv],
          [self.sum_y[0]*inv, self.sum_y[1]*inv, self.sum_y[2]*inv])
     }
@@ -304,34 +307,42 @@ impl RunningStats {
 fn qcp_from_stats(st: &RunningStats) -> ([[f32; 3]; 3], [f32; 3]) {
     debug_assert!(st.n >= 3);
     let (mux, muy) = st.means();
-    // A = syx - n * μy μx^T
-    let mut a = [[0.0f32; 3]; 3];
-    a[0][0] = st.syx[0][0] - st.n as f32 * (muy[0]*mux[0]);
-    a[0][1] = st.syx[0][1] - st.n as f32 * (muy[0]*mux[1]);
-    a[0][2] = st.syx[0][2] - st.n as f32 * (muy[0]*mux[2]);
-    a[1][0] = st.syx[1][0] - st.n as f32 * (muy[1]*mux[0]);
-    a[1][1] = st.syx[1][1] - st.n as f32 * (muy[1]*mux[1]);
-    a[1][2] = st.syx[1][2] - st.n as f32 * (muy[1]*mux[2]);
-    a[2][0] = st.syx[2][0] - st.n as f32 * (muy[2]*mux[0]);
-    a[2][1] = st.syx[2][1] - st.n as f32 * (muy[2]*mux[1]);
-    a[2][2] = st.syx[2][2] - st.n as f32 * (muy[2]*mux[2]);
+    // A = syx - n * μy μx^T (all in f64)
+    let mut a = [[0.0f64; 3]; 3];
+    a[0][0] = st.syx[0][0] - st.n as f64 * (muy[0]*mux[0]);
+    a[0][1] = st.syx[0][1] - st.n as f64 * (muy[0]*mux[1]);
+    a[0][2] = st.syx[0][2] - st.n as f64 * (muy[0]*mux[2]);
+    a[1][0] = st.syx[1][0] - st.n as f64 * (muy[1]*mux[0]);
+    a[1][1] = st.syx[1][1] - st.n as f64 * (muy[1]*mux[1]);
+    a[1][2] = st.syx[1][2] - st.n as f64 * (muy[1]*mux[2]);
+    a[2][0] = st.syx[2][0] - st.n as f64 * (muy[2]*mux[0]);
+    a[2][1] = st.syx[2][1] - st.n as f64 * (muy[2]*mux[1]);
+    a[2][2] = st.syx[2][2] - st.n as f64 * (muy[2]*mux[2]);
 
     let mu2x = mux[0]*mux[0] + mux[1]*mux[1] + mux[2]*mux[2];
     let mu2y = muy[0]*muy[0] + muy[1]*muy[1] + muy[2]*muy[2];
-    let e0 = 0.5f32 * ((st.syy - st.n as f32 * mu2y) + (st.sxx - st.n as f32 * mu2x)).max(0.0);
+    let e0 = 0.5f64 * ((st.syy - st.n as f64 * mu2y) + (st.sxx - st.n as f64 * mu2x)).max(0.0);
 
     let rot = qcp_from_a_e0(a, e0, st.n);
 
     // translation: t = μy - R μx
-    let rx = apply_rot(rot, mux);
+    let rx = apply_rot_f64(rot, mux);
     let t = [muy[0] - rx[0], muy[1] - rx[1], muy[2] - rx[2]];
-    (rot, t)
+    
+    // Convert back to f32 for output
+    let rot_f32 = [
+        [rot[0][0] as f32, rot[0][1] as f32, rot[0][2] as f32],
+        [rot[1][0] as f32, rot[1][1] as f32, rot[1][2] as f32],
+        [rot[2][0] as f32, rot[2][1] as f32, rot[2][2] as f32],
+    ];
+    let t_f32 = [t[0] as f32, t[1] as f32, t[2] as f32];
+    (rot_f32, t_f32)
 }
 
 // ====== QCP kernel (A,e0 form) ======
 
 #[inline]
-fn qcp_from_a_e0(a: [[f32; 3]; 3], e0: f32, _n: usize) -> [[f32; 3]; 3] {
+fn qcp_from_a_e0(a: [[f64; 3]; 3], e0: f64, _n: usize) -> [[f64; 3]; 3] {
     let sxx = a[0][0]; let sxy = a[0][1]; let sxz = a[0][2];
     let syx = a[1][0]; let syy = a[1][1]; let syz = a[1][2];
     let szx = a[2][0]; let szy = a[2][1]; let szz = a[2][2];
@@ -370,8 +381,8 @@ fn qcp_from_a_e0(a: [[f32; 3]; 3], e0: f32, _n: usize) -> [[f32; 3]; 3] {
 
     // Newton on quartic for max eigenvalue
     let mut lam = e0.max(0.0);
-    let eps = 1e-11f32;
-    for _ in 0..5 {
+    let eps = 1e-15f64;
+    for _ in 0..10 {
         let x2 = lam*lam;
         let b = (x2 + c2)*lam;
         let a = b + c1;
@@ -414,7 +425,7 @@ fn qcp_from_a_e0(a: [[f32; 3]; 3], e0: f32, _n: usize) -> [[f32; 3]; 3] {
     let mut q4 = -a21*a3243_4233 + a22*a3143_4133 - a23*a3142_4132;
 
     let mut qsqr = q1*q1 + q2*q2 + q3*q3 + q4*q4;
-    let evec_prec = 1e-6f32;
+    let evec_prec = 1e-12f64;
 
     if qsqr < evec_prec {
         // fallback 1
@@ -437,7 +448,7 @@ fn qcp_from_a_e0(a: [[f32; 3]; 3], e0: f32, _n: usize) -> [[f32; 3]; 3] {
     let a2 = q1*q1; let x2 = q2*q2; let y2 = q3*q3; let z2 = q4*q4;
     let xy = q2*q3; let az = q1*q4; let zx = q4*q2; let ay = q1*q3; let yz = q3*q4; let ax = q1*q2;
 
-    let mut rot = [[0.0f32;3];3];
+    let mut rot = [[0.0f64;3];3];
     rot[0][0] = a2 + x2 - y2 - z2;
     rot[0][1] = 2.0*(xy + az);
     rot[0][2] = 2.0*(zx - ay);
@@ -459,7 +470,9 @@ fn select_quantile_squared(res_sq: &mut [f32], q: f32) -> f32 {
     let q = q.clamp(0.0, 1.0);
     let n = res_sq.len();
     let pos = (q * ((n - 1) as f32)).round() as usize;
+    // let (_, nth, _) = res_sq.select_nth_unstable_by(pos, |a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let (_, nth, _) = res_sq.select_nth_unstable_by(pos, |a, b| a.partial_cmp(b).unwrap());
+
     *nth
 }
 
@@ -467,6 +480,14 @@ fn select_quantile_squared(res_sq: &mut [f32], q: f32) -> f32 {
 
 #[inline(always)]
 fn apply_rot(r: [[f32; 3]; 3], v: [f32; 3]) -> [f32; 3] {
+    [
+        r[0][0]*v[0] + r[0][1]*v[1] + r[0][2]*v[2],
+        r[1][0]*v[0] + r[1][1]*v[1] + r[1][2]*v[2],
+        r[2][0]*v[0] + r[2][1]*v[1] + r[2][2]*v[2],
+    ]
+}
+#[inline(always)]
+fn apply_rot_f64(r: [[f64; 3]; 3], v: [f64; 3]) -> [f64; 3] {
     [
         r[0][0]*v[0] + r[0][1]*v[1] + r[0][2]*v[2],
         r[1][0]*v[0] + r[1][1]*v[1] + r[1][2]*v[2],

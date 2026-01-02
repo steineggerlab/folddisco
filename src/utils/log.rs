@@ -13,7 +13,8 @@ pub fn log_msg(prefix: &str, msg: &str) -> String { format!("{} {}", prefix, msg
 pub fn print_log_msg(prefix: &str, msg: &str) { eprintln!("{}", log_msg(prefix, msg)); }
 
 // Macro for measuring time for a function
-// measure_time gets two arguments; function and its name
+// measure_time gets expression and optional verbose flag
+// Usage: measure_time!(expr) or measure_time!(expr, verbose)
 #[macro_export]
 macro_rules! measure_time {
     ($x:expr) => {{
@@ -26,6 +27,21 @@ macro_rules! measure_time {
         // Don't print quotation marks around the function name
         eprintln!("\x1b[1;32m[INFO]\x1b[0m {}: {:?}", fn_name, duration);
         result
+    }};
+    ($x:expr, $verbose:expr) => {{
+        if $verbose {
+            let start = std::time::Instant::now();
+            let result = $x;
+            let duration = start.elapsed();
+            // Print only the name of the function
+            let mut fn_name = stringify!($x);
+            fn_name = fn_name.split("(").collect::<Vec<&str>>()[0];
+            // Don't print quotation marks around the function name
+            eprintln!("\x1b[1;32m[INFO]\x1b[0m {}: {:?}", fn_name, duration);
+            result
+        } else {
+            $x
+        }
     }}
 }
 

@@ -1,7 +1,33 @@
 #[cfg(feature = "foldcomp")] 
 extern crate cmake;
 
+use std::process::Command;
+
 fn main() {
+    // Set git version 
+    // First read environment variable - FOLDDISCO_BUILD_VERSION
+    let git_hash = std::env::var("FOLDDISCO_BUILD_VERSION").unwrap_or_else(|_| {
+        let git_hash = Command::new("git").args(&["rev-parse", "HEAD"])
+            .output()
+            .ok()
+            .and_then(|output| {
+                if output.status.success() {
+                    Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+                } else {
+                    None
+                }
+            });
+        git_hash.unwrap_or_else(|| "unknown".into())
+    });
+    
+    // Set environment variable
+    println!("cargo:rustc-env=FOLDDISCO_BUILD_VERSION={}", git_hash);
+    // Configure rebuild triggers
+    println!("cargo:rerun-if-env-changed=FOLDDISCO_BUILD_VERSION");
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=.git/HEAD");        
+
+    // Build Foldcomp C++ library needed for Foldcomp support
     #[cfg(feature = "foldcomp")] 
     {
     let dst = cmake::Config::new("lib/foldcomp")

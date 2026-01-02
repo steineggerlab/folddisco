@@ -1,5 +1,3 @@
-
-
 use std::cell::UnsafeCell;
 use std::io::Write;
 use std::mem::ManuallyDrop;
@@ -8,12 +6,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use memmap2::{Mmap, MmapMut, MmapOptions};
 // use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
-
 pub struct FolddiscoIndex {
+    hashes: UnsafeCell<Vec<u32>>, // This is deduplicated hash list
     offsets: UnsafeCell<Vec<usize>>,
     last_id: UnsafeCell<Vec<usize>>,
-    loaded_offsets: ManuallyDrop<Vec<usize>>,
-    total_hashes: usize,
+    pub loaded_hashes: ManuallyDrop<Vec<u32>>,
+    pub loaded_offsets: ManuallyDrop<Vec<usize>>,
+    pub total_hashes: usize,
     entries: UnsafeCell<MmapMut>,
     index_path: String,
     mmap_on_disk: bool,
@@ -23,14 +22,17 @@ unsafe impl Sync for FolddiscoIndex {}
 
 impl FolddiscoIndex {
     pub fn new(total_hashes: usize, path: String, mmap_on_disk: bool) -> Self {
+        let hashes = vec![0u32; total_hashes];
         let offsets = vec![0usize; total_hashes + 1];
         let last_id = vec![usize::MAX; total_hashes];
         let entries = MmapMut::map_anon(1024).unwrap();
 
         FolddiscoIndex {
+            hashes: UnsafeCell::new(hashes),
             offsets: UnsafeCell::new(offsets),
             // atomic_offsets: UnsafeCell::new(atomic_offsets),
             last_id: UnsafeCell::new(last_id),
+            loaded_hashes: ManuallyDrop::new(vec![]),
             loaded_offsets: ManuallyDrop::new(vec![]),
             total_hashes,
             entries: UnsafeCell::new(entries),
@@ -39,6 +41,50 @@ impl FolddiscoIndex {
         }
     }
 
+    #[inline(always)]
+    fn find_hash_index(&self, hash: u32) -> Option<usize> {
+        let hashes = if self.loaded_hashes.is_empty() {
+            unsafe { &*self.hashes.get() }
+        } else {
+            &self.loaded_hashes
+        };
+        hashes.binary_search(&hash).ok()
+    }
+    
+    pub fn get_raw_entries(&self, hash: u32) -> &[u8] {
+        let offsets = if self.loaded_offsets.is_empty() {
+            unsafe { &*self.offsets.get() }
+        } else {
+            &self.loaded_offsets
+        };
+        let entries = unsafe { &*self.entries.get() };
+
+        match self.find_hash_index(hash) {
+            Some(idx) => {
+                // offsets[0] is always 0, offsets[idx] is start for hashes[idx-1]
+                let start = offsets[idx];
+                let end = if idx + 1 < offsets.len() {
+                    offsets[idx + 1]
+                } else {
+                    entries.len()
+                };
+                
+                if end > start {
+                    &entries[start..end]
+                } else {
+                    &[]
+                }
+            }
+            None => {
+                &[]
+            },
+        }
+    }
+    
+    pub fn get_entries(&self, hash: u32) -> Vec<usize> {
+        let raw_entries = self.get_raw_entries(hash);
+        merge_usize_vec_from_bytes(raw_entries)
+    }
     
     pub fn count_single_entry(&self, hash: u32, id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
@@ -122,7 +168,6 @@ impl FolddiscoIndex {
             }
         }
     }
-
     
     pub fn add_single_entry(&self, hash: u32, id: usize, bit_container: &mut Vec<u8>) {
         let last_id = unsafe { &mut *self.last_id.get() };
@@ -192,7 +237,7 @@ impl FolddiscoIndex {
         }
     }
 
-    pub fn finish_index(&self) {
+    pub fn wrapup_offset_and_save_entries(&self) {
         let offsets = unsafe { &mut *self.offsets.get() };
         let entries = unsafe { &*self.entries.get() };
         for i in (1..=self.total_hashes).rev() {
@@ -219,57 +264,112 @@ impl FolddiscoIndex {
         }
     }
 
-    pub fn get_raw_entries(&self, hash: usize) -> &[u8] {
-        let offsets = if self.loaded_offsets.is_empty() {
-            unsafe { &*self.offsets.get() }
-        } else {
-            &self.loaded_offsets
-        };
-        let entries = unsafe { &*self.entries.get() };
+    // Prune dense index to sparse representation
+    pub fn prune_to_sparse(&mut self) {
+        let offsets = unsafe { &*self.offsets.get() };
+        
+        // Collect only hashes where data exists
+        let mut hashes = Vec::with_capacity(self.total_hashes);
+        let mut sparse_offsets = Vec::with_capacity(self.total_hashes);
 
-        let start = offsets[hash];
-        let end = offsets[hash + 1];
-
-        &entries[start..end]
-    }
-    
-    pub fn get_entries(&self, hash: u32) -> Vec<usize> {
-        let raw_entries = self.get_raw_entries(hash as usize);
-        merge_usize_vec_from_bytes(raw_entries)
+        sparse_offsets.push(0); // Initial offset is always 0
+        
+        // Find all hashes with data and their corresponding offsets
+        for hash in 0..self.total_hashes {
+            let start = offsets[hash];
+            let end = offsets[hash + 1];
+            
+            if start < end {
+                // This hash has data
+                hashes.push(hash as u32);
+                // Store the cumulative end offset
+                sparse_offsets.push(end);
+            }
+        }
+        
+        hashes.shrink_to_fit();
+        sparse_offsets.shrink_to_fit();
+        
+        // Replace dense with sparse
+        self.hashes = UnsafeCell::new(hashes);
+        self.offsets = UnsafeCell::new(sparse_offsets);
     }
     
     pub fn save_offset_to_file(&self) {
+        let hashes = unsafe { &*self.hashes.get() };
         let offsets = unsafe { &*self.offsets.get() };
         let offset_path = format!("{}.offset", self.index_path);
-        let file = std::fs::File::create(&offset_path).expect("Unable to create offset file");
+        let file = std::fs::File::create(&offset_path).unwrap();
         let mut writer = std::io::BufWriter::new(file);
-        let offset_bytes = unsafe {
-            std::slice::from_raw_parts(offsets.as_ptr() as *const u8,
-            offsets.len() * std::mem::size_of::<usize>())
+        
+        // Write count (number of hashes)
+        let count = hashes.len();
+        writer.write_all(&count.to_le_bytes()).unwrap();
+        
+        // Write hashes array
+        let hash_bytes = unsafe {
+            std::slice::from_raw_parts(
+                hashes.as_ptr() as *const u8,
+                hashes.len() * std::mem::size_of::<u32>()
+            )
         };
-        writer.write_all(offset_bytes).expect("Unable to write offset bytes");
+        writer.write_all(hash_bytes).unwrap();
+        
+        // Write offsets array (length is hashes.len() + 1, includes initial 0)
+        let offset_bytes = unsafe {
+            std::slice::from_raw_parts(
+                offsets.as_ptr() as *const u8,
+                offsets.len() * std::mem::size_of::<usize>()
+            )
+        };
+        writer.write_all(offset_bytes).unwrap();
+        
     }
         
 }
 
-pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
+
+pub fn load_folddisco_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
     let offset_path = format!("{}.offset", index_prefix);
-    // Compatibility
     let index_path = if std::path::Path::new(&format!("{}.value", index_prefix)).exists() {
         format!("{}.value", index_prefix)
     } else {
-        index_prefix.to_string() // Changed to new format without .value extension
+        index_prefix.to_string()
     };
-    let offset_file = std::fs::File::open(&offset_path).expect("Unable to open offset file");
-    let offset_mmap = unsafe { Mmap::map(&offset_file).expect("Unable to map offset file") };
+    
+    let offset_file = std::fs::File::open(&offset_path).unwrap();
+    let offset_mmap = unsafe { Mmap::map(&offset_file).unwrap() };
+    
+    // Read count (number of hashes)
+    let count = usize::from_le_bytes(offset_mmap[0..8].try_into().unwrap());
+    
+    // Calculate expected file size for new format
+    let expected_size = 8 + count * std::mem::size_of::<u32>() + (count + 1) * std::mem::size_of::<usize>();
+    
+    if offset_mmap.len() < expected_size {
+        panic!(
+            "Offset file '{}' appears to be in old format or corrupted. Expected {} bytes, got {} bytes. \
+            Please delete the .offset file and regenerate the index.",
+            offset_path, expected_size, offset_mmap.len()
+        );
+    }
+    
+    // Read hashes
+    let hash_start = 8;
+    let hash_end = hash_start + count * std::mem::size_of::<u32>();
+    let hashes = unsafe {
+        let ptr = offset_mmap[hash_start..hash_end].as_ptr() as *const u32;
+        ManuallyDrop::new(Vec::from_raw_parts(ptr as *mut u32, count, count))
+    };
+    
+    // Read offsets (length is count + 1, includes initial 0)
+    let offset_start = hash_end;
+    let offset_count = count + 1;
+    let offset_end = offset_start + offset_count * std::mem::size_of::<usize>();
     let offsets = unsafe {
-        let offsets_ptr = offset_mmap.as_ptr() as *const usize;
-        ManuallyDrop::new(Vec::from_raw_parts(
-            offsets_ptr as *mut usize, offset_mmap.len() / std::mem::size_of::<usize>(),
-            offset_mmap.len() / std::mem::size_of::<usize>()
-        ))
+        let ptr = offset_mmap[offset_start..offset_end].as_ptr() as *const usize;
+        ManuallyDrop::new(Vec::from_raw_parts(ptr as *mut usize, offset_count, offset_count))
     };
-    let total_hashes = offsets.len() - 1;
 
     let entries_file = std::fs::OpenOptions::new()
         .read(true)
@@ -277,16 +377,18 @@ pub fn load_big_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
         .open(&index_path)
         .expect("Unable to open index file");
     let entries_mmap = unsafe { MmapOptions::new().map_copy(&entries_file).expect("Unable to map index file") };
-
-    ( FolddiscoIndex {
+    
+    (FolddiscoIndex {
+        hashes: UnsafeCell::new(vec![]),
         offsets: UnsafeCell::new(vec![]),
         last_id: UnsafeCell::new(vec![]),
+        loaded_hashes: hashes,
         loaded_offsets: offsets,
-        total_hashes: total_hashes,
+        total_hashes: count,
         entries: UnsafeCell::new(entries_mmap),
         index_path,
         mmap_on_disk: true,
-    }, offset_mmap )
+    }, offset_mmap)
 }
 
 #[inline(always)]
@@ -367,15 +469,15 @@ mod tests {
     fn test_folddisco_index() {
         let total_hashes = 10;
         let start = std::time::Instant::now();
-        let index = FolddiscoIndex::new(total_hashes, "test.index".to_string(), false);
+        let mut index = FolddiscoIndex::new(total_hashes, "test.index".to_string(), false);
 
         let hashes1: Vec<u32> = (0u32..7).collect();
         let id1 = 0usize;
-        let hashes4: Vec<u32> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let hashes4: Vec<u32> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8];
         let id4 = 10usize;
         let hashes3: Vec<u32> = vec![2, 4, 6, 8];
         let id3 = 128usize;
-        let hashes2: Vec<u32>= vec![1, 3, 5, 7, 9];
+        let hashes2: Vec<u32>= vec![1, 3, 5, 7];
         let id2 = 655345usize;
 
         index.count_entries(&hashes1, id1);
@@ -390,12 +492,15 @@ mod tests {
         index.add_entries(&hashes3, id3, &mut bit_container);
         index.add_entries(&hashes2, id2, &mut bit_container);
         
-        index.finish_index();
+        index.wrapup_offset_and_save_entries();
+        index.prune_to_sparse();
+        index.save_offset_to_file();
         let elapsed = start.elapsed();
         println!("Indexing time: {:?}", elapsed);
         // Print offsets
         let offsets = unsafe { &*index.offsets.get() };
-        for i in 0..total_hashes+1 {
+        println!("Offsets length: {}", offsets.len());
+        for i in 0..offsets.len() {
             println!("offsets[{}]: {}", i, offsets[i]);
         }
         let entries = unsafe { &*index.entries.get() };
@@ -411,6 +516,5 @@ mod tests {
             println!("Entries for hash {}: {:?}", i, entries);
         }
     }
-    
 }
 

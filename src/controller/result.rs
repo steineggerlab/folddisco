@@ -142,7 +142,6 @@ impl<'a> MatchResult<'a> {
             }
         }).sum();
 
-        // let evalue = evalue_fitting_new_sat(avg_idf, index_size as f32, node_count as f32);
         let evalue =  evalue_fitting(avg_idf, index_size as f32,query_length as f32);
         
         Self {
@@ -334,7 +333,7 @@ pub const MATCH_RESULT_DEFAULT_COLUMNS: &[&str] = &[
     "node_count",
     "idf",
     "rmsd",
-    "e_value",
+    // "e_value",
     "matching_residues",
     "query_residues",
 ];

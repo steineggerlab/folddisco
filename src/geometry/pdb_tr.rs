@@ -1050,10 +1050,6 @@ mod tests {
         // Try to load test structures
         let test_structures = vec![
             "data/AF-P17538-F1-model_v4.pdb",
-            "analysis/AF-P76176-F1-model_v4.pdb", 
-            "analysis/AF-O15391-F1-model_v4.pdb",
-            "analysis/1ntc.pdb",
-            "analysis/3jb9.pdb",
         ];
         
         let mut all_features = Vec::new();

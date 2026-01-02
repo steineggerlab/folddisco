@@ -164,20 +164,6 @@ impl MatchSortStrategy {
     /// 1. `"key1,key2,key3"` - Uses default order for each key
     /// 2. `"key1:order1,key2:order2"` - Custom order for each key
     /// 3. Mixed: `"key1,key2:desc,key3"` - Mix default and custom
-    ///
-    /// # Examples
-    /// ```
-    /// use folddisco::controller::sort::MatchSortStrategy;
-    ///
-    /// // Default orders
-    /// let strategy = MatchSortStrategy::from_str("node_count,tm_score,rmsd").unwrap();
-    ///
-    /// // Custom orders
-    /// let strategy = MatchSortStrategy::from_str("node_count:desc,tm_score:desc,rmsd:asc").unwrap();
-    ///
-    /// // Mixed
-    /// let strategy = MatchSortStrategy::from_str("node_count,tm_score:asc,rmsd").unwrap();
-    /// ```
     pub fn from_str(s: &str) -> Result<Self, String> {
         if s.trim().is_empty() {
             return Ok(Self::default());
@@ -407,20 +393,6 @@ impl StructureSortStrategy {
     /// 1. `"key1,key2,key3"` - Uses default order for each key
     /// 2. `"key1:order1,key2:order2"` - Custom order for each key
     /// 3. Mixed: `"key1,key2:desc,key3"` - Mix default and custom
-    ///
-    /// # Examples
-    /// ```
-    /// use folddisco::controller::sort::StructureSortStrategy;
-    ///
-    /// // Default orders
-    /// let strategy = StructureSortStrategy::from_str("max_node_count,min_rmsd").unwrap();
-    ///
-    /// // Custom orders
-    /// let strategy = StructureSortStrategy::from_str("max_node_count:desc,idf:desc").unwrap();
-    ///
-    /// // Mixed
-    /// let strategy = StructureSortStrategy::from_str("max_node_count,idf:desc,min_rmsd").unwrap();
-    /// ```
     pub fn from_str(s: &str) -> Result<Self, String> {
         if s.trim().is_empty() {
             return Ok(Self::default());

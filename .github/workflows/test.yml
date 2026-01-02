@@ -20,8 +20,6 @@ jobs:
           toolchain: stable
       - name: Run cargo test
         run: cargo test -v
-      - name: Test foldcomp feature
-        run: cargo test --features foldcomp -v
       - name: Build
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then

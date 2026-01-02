@@ -16,6 +16,8 @@ pub enum SortKey {
     NodeCount,
     /// IDF score
     Idf,
+    /// E-value (from IDF)
+    Evalue,
     /// RMSD
     Rmsd,
     /// TM-score
@@ -48,6 +50,7 @@ impl SortKey {
         match s.trim().to_lowercase().as_str() {
             "node_count" | "node-count" | "nodes" | "node" | "n" => Ok(Self::NodeCount),
             "idf" | "score" => Ok(Self::Idf),
+            "evalue" | "e_value" | "e-value" => Ok(Self::Evalue),
             "rmsd" => Ok(Self::Rmsd),
             "tm_score" | "tm-score" | "tmscore" | "tm" => Ok(Self::TmScore),
             "gdt_ts" | "gdt-ts" | "gdtts" | "gdt" => Ok(Self::GdtTs),
@@ -64,7 +67,7 @@ impl SortKey {
 
     /// Get all valid key names for help text
     pub fn valid_keys() -> &'static str {
-        "node_count, idf, rmsd, tm_score, tm_score_strict, gdt_ts, gdt_ha, gdt_strict, chamfer_distance, hausdorff_distance"
+        "node_count, idf, evalue, rmsd, tm_score, tm_score_strict, gdt_ts, gdt_ha, gdt_strict, chamfer_distance, hausdorff_distance"
     }
 
     /// Get the default sort order for this key
@@ -75,22 +78,23 @@ impl SortKey {
         match self {
             // Descending order for NodeCount, IDF, TM-score, GDT scores
             Self::NodeCount | Self::Idf | Self::TmScore | Self::GdtTs | Self::GdtHa => SortOrder::Desc,
-            // Ascending order for distance metrics: RMSD, Chamfer, Hausdorff
-            Self::Rmsd | Self::ChamferDistance | Self::HausdorffDistance => SortOrder::Asc,
+            // Ascending order for distance metrics: RMSD, Chamfer, Hausdorff, E-value
+            Self::Evalue | Self::Rmsd | Self::ChamferDistance | Self::HausdorffDistance => SortOrder::Asc,
         }
     }
 
     /// Extract value from MatchResult
-    fn extract_value(&self, result: &MatchResult) -> f32 {
+    fn extract_value(&self, result: &MatchResult) -> f64 {
         match self {
-            Self::NodeCount => result.node_count as f32,
-            Self::Idf => result.idf,
-            Self::Rmsd => result.rmsd,
-            Self::TmScore => result.metrics.tm_score,
-            Self::GdtTs => result.metrics.gdt_ts,
-            Self::GdtHa => result.metrics.gdt_ha,
-            Self::ChamferDistance => result.metrics.chamfer_distance,
-            Self::HausdorffDistance => result.metrics.hausdorff_distance,
+            Self::NodeCount => result.node_count as f64,
+            Self::Idf => result.idf as f64,
+            Self::Evalue => result.evalue,
+            Self::Rmsd => result.rmsd as f64,
+            Self::TmScore => result.metrics.tm_score as f64,
+            Self::GdtTs => result.metrics.gdt_ts as f64,
+            Self::GdtHa => result.metrics.gdt_ha as f64,
+            Self::ChamferDistance => result.metrics.chamfer_distance as f64,
+            Self::HausdorffDistance => result.metrics.hausdorff_distance as f64,
         }
     }
 
@@ -577,6 +581,7 @@ mod tests {
             idf: 5.0,
             matching_residues: vec![],
             rmsd: 0.1,
+            evalue: 0.00001,
             u_matrix: [[0.0; 3]; 3],
             t_matrix: [0.0; 3], 
             matching_coordinates: vec![],
@@ -596,6 +601,7 @@ mod tests {
             idf: 6.0,
             matching_residues: vec![],
             rmsd: 0.24,
+            evalue: 0.01,
             u_matrix: [[0.0; 3]; 3],
             t_matrix: [0.0; 3], 
             matching_coordinates: vec![],
@@ -615,6 +621,7 @@ mod tests {
             idf: 7.0,
             matching_residues: vec![],
             rmsd: 0.5,
+            evalue: 2.0,
             u_matrix: [[0.0; 3]; 3],
             t_matrix: [0.0; 3], 
             matching_coordinates: vec![],

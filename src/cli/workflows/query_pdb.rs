@@ -340,7 +340,7 @@ pub fn query_pdb(env: AppArgs) {
                 
                 let (query_residues, aa_substitutions) = parse_query_string(&query_string, query_structure.chains[0]);
                 
-                let _residue_count = if query_residues.is_empty() {
+                let residue_count = if query_residues.is_empty() {
                     query_structure.num_residues
                 } else {
                     query_residues.len()
@@ -373,7 +373,7 @@ pub fn query_pdb(env: AppArgs) {
                     total_match_count, covered_node_count, covered_node_ratio,
                     idf_score_cutoff, num_res_cutoff, plddt_cutoff, 
                     max_matching_node_count, max_matching_node_ratio, rmsd_cutoff,
-                    _residue_count,
+                    residue_count,
                 );
 
                 let query_count_map = measure_time!(count_query(
@@ -436,18 +436,19 @@ pub fn query_pdb(env: AppArgs) {
                 }
                 let mut queried_from_indices = query_count_vec;
                 drop(query_residues);
-                
+                let evalue_cutoff = f64::MAX; // Currently not used
                 let match_filter= MatchFilter::new(
-                    connected_node_count, connected_node_ratio, idf_score_cutoff, rmsd_cutoff,
-                    tm_score_cutoff, gdt_ts_cutoff, gdt_ha_cutoff, 
+                    connected_node_count, connected_node_ratio, idf_score_cutoff, evalue_cutoff, 
+                    rmsd_cutoff, tm_score_cutoff, gdt_ts_cutoff, gdt_ha_cutoff, 
                     chamfer_distance_cutoff, hausdorff_distance_cutoff,
-                    _residue_count,
+                    residue_count,
                 );
 
                 match query_mode {
                     QueryMode::PerMatch => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
-                            &queried_from_indices, skip_ca_match, total_structures as usize
+                            &queried_from_indices, skip_ca_match, 
+                            total_structures as usize, residue_count
                         );
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         sort_and_print_match_query_result(
@@ -459,7 +460,8 @@ pub fn query_pdb(env: AppArgs) {
                     }
                     QueryMode::Web => {
                         let mut match_results = convert_structure_query_result_to_match_query_results(
-                            &queried_from_indices, skip_ca_match, total_structures as usize
+                            &queried_from_indices, skip_ca_match, 
+                            total_structures as usize, residue_count
                         );
                         match_results.retain(|(_, v)| match_filter.filter(v));
                         // If web, set superpose to true.

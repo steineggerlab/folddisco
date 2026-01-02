@@ -12,6 +12,7 @@ pub enum Value {
     Int(i64),
     Uint(u64),
     Float(f32, usize), // value, precision
+    ScientificFloat(f64, usize), // value, precision. Print in scientific notation
     Str(String),
     Bool(bool),
     Float3DMatrix([[f32; 3]; 3], usize, &'static str), // matrix, precision, separator
@@ -34,6 +35,12 @@ impl From<u64> for Value {
 impl From<f32> for Value {
     fn from(v: f32) -> Self {
         Value::Float(v, DEFAULT_FLOAT_PRECISION) // default precision
+    }
+}
+
+impl From<f64> for Value {
+    fn from(v: f64) -> Self {
+        Value::ScientificFloat(v, DEFAULT_FLOAT_PRECISION) // default precision
     }
 }
 
@@ -144,6 +151,7 @@ impl<R> TsvFormatter<R> {
             Value::Int(v) => write!(w, "{}", v),
             Value::Uint(v) => write!(w, "{}", v),
             Value::Float(v, precision) => write!(w, "{:.1$}", v, precision),
+            Value::ScientificFloat(v, precision) => write!(w, "{:.1$e}", v, precision),
             Value::Str(s) => write!(w, "{}", escape_tsv(s)),
             Value::Bool(b) => write!(w, "{}", if *b { "1" } else { "0" }),
             Value::Float3DMatrix(m, precision, separator) => {
@@ -188,12 +196,14 @@ mod tests {
         struct Record {
             id: i64,
             score: f32,
+            score_scientific: f64,
             name: String,
             active: bool,
         }
         let columns = vec![
             Column::new("id", "Record ID", |r: &Record| Value::from(r.id)),
             Column::new("score", "Score", |r: &Record| Value::from(r.score)),
+            Column::new("score_sci", "Score Scientific", |r: &Record| Value::ScientificFloat(r.score_scientific, 4)),
             Column::new("name", "Name", |r: &Record| Value::from(r.name.clone())),
             Column::new("active", "Active Status", |r: &Record| Value::from(r.active)),
         ];
@@ -201,6 +211,7 @@ mod tests {
         let record = Record {
             id: 42,
             score: 3.14159,
+            score_scientific: 0.0000000314159,
             name: "Test\tName".to_string(),
             active: true,
         };
@@ -208,7 +219,7 @@ mod tests {
         formatter.write_header(&mut output).unwrap();
         formatter.write_record(&mut output, &record).unwrap();
         let result = String::from_utf8(output).unwrap();
-        let expected = "id\tscore\tname\tactive\n42\t3.1416\tTest Name\t1\n";
+        let expected = "id\tscore\tscore_sci\tname\tactive\n42\t3.1416\t3.1500e-08\tTest Name\t1\n";
         println!("Result:\n{}", result);
         assert_eq!(result, expected);
         
@@ -216,12 +227,14 @@ mod tests {
             Record {
                 id: 1,
                 score: 2.71828,
+                score_scientific: 0.0000000271828,
                 name: "Alice".to_string(),
                 active: false,
             },
             Record {
                 id: 2,
                 score: 1.61803,
+                score_scientific: 0.0000000161803,
                 name: "Bob".to_string(),
                 active: true,
             },
@@ -231,6 +244,7 @@ mod tests {
             Column::new("name", "Name", |r: &Record| Value::from(r.name.clone())),
             Column::new("active", "Active Status", |r: &Record| Value::from(r.active)),
             Column::new("score", "Score", |r: &Record| Value::from(r.score)),
+            Column::new("score_sci", "Score Scientific", |r: &Record| Value::ScientificFloat(r.score_scientific, 4)),
         ];
         let formatter_new = TsvFormatter::new(columns_new);
         let mut output_new = Vec::new();
@@ -240,7 +254,7 @@ mod tests {
         }
         let result_new = String::from_utf8(output_new).unwrap();
         println!("Result with new columns:\n{}", result_new);
-        let expected_new = "name\tactive\tscore\nAlice\t0\t2.7183\nBob\t1\t1.6180\n";
+        let expected_new = "name\tactive\tscore\tscore_sci\nAlice\t0\t2.7183\t2.7183e-08\nBob\t1\t1.6180\t1.6180e-08\n";
         assert_eq!(result_new, expected_new);
     }
 }   

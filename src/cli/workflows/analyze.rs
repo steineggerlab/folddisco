@@ -11,7 +11,7 @@
 use crate::cli::config::read_index_config_from_file;
 use crate::cli::{AppArgs, print_logo};
 use crate::controller::io::get_lookup_and_type;
-use crate::controller::summary::{count_encodings, save_summary};
+use crate::controller::summary::{analyze_enrichment, count_encodings, save_summary};
 use crate::prelude::*;
 
 pub const HELP_ANALYZE: &str = "\
@@ -24,9 +24,14 @@ input:
 output:
     -o, --output <OUTPUT_PATH>   Path to save analysis results (optional)
 
-options:
+summary options:
     --top <INT>                  Limit output to top N encodings by frequency [default: 10]
 
+enrichment options:
+    --p-value <FLOAT>            P-value threshold for enrichment analysis [default: 0.0001]
+    --min-support <INT>          Minimum number of enriched hashes supporting a position  [default: 4]
+    --max-pos <INT>              Maximum number of positions to report per structure [default: 32]
+ 
 general options:
     -t, --threads <INT>          Number of threads to use [default: 1]
     -v, --verbose                Print verbose messages
@@ -40,6 +45,9 @@ pub fn analyze(env: AppArgs) {
             pdb_container,
             output,
             top_n,
+            p_value,
+            min_support,
+            max_pos,
             threads,
             verbose,
             help: _,
@@ -61,9 +69,10 @@ pub fn analyze(env: AppArgs) {
                 Some(p) => p,
                 None => {
                     if compare_with_pdbs {
-                        format!("{}_vs_{}",
-                            index_path,
-                            pdb_container.as_ref().unwrap().replace("/", "_")
+                        // output prefix: pdb_container_vs_index
+                        // use basename of index_path
+                        format!("{}_vs_{}", pdb_container.as_ref().unwrap(),
+                            index_path.split('/').last().unwrap_or(&index_path)
                         )
                     } else {
                         format!("{}_summary", index_path)
@@ -74,12 +83,12 @@ pub fn analyze(env: AppArgs) {
             if verbose {
                 if compare_with_pdbs {
                     print_log_msg(INFO, &format!(
-                        "Comparing encoding distribution of {:?} against {}",
-                        pdb_container.as_ref().unwrap(), &index_path
+                        "Comparing encoding distribution of {:?} against {} using {} threads",
+                        pdb_container.as_ref().unwrap(), &index_path, threads
                     ));
                 } else {
                     print_log_msg(INFO, &format!(
-                        "Summarizing encoding distribution of index {:?}", &index_path
+                        "Summarizing encoding distribution of index {:?} using {} threads", &index_path, threads
                     ));
                 }
             }
@@ -100,8 +109,26 @@ pub fn analyze(env: AppArgs) {
             
             // Execute workflow
             if compare_with_pdbs {
-                // let analysis_result = 
-                todo!("analyze_enrichment(&index, &offset_mmap, pdb_container.unwrap(), verbose)");
+                if let Some(pdb_container) = pdb_container {
+                    if verbose {
+                        print_log_msg(INFO, &format!(
+                            "Analyzing enrichment of encodings in PDBs from {}",
+                            pdb_container
+                        ));
+                    }
+                    let saved_enrichment = analyze_enrichment(
+                        &index, &pdb_container, hash_type, nbin_dist, nbin_angle, threads,
+                        p_value, &output_prefix, min_support, max_pos, verbose
+                    );
+                    if saved_enrichment.is_err() {
+                        print_log_msg(FAIL, &format!(
+                            "Failed to analyze enrichment for PDBs in {}",
+                            pdb_container
+                        ));
+                    }
+                } else {
+                    print_log_msg(FAIL, "PDB container path is not provided");
+                }
                 // todo!("save_enrichment_result(&analysis_result, &output_prefix, verbose)");
             } else {
                 let summary = count_encodings(

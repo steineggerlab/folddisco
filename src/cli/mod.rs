@@ -112,11 +112,16 @@ pub enum AppArgs {
         // Optional
         pdb_container: Option<String>,
         output: Option<String>,
+        // sumamry options
         top_n: usize,
+        // enrichment options
+        p_value: f64,
+        min_support: usize,
+        max_pos: usize,
         // other general options
-        threads: usize,        
+        threads: usize,
         verbose: bool,
-        help: bool,        
+        help: bool,
     },
     Test {
         index_path: String,

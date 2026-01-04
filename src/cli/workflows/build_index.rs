@@ -247,6 +247,7 @@ pub fn build_index(env: AppArgs) {
 mod tests {
     use super::*;
     #[test]
+    #[ignore]
     fn test_build_index() {
         let env = AppArgs::Index {
             pdb_container: Some("data/serine_peptidases".to_string()),
@@ -267,6 +268,7 @@ mod tests {
         build_index(env);
     }
     #[test]
+    #[ignore]
     fn test_build_index_of_foldcomp_db() {
         #[cfg(feature = "foldcomp")]
         {

@@ -112,7 +112,7 @@ pub fn analyze(env: AppArgs) {
                 );
                 if saved.is_err() {
                     print_log_msg(FAIL, &format!(
-                        "Failed to save summary result to {}*", &output_prefix
+                        "Failed to save summary result to {}", &output_prefix
                     ));
                 }
             }

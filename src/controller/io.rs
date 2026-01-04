@@ -487,6 +487,8 @@ mod tests {
             let value = entry.value();
             println!("{:?} -> {:?}", key, value);
         });
+        // Delete test file
+        std::fs::remove_file("test_offset_map_io.offset").unwrap();
     }
     #[test]
     fn test_usize_vector_io() {
@@ -494,5 +496,7 @@ mod tests {
         write_usize_vector("test_usize_vector_io.value", &vec).unwrap();
         let (_mmap, vec) = read_usize_vector("test_usize_vector_io.value").unwrap();
         assert_eq!(vec, &[1, 2, 3, 4, 5]);
+        // Delete test file
+        std::fs::remove_file("test_usize_vector_io.value").unwrap();
     }
 }

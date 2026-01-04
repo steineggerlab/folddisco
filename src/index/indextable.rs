@@ -515,6 +515,9 @@ mod tests {
             let entries = index.get_entries(i as u32);
             println!("Entries for hash {}: {:?}", i, entries);
         }
+        // Clean up test files
+        std::fs::remove_file("test.index").unwrap();
+        std::fs::remove_file("test.index.offset").unwrap();
     }
 }
 

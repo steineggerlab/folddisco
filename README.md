@@ -55,6 +55,8 @@ cd ..
 
 #### Pre-built Indices
 
+> **⚠️ Compatibility Warning:** The pre-built indices listed below were created with an older version of Folddisco and are **not compatible** with the current version. Please rebuild your indices using the new version, or wait for updated pre-built indices (coming soon).
+
 Download pre-built index files:
 - [Human proteome](https://opendata.mmseqs.org/folddisco/h_sapiens_folddisco.tar.gz)
 - [E. coli proteome](https://opendata.mmseqs.org/folddisco/e_coli_folddisco.tar.gz)

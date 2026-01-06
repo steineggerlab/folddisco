@@ -3,8 +3,7 @@ use std::io::Write;
 use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use memmap2::{Mmap, MmapMut, MmapOptions};
-// use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use memmap2::{Mmap, MmapMut};
 
 pub struct FolddiscoIndex {
     hashes: UnsafeCell<Vec<u32>>, // This is deduplicated hash list
@@ -376,7 +375,10 @@ pub fn load_folddisco_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
         .write(false)
         .open(&index_path)
         .expect("Unable to open index file");
-    let entries_mmap = unsafe { MmapOptions::new().map_copy(&entries_file).expect("Unable to map index file") };
+    // Use regular map() for read-only access - works with files larger than physical RAM
+    let entries_mmap_ro = unsafe { Mmap::map(&entries_file).expect("Unable to map index file") };
+    // Transmute just for API consistency
+    let entries_mmap = unsafe { std::mem::transmute::<Mmap, MmapMut>(entries_mmap_ro) };
     
     (FolddiscoIndex {
         hashes: UnsafeCell::new(vec![]),

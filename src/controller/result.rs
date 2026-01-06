@@ -51,7 +51,7 @@ impl<'a> StructureResult<'a> {
         }
     }
 
-    pub fn into_match_query_results(&self, skip_ca_dist: bool, index_size: usize, query_length: usize) -> Vec<MatchResult> {
+    pub fn into_match_query_results(&self, skip_ca_dist: bool, index_size: usize, query_length: usize) -> Vec<MatchResult<'_>> {
         match skip_ca_dist {
             false => self.matching_residues_processed.iter().enumerate().map(|(i, (residues, rmsd, u_matrix, t_matrix, matching_coordinates, metrics, subgraph_idf))| {
                 MatchResult::new(

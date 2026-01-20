@@ -49,100 +49,128 @@ pub fn res_vec_as_string(res_vec: &Vec<((u8, u8), (u64, u64))>) -> String {
     output
 }
 
-
 pub fn retrieve_with_prefilter(
-    compact: &CompactStructure, hash_set: &HashSet<GeometricHash>, prefilter: CombinationVecIterator,
-    nbin_dist: usize, nbin_angle: usize, multiple_bin: &Option<Vec<(usize, usize)>>,
-    dist_cutoff: f32, ca_distance_cutoff: f32,
+    compact: &CompactStructure,
+    hash_set: &HashSet<GeometricHash>,
+    prefilter: CombinationVecIterator,
+    nbin_dist: usize,
+    nbin_angle: usize,
+    multiple_bin: &Option<Vec<(usize, usize)>>,
+    dist_cutoff: f32,
+    ca_distance_cutoff: f32,
     query_aa_dist_map: &HashMap<(u8, u8), Vec<(f32, usize)>>,
-) -> (Vec<(usize, usize, GeometricHash)>, Vec<(usize, (usize, usize))>) {
+) -> (
+    Vec<(usize, usize, GeometricHash)>,
+    Vec<(usize, (usize, usize))>,
+) {
     let mut output: Vec<(usize, usize, GeometricHash)> = Vec::new();
     let mut candidate_pairs: Vec<(usize, (usize, usize))> = Vec::new();
-    let hash = hash_set.iter().next().cloned().unwrap();
+
+    let hash_type = match hash_set.iter().next() {
+        Some(h) => h.hash_type(),
+        None => return (output, candidate_pairs),
+    };
+    
+    // OPTIMIZATION 2: Pre-convert all residues to u8. 
+    // Accessing `residue_types[i]` is much faster than `map_aa_to_u8` repeatedly.
+    let residue_types: Vec<u8> = compact.residue_name
+        .iter()
+        .map(|r| map_aa_to_u8(r))
+        .collect();
+
+    // OPTIMIZATION 3: Flatten HashMap to a Lookup Table (Vector of Options)
+    // Size is 256 * 256 = 65,536 entries. Small enough for L2/L3 cache.
+    // Index = (aa1 as usize * 256) + aa2 as usize
+    let mut dist_lookup: Vec<Option<&Vec<(f32, usize)>>> = vec![None; 256 * 256];
+    for ((aa1, aa2), v) in query_aa_dist_map {
+        let idx = (*aa1 as usize) << 8 | (*aa2 as usize); // equivalent to aa1 * 256 + aa2
+        dist_lookup[idx] = Some(v);
+    }
+    
+    // Use a small buffer to store candidates temporarily to avoid heap writes if feature fails
+    let mut temp_candidates: Vec<(usize, (usize, usize))> = Vec::with_capacity(16);
+    
     let mut feature = vec![0.0; 9];
-    if prefilter.is_empty() {
-        let comb = CombinationIterator::new(compact.num_residues);
-        comb.for_each(|(i, j)| {
-            let is_feature = get_single_feature(i, j, compact, hash.hash_type(), dist_cutoff, &mut feature);
-            if is_feature {
-                // Check distance & if it is within the threshold, add to candidate_pairs
-                let aa1 = map_aa_to_u8(&compact.residue_name[i]);
-                let aa2 = map_aa_to_u8(&compact.residue_name[j]);
-                if query_aa_dist_map.contains_key(&(aa1, aa2)) {
-                    let dists = query_aa_dist_map.get(&(aa1, aa2)).unwrap();
-                    let curr_dist = compact.get_ca_distance(i, j);
-                    // If curr_dist is Some and within the threshold, add to candidate_pairs
-                    if curr_dist.is_some() {
-                        let curr_dist = curr_dist.unwrap();
-                        for (dist, qi) in dists {
-                            if (curr_dist - dist).abs() < ca_distance_cutoff {
-                                candidate_pairs.push((*qi, (i, j)));
-                            }
-                        }
-                    }
-                }
-                if let Some(multiple_bins) = multiple_bin {
-                    for (nbin_dist, nbin_angle) in multiple_bins.iter() {
-                        let curr_hash = GeometricHash::perfect_hash(&feature, hash.hash_type(), *nbin_dist, *nbin_angle);
-                        if hash_set.contains(&curr_hash) {
-                            output.push((i, j, curr_hash));
-                        }
-                    }
-                } else {
-                    let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
-                        GeometricHash::perfect_hash_default(&feature, hash.hash_type())
-                    } else {
-                        GeometricHash::perfect_hash(&feature, hash.hash_type(), nbin_dist, nbin_angle)
-                    };
-                    if hash_set.contains(&curr_hash) {
-                        output.push((i, j, curr_hash));
-                    }
-                }
+
+    let mut process_pair = |i: usize, j: usize| {
+        // 1. Cheap: Calculate Euclidean Distance
+        let curr_dist = match compact.get_ca_distance(i, j) {
+            Some(d) if d <= dist_cutoff => d,
+            _ => return, // Skip if invalid or exceeds global cutoff
+        };
+
+        // 2. Cheap: Check Amino Acid pair constraints
+        let aa1 = residue_types[i] as usize;
+        let aa2 = residue_types[j] as usize;
+        let idx = (aa1 << 8) | aa2; // Bitwise shift is faster than multiplication
+        
+        // "Pretermination": Check if this AA pair and distance exist in the query map
+        // If the map doesn't contain this pair, OR the distance doesn't match, we skip EVERYTHING.
+        let dists = match dist_lookup[idx] {
+            Some(d) => d,
+            None => return, // AA pair not found in query -> Skip feature calc
+        };
+
+        // We need to know if we should add to candidate_pairs, but we can also use this 
+        // loop to validate if we should proceed to feature calculation at all.
+        let mut is_valid_dist_for_query = false;
+
+        // 3. Check Distances & Buffer Candidates
+        // Don't push to main `candidate_pairs` yet. Wait for feature check.
+        temp_candidates.clear();
+        
+        // We iterate through valid distances for this AA pair in the query
+        for (dist, qi) in dists {
+            if (curr_dist - dist).abs() < ca_distance_cutoff {
+                // It matches! Record it for later candidate_pairs
+                temp_candidates.push((*qi, (i, j)));
+                is_valid_dist_for_query = true;
             }
-        });
-    } else {
-        for (i, j) in prefilter {
-            let is_feature = get_single_feature(i, j, compact, hash.hash_type(), dist_cutoff, &mut feature);
-            if is_feature {
-                // Check distance & if it is within the threshold, add to candidate_pairs
-                let aa1 = map_aa_to_u8(&compact.residue_name[i]);
-                let aa2 = map_aa_to_u8(&compact.residue_name[j]);
-                if query_aa_dist_map.contains_key(&(aa1, aa2)) {
-                    let dists = query_aa_dist_map.get(&(aa1, aa2)).unwrap();
-                    let curr_dist = compact.get_ca_distance(i, j);
-                    // If curr_dist is Some and within the threshold, add to candidate_pairs
-                    if curr_dist.is_some() {
-                        let curr_dist = curr_dist.unwrap();
-                        for (dist, qi) in dists {
-                            if (curr_dist - dist).abs() < ca_distance_cutoff{
-                                candidate_pairs.push((*qi, (i, j)));
-                            }
-                        }
-                    }
-                }
-                if let Some(multiple_bins) = multiple_bin {
-                    for (nbin_dist, nbin_angle) in multiple_bins.iter() {
-                        let curr_hash = GeometricHash::perfect_hash(&feature, hash.hash_type(), *nbin_dist, *nbin_angle);
-                        if hash_set.contains(&curr_hash) {
-                            output.push((i, j, curr_hash));
-                        }
-                    }
-                } else {
-                    let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
-                        GeometricHash::perfect_hash_default(&feature, hash.hash_type())
-                    } else {
-                        GeometricHash::perfect_hash(&feature, hash.hash_type(), nbin_dist, nbin_angle)
-                    };
+        }
+
+        // If the distance didn't match ANY observed distance in the query, 
+        // we skip the expensive feature calculation.
+        if !is_valid_dist_for_query {
+            return;
+        }
+
+        // 3. Expensive: Calculate Feature
+        // We pass 'curr_dist' implicitly by ensuring we are within cutoff previously
+        let is_feature = get_single_feature(i, j, compact, hash_type, dist_cutoff, &mut feature);
+
+        if is_feature {
+            candidate_pairs.extend_from_slice(&temp_candidates);
+            // 4. Hashing Logic
+            if let Some(multiple_bins) = multiple_bin {
+                for (nb_d, nb_a) in multiple_bins.iter() {
+                    let curr_hash =
+                        GeometricHash::perfect_hash(&feature, hash_type, *nb_d, *nb_a);
                     if hash_set.contains(&curr_hash) {
-                        // output.push((*i, *j));
                         output.push((i, j, curr_hash));
                     }
+                }
+            } else {
+                let curr_hash = if nbin_dist == 0 || nbin_angle == 0 {
+                    GeometricHash::perfect_hash_default(&feature, hash_type)
+                } else {
+                    GeometricHash::perfect_hash(&feature, hash_type, nbin_dist, nbin_angle)
+                };
+                if hash_set.contains(&curr_hash) {
+                    output.push((i, j, curr_hash));
                 }
             }
         }
+    };
+
+    if prefilter.is_empty() {
+        let comb = CombinationIterator::new(compact.num_residues);
+        comb.for_each(|(i, j)| process_pair(i, j));
+    } else {
+        for (i, j) in prefilter {
+            process_pair(i, j);
+        }
     }
-    // Sort candidatpar_sort_byfirst element (query index)
-    // candidate_pairs.par_sort_by_key(|(qi, _)| *qi);
+
     (output, candidate_pairs)
 }
 

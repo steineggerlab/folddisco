@@ -29,12 +29,18 @@ wget https://mmseqs.com/folddisco/folddisco-linux-arm64.tar.gz; tar xvfz folddis
 
 # macOS (universal, works on Apple Silicon and Intel Macs)
 wget https://mmseqs.com/folddisco/folddisco-macos-universal.tar.gz; tar xvfz folddisco-macos-universal.tar.gz; export PATH=$(pwd)/folddisco/bin/:$PATH
+```
 
-# Compile from source
+**Compile from source**
+
+Compiling from source requires the Rust toolchain (Cargo). Installation instructions are available [here](https://www.rust-lang.org/tools/install).
+
+```bash
 git clone https://github.com/steineggerlab/folddisco.git
 cd folddisco
 cargo install --features foldcomp --path .
 ```
+
 ## Quick start
 Folddisco queries a database of precomputed geometric hashes computed from structures. 
 
@@ -46,7 +52,7 @@ This example is fully self-contained. You can copy and paste the entire block in
 ```bash
 # Download human proteome index. Use wget or aria2 to download the index.
 cd index
-aria2c https://foldcomp.steineggerlab.workers.dev/h_sapiens_folddisco.tar.gz
+aria2c https://opendata.mmseqs.org/folddisco/h_sapiens_folddisco.tar.gz
 
 # Extract the index
 tar -xzf h_sapiens_folddisco.tar.gz

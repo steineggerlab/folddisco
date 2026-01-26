@@ -214,9 +214,16 @@ impl MatchSortStrategy {
         Ordering::Equal
     }
 
-    /// Default strategy: NodeCount (desc) -> RMSD (asc)
-    /// This matches the legacy behavior
+    /// Default: IDF (desc) -> RMSD (asc)
     pub fn default() -> Self {
+        Self::new()
+            .then_by_default(SortKey::Idf)
+            .then_by_default(SortKey::Rmsd)
+    }
+
+    /// NodeCount (desc) -> RMSD (asc)
+    /// This matches the legacy behavior
+    pub fn by_node_count_rmsd() -> Self {
         Self::new()
             .then_by_default(SortKey::NodeCount)
             .then_by_default(SortKey::Rmsd)
@@ -443,9 +450,16 @@ impl StructureSortStrategy {
         Ordering::Equal
     }
 
-    /// Default strategy: MaxNodeCount (desc) -> MinRmsd (asc)
-    /// This matches the legacy behavior
+    /// Default strategy: IDF (desc) -> MinRmsd (asc)
     pub fn default() -> Self {
+        Self::new()
+            .then_by_default(StructureSortKey::Idf)
+            .then_by_default(StructureSortKey::MinRmsd)
+    }
+    
+    /// MaxNodeCount (desc) -> MinRmsd (asc)
+    /// This matches the legacy behavior
+    pub fn by_max_node_count_rmsd() -> Self {
         Self::new()
             .then_by_default(StructureSortKey::MaxNodeCount)
             .then_by_default(StructureSortKey::MinRmsd)

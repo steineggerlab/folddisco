@@ -81,7 +81,7 @@ fn parse_arg() -> Result<AppArgs, Box<dyn std::error::Error>> {
             freq_filter: args.opt_value_from_str("--freq-filter")?,
             length_penalty: args.opt_value_from_str("--length-penalty")?,
             // Sorting strategy (comma-separated keys)
-            sort_by: args.value_from_str("--sort-by").unwrap_or("node_count,rmsd".into()),
+            sort_by: args.value_from_str("--sort-by").unwrap_or("".into()),
             // Output format (comma-separated column names)
             format_output: args.opt_value_from_str("--format-output")?,
             // Output mode

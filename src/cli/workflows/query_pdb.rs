@@ -216,21 +216,31 @@ pub fn query_pdb(env: AppArgs) {
             );
             
             let match_sort_strategy = if !use_structure_sort {
-                MatchSortStrategy::from_str(&sort_by)
-                    .unwrap_or_else(|e| {
-                        print_log_msg(FAIL, &format!("Error parsing --sort-by: {}", e));
-                        std::process::exit(1);
-                    })
+                // If sort_by is given, parse it
+                if sort_by.is_empty() {
+                    MatchSortStrategy::default()
+                } else {
+                    MatchSortStrategy::from_str(&sort_by)
+                        .unwrap_or_else(|e| {
+                            print_log_msg(FAIL, &format!("Error parsing --sort-by: {}", e));
+                            std::process::exit(1);
+                        })
+                }
             } else {
                 MatchSortStrategy::default()
             };
             
             let structure_sort_strategy = if use_structure_sort {
-                StructureSortStrategy::from_str(&sort_by)
-                    .unwrap_or_else(|e| {
-                        print_log_msg(FAIL, &format!("Error parsing --sort-by: {}", e));
-                        std::process::exit(1);
-                    })
+                // If sort_by is given, parse it
+                if sort_by.is_empty() {
+                    StructureSortStrategy::default()
+                } else {
+                    StructureSortStrategy::from_str(&sort_by)
+                        .unwrap_or_else(|e| {
+                            print_log_msg(FAIL, &format!("Error parsing --sort-by: {}", e));
+                            std::process::exit(1);
+                        })
+                }
             } else {
                 StructureSortStrategy::default()
             };

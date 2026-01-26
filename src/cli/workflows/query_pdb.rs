@@ -359,7 +359,7 @@ pub fn query_pdb(env: AppArgs) {
                     query_string
                 } else {
                     let mut query_residues = query_residues.clone();
-                    query_residues.sort();
+                    // query_residues.sort();
                     res_chain_to_string(&query_residues)
                 };
 

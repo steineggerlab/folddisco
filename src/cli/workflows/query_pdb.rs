@@ -358,7 +358,7 @@ pub fn query_pdb(env: AppArgs) {
                 let query_string = if query_residues.is_empty() {
                     query_string
                 } else {
-                    let mut query_residues = query_residues.clone();
+                    let query_residues = query_residues.clone();
                     // query_residues.sort();
                     res_chain_to_string(&query_residues)
                 };

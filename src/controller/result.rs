@@ -333,7 +333,7 @@ pub const MATCH_RESULT_DEFAULT_COLUMNS: &[&str] = &[
     "node_count",
     "idf",
     "rmsd",
-    // "e_value",
+    "e_value",
     "matching_residues",
     "query_residues",
 ];

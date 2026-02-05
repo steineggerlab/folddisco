@@ -363,20 +363,19 @@ pub fn evalue_fitting(x: f32, m: f32, l: f32) -> f64 {
     let m_d = m as f64;
     let l_d = l as f64;
 
-    let mu = 0.01115566 * l_d.powi(2) + 0.06267775 * l_d + 18.8132141;
-    // let lam = 0.50 * (-0.043 * l_d).exp();
-    let lam = 5.73798993 / (l_d + 6.51703860);
+    let mu = 4.2161 * (l_d * 0.0489).exp() + 3.6661;
+    let lam = 0.2894 * (l_d * -0.0762).exp() + 0.0316;
     
-    let ref_db_size = 10547.0; 
+    let ref_db_size = 10546.0; 
     let search_space_ref = ref_db_size;    // let search_space_ref = ref_db_size;
     
     let k_val = (lam * mu).exp() / search_space_ref;
     let real_search_space = m_d;
-    let e_val_raw = k_val * real_search_space * (-lam * x_d).exp();
+    let e_val_raw = k_val * real_search_space * l_d * (-lam * x_d).exp();
 
     let e_val = (e_val_raw * real_search_space) / (e_val_raw + real_search_space);
 
-    e_val
+    e_val as f32
 }
 
 /// Create a TsvFormatter for MatchResult with specified column keys

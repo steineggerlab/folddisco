@@ -71,75 +71,55 @@ pub fn retrieve_with_prefilter(
         None => return (output, candidate_pairs),
     };
     
-    // OPTIMIZATION 2: Pre-convert all residues to u8. 
-    // Accessing `residue_types[i]` is much faster than `map_aa_to_u8` repeatedly.
+    // Pre-convert all residues to u8
     let residue_types: Vec<u8> = compact.residue_name
         .iter()
         .map(|r| map_aa_to_u8(r))
         .collect();
 
-    // OPTIMIZATION 3: Flatten HashMap to a Lookup Table (Vector of Options)
-    // Size is 256 * 256 = 65,536 entries. Small enough for L2/L3 cache.
-    // Index = (aa1 as usize * 256) + aa2 as usize
-    let mut dist_lookup: Vec<Option<&Vec<(f32, usize)>>> = vec![None; 256 * 256];
-    for ((aa1, aa2), v) in query_aa_dist_map {
-        let idx = (*aa1 as usize) << 8 | (*aa2 as usize); // equivalent to aa1 * 256 + aa2
-        dist_lookup[idx] = Some(v);
-    }
-    
-    // Use a small buffer to store candidates temporarily to avoid heap writes if feature fails
+
+    // 
     let mut temp_candidates: Vec<(usize, (usize, usize))> = Vec::with_capacity(16);
-    
     let mut feature = vec![0.0; 9];
 
     let mut process_pair = |i: usize, j: usize| {
-        // 1. Cheap: Calculate Euclidean Distance
+        // 1. Calculate Euclidean Distance
         let curr_dist = match compact.get_ca_distance(i, j) {
             Some(d) if d <= dist_cutoff => d,
-            _ => return, // Skip if invalid or exceeds global cutoff
+            _ => return,
         };
 
-        // 2. Cheap: Check Amino Acid pair constraints
-        let aa1 = residue_types[i] as usize;
-        let aa2 = residue_types[j] as usize;
-        let idx = (aa1 << 8) | aa2; // Bitwise shift is faster than multiplication
+        // 2. Check Amino Acid pair constraints using query_aa_dist_map directly
+        let aa1 = residue_types[i];
+        let aa2 = residue_types[j];
         
-        // "Pretermination": Check if this AA pair and distance exist in the query map
-        // If the map doesn't contain this pair, OR the distance doesn't match, we skip EVERYTHING.
-        let dists = match dist_lookup[idx] {
+        let dists = match query_aa_dist_map.get(&(aa1, aa2)) {
             Some(d) => d,
-            None => return, // AA pair not found in query -> Skip feature calc
+            None => return, // AA pair not found in query
         };
 
-        // We need to know if we should add to candidate_pairs, but we can also use this 
-        // loop to validate if we should proceed to feature calculation at all.
         let mut is_valid_dist_for_query = false;
-
-        // 3. Check Distances & Buffer Candidates
-        // Don't push to main `candidate_pairs` yet. Wait for feature check.
         temp_candidates.clear();
         
-        // We iterate through valid distances for this AA pair in the query
+        // Check distances and buffer candidates
         for (dist, qi) in dists {
             if (curr_dist - dist).abs() < ca_distance_cutoff {
-                // It matches! Record it for later candidate_pairs
                 temp_candidates.push((*qi, (i, j)));
                 is_valid_dist_for_query = true;
             }
         }
 
-        // If the distance didn't match ANY observed distance in the query, 
-        // we skip the expensive feature calculation.
+        // As calculate feature is more expensive than distance check, if no valid distance found, skip
         if !is_valid_dist_for_query {
             return;
         }
 
-        // 3. Expensive: Calculate Feature
-        // We pass 'curr_dist' implicitly by ensuring we are within cutoff previously
+        // 3. Calculate features for valid ij pairs
         let is_feature = get_single_feature(i, j, compact, hash_type, dist_cutoff, &mut feature);
 
         if is_feature {
             candidate_pairs.extend_from_slice(&temp_candidates);
+            
             // 4. Hashing Logic
             if let Some(multiple_bins) = multiple_bin {
                 for (nb_d, nb_a) in multiple_bins.iter() {
@@ -162,6 +142,7 @@ pub fn retrieve_with_prefilter(
         }
     };
 
+    // If amino acid prefilter is given, only process those pairs
     if prefilter.is_empty() {
         let comb = CombinationIterator::new(compact.num_residues);
         comb.for_each(|(i, j)| process_pair(i, j));

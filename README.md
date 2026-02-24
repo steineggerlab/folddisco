@@ -3,10 +3,8 @@
 Folddisco is tool for searching discontinuous motifs in protein structures.
 It is designed to handle large-scale protein databases with efficiency, enabling the detection of structural motifs across thousands of proteomes or millions of structures.
 
-> **⚠️ Important Notice:** This release introduces a new index format that is **not compatible** with indices created by previous versions. Please rebuild your indices using the new version or download the updated pre-built indices (coming soon).
-
 ## Publications
-[Kim H, Kim RS, Mirdita M, Steinegger M. Structural motif search across the protein-universe with Folddisco. bioRxiv, doi: 10.1101/2025.07.06.663357  (2025)](https://www.biorxiv.org/content/10.1101/2025.07.06.663357v1)
+[Kim H, Kim RS, Mirdita M, Yoon J, Steinegger M. Structural motif search across the protein-universe with Folddisco. bioRxiv, doi: 10.1101/2025.07.06.663357  (2025)](https://www.biorxiv.org/content/10.1101/2025.07.06.663357v2)
 
 [![BioConda Install](https://img.shields.io/conda/dn/bioconda/folddisco.svg?style=flag&label=BioConda%20install)](https://anaconda.org/bioconda/folddisco) [![Github All Releases](https://img.shields.io/github/downloads/steineggerlab/folddisco/total.svg)](https://github.com/steineggerlab/folddisco/releases/latest) 
 
@@ -52,23 +50,25 @@ This example is fully self-contained. You can copy and paste the entire block in
 ```bash
 # Download human proteome index. Use wget or aria2 to download the index.
 cd index
-aria2c https://opendata.mmseqs.org/folddisco/h_sapiens_folddisco.tar.gz
+aria2c https://opendata.mmseqs.org/folddisco/h_sapiens_folddisco.tar.lz4
 
 # Extract the index
-tar -xzf h_sapiens_folddisco.tar.gz
+lz4 -dc h_sapiens_folddisco.tar.lz4 | tar -xvf -
 cd ..
 ```
 
 #### Pre-built Indices
 
-> **⚠️ Compatibility Warning:** The pre-built indices listed below were created with an older version of Folddisco and are **not compatible** with the current version. Please rebuild your indices using the new version, or wait for updated pre-built indices (coming soon).
-
 Download pre-built index files:
-- [Human proteome](https://opendata.mmseqs.org/folddisco/h_sapiens_folddisco.tar.gz)
-- [E. coli proteome](https://opendata.mmseqs.org/folddisco/e_coli_folddisco.tar.gz)
-- [AFDB proteome of 16 model organisms](https://opendata.mmseqs.org/folddisco/afdb_proteome_v4_folddisco.tar.gz)
-- [Swiss-Prot](https://opendata.mmseqs.org/folddisco/afdb_swissprot_v4_folddisco.tar.gz)
-- To get the full AFDB50 and ESM30 indices, please **visit** https://opendata.mmseqs.org/folddisco
+- [Human proteome](https://opendata.mmseqs.org/folddisco/h_sapiens_folddisco.tar.lz4)
+- [E. coli proteome](https://opendata.mmseqs.org/folddisco/e_coli_folddisco.tar.lz4)
+- [AFDB proteome of 16 model organisms](https://opendata.mmseqs.org/folddisco/afdb_proteome_v4_folddisco.tar.lz4)
+- [Swiss-Prot](https://opendata.mmseqs.org/folddisco/afdb_swissprot_v4_folddisco.tar.lz4)
+- [AFDB50](https://opendata.mmseqs.org/folddisco/afdb50_v4_folddisco.tar.lz4) 
+- [ESM30](https://opendata.mmseqs.org/folddisco/highquality_clust30_folddisco.tar.lz4)
+- To get the old version of Folddisco indices, please **visit** https://opendata.mmseqs.org/folddisco/
+  - `*.tar.gz` indices are legacy indices (version 1.0), which are not compatible with version 2.0. 
+    Please use `*.tar.lz4` indices for version 2.0.
   - **AFDB50** (`afdb50_v4_folddisco*` + `afdb50_v4*`)
   - **ESM30** (`highquality_clust30_folddisco*` + `highquality_clust30*`)
 

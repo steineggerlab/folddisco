@@ -375,7 +375,7 @@ pub fn evalue_fitting(x: f32, m: f32, l: f32) -> f64 {
 
     let e_val = (e_val_raw * real_search_space) / (e_val_raw + real_search_space);
 
-    e_val as f32
+    e_val
 }
 
 /// Create a TsvFormatter for MatchResult with specified column keys

@@ -434,8 +434,8 @@ pub fn get_foldcomp_db_path_with_prefix(prefix: &str) -> Option<String> {
     
     // Create candidate prefixes
     let candidate_prefixes = vec![
+        format!("{}_foldcomp", parsed_prefix),
         parsed_prefix.clone(),
-        format!("{}_foldcomp", parsed_prefix)
     ];
     // Check each candidate prefix for foldcomp database files
     for candidate in candidate_prefixes {

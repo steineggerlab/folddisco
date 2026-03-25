@@ -499,4 +499,39 @@ mod tests {
         let compact = structure.to_compact();
         println!("{:?}", compact);
     }
+
+    #[test]
+    fn test_get_three_char_array_numeric() {
+        let ctx = Context::show("test");
+        // Numeric residue code like ligand "919" (PDB 6MWE)
+        let val = Value::Numeric(919.0);
+        let result = get_three_char_array(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some([b'9', b'1', b'9']));
+    }
+
+    #[test]
+    fn test_get_four_char_array_numeric() {
+        let ctx = Context::show("test");
+        let val = Value::Numeric(10.0);
+        let result = get_four_char_array(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some([b' ', b'1', b'0', b' ']));
+    }
+
+    #[test]
+    fn test_get_one_char_numeric() {
+        let ctx = Context::show("test");
+        // Single-digit chain ID
+        let val = Value::Numeric(1.0);
+        let result = get_one_char(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some(b'1'));
+    }
+
+    #[test]
+    fn test_get_one_char_numeric_multi_digit() {
+        let ctx = Context::show("test");
+        // Multi-digit chain ID like "10" (PDB 9A1O) — truncated to first byte
+        let val = Value::Numeric(10.0);
+        let result = get_one_char(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some(b'1'));
+    }
 }

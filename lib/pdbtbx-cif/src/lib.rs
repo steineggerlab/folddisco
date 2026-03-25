@@ -908,6 +908,56 @@ mod tests {
     }
 
     #[test]
+    fn parse_value_dot_then_digit_numeric() {
+        // '.5' is numeric, not inapplicable
+        let mut pos = Position {
+            text: ".5 hello",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Numeric(0.5)));
+        assert_eq!(pos.text, " hello");
+    }
+
+    #[test]
+    fn parse_value_dot_path() {
+        // './path/to/file' is text — the real-world trigger (PDB 9A1O)
+        let mut pos = Position {
+            text: "./EM/part_4.mrc next",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Text("./EM/part_4.mrc".to_string())));
+        assert_eq!(pos.text, " next");
+    }
+
+    #[test]
+    fn parse_value_dot_at_eof() {
+        // '.' at end of input is inapplicable
+        let mut pos = Position {
+            text: ".",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Inapplicable));
+    }
+
+    #[test]
+    fn parse_value_question_at_eof() {
+        // '?' at end of input is unknown
+        let mut pos = Position {
+            text: "?",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Unknown));
+    }
+
+    #[test]
     fn parse_char_string_simple() {
         let mut pos = Position {
             text: "hello hello",

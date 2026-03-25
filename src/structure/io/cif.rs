@@ -345,15 +345,9 @@ fn get_one_char(
         Value::Numeric(n) => format!("{n}"),
         _ => return Ok(None),
     };
-    match text.as_bytes().len() {
-        1 => Ok(Some(text.as_bytes()[0])),
-        _ => Err(PDBError::new(
-            ErrorLevel::InvalidatingError,
-            "Invalid chain name",
-            "Currently only one character chain names are supported",
-            _context.clone(),
-        )),
-    }
+    // Take the first byte — large structures (e.g. 9A1O) can have
+    // multi-character chain IDs like "10" that the lexer parses as Numeric.
+    Ok(text.as_bytes().first().copied())
 }
 
 // fn get_text(

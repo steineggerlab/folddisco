@@ -296,22 +296,22 @@ fn get_four_char_array(
     _context: &Context,
     _column: Option<&str>,
 ) -> Result<Option<[u8; 4]>, PDBError> {
-    match value {
-        Value::Text(t) => {
-            match t.as_bytes().len() {
-                1 => Ok(Some([b' ', t.as_bytes()[0], b' ', b' '])),
-                2 => Ok(Some([b' ', t.as_bytes()[0], t.as_bytes()[1], b' '])),
-                3 => Ok(Some([b' ', t.as_bytes()[0], t.as_bytes()[1], t.as_bytes()[2]])),
-                4 => Ok(Some([t.as_bytes()[0], t.as_bytes()[1], t.as_bytes()[2], t.as_bytes()[3]])),
-                _ => Err(PDBError::new(
-                    ErrorLevel::InvalidatingError,
-                    "Invalid atom name",
-                    "Invalid atom name",
-                    _context.clone(),
-                )),
-            }
-        },
-        _ => Ok(None),
+    let text = match value {
+        Value::Text(t) => t.clone(),
+        Value::Numeric(n) => format!("{n}"),
+        _ => return Ok(None),
+    };
+    match text.as_bytes().len() {
+        1 => Ok(Some([b' ', text.as_bytes()[0], b' ', b' '])),
+        2 => Ok(Some([b' ', text.as_bytes()[0], text.as_bytes()[1], b' '])),
+        3 => Ok(Some([b' ', text.as_bytes()[0], text.as_bytes()[1], text.as_bytes()[2]])),
+        4 => Ok(Some([text.as_bytes()[0], text.as_bytes()[1], text.as_bytes()[2], text.as_bytes()[3]])),
+        _ => Err(PDBError::new(
+            ErrorLevel::InvalidatingError,
+            "Invalid atom name",
+            "Invalid atom name",
+            _context.clone(),
+        )),
     }
 }
 
@@ -320,24 +320,18 @@ fn get_three_char_array(
     _context: &Context,
     _column: Option<&str>,
 ) -> Result<Option<[u8; 3]>, PDBError> {
-    match value {
-        Value::Text(t) => {
-            match t.as_bytes().len() {
-                1 => Ok(Some([t.as_bytes()[0], b' ', b' '])),
-                2 => Ok(Some([t.as_bytes()[0], t.as_bytes()[1], b' '])),
-                3 => Ok(Some([t.as_bytes()[0], t.as_bytes()[1], t.as_bytes()[2]])),
-                // _ => Err(PDBError::new(
-                //     ErrorLevel::InvalidatingError,
-                //     "Invalid residue name",
-                //     "Invalid residue name",
-                //     _context.clone(),
-                // )), 
-                // 2025-06-24 16:29:00 For now, not allowing residue names longer than 3 characters
-                // If more than 3 characters, we will return empty residue name
-                _ => Ok(Some([b' ', b' ', b' '])), // Default to empty residue name
-            }
-        },
-        _ => Ok(None),
+    let text = match value {
+        Value::Text(t) => t.clone(),
+        Value::Numeric(n) => format!("{n}"),
+        _ => return Ok(None),
+    };
+    match text.as_bytes().len() {
+        1 => Ok(Some([text.as_bytes()[0], b' ', b' '])),
+        2 => Ok(Some([text.as_bytes()[0], text.as_bytes()[1], b' '])),
+        3 => Ok(Some([text.as_bytes()[0], text.as_bytes()[1], text.as_bytes()[2]])),
+        // For now, not allowing residue names longer than 3 characters
+        // If more than 3 characters, we will return empty residue name
+        _ => Ok(Some([b' ', b' ', b' '])),
     }
 }
 
@@ -346,19 +340,19 @@ fn get_one_char(
     _context: &Context,
     _column: Option<&str>,
 ) -> Result<Option<u8>, PDBError> {
-    match value {
-        Value::Text(t) => {
-            match t.as_bytes().len() {
-                1 => Ok(Some(t.as_bytes()[0])),
-                _ => Err(PDBError::new(
-                    ErrorLevel::InvalidatingError,
-                    "Invalid chain name",
-                    "Currently only one character chain names are supported",
-                    _context.clone(),
-                )),
-            }
-        },
-        _ => Ok(None),
+    let text = match value {
+        Value::Text(t) => t.clone(),
+        Value::Numeric(n) => format!("{n}"),
+        _ => return Ok(None),
+    };
+    match text.as_bytes().len() {
+        1 => Ok(Some(text.as_bytes()[0])),
+        _ => Err(PDBError::new(
+            ErrorLevel::InvalidatingError,
+            "Invalid chain name",
+            "Currently only one character chain names are supported",
+            _context.clone(),
+        )),
     }
 }
 

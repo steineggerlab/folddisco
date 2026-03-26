@@ -345,9 +345,13 @@ fn get_one_char(
         Value::Numeric(n) => format!("{n}"),
         _ => return Ok(None),
     };
-    // Take the first byte — large structures (e.g. 9A1O) can have
-    // multi-character chain IDs like "10" that the lexer parses as Numeric.
-    Ok(text.as_bytes().first().copied())
+    match text.as_bytes().len() {
+        1 => Ok(Some(text.as_bytes()[0])),
+        // Multi-character chain IDs (e.g. "10" in PDB 9A1O) can't be
+        // represented as a single byte. Return None so the caller can
+        // fall back to label_asym_id (which is typically single-char).
+        _ => Ok(None),
+    }
 }
 
 // fn get_text(
@@ -529,9 +533,10 @@ mod tests {
     #[test]
     fn test_get_one_char_numeric_multi_digit() {
         let ctx = Context::show("test");
-        // Multi-digit chain ID like "10" (PDB 9A1O) — truncated to first byte
+        // Multi-digit chain ID like "10" (PDB 9A1O) can't be represented
+        // as a single byte — returns None so caller falls back to label_asym_id
         let val = Value::Numeric(10.0);
         let result = get_one_char(&val, &ctx, None).unwrap();
-        assert_eq!(result, Some(b'1'));
+        assert_eq!(result, None);
     }
 }

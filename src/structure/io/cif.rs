@@ -329,9 +329,9 @@ fn get_three_char_array(
         1 => Ok(Some([text.as_bytes()[0], b' ', b' '])),
         2 => Ok(Some([text.as_bytes()[0], text.as_bytes()[1], b' '])),
         3 => Ok(Some([text.as_bytes()[0], text.as_bytes()[1], text.as_bytes()[2]])),
-        // For now, not allowing residue names longer than 3 characters
+        //  2025-06-24 16:29:00 For now, not allowing residue names longer than 3 characters
         // If more than 3 characters, we will return empty residue name
-        _ => Ok(Some([b' ', b' ', b' '])),
+        _ => Ok(Some([b' ', b' ', b' '])), // Default to empty residue name
     }
 }
 
@@ -540,3 +540,4 @@ mod tests {
         assert_eq!(result, None);
     }
 }
+

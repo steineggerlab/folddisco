@@ -91,7 +91,7 @@ impl<'a> fmt::Display for StructureResult<'a> {
             self.matching_residues_processed.iter().map(
                 |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                     match x {
-                        Some((a, b)) => format!("{}{}", *a as char, b),
+                        Some((a, b)) => format!("{}_{}", a, b),
                         None => "_".to_string()
                     }
                 }).collect::<Vec<String>>().join(","), y)
@@ -163,7 +163,7 @@ impl<'a> MatchResult<'a> {
     pub fn to_string(&self, superpose: bool) -> String {
         let matching_residues = self.matching_residues.iter().map(|x| {
             match x {
-                Some((a, b)) => format!("{}{}", *a as char, b),
+                Some((a, b)) => format!("{}_{}", a, b),
                 None => "_".to_string()
             }
         }).collect::<Vec<String>>().join(",");
@@ -202,7 +202,7 @@ impl<'a> fmt::Display for MatchResult<'a> {
             self.tid, self.node_count, self.idf, self.rmsd, self.evalue,
             self.matching_residues.iter().map(|x| {
                 match x {
-                    Some((a, b)) => format!("{}{}", *a as char, b),
+                    Some((a, b)) => format!("{}_{}", a, b),
                     None => "_".to_string()
                 }
             }).collect::<Vec<String>>().join(","),
@@ -244,7 +244,7 @@ fn build_structure_result_columns<'a>(qid: String, query_residues: String) -> Ha
                 r.matching_residues_processed.iter().map(
                     |(x, y, _, _, _, _, _)| format!("{}:{:.4}", x.iter().map(|x| {
                         match x {
-                            Some((a, b)) => format!("{}{}", *a as char, b),
+                            Some((a, b)) => format!("{}_{}", a, b),
                             None => "_".to_string()
                         }
                     }).collect::<Vec<String>>().join(","), y)
@@ -273,7 +273,7 @@ fn build_match_result_columns<'a>(qid: String, query_residues: String) -> HashMa
         Column::new("matching_residues", "Matching residues", |r: &MatchResult| {
             r.matching_residues.iter().map(|x| {
                 match x {
-                    Some((a, b)) => format!("{}{}", *a as char, b),
+                    Some((a, b)) => format!("{}_{}", a, b),
                     None => "_".to_string()
                 }
             }).collect::<Vec<String>>().join(",").into()

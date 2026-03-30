@@ -37,7 +37,7 @@ impl Reader<File> {
     pub fn read_structure(&self) -> Result<Structure, &str> {
         let reader = BufReader::new(&self.reader);
         let mut structure = Structure::new(); // revise
-        let mut record = (b' ', 0);
+        let mut record = (String::new(), 0u64);
         let mut model = 0;
         // Reading each line of PDB, parse and build atomvector.
         for (_idx, line) in reader.lines().enumerate() {
@@ -58,7 +58,8 @@ impl Reader<File> {
                         let atom = parse_line(&atomline);
                         match atom {
                             Ok(atom) => {
-                                structure.update(atom, &mut record);
+                                let chain_name = String::from(&atomline[PDB_CHAIN_ID_COL]);
+                                structure.update(atom, &mut record, chain_name);
                             }
                             Err(_e) => {
                                 continue;
@@ -87,8 +88,8 @@ impl Reader<File> {
 
         // Create a new Structure
         let mut structure = Structure::new();
-        let mut record = (b' ', 0);
-        
+        let mut record = (String::new(), 0u64);
+
         // Read binary as a string. Conver
         let reader = BufReader::new(&binary[..]);
         // Convert to string
@@ -99,7 +100,8 @@ impl Reader<File> {
                         let atom = parse_line(&atomline);
                         match atom {
                             Ok(atom) => {
-                                structure.update(atom, &mut record);
+                                let chain_name = String::from(&atomline[PDB_CHAIN_ID_COL]);
+                                structure.update(atom, &mut record, chain_name);
                             }
                             Err(_e) => {
                                 // Conversion error. Jusk skip the line.

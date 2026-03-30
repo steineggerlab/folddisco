@@ -41,7 +41,7 @@ const DEFAULT_MAX_RESIDUE: usize = 65535;
 const DEFAULT_DIST_CUTOFF: f32 = 20.0;
 
 // Module specific types
-pub type ResidueMatch = Option<(u8, u64)>;
+pub type ResidueMatch = Option<(String, u64)>;
 
 unsafe impl Send for Folddisco {}
 unsafe impl Sync for Folddisco {}

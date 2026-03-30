@@ -348,7 +348,7 @@ pub fn query_pdb(env: AppArgs) {
                     &log_msg(FAIL, &format!("Failed to read structure: {}", &pdb_path))
                 );
                 
-                let (query_residues, aa_substitutions) = parse_query_string(&query_string, query_structure.chains[0]);
+                let (query_residues, aa_substitutions) = parse_query_string(&query_string, &query_structure.chains[0]);
                 
                 let residue_count = if query_residues.is_empty() {
                     query_structure.num_residues
@@ -508,10 +508,10 @@ pub fn query_pdb(env: AppArgs) {
     }
 }
 
-pub fn res_chain_to_string(res_chain: &Vec<(u8, u64)>) -> String {
+pub fn res_chain_to_string(res_chain: &Vec<(String, u64)>) -> String {
     let mut output = String::new();
     for (i, (chain, res)) in res_chain.iter().enumerate() {
-        output.push_str(&format!("{}{}", *chain as char, res));
+        output.push_str(&format!("{}_{}", chain, res));
         if i < res_chain.len() - 1 {
             output.push(',');
         }

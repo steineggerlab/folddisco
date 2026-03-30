@@ -9,7 +9,7 @@ use super::coordinate::{calc_torsion_radian, calc_angle_radian};
 #[derive(Debug)]
 pub struct Structure {
     pub num_chains: usize,
-    pub chains: Vec<u8>,
+    pub chains: Vec<String>,
     pub atom_vector: AtomVector,
     pub num_atoms: usize,
     pub num_residues: usize,
@@ -26,12 +26,12 @@ impl Structure {
         }
     }
 
-    pub fn update(&mut self, atom: Atom, record: &mut (u8, u64)) {
+    pub fn update(&mut self, atom: Atom, record: &mut (String, u64), chain_name: String) {
         // record store previous chain ID and residue serial
-        if record.0 != atom.chain {
-            self.chains.push(atom.chain);
+        if record.0 != chain_name {
+            self.chains.push(chain_name.clone());
             self.num_chains += 1;
-            record.0 = atom.chain;
+            record.0.clone_from(&chain_name);
         }
         if record.1 != atom.res_serial {
             self.num_residues += 1;
@@ -39,7 +39,7 @@ impl Structure {
         }
         self.num_atoms += 1;
 
-        self.atom_vector.push_atom(atom);
+        self.atom_vector.push_atom(atom, chain_name);
     }
 
     pub fn to_compact(&self) -> CompactStructure {
@@ -55,8 +55,8 @@ impl Structure {
 #[derive(Debug, Clone)]
 pub struct CompactStructure {
     pub num_chains: usize,
-    pub chains: Vec<u8>,
-    pub chain_per_residue: Vec<u8>,
+    pub chains: Vec<String>,
+    pub chain_per_residue: Vec<String>,
     pub num_residues: usize,
     pub residue_serial: Vec<u64>,
     pub residue_name: Vec<[u8; 3]>,
@@ -89,7 +89,7 @@ impl CompactStructure {
         let mut cb_vec_z: Vec<f32> = Vec::with_capacity(origin.num_residues);
         
 
-        let mut chain_per_residue: Vec<u8> = Vec::with_capacity(origin.num_residues);
+        let mut chain_per_residue: Vec<String> = Vec::with_capacity(origin.num_residues);
         let mut prev_res_serial: Option<u64> = None;
         let mut prev_res_name: Option<&[u8; 3]> = None;
         let mut n: Option<Coordinate> = None;
@@ -113,7 +113,7 @@ impl CompactStructure {
                         cb_vec.push(&cb);
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
-                        chain_per_residue.push(origin.atom_vector.chain[idx]);
+                        chain_per_residue.push(origin.atom_vector.chain[idx].clone());
                         b_factors.push(origin.atom_vector.b_factor[idx]);
                         n_vec_x.push(n.x);
                         n_vec_y.push(n.y);
@@ -133,7 +133,7 @@ impl CompactStructure {
                         ca_vec.push(&ca);
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
-                        chain_per_residue.push(origin.atom_vector.chain[idx]);
+                        chain_per_residue.push(origin.atom_vector.chain[idx].clone());
                         b_factors.push(origin.atom_vector.b_factor[idx]);
                         if let (Some(b"GLY"), Some(gly_n), Some(gly_c)) =
                             (prev_res_name, &gly_n, &gly_c)
@@ -213,9 +213,9 @@ impl CompactStructure {
         }
     }
     #[inline(always)]
-    pub fn get_index(&self, chain: &u8, res_serial: &u64) -> Option<usize> {
+    pub fn get_index(&self, chain: &str, res_serial: &u64) -> Option<usize> {
         for i in 0..self.num_residues {
-            if self.chain_per_residue[i] == *chain && self.residue_serial[i] == *res_serial {
+            if self.chain_per_residue[i] == chain && self.residue_serial[i] == *res_serial {
                 return Some(i);
             }
         }

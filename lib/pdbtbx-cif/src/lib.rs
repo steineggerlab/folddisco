@@ -160,21 +160,36 @@ fn parse_value(input: &mut Position<'_>) -> Result<Value, PDBError> {
             Context::position(input),
         ))
     } else if input.text.starts_with('.') {
-        // Technically there could be a number starting with a dot...
-        let mut branch: Position<'_> = *input;
-        if let Some(value) = parse_numeric(parse_identifier(&mut branch)) {
-            input.text = branch.text;
-            input.column = branch.column;
-            Ok(value)
-        } else {
+        let next = input.text.chars().nth(1);
+        if next.is_none() || next.unwrap().is_ascii_whitespace() {
+            // Bare '.' → inapplicable
             input.text = &input.text[1..];
             input.column += 1;
             Ok(Value::Inapplicable)
+        } else if next.unwrap().is_ascii_digit() {
+            // '.5', '.42e10', etc → try numeric, fall back to text
+            let text = parse_identifier(input);
+            if let Some(value) = parse_numeric(text) {
+                Ok(value)
+            } else {
+                Ok(Value::Text(text.to_string()))
+            }
+        } else {
+            // './path', '.foo' → text identifier
+            let text = parse_identifier(input);
+            Ok(Value::Text(text.to_string()))
         }
     } else if input.text.starts_with('?') {
-        input.text = &input.text[1..];
-        input.column += 1;
-        Ok(Value::Unknown)
+        let next = input.text.chars().nth(1);
+        if next.is_none() || next.unwrap().is_ascii_whitespace() {
+            input.text = &input.text[1..];
+            input.column += 1;
+            Ok(Value::Unknown)
+        } else {
+            // '?foo' → text identifier
+            let text = parse_identifier(input);
+            Ok(Value::Text(text.to_string()))
+        }
     } else if input.text.starts_with('\'') {
         parse_enclosed(input, '\'').map(|text| Value::Text(text.to_string()))
     } else if input.text.starts_with('\"') {
@@ -834,30 +849,112 @@ mod tests {
 
     #[test]
     fn parse_value_inapplicable() {
+        // Bare '.' is inapplicable
+        let mut pos = Position {
+            text: ". hello",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Inapplicable));
+        assert_eq!(pos.text, " hello");
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.column, 2);
+    }
+
+    #[test]
+    fn parse_value_dot_prefix_text() {
+        // '.hello' is a text value, not inapplicable
         let mut pos = Position {
             text: ".hello hello",
             line: 1,
             column: 1,
         };
         let res = parse_value(&mut pos);
-        assert_eq!(res, Ok(Value::Inapplicable));
-        assert_eq!(pos.text, "hello hello");
+        assert_eq!(res, Ok(Value::Text(".hello".to_string())));
+        assert_eq!(pos.text, " hello");
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.column, 7);
+    }
+
+    #[test]
+    fn parse_value_unknown() {
+        // Bare '?' is unknown
+        let mut pos = Position {
+            text: "? hello",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Unknown));
+        assert_eq!(pos.text, " hello");
         assert_eq!(pos.line, 1);
         assert_eq!(pos.column, 2);
     }
 
     #[test]
-    fn parse_value_unknown() {
+    fn parse_value_question_prefix_text() {
+        // '?hello' is a text value, not unknown
         let mut pos = Position {
             text: "?hello hello",
             line: 1,
             column: 1,
         };
         let res = parse_value(&mut pos);
-        assert_eq!(res, Ok(Value::Unknown));
-        assert_eq!(pos.text, "hello hello");
+        assert_eq!(res, Ok(Value::Text("?hello".to_string())));
+        assert_eq!(pos.text, " hello");
         assert_eq!(pos.line, 1);
-        assert_eq!(pos.column, 2);
+        assert_eq!(pos.column, 7);
+    }
+
+    #[test]
+    fn parse_value_dot_then_digit_numeric() {
+        // '.5' is numeric, not inapplicable
+        let mut pos = Position {
+            text: ".5 hello",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Numeric(0.5)));
+        assert_eq!(pos.text, " hello");
+    }
+
+    #[test]
+    fn parse_value_dot_path() {
+        // './path/to/file' is text — the real-world trigger (PDB 9A1O)
+        let mut pos = Position {
+            text: "./EM/part_4.mrc next",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Text("./EM/part_4.mrc".to_string())));
+        assert_eq!(pos.text, " next");
+    }
+
+    #[test]
+    fn parse_value_dot_at_eof() {
+        // '.' at end of input is inapplicable
+        let mut pos = Position {
+            text: ".",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Inapplicable));
+    }
+
+    #[test]
+    fn parse_value_question_at_eof() {
+        // '?' at end of input is unknown
+        let mut pos = Position {
+            text: "?",
+            line: 1,
+            column: 1,
+        };
+        let res = parse_value(&mut pos);
+        assert_eq!(res, Ok(Value::Unknown));
     }
 
     #[test]
@@ -1290,3 +1387,4 @@ mod tests {
         (1.0 - dif) > -0.000000000000001 && (dif - 1.0) < 0.000000000000001
     }
 }
+

@@ -558,10 +558,7 @@ mod tests {
     #[test]
     fn test_read_cif_multi_chain() {
         let path = Path::new("data/io_test/cif/multi_chain.cif");
-        if !path.exists() {
-            println!("Skipping test_read_cif_multi_chain: test file not found");
-            return;
-        }
+        assert!(path.exists(), "Test file not found: {:?}", path);
         let file = File::open(&path).unwrap();
         let reader = Reader::new(file);
         let structure = reader.read_structure().unwrap();

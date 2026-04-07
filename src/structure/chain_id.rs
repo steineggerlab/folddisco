@@ -23,9 +23,13 @@ pub fn chain_id_from_byte(b: u8) -> ChainId {
 }
 
 /// Return the string representation of a `ChainId`, trimming trailing null bytes.
+///
+/// # Panics
+/// Panics if the bytes are not valid UTF-8 (which should never happen when
+/// chain IDs are constructed via `chain_id_from_str` or `chain_id_from_byte`).
 pub fn chain_id_to_str(id: &ChainId) -> &str {
     let end = id.iter().position(|&b| b == 0).unwrap_or(4);
-    std::str::from_utf8(&id[..end]).unwrap_or("")
+    std::str::from_utf8(&id[..end]).expect("ChainId contains non-UTF-8 bytes")
 }
 
 #[cfg(test)]

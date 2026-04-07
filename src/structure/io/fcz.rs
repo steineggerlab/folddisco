@@ -135,22 +135,25 @@ impl FoldcompDbReader {
     }
 }
 
-// Methods to convert atom_t to Atom
+// Methods to convert atom_t to Atom.
+//
+// NOTE: `Atom` previously had `chain: u8` which matched `atom_t.chain: c_char` exactly,
+// making a raw pointer cast safe.  After the chain-ID change to `chain: [u8; 4]` the
+// layouts diverge at offset 24, so we must do an explicit field-by-field conversion.
 impl Atom {
-    pub fn from_c(atom: &atom_t) -> &Self {
-        unsafe { &*(atom as *const atom_t as *const Atom) }
-    }
-    
-    pub fn from_c_mut(atom: &mut atom_t) -> &mut Self {
-        unsafe { &mut *(atom as *mut atom_t as *mut Atom) }
-    }
-
-    pub fn as_c(&self) -> &atom_t {
-        unsafe { &*(self as *const Atom as *const atom_t) }
-    }
-
-    pub fn as_c_mut(&mut self) -> &mut atom_t {
-        unsafe { &mut *(self as *mut Atom as *mut atom_t) }
+    pub fn from_c(atom: &atom_t) -> Self {
+        use crate::structure::chain_id::chain_id_from_byte;
+        Atom {
+            x: atom.x,
+            y: atom.y,
+            z: atom.z,
+            atom_name: unsafe { std::mem::transmute(atom.atom) },
+            atom_serial: atom.atomIdx,
+            chain: chain_id_from_byte(atom.chain as u8),
+            res_name: unsafe { std::mem::transmute(atom.aa) },
+            res_serial: atom.resIdx,
+            b_factor: atom.bfactor,
+        }
     }
 }
 

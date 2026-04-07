@@ -9,6 +9,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::structure::lms_qcp::LmsQcpSuperimposer;
 use crate::structure::metrics::{PrecomputedDistances, StructureSimilarityMetrics};
+use crate::structure::chain_id::{ChainId, chain_id_to_str};
 use crate::utils::convert::{map_aa_to_u8, map_u8_to_aa}; 
 use crate::prelude::*; 
 use crate::structure::{coordinate::Coordinate, core::CompactStructure, kabsch::KabschSuperimposer}; 
@@ -35,15 +36,15 @@ pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)
 }
 
 
-pub fn res_vec_as_string(res_vec: &Vec<((u8, u8), (u64, u64))>) -> String {
+pub fn res_vec_as_string(res_vec: &Vec<((ChainId, ChainId), (u64, u64))>) -> String {
     let mut output = String::new();
     // Merge chain and residue number. Commas separate each pair
     for (k, (i, j)) in res_vec.iter().enumerate() {
         // If last element, don't add comma
         if k == res_vec.len() - 1 {
-            output.push_str(&format!("{}{}-{}{}", i.0 as char, j.0, i.1 as char, j.1));
+            output.push_str(&format!("{}{}-{}{}", chain_id_to_str(&i.0), j.0, chain_id_to_str(&i.1), j.1));
         } else {
-            output.push_str(&format!("{}{}-{}{},", i.0 as char, j.0, i.1 as char, j.1));
+            output.push_str(&format!("{}{}-{}{},", chain_id_to_str(&i.0), j.0, chain_id_to_str(&i.1), j.1));
         }
     }
     output
@@ -156,11 +157,11 @@ pub fn retrieve_with_prefilter(
 }
 
 
-pub fn get_chain_and_res_ind(compact: &CompactStructure, i: usize) -> (u8, u64) {
+pub fn get_chain_and_res_ind(compact: &CompactStructure, i: usize) -> (ChainId, u64) {
     (compact.chain_per_residue[i], compact.residue_serial[i])
 }
-pub fn res_index_to_char(chain: u8, res_ind: u64) -> String {
-    format!("{}{}", chain as char, res_ind)
+pub fn res_index_to_str(chain: ChainId, res_ind: u64) -> String {
+    format!("{}{}", chain_id_to_str(&chain), res_ind)
 }
 
 #[cfg(feature = "foldcomp")]
@@ -843,7 +844,7 @@ mod tests {
     fn test_retrieval_wrapper() {
         let path = String::from("data/serine_peptidases/4cha.pdb");
         let query_string = "B57,B102,C195";
-        let (query_residues, aa_substitutions) = parse_query_string(query_string, b'A');
+        let (query_residues, aa_substitutions) = parse_query_string(query_string, crate::structure::chain_id::chain_id_from_byte(b'A'));
         let hash_type = HashType::PDBTrRosetta;
         let nbin_dist = 16;
         let nbin_angle = 4;

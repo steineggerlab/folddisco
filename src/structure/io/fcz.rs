@@ -75,7 +75,7 @@ impl FoldcompDbReader {
 
     pub fn read_single_structure(&self, name: &str) -> Result<Structure, String> {
         let mut structure = Structure::new(); // revise
-        let mut record = (b' ', 0);
+        let mut record = ([0u8; 4], 0u64);
         let entry = get_foldcomp_db_entry_by_name(&self.db, &self.lookup, &self.index, name);
         match entry {
             Some(entry) => unsafe {
@@ -97,7 +97,7 @@ impl FoldcompDbReader {
 
     pub fn read_single_structure_by_id(&self, id: usize) -> Result<Structure, String> {
         let mut structure = Structure::new(); // revise
-        let mut record = (b' ', 0);
+        let mut record = ([0u8; 4], 0u64);
         let entry = get_foldcomp_db_entry_by_id(&self.db, &self.index, id);
         match entry {
             Some(entry) => unsafe {
@@ -157,7 +157,7 @@ impl Atom {
 // Convert atom_t slice to Structure
 pub unsafe fn atom_t_slice_to_structure(slice: &[atom_t]) -> Structure {
     let mut structure = Structure::new(); 
-    let mut record = (b' ', 0);
+    let mut record = ([0u8; 4], 0u64);
     for atom in slice {
         let atom = Atom::from_c(atom);
         structure.update(atom.clone(), &mut record);

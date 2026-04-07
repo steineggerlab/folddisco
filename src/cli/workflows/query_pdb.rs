@@ -31,6 +31,7 @@ use crate::controller::retrieve::retrieval_wrapper;
 use crate::index::indextable::load_folddisco_index;
 use crate::index::lookup::load_lookup_from_file;
 use crate::prelude::*;
+use crate::structure::chain_id::{ChainId, chain_id_to_str};
 
 #[cfg(feature = "foldcomp")]
 use crate::controller::retrieve::retrieval_wrapper_for_foldcompdb;
@@ -508,10 +509,10 @@ pub fn query_pdb(env: AppArgs) {
     }
 }
 
-pub fn res_chain_to_string(res_chain: &Vec<(u8, u64)>) -> String {
+pub fn res_chain_to_string(res_chain: &Vec<(ChainId, u64)>) -> String {
     let mut output = String::new();
     for (i, (chain, res)) in res_chain.iter().enumerate() {
-        output.push_str(&format!("{}{}", *chain as char, res));
+        output.push_str(&format!("{}{}", chain_id_to_str(chain), res));
         if i < res_chain.len() - 1 {
             output.push(',');
         }

@@ -37,7 +37,7 @@ impl Reader<File> {
     pub fn read_structure(&self) -> Result<Structure, &str> {
         let reader = BufReader::new(&self.reader);
         let mut structure = Structure::new(); // revise
-        let mut record = (b' ', 0);
+        let mut record = ([0u8; 4], 0u64);
         let mut model = 0;
         // Reading each line of PDB, parse and build atomvector.
         for (_idx, line) in reader.lines().enumerate() {
@@ -87,7 +87,7 @@ impl Reader<File> {
 
         // Create a new Structure
         let mut structure = Structure::new();
-        let mut record = (b' ', 0);
+        let mut record = ([0u8; 4], 0u64);
         
         // Read binary as a string. Conver
         let reader = BufReader::new(&binary[..]);

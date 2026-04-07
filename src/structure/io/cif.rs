@@ -7,6 +7,7 @@ use std::path::Path;
 use flate2::read::GzDecoder;
 
 use crate::structure::atom::Atom;
+use crate::structure::chain_id::{ChainId, chain_id_from_str};
 
 use super::super::core::*;
 use super::*;
@@ -97,7 +98,7 @@ impl Reader<File> {
 
 fn parse_mmcif_block_into_structure(input: &DataBlock, structure: &mut Structure) {
     let mut errors: Vec<PDBError> = Vec::new();
-    let mut record = (b' ', 0);
+    let mut record = ([0u8; 4], 0u64);
     for item in &input.items {
         let result = match item {
             Item::DataItem(di) => match di {
@@ -135,7 +136,7 @@ fn flatten_result<T, E>(value: Result<Result<T, E>, E>) -> Result<T, E> {
 
 /// Parse a loop containing atomic data
 fn parse_atoms(
-    input: &Loop, structure: &mut Structure, record: &mut (u8, u64)
+    input: &Loop, structure: &mut Structure, record: &mut (ChainId, u64)
 ) -> Option<Vec<PDBError>> {
     #[derive(Eq, PartialEq)]
     /// The mode of a column
@@ -256,8 +257,8 @@ fn parse_atoms(
             parse_column!(get_isize, ATOM_SEQ_ID)
                 .expect("Residue number should be provided")
         }) as u64;
-        let chain_name = parse_column!(get_one_char, ATOM_AUTH_ASYM_ID).unwrap_or_else(|| {
-            parse_column!(get_one_char, ATOM_ASYM_ID).expect("Chain name should be provided")
+        let chain_name = parse_column!(get_chain_id, ATOM_AUTH_ASYM_ID).unwrap_or_else(|| {
+            parse_column!(get_chain_id, ATOM_ASYM_ID).expect("Chain name should be provided")
         });
         let pos_x = parse_column!(get_f32, ATOM_X).expect("Atom X position should be provided");
         let pos_y = parse_column!(get_f32, ATOM_Y).expect("Atom Y position should be provided");
@@ -335,22 +336,21 @@ fn get_three_char_array(
     }
 }
 
-fn get_one_char(
+fn get_chain_id(
     value: &Value,
     _context: &Context,
     _column: Option<&str>,
-) -> Result<Option<u8>, PDBError> {
+) -> Result<Option<ChainId>, PDBError> {
     let text = match value {
         Value::Text(t) => t.clone(),
         Value::Numeric(n) => format!("{n}"),
         _ => return Ok(None),
     };
-    match text.as_bytes().len() {
-        1 => Ok(Some(text.as_bytes()[0])),
-        // Multi-character chain IDs (e.g. "10" in PDB 9A1O) can't be
-        // represented as a single byte. Return None so the caller can
-        // fall back to label_asym_id (which is typically single-char).
-        _ => Ok(None),
+    let s = text.trim();
+    if s.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(chain_id_from_str(s)))
     }
 }
 
@@ -522,22 +522,61 @@ mod tests {
     }
 
     #[test]
-    fn test_get_one_char_numeric() {
+    fn test_get_chain_id_single_char() {
         let ctx = Context::show("test");
-        // Single-digit chain ID
-        let val = Value::Numeric(1.0);
-        let result = get_one_char(&val, &ctx, None).unwrap();
-        assert_eq!(result, Some(b'1'));
+        let val = Value::Text("A".to_string());
+        let result = get_chain_id(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some([b'A', 0, 0, 0]));
     }
 
     #[test]
-    fn test_get_one_char_numeric_multi_digit() {
+    fn test_get_chain_id_multi_char() {
         let ctx = Context::show("test");
-        // Multi-digit chain ID like "10" (PDB 9A1O) can't be represented
-        // as a single byte — returns None so caller falls back to label_asym_id
+        let val = Value::Text("AA".to_string());
+        let result = get_chain_id(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some([b'A', b'A', 0, 0]));
+    }
+
+    #[test]
+    fn test_get_chain_id_numeric_single() {
+        let ctx = Context::show("test");
+        // Single-digit numeric chain ID (e.g., from CIF "1")
+        let val = Value::Numeric(1.0);
+        let result = get_chain_id(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some([b'1', 0, 0, 0]));
+    }
+
+    #[test]
+    fn test_get_chain_id_numeric_multi_digit() {
+        let ctx = Context::show("test");
+        // Multi-digit numeric chain ID like "10" (PDB 9A1O)
         let val = Value::Numeric(10.0);
-        let result = get_one_char(&val, &ctx, None).unwrap();
-        assert_eq!(result, None);
+        let result = get_chain_id(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some([b'1', b'0', 0, 0]));
+    }
+
+    #[test]
+    fn test_read_cif_multi_chain() {
+        let path = Path::new("data/io_test/cif/multi_chain.cif");
+        if !path.exists() {
+            println!("Skipping test_read_cif_multi_chain: test file not found");
+            return;
+        }
+        let file = File::open(&path).unwrap();
+        let reader = Reader::new(file);
+        let structure = reader.read_structure().unwrap();
+        // The file should have two chains: "AA" and "BB"
+        assert_eq!(structure.num_chains, 2, "expected 2 chains");
+        assert!(
+            structure.chains.contains(&[b'A', b'A', 0, 0]),
+            "expected chain AA"
+        );
+        assert!(
+            structure.chains.contains(&[b'B', b'B', 0, 0]),
+            "expected chain BB"
+        );
+        let compact = structure.to_compact();
+        assert!(compact.num_residues >= 2, "expected at least 2 residues");
     }
 }
 

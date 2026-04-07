@@ -11,6 +11,7 @@ use crate::controller::io::read_structure_from_path;
 use crate::geometry::core::HashType;
 use crate::geometry::core::GeometricHash;
 use crate::index::indextable::FolddiscoIndex;
+use crate::structure::chain_id::chain_id_to_str;
 use crate::utils::combination::CombinationIterator;
 use crate::utils::convert::map_u8_to_aa;
 use crate::utils::log::{log_msg, print_log_msg, INFO, FAIL};
@@ -457,13 +458,17 @@ pub fn analyze_enrichment(
             .map(|(pos, _)| pos.clone())
             .collect();
         final_positions.sort_by(|a, b| {
-            // Extract chain id (first char) and residue index (remaining chars)
-            let a_chain = a.chars().next().unwrap_or(' ');
-            let b_chain = b.chars().next().unwrap_or(' ');
-            let a_idx: i32 = a.chars().skip(1).collect::<String>().parse().unwrap_or(0);
-            let b_idx: i32 = b.chars().skip(1).collect::<String>().parse().unwrap_or(0);
-            
-            a_chain.cmp(&b_chain).then_with(|| a_idx.cmp(&b_idx))
+            // Split at the first digit: everything before is the chain ID,
+            // everything from the first digit onward is the residue index.
+            // This correctly handles both single-char ("A123") and
+            // multi-char ("AA123") chain IDs.
+            let digit_pos_a = a.chars().position(|c| c.is_ascii_digit()).unwrap_or(a.len());
+            let digit_pos_b = b.chars().position(|c| c.is_ascii_digit()).unwrap_or(b.len());
+            let a_chain = &a[..digit_pos_a];
+            let b_chain = &b[..digit_pos_b];
+            let a_idx: i32 = a[digit_pos_a..].parse().unwrap_or(0);
+            let b_idx: i32 = b[digit_pos_b..].parse().unwrap_or(0);
+            a_chain.cmp(b_chain).then_with(|| a_idx.cmp(&b_idx))
         });
         
         if !final_positions.is_empty() {
@@ -676,15 +681,15 @@ impl Folddisco {
                         if has_feature {
                             if self.num_bin_dist == 0 || self.num_bin_angle == 0 {
                                 let hash = GeometricHash::perfect_hash_default_as_u32(&feature, self.hash_type);
-                                let pos1 = format!("{}{}", compact.chain_per_residue[i] as char, compact.residue_serial[i]);
-                                let pos2 = format!("{}{}", compact.chain_per_residue[j] as char, compact.residue_serial[j]);
+                                let pos1 = format!("{}{}", chain_id_to_str(&compact.chain_per_residue[i]), compact.residue_serial[i]);
+                                let pos2 = format!("{}{}", chain_id_to_str(&compact.chain_per_residue[j]), compact.residue_serial[j]);
                                 output_map.entry(hash).or_default().push((pdb_pos, pos1, pos2));
                             } else {
                                 let hash = GeometricHash::perfect_hash_as_u32(
                                     &feature, self.hash_type, self.num_bin_dist, self.num_bin_angle
                                 );
-                                let pos1 = format!("{}{}", compact.chain_per_residue[i] as char, compact.residue_serial[i]);
-                                let pos2 = format!("{}{}", compact.chain_per_residue[j] as char, compact.residue_serial[j]);
+                                let pos1 = format!("{}{}", chain_id_to_str(&compact.chain_per_residue[i]), compact.residue_serial[i]);
+                                let pos2 = format!("{}{}", chain_id_to_str(&compact.chain_per_residue[j]), compact.residue_serial[j]);
                                 output_map.entry(hash).or_default().push((pdb_pos, pos1, pos2));
                             }
                         }

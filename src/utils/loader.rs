@@ -71,7 +71,7 @@ mod tests {
         assert_eq!(pdb_paths.len(), 5);
         println!("Flat: {:?}", pdb_paths);
         let pdb_paths = load_path("data/io_test", true);
-        assert_eq!(pdb_paths.len(), 14);
+        assert_eq!(pdb_paths.len(), 15);
         println!("Recursive: {:?}", pdb_paths);
     }
 }

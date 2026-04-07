@@ -6,6 +6,7 @@
 use rustc_hash::FxHashMap as HashMap;
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::index::indextable::FolddiscoIndex;
+use crate::structure::chain_id::{ChainId, chain_id_from_str};
 use crate::utils::convert::{is_aa_group_char, map_one_letter_to_u8_vec};
 use crate::utils::combination::CombinationIterator;
 use crate::utils::log::{log_msg, FAIL};
@@ -206,7 +207,7 @@ fn expand_and_insert(
 }
 
 pub fn make_query_map(
-    path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
+    path: &String, query_residues: &Vec<(ChainId, u64)>, hash_type: HashType, 
     nbin_dist: usize, nbin_angle: usize, multiple_bin: &Option<Vec<(usize, usize)>>,
     dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
     amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32, serial_query: bool,
@@ -328,29 +329,26 @@ pub fn make_query_map(
     (hash_collection, indices, observed_distance_map)
 }
 
-pub fn parse_query_string(query_string: &str, mut default_chain: u8) -> (Vec<(u8, u64)>, Vec<Option<Vec<u8>>>) {
+pub fn parse_query_string(query_string: &str, default_chain: ChainId) -> (Vec<(ChainId, u64)>, Vec<Option<Vec<u8>>>) {
     let mut query_residues = Vec::new();
     let mut amino_acid_substitutions = Vec::new();
 
     if query_string.is_empty() {
         return (query_residues, amino_acid_substitutions);
     }
-    if !default_chain.is_ascii_alphabetic() {
-        default_chain = b'A';
-    }
     // Remove whitespace
     let query_string = query_string.replace(" ", "");
     for segment in query_string.split(',') {
-        let (chain, rest) = if let Some(first) = segment.chars().next() {
-            // NOTE: 2025-01-15 15:55:19
-            // Current querying doesn't support chain ID with more than 1 character
-            if first.is_ascii_alphabetic() {
-                (first as u8, &segment[1..])
+        let (chain, rest) = {
+            // Scan leading alphabetic characters as the chain ID.
+            // This supports both single-char ("A57") and multi-char ("AA57") chains.
+            let alpha_len = segment.chars().take_while(|c| c.is_ascii_alphabetic()).count();
+            if alpha_len > 0 {
+                let (chain_str, rest) = segment.split_at(alpha_len);
+                (chain_id_from_str(chain_str), rest)
             } else {
                 (default_chain, segment)
             }
-        } else {
-            (default_chain, segment)
         };
 
         let (range_part, subst_part) = match rest.split_once(':') {
@@ -389,18 +387,17 @@ pub fn parse_query_string(query_string: &str, mut default_chain: u8) -> (Vec<(u8
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::structure::chain_id::chain_id_from_byte;
     
     #[test]
     fn test_make_query_map() {
         let path= String::from("query/1G2F.pdb");
         let query_residues = vec![
-            (b'F', 207), (b'F', 212), (b'F', 225)
+            (chain_id_from_byte(b'F'), 207u64),
+            (chain_id_from_byte(b'F'), 212u64),
+            (chain_id_from_byte(b'F'), 225u64),
         ];
         let amino_acid_substitutions = vec![None; query_residues.len()];
-        // let path = String::from("data/serine_peptidases/1aq2.pdb");
-        // let query_residues = vec![
-        //     (b'A', 250), (b'A', 232), (b'A', 269)
-        // ];
         let hash_type = HashType::PDBTrRosetta;
         let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
             &path, &query_residues, hash_type, 16, 4, &None,
@@ -425,43 +422,83 @@ mod tests {
     #[test]
     fn test_parse_query_string() {
         let query_string = "A250,B232,C269";
-        let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'B', 232), (b'C', 269)], vec![None, None, None]));
+        let (residues, subs) = parse_query_string(query_string, chain_id_from_byte(b'A'));
+        assert_eq!(residues, vec![
+            (chain_id_from_byte(b'A'), 250),
+            (chain_id_from_byte(b'B'), 232),
+            (chain_id_from_byte(b'C'), 269),
+        ]);
+        assert_eq!(subs, vec![None, None, None]);
     }
     #[test]
     fn test_parse_query_string_with_space() {
         let query_string = "A250, A232, A269";
-        let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![None, None, None]));
+        let (residues, subs) = parse_query_string(query_string, chain_id_from_byte(b'A'));
+        assert_eq!(residues, vec![
+            (chain_id_from_byte(b'A'), 250),
+            (chain_id_from_byte(b'A'), 232),
+            (chain_id_from_byte(b'A'), 269),
+        ]);
+        assert_eq!(subs, vec![None, None, None]);
     }
     
     #[test]
     fn test_parse_query_string_with_space_and_no_chain() {
         let query_string = "250, 232, 269";
-        let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![None, None, None]));
+        let (residues, subs) = parse_query_string(query_string, chain_id_from_byte(b'A'));
+        assert_eq!(residues, vec![
+            (chain_id_from_byte(b'A'), 250),
+            (chain_id_from_byte(b'A'), 232),
+            (chain_id_from_byte(b'A'), 269),
+        ]);
+        assert_eq!(subs, vec![None, None, None]);
     }
 
     #[test]
     fn test_parse_query_string_with_aa_substitution() {
         let query_string = "A250:R,B232:K,C269:QK";
-        let query_residues = parse_query_string(query_string, b'A');
+        let (residues, subs) = parse_query_string(query_string, chain_id_from_byte(b'A'));
         // R = 1, K = 11, Q = 5
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'B', 232), (b'C', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]));
+        assert_eq!(residues, vec![
+            (chain_id_from_byte(b'A'), 250),
+            (chain_id_from_byte(b'B'), 232),
+            (chain_id_from_byte(b'C'), 269),
+        ]);
+        assert_eq!(subs, vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]);
+
         let query_string = "250:R,232:K,269:QK";
-        let query_residues = parse_query_string(query_string, b'A');
+        let (residues, subs) = parse_query_string(query_string, chain_id_from_byte(b'A'));
         // R = 1, K = 11, Q = 5
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]));
+        assert_eq!(residues, vec![
+            (chain_id_from_byte(b'A'), 250),
+            (chain_id_from_byte(b'A'), 232),
+            (chain_id_from_byte(b'A'), 269),
+        ]);
+        assert_eq!(subs, vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]);
     }
+
     #[test]
     fn test_parse_query_string_with_range() {
         let query_string = "A250-252,B232-234,C269:Q";
-        let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, (vec![
-            (b'A', 250), (b'A', 251), (b'A', 252), 
-            (b'B', 232), (b'B', 233), (b'B', 234), 
-            (b'C', 269),
-        ], vec![None, None, None, None, None, None, Some(vec![5])]));
+        let (residues, subs) = parse_query_string(query_string, chain_id_from_byte(b'A'));
+        assert_eq!(residues, vec![
+            (chain_id_from_byte(b'A'), 250), (chain_id_from_byte(b'A'), 251), (chain_id_from_byte(b'A'), 252), 
+            (chain_id_from_byte(b'B'), 232), (chain_id_from_byte(b'B'), 233), (chain_id_from_byte(b'B'), 234), 
+            (chain_id_from_byte(b'C'), 269),
+        ]);
+        assert_eq!(subs, vec![None, None, None, None, None, None, Some(vec![5])]);
+    }
+
+    #[test]
+    fn test_parse_query_string_multi_char_chain() {
+        // Multi-character chain IDs like "AA57,BB102"
+        let query_string = "AA57,BB102";
+        let (residues, subs) = parse_query_string(query_string, chain_id_from_byte(b'A'));
+        assert_eq!(residues, vec![
+            (chain_id_from_str("AA"), 57),
+            (chain_id_from_str("BB"), 102),
+        ]);
+        assert_eq!(subs, vec![None, None]);
     }
     
     #[test]

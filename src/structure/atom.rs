@@ -1,4 +1,5 @@
 use crate::structure::coordinate::{Coordinate, CoordinateVector};
+use crate::structure::chain_id::ChainId;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -8,7 +9,7 @@ pub struct Atom {
     pub z: f32,
     pub atom_name: [u8; 4],
     pub atom_serial: u64,
-    pub chain: u8,
+    pub chain: ChainId,
     pub res_name: [u8; 3],
     pub res_serial: u64,
     pub b_factor: f32,
@@ -22,7 +23,7 @@ impl Atom {
         z: f32,
         atom_name: [u8; 4],
         atom_serial: u64,
-        chain: u8,
+        chain: ChainId,
         res_name: [u8; 3],
         res_serial: u64,
         b_factor: f32,
@@ -46,7 +47,7 @@ impl Atom {
             z: 0.0,
             atom_name: [0; 4],
             atom_serial: 0,
-            chain: 0,
+            chain: [0; 4],
             res_name: [0; 3],
             res_serial: 0,
             b_factor: 0.0,
@@ -77,7 +78,7 @@ pub struct AtomVector {
     pub atom_serial: Vec<u64>,
     pub res_name: Vec<[u8; 3]>,
     pub res_serial: Vec<u64>,
-    pub chain: Vec<u8>,
+    pub chain: Vec<ChainId>,
     pub b_factor: Vec<f32>,
 }
 
@@ -103,7 +104,7 @@ impl AtomVector {
         atom_serial: u64,
         res_name: [u8; 3],
         res_serial: u64,
-        chain: u8,
+        chain: ChainId,
         b_factor: f32,
     ) {
         self.atom_name.push(atom_name);

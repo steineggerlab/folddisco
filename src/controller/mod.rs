@@ -346,6 +346,11 @@ impl Folddisco {
 
                     }).flatten().collect()
                 });
+            // The delta encoding in count_single_entry assumes pdb_pos values
+            // are visited in ascending order for each hash.  Parallel rayon does
+            // not guarantee that order, so sort by pdb_pos first.
+            let mut collected = collected;
+            collected.sort_unstable_by_key(|&(_, pdb_pos)| pdb_pos);
             pool.install(|| {
                 (0..self.num_threads).into_par_iter().for_each(| tid | {
                     // Thread only saves hashes with same modulos
@@ -424,6 +429,11 @@ impl Folddisco {
 
                     }).flatten().collect()
                 });
+            // The delta encoding in add_single_entry assumes pdb_pos values
+            // are visited in ascending order for each hash.  Parallel rayon does
+            // not guarantee that order, so sort by pdb_pos first.
+            let mut collected = collected;
+            collected.sort_unstable_by_key(|&(_, pdb_pos)| pdb_pos);
             pool.install(|| {
                 (0..self.num_threads).into_par_iter().for_each(| tid | {
                     // Thread only saves hashes with same modulos

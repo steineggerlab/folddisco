@@ -1,5 +1,11 @@
 # Folddisco
 
+<p align="center">
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/steineggerlab/folddisco/master/.github/img/folddisco_logo_with_light.png">
+<img src="https://raw.githubusercontent.com/steineggerlab/folddisco/master/.github/img/folddisco_logo_without_light.png" max-height="300px" height="300" display="block" margin-left="auto" margin-right="auto" display="block"/>
+</picture>
+
 Folddisco is tool for searching discontinuous motifs in protein structures.
 It is designed to handle large-scale protein databases with efficiency, enabling the detection of structural motifs across thousands of proteomes or millions of structures.
 

@@ -9,6 +9,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::structure::lms_qcp::LmsQcpSuperimposer;
 use crate::structure::metrics::{PrecomputedDistances, StructureSimilarityMetrics};
+use crate::structure::point_to_plane::PointToPlaneSupimposer;
 use crate::utils::convert::{map_aa_to_u8, map_u8_to_aa}; 
 use crate::prelude::*; 
 use crate::structure::{coordinate::Coordinate, core::CompactStructure, kabsch::KabschSuperimposer}; 
@@ -733,7 +734,8 @@ pub fn rmsd_for_matched(
     match lms {
         true => {
             if index1.len() <= 3 {
-                let mut superposer = KabschSuperimposer::new();
+                // let mut superposer = KabschSuperimposer::new();
+                let mut superposer = PointToPlaneSupimposer::new();
                 superposer.set_atoms(&coord_vec1, &coord_vec2);
                 superposer.run();
                 superposer.get_rms()
@@ -745,7 +747,8 @@ pub fn rmsd_for_matched(
             }
         }
         false => {
-            let mut superposer = KabschSuperimposer::new();
+            // let mut superposer = KabschSuperimposer::new();
+            let mut superposer = PointToPlaneSupimposer::new();
             superposer.set_atoms(&coord_vec1, &coord_vec2);
             superposer.run();
             superposer.get_rms()
@@ -773,7 +776,8 @@ pub fn rmsd_with_calpha_and_rottran(
     match lms {
         true => {
             if index1.len() <= 3 {
-                let mut superposer = KabschSuperimposer::new();
+                // let mut superposer = KabschSuperimposer::new();
+                let mut superposer = PointToPlaneSupimposer::new();
                 superposer.set_atoms(&coord_vec1, &coord_vec2);
                 superposer.run();
 
@@ -813,7 +817,8 @@ pub fn rmsd_with_calpha_and_rottran(
             }
         }
         false => {
-            let mut superposer = KabschSuperimposer::new();
+            // let mut superposer = KabschSuperimposer::new();
+            let mut superposer = PointToPlaneSupimposer::new();
             superposer.set_atoms(&coord_vec1, &coord_vec2);
             superposer.run();
             // Calculate target metrics

@@ -1,7 +1,10 @@
+pub mod point_to_plane;
 pub mod atom;
 pub mod coordinate;
 pub mod core;
+pub mod distance_graph;
 pub mod feature;
+pub mod hks;
 pub mod io;
 pub mod qcp;
 pub mod kabsch;

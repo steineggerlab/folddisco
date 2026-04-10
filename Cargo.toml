@@ -33,6 +33,9 @@ regex = "1.10.4"
 petgraph = "0.6.4"
 libc = "0.2.155"
 dashmap = { version = "6.1.0", features = ["rayon"] }
+graphalgs = "0.2.0"
+ndarray = { version = "0.17.2", features = ["approx", "blas", "matrixmultiply-threading", "portable-atomic-critical-section", "serde", "rayon"] }
+nalgebra = "0.33.2"
 
 
 [build-dependencies]

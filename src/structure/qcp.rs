@@ -412,6 +412,48 @@ fn trace(matrix: [[f32; 3]; 3]) -> f32 {
     matrix[0][0] + matrix[1][1] + matrix[2][2]
 }
 
+
+fn point_to_plane_distance(
+    ca_ref: [f32; 3],     // Cα position in the reference
+    cb_ref: [f32; 3],     // Cβ position in the reference
+    ca_target: [f32; 3],  // Cα position in the target
+    cb_target: [f32; 3],  // Cβ position in the target
+) -> f32 {
+
+    // Calculate the normal vector for the target (CA→CB)
+    let np: [f32; 3] = [
+        cb_target[0] - ca_target[0],
+        cb_target[1] - ca_target[1],
+        cb_target[2] - ca_target[2],
+    ];
+
+    // Calculate the normal vector for the reference (CA→CB)
+    let nq: [f32; 3] = [
+        cb_ref[0] - ca_ref[0],
+        cb_ref[1] - ca_ref[1],
+        cb_ref[2] - ca_ref[2],
+    ];
+
+    // Point-to-point distance (Euclidean distance)
+    let pq = [
+        cb_ref[0] - cb_target[0],
+        cb_ref[1] - cb_target[1],
+        cb_ref[2] - cb_target[2],
+    ];
+    
+    // min((p - q) * (np + nq))2 
+    // based on "A symmetric objective function for icp"
+    let np_plus_nq = [
+        np[0] + nq[0],
+        np[1] + nq[1],
+        np[2] + nq[2],
+    ];
+
+    (pq[0] * np_plus_nq[0] + pq[1] * np_plus_nq[1] + pq[2] * np_plus_nq[2]).powi(2)
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;

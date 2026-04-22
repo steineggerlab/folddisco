@@ -17,7 +17,9 @@ use crate::controller::sort::{MatchSortStrategy, StructureSortStrategy};
 use crate::cli::*;
 use crate::controller::io::{
     read_compact_structure, 
-    check_and_get_indices, get_lookup_and_type,
+    check_and_get_indices,
+    get_lookup_and_type,
+    resolve_tid_path_from_index_prefix,
 };
 use crate::controller::query::{
     make_query_map, parse_threshold_string
@@ -411,9 +413,17 @@ pub fn query_pdb(env: AppArgs) {
                 // IF retrieve is true, retrieve matching residues
                 if !skip_match {
                     measure_time!(query_count_vec.par_iter_mut().for_each(|(_, v)| {
+                        let joined_path;
+                        let resolved_tid: &str = if std::path::Path::new(&v.tid).is_file() {
+                            &v.tid
+                        } else {
+                            joined_path = resolve_tid_path_from_index_prefix(&v.tid, &index_prefix);
+                            &joined_path
+                        };
+                        
                         #[cfg(not(feature = "foldcomp"))]
                         let retrieval_result = retrieval_wrapper(
-                            &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                            resolved_tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                             hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                             &pdb_query_map, &query_structure, &query_indices,
                             &aa_dist_map, ca_dist_threshold, partial_fit
@@ -429,7 +439,7 @@ pub fn query_pdb(env: AppArgs) {
                             )
                         } else {
                             retrieval_wrapper(
-                                &v.tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
+                                resolved_tid, MIN_CONNECTED_COMPONENT_SIZE, &pdb_query,
                                 hash_type, num_bin_dist, num_bin_angle, multiple_bin, dist_cutoff,
                                 &pdb_query_map, &query_structure, &query_indices,
                                 &aa_dist_map, ca_dist_threshold, partial_fit,

@@ -469,6 +469,65 @@ pub fn default_index_path(input_path: &str) -> String {
 }
 
 
+fn extract_tail_from_anchor(path: &std::path::Path, anchor: &str) -> Option<std::path::PathBuf> {
+    if anchor.is_empty() {
+        return None;
+    }
+
+    let mut tail_from_anchor: Option<std::path::PathBuf> = None;
+    for component in path.components() {
+        if component.as_os_str() == std::ffi::OsStr::new(anchor) {
+            tail_from_anchor = Some(std::path::PathBuf::from(component.as_os_str()));
+        } else if let Some(ref mut tail) = tail_from_anchor {
+            tail.push(component.as_os_str());
+        }
+    }
+    tail_from_anchor
+}
+
+pub fn resolve_tid_path_from_index_prefix(tid: &str, index_prefix: &str) -> String {
+    let tid_path = std::path::Path::new(tid);
+    if tid_path.is_file() {
+        return tid.to_string();
+    }
+
+    let index_prefix_path = std::path::Path::new(index_prefix);
+    let index_base_dir = index_prefix_path.parent().unwrap_or(std::path::Path::new(""));
+    let index_prefix_name = index_prefix_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    let anchor_dir_name = index_prefix_name
+        .strip_suffix("_folddisco")
+        .unwrap_or(index_prefix_name);
+
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+
+    if let Some(tail) = extract_tail_from_anchor(tid_path, anchor_dir_name) {
+        candidates.push(index_base_dir.join(tail));
+    }
+
+    if !anchor_dir_name.is_empty() {
+        candidates.push(index_base_dir.join(anchor_dir_name).join(tid_path));
+    }
+
+    candidates.push(index_base_dir.join(tid_path));
+
+    for candidate in &candidates {
+        if candidate.is_file() {
+            return candidate.to_string_lossy().to_string();
+        }
+    }
+
+    candidates
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| index_base_dir.join(tid_path))
+        .to_string_lossy()
+        .to_string()
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;

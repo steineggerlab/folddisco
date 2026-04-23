@@ -35,15 +35,15 @@ pub fn hash_vec_to_aa_pairs(hash_vec: &Vec<GeometricHash>) -> HashSet<(u32, u32)
 }
 
 
-pub fn res_vec_as_string(res_vec: &Vec<((u8, u8), (u64, u64))>) -> String {
+pub fn res_vec_as_string(res_vec: &Vec<((String, String), (u64, u64))>) -> String {
     let mut output = String::new();
     // Merge chain and residue number. Commas separate each pair
     for (k, (i, j)) in res_vec.iter().enumerate() {
         // If last element, don't add comma
         if k == res_vec.len() - 1 {
-            output.push_str(&format!("{}{}-{}{}", i.0 as char, j.0, i.1 as char, j.1));
+            output.push_str(&format!("{}_{}-{}_{}", i.0, j.0, i.1, j.1));
         } else {
-            output.push_str(&format!("{}{}-{}{},", i.0 as char, j.0, i.1 as char, j.1));
+            output.push_str(&format!("{}_{}-{}_{},", i.0, j.0, i.1, j.1));
         }
     }
     output
@@ -156,11 +156,11 @@ pub fn retrieve_with_prefilter(
 }
 
 
-pub fn get_chain_and_res_ind(compact: &CompactStructure, i: usize) -> (u8, u64) {
-    (compact.chain_per_residue[i], compact.residue_serial[i])
+pub fn get_chain_and_res_ind(compact: &CompactStructure, i: usize) -> (String, u64) {
+    (compact.chain_per_residue[i].clone(), compact.residue_serial[i])
 }
-pub fn res_index_to_char(chain: u8, res_ind: u64) -> String {
-    format!("{}{}", chain as char, res_ind)
+pub fn res_index_to_char(chain: &str, res_ind: u64) -> String {
+    format!("{}_{}", chain, res_ind)
 }
 
 #[cfg(feature = "foldcomp")]
@@ -256,10 +256,10 @@ pub fn retrieval_wrapper_for_foldcompdb(
             count_map.clear();
             if let Some(&retrieved_index) = query_to_retrieved.get(&i) {
                 let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_index);
-                res_vec_from_hash.push(Some((chain, res_ind)));
-                
+                res_vec_from_hash.push(Some((chain.clone(), res_ind)));
+
                 if !retrieved_indices_scanned_set.contains(&retrieved_index) {
-                    res_vec.push(Some((chain, res_ind)));
+                    res_vec.push(Some((chain.clone(), res_ind)));
                     query_indices_scanned.push(i);
                     retrieved_indices_scanned.push(retrieved_index);
                     retrieved_indices_scanned_set.insert(retrieved_index);
@@ -268,7 +268,7 @@ pub fn retrieval_wrapper_for_foldcompdb(
                     // This case should be rare, so we keep it simple
                     if let Some(prev_pos) = retrieved_indices_scanned.iter().position(|&x| x == retrieved_index) {
                         res_vec[prev_pos] = None;
-                        res_vec.push(Some((chain, res_ind)));
+                        res_vec.push(Some((chain.clone(), res_ind)));
                         query_indices_scanned.remove(prev_pos);
                         retrieved_indices_scanned.remove(prev_pos);
                         retrieved_indices_scanned_set.remove(&retrieved_index);
@@ -455,10 +455,10 @@ pub fn retrieval_wrapper(
             count_map.clear();
             if let Some(&retrieved_index) = query_to_retrieved.get(&i) {
                 let (chain, res_ind) = get_chain_and_res_ind(&compact, retrieved_index);
-                res_vec_from_hash.push(Some((chain, res_ind)));
-                
+                res_vec_from_hash.push(Some((chain.clone(), res_ind)));
+
                 if !retrieved_indices_scanned_set.contains(&retrieved_index) {
-                    res_vec.push(Some((chain, res_ind)));
+                    res_vec.push(Some((chain.clone(), res_ind)));
                     query_indices_scanned.push(i);
                     retrieved_indices_scanned.push(retrieved_index);
                     retrieved_indices_scanned_set.insert(retrieved_index);
@@ -467,7 +467,7 @@ pub fn retrieval_wrapper(
                     // This case should be rare, so we keep it simple
                     if let Some(prev_pos) = retrieved_indices_scanned.iter().position(|&x| x == retrieved_index) {
                         res_vec[prev_pos] = None;
-                        res_vec.push(Some((chain, res_ind)));
+                        res_vec.push(Some((chain.clone(), res_ind)));
                         query_indices_scanned.remove(prev_pos);
                         retrieved_indices_scanned.remove(prev_pos);
                         retrieved_indices_scanned_set.remove(&retrieved_index);
@@ -843,7 +843,7 @@ mod tests {
     fn test_retrieval_wrapper() {
         let path = String::from("data/serine_peptidases/4cha.pdb");
         let query_string = "B57,B102,C195";
-        let (query_residues, aa_substitutions) = parse_query_string(query_string, b'A');
+        let (query_residues, aa_substitutions) = parse_query_string(query_string, "A");
         let hash_type = HashType::PDBTrRosetta;
         let nbin_dist = 16;
         let nbin_angle = 4;

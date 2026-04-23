@@ -206,7 +206,7 @@ fn expand_and_insert(
 }
 
 pub fn make_query_map(
-    path: &String, query_residues: &Vec<(u8, u64)>, hash_type: HashType, 
+    path: &String, query_residues: &Vec<(String, u64)>, hash_type: HashType,
     nbin_dist: usize, nbin_angle: usize, multiple_bin: &Option<Vec<(usize, usize)>>,
     dist_thresholds: &Vec<f32>, angle_thresholds: &Vec<f32>,
     amino_acid_substitutions: &Vec<Option<Vec<u8>>>, distance_cutoff: f32, serial_query: bool,
@@ -215,10 +215,10 @@ pub fn make_query_map(
 ) -> (HashMap<GeometricHash, ((usize, usize), bool, f32)>, Vec<usize>, HashMap<(u8, u8), Vec<(f32, usize)>>) {
 
     let (compact, _) = read_compact_structure(path).expect("Failed to read compact structure");
-    
+
     let mut hash_collection = HashMap::default();
     let mut observed_distance_map: HashMap<(u8, u8), Vec<(f32, usize)>> = HashMap::default();
-    
+
     // Convert residue indices to vector indices
     let mut indices = Vec::new();
     let mut query_residues = query_residues.clone();
@@ -227,7 +227,7 @@ pub fn make_query_map(
     if query_residues.is_empty() {
         // Iterate over all residues and set to query_residues
         for i in 0..compact.num_residues {
-            let chain = compact.chain_per_residue[i];
+            let chain = compact.chain_per_residue[i].clone();
             let residue_index = compact.residue_serial[i];
             query_residues.push((chain, residue_index));
             amino_acid_substitutions.push(None);
@@ -235,9 +235,9 @@ pub fn make_query_map(
     }
 
     let mut substitution_map: HashMap<usize, Vec<u8>> = HashMap::default();
-    
+
     for (i, (chain, ri)) in query_residues.iter().enumerate() {
-        let index = if serial_query { Some(*ri as usize) } else { compact.get_index(&chain, &ri) };
+        let index = if serial_query { Some(*ri as usize) } else { compact.get_index(chain, ri) };
         if let Some(index) = index {
             // convert u8 array to string
             let _residue: String = compact.get_res_name(index).iter().map(|&c| c as char).collect();
@@ -328,29 +328,36 @@ pub fn make_query_map(
     (hash_collection, indices, observed_distance_map)
 }
 
-pub fn parse_query_string(query_string: &str, mut default_chain: u8) -> (Vec<(u8, u64)>, Vec<Option<Vec<u8>>>) {
+pub fn parse_query_string(query_string: &str, default_chain: &str) -> (Vec<(String, u64)>, Vec<Option<Vec<u8>>>) {
     let mut query_residues = Vec::new();
     let mut amino_acid_substitutions = Vec::new();
 
     if query_string.is_empty() {
         return (query_residues, amino_acid_substitutions);
     }
-    if !default_chain.is_ascii_alphabetic() {
-        default_chain = b'A';
-    }
+    let default_chain = if default_chain.is_empty() {
+        "A"
+    } else {
+        default_chain
+    };
     // Remove whitespace
     let query_string = query_string.replace(" ", "");
     for segment in query_string.split(',') {
-        let (chain, rest) = if let Some(first) = segment.chars().next() {
-            // NOTE: 2025-01-15 15:55:19
-            // Current querying doesn't support chain ID with more than 1 character
+        // Parse chain and residue. Supports:
+        //   "AA_250"  — explicit separator (any chain length)
+        //   "A250"    — legacy single-char chain (backward compat)
+        //   "250"     — no chain, use default
+        let (chain, rest) = if let Some(sep_pos) = segment.find('_') {
+            (segment[..sep_pos].to_string(), &segment[sep_pos + 1..])
+        } else if let Some(first) = segment.chars().next() {
             if first.is_ascii_alphabetic() {
-                (first as u8, &segment[1..])
+                // Legacy: single leading alpha char is the chain
+                (segment[..1].to_string(), &segment[1..])
             } else {
-                (default_chain, segment)
+                (default_chain.to_string(), segment)
             }
         } else {
-            (default_chain, segment)
+            (default_chain.to_string(), segment)
         };
 
         let (range_part, subst_part) = match rest.split_once(':') {
@@ -370,7 +377,7 @@ pub fn parse_query_string(query_string: &str, mut default_chain: u8) -> (Vec<(u8
             let start = start_str.parse::<u64>().expect("Invalid start residue");
             let end = end_str.parse::<u64>().expect("Invalid end residue");
             for r in start..=end {
-                query_residues.push((chain, r));
+                query_residues.push((chain.clone(), r));
                 amino_acid_substitutions.push(subst_part.clone());
             }
         } else {
@@ -394,13 +401,9 @@ mod tests {
     fn test_make_query_map() {
         let path= String::from("query/1G2F.pdb");
         let query_residues = vec![
-            (b'F', 207), (b'F', 212), (b'F', 225)
+            ("F".to_string(), 207), ("F".to_string(), 212), ("F".to_string(), 225)
         ];
         let amino_acid_substitutions = vec![None; query_residues.len()];
-        // let path = String::from("data/serine_peptidases/1aq2.pdb");
-        // let query_residues = vec![
-        //     (b'A', 250), (b'A', 232), (b'A', 269)
-        // ];
         let hash_type = HashType::PDBTrRosetta;
         let (hash_collection, _index_found, _observed_dist_map) = make_query_map(
             &path, &query_residues, hash_type, 16, 4, &None,
@@ -425,45 +428,87 @@ mod tests {
     #[test]
     fn test_parse_query_string() {
         let query_string = "A250,B232,C269";
-        let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'B', 232), (b'C', 269)], vec![None, None, None]));
+        let query_residues = parse_query_string(query_string, "A");
+        assert_eq!(query_residues, (vec![("A".into(), 250), ("B".into(), 232), ("C".into(), 269)], vec![None, None, None]));
     }
     #[test]
     fn test_parse_query_string_with_space() {
         let query_string = "A250, A232, A269";
-        let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![None, None, None]));
+        let query_residues = parse_query_string(query_string, "A");
+        assert_eq!(query_residues, (vec![("A".into(), 250), ("A".into(), 232), ("A".into(), 269)], vec![None, None, None]));
     }
-    
+
     #[test]
     fn test_parse_query_string_with_space_and_no_chain() {
         let query_string = "250, 232, 269";
-        let query_residues = parse_query_string(query_string, b'A');
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![None, None, None]));
+        let query_residues = parse_query_string(query_string, "A");
+        assert_eq!(query_residues, (vec![("A".into(), 250), ("A".into(), 232), ("A".into(), 269)], vec![None, None, None]));
     }
 
     #[test]
     fn test_parse_query_string_with_aa_substitution() {
         let query_string = "A250:R,B232:K,C269:QK";
-        let query_residues = parse_query_string(query_string, b'A');
+        let query_residues = parse_query_string(query_string, "A");
         // R = 1, K = 11, Q = 5
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'B', 232), (b'C', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]));
+        assert_eq!(query_residues, (vec![("A".into(), 250), ("B".into(), 232), ("C".into(), 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]));
         let query_string = "250:R,232:K,269:QK";
-        let query_residues = parse_query_string(query_string, b'A');
+        let query_residues = parse_query_string(query_string, "A");
         // R = 1, K = 11, Q = 5
-        assert_eq!(query_residues, (vec![(b'A', 250), (b'A', 232), (b'A', 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]));
+        assert_eq!(query_residues, (vec![("A".into(), 250), ("A".into(), 232), ("A".into(), 269)], vec![Some(vec![1]), Some(vec![11]), Some(vec![5, 11])]));
     }
     #[test]
     fn test_parse_query_string_with_range() {
+        // Legacy single-char format still works for ranges
         let query_string = "A250-252,B232-234,C269:Q";
-        let query_residues = parse_query_string(query_string, b'A');
+        let query_residues = parse_query_string(query_string, "A");
         assert_eq!(query_residues, (vec![
-            (b'A', 250), (b'A', 251), (b'A', 252), 
-            (b'B', 232), (b'B', 233), (b'B', 234), 
-            (b'C', 269),
+            ("A".into(), 250), ("A".into(), 251), ("A".into(), 252),
+            ("B".into(), 232), ("B".into(), 233), ("B".into(), 234),
+            ("C".into(), 269),
         ], vec![None, None, None, None, None, None, Some(vec![5])]));
+        // Same with underscore separator
+        let query_string = "A_250-252,B_232-234,C_269:Q";
+        let query_residues2 = parse_query_string(query_string, "A");
+        assert_eq!(query_residues, query_residues2);
     }
     
+    #[test]
+    fn test_parse_query_string_multi_char_chain() {
+        // Multi-character chain IDs with underscore separator
+        let query_string = "AA_250,AB_232,AC_269";
+        let query_residues = parse_query_string(query_string, "A");
+        assert_eq!(query_residues, (vec![
+            ("AA".into(), 250), ("AB".into(), 232), ("AC".into(), 269),
+        ], vec![None, None, None]));
+    }
+
+    #[test]
+    fn test_parse_query_string_separator_single_char() {
+        // Single-char chains work with or without underscore separator
+        let with_sep = parse_query_string("A_250,B_232", "A");
+        let without_sep = parse_query_string("A250,B232", "A");
+        assert_eq!(with_sep, without_sep);
+    }
+
+    #[test]
+    fn test_parse_query_string_multi_char_chain_with_range() {
+        let query_string = "AA_250-252,AB_232";
+        let query_residues = parse_query_string(query_string, "A");
+        assert_eq!(query_residues, (vec![
+            ("AA".into(), 250), ("AA".into(), 251), ("AA".into(), 252),
+            ("AB".into(), 232),
+        ], vec![None, None, None, None]));
+    }
+
+    #[test]
+    fn test_parse_query_string_multi_char_chain_with_substitution() {
+        let query_string = "AA_250:R,AB_232:K";
+        let query_residues = parse_query_string(query_string, "A");
+        assert_eq!(query_residues, (vec![
+            ("AA".into(), 250), ("AB".into(), 232),
+        ], vec![Some(vec![1]), Some(vec![11])]));
+    }
+
     #[test]
     fn test_add_shifted_hashes() {
         let mut hash_collection = HashMap::default();

@@ -1,5 +1,12 @@
 use crate::structure::coordinate::{Coordinate, CoordinateVector};
 
+/// Low-level atom representation. Must stay `#[repr(C)]` with this exact field layout
+/// for zero-copy FFI compatibility with foldcomp's `atom_t` (see `fcz.rs`).
+///
+/// NOTE: `chain` is a single byte here for FFI layout reasons. The full chain name
+/// (which may be multi-character for CIF structures) is carried separately via
+/// `Structure::update`'s `chain_name` parameter and stored in `AtomVector.chain` as `String`.
+/// Do not rely on `Atom.chain` for chain identity outside the foldcomp FFI path.
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct Atom {
@@ -77,7 +84,7 @@ pub struct AtomVector {
     pub atom_serial: Vec<u64>,
     pub res_name: Vec<[u8; 3]>,
     pub res_serial: Vec<u64>,
-    pub chain: Vec<u8>,
+    pub chain: Vec<String>,
     pub b_factor: Vec<f32>,
 }
 
@@ -103,7 +110,7 @@ impl AtomVector {
         atom_serial: u64,
         res_name: [u8; 3],
         res_serial: u64,
-        chain: u8,
+        chain: String,
         b_factor: f32,
     ) {
         self.atom_name.push(atom_name);
@@ -118,7 +125,7 @@ impl AtomVector {
         self.b_factor.push(b_factor);
     }
 
-    pub fn push_atom(&mut self, atom: Atom) {
+    pub fn push_atom(&mut self, atom: Atom, chain_name: String) {
         self.atom_name.push(atom.atom_name);
         self.coordinates.x.push(atom.x);
         self.coordinates.y.push(atom.y);
@@ -127,7 +134,7 @@ impl AtomVector {
         self.atom_serial.push(atom.atom_serial);
         self.res_name.push(atom.res_name);
         self.res_serial.push(atom.res_serial);
-        self.chain.push(atom.chain);
+        self.chain.push(chain_name);
         self.b_factor.push(atom.b_factor);
     }
 
@@ -142,7 +149,7 @@ impl AtomVector {
             // res_name: self.res_name[index].clone(),
             res_name: self.res_name[index],
             res_serial: self.res_serial[index],
-            chain: self.chain[index],
+            chain: self.chain[index].as_bytes().first().copied().unwrap_or(b' '),
             b_factor: self.b_factor[index],
         }
     }
@@ -194,7 +201,7 @@ impl AtomVector {
         let mut nth_vector = AtomVector::new();
         for i in 0..self.len() {
             if self.get_res_serial(i) as usize == n + 1 {
-                nth_vector.push_atom(self.get(i));
+                nth_vector.push_atom(self.get(i), self.chain[i].clone());
             }
         }
         nth_vector

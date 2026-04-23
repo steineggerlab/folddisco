@@ -97,7 +97,7 @@ impl Reader<File> {
 
 fn parse_mmcif_block_into_structure(input: &DataBlock, structure: &mut Structure) {
     let mut errors: Vec<PDBError> = Vec::new();
-    let mut record = (b' ', 0);
+    let mut record = (String::new(), 0u64);
     for item in &input.items {
         let result = match item {
             Item::DataItem(di) => match di {
@@ -135,7 +135,7 @@ fn flatten_result<T, E>(value: Result<Result<T, E>, E>) -> Result<T, E> {
 
 /// Parse a loop containing atomic data
 fn parse_atoms(
-    input: &Loop, structure: &mut Structure, record: &mut (u8, u64)
+    input: &Loop, structure: &mut Structure, record: &mut (String, u64)
 ) -> Option<Vec<PDBError>> {
     #[derive(Eq, PartialEq)]
     /// The mode of a column
@@ -256,8 +256,8 @@ fn parse_atoms(
             parse_column!(get_isize, ATOM_SEQ_ID)
                 .expect("Residue number should be provided")
         }) as u64;
-        let chain_name = parse_column!(get_one_char, ATOM_AUTH_ASYM_ID).unwrap_or_else(|| {
-            parse_column!(get_one_char, ATOM_ASYM_ID).expect("Chain name should be provided")
+        let chain_name: String = parse_column!(get_text_string, ATOM_AUTH_ASYM_ID).unwrap_or_else(|| {
+            parse_column!(get_text_string, ATOM_ASYM_ID).expect("Chain name should be provided")
         });
         let pos_x = parse_column!(get_f32, ATOM_X).expect("Atom X position should be provided");
         let pos_y = parse_column!(get_f32, ATOM_Y).expect("Atom Y position should be provided");
@@ -275,12 +275,13 @@ fn parse_atoms(
         //     true
         // };
 
+        let chain_byte = chain_name.as_bytes().first().copied().unwrap_or(b' ');
         let atom = Atom::new(
             pos_x, pos_y, pos_z, name, id,
-            chain_name, residue_name, residue_number, b_factor
+            chain_byte, residue_name, residue_number, b_factor
         );
-        
-        structure.update(atom, record);
+
+        structure.update(atom, record, chain_name);
     }
 
     if !errors.is_empty() {
@@ -335,21 +336,14 @@ fn get_three_char_array(
     }
 }
 
-fn get_one_char(
+fn get_text_string(
     value: &Value,
     _context: &Context,
     _column: Option<&str>,
-) -> Result<Option<u8>, PDBError> {
-    let text = match value {
-        Value::Text(t) => t.clone(),
-        Value::Numeric(n) => format!("{n}"),
-        _ => return Ok(None),
-    };
-    match text.as_bytes().len() {
-        1 => Ok(Some(text.as_bytes()[0])),
-        // Multi-character chain IDs (e.g. "10" in PDB 9A1O) can't be
-        // represented as a single byte. Return None so the caller can
-        // fall back to label_asym_id (which is typically single-char).
+) -> Result<Option<String>, PDBError> {
+    match value {
+        Value::Text(t) => Ok(Some(t.clone())),
+        Value::Numeric(n) => Ok(Some(format!("{n}"))),
         _ => Ok(None),
     }
 }
@@ -522,22 +516,21 @@ mod tests {
     }
 
     #[test]
-    fn test_get_one_char_numeric() {
+    fn test_get_text_string_numeric() {
         let ctx = Context::show("test");
         // Single-digit chain ID
         let val = Value::Numeric(1.0);
-        let result = get_one_char(&val, &ctx, None).unwrap();
-        assert_eq!(result, Some(b'1'));
+        let result = get_text_string(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some("1".to_string()));
     }
 
     #[test]
-    fn test_get_one_char_numeric_multi_digit() {
+    fn test_get_text_string_numeric_multi_digit() {
         let ctx = Context::show("test");
-        // Multi-digit chain ID like "10" (PDB 9A1O) can't be represented
-        // as a single byte — returns None so caller falls back to label_asym_id
+        // Multi-digit chain ID like "10" (PDB 9A1O) — now preserved as full string
         let val = Value::Numeric(10.0);
-        let result = get_one_char(&val, &ctx, None).unwrap();
-        assert_eq!(result, None);
+        let result = get_text_string(&val, &ctx, None).unwrap();
+        assert_eq!(result, Some("10".to_string()));
     }
 }
 

@@ -72,6 +72,7 @@ Download pre-built index files:
 - [Swiss-Prot](https://opendata.mmseqs.org/folddisco/afdb_swissprot_v4_folddisco.tar.lz4)
 - [AFDB50](https://opendata.mmseqs.org/folddisco/afdb50_v4_folddisco.tar.lz4) 
 - [ESM30](https://opendata.mmseqs.org/folddisco/highquality_clust30_folddisco.tar.lz4)
+- [PDB](https://opendata.mmseqs.org/folddisco/pdb_folddisco.tar.lz4)
 - To get the old version of Folddisco indices, please **visit** https://opendata.mmseqs.org/folddisco/
   - `*.tar.gz` indices are legacy indices (version 1.0), which are not compatible with version 2.0. 
     Please use `*.tar.lz4` indices for version 2.0.

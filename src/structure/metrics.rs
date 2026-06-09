@@ -398,10 +398,10 @@ mod tests {
         let target_zinc_structure = target_reader.read_structure().unwrap().to_compact();
         // Get reference coordinates: F207,F212,F225,F229
         let reference_indices = vec![
-            query_zinc_structure.get_index(&b'F', &207).unwrap(),
-            query_zinc_structure.get_index(&b'F', &212).unwrap(),
-            query_zinc_structure.get_index(&b'F', &225).unwrap(),
-            query_zinc_structure.get_index(&b'F', &229).unwrap(),
+            query_zinc_structure.get_index("F", &207).unwrap(),
+            query_zinc_structure.get_index("F", &212).unwrap(),
+            query_zinc_structure.get_index("F", &225).unwrap(),
+            query_zinc_structure.get_index("F", &229).unwrap(),
         ];
         println!("Reference indices: {:?}", reference_indices);
         let reference_coords = vec![
@@ -418,10 +418,10 @@ mod tests {
         
         // Get target coordinates: A257,A262,A275,A279
         let target_indices = vec![
-            target_zinc_structure.get_index(&b'A', &257).unwrap(),
-            target_zinc_structure.get_index(&b'A', &262).unwrap(),
-            target_zinc_structure.get_index(&b'A', &275).unwrap(),
-            target_zinc_structure.get_index(&b'A', &279).unwrap(),
+            target_zinc_structure.get_index("A", &257).unwrap(),
+            target_zinc_structure.get_index("A", &262).unwrap(),
+            target_zinc_structure.get_index("A", &275).unwrap(),
+            target_zinc_structure.get_index("A", &279).unwrap(),
         ];
         println!("Target indices: {:?}", target_indices);
         let target_coords = vec![
@@ -463,10 +463,10 @@ mod tests {
         let target_zinc_structure = target_reader.read_structure().unwrap().to_compact();
         // Get reference coordinates: F205-214,F223-232
         let mut reference_indices = (207..213).map(|res_num| {
-            query_zinc_structure.get_index(&b'F', &res_num).unwrap()
+            query_zinc_structure.get_index("F", &res_num).unwrap()
         }).collect::<Vec<usize>>();
         reference_indices.extend((225..230).map(|res_num| {
-            query_zinc_structure.get_index(&b'F', &res_num).unwrap()
+            query_zinc_structure.get_index("F", &res_num).unwrap()
         }));
         println!("Reference indices: {:?}", reference_indices);
         let reference_coords = reference_indices.iter().flat_map(|&idx| {
@@ -480,10 +480,10 @@ mod tests {
         
         // Get target coordinates: A255-260,A273-282
         let mut target_indices = (256..262).map(|res_num| {
-            target_zinc_structure.get_index(&b'A', &res_num).unwrap()
+            target_zinc_structure.get_index("A", &res_num).unwrap()
         }).collect::<Vec<usize>>();
         target_indices.extend((275..280).map(|res_num| {
-            target_zinc_structure.get_index(&b'A', &res_num).unwrap()
+            target_zinc_structure.get_index("A", &res_num).unwrap()
         }));
         println!("Target indices: {:?}", target_indices);
         let target_coords = target_indices.iter().flat_map(|&idx| {
@@ -521,10 +521,10 @@ mod tests {
         let target_zinc_structure = target_reader.read_structure().unwrap().to_compact();
         // Get reference coordinates: F205,F212,F225,F229
         let reference_indices = vec![
-            query_zinc_structure.get_index(&b'F', &205).unwrap(), // Outlier
-            query_zinc_structure.get_index(&b'F', &212).unwrap(),
-            query_zinc_structure.get_index(&b'F', &225).unwrap(),
-            query_zinc_structure.get_index(&b'F', &229).unwrap(),
+            query_zinc_structure.get_index("F", &205).unwrap(), // Outlier
+            query_zinc_structure.get_index("F", &212).unwrap(),
+            query_zinc_structure.get_index("F", &225).unwrap(),
+            query_zinc_structure.get_index("F", &229).unwrap(),
         ];
         println!("Reference indices: {:?}", reference_indices);
         let reference_coords = vec![
@@ -541,10 +541,10 @@ mod tests {
         
         // Get target coordinates: A257,A262,A275,A279
         let target_indices = vec![
-            target_zinc_structure.get_index(&b'A', &257).unwrap(),
-            target_zinc_structure.get_index(&b'A', &262).unwrap(),
-            target_zinc_structure.get_index(&b'A', &275).unwrap(),
-            target_zinc_structure.get_index(&b'A', &279).unwrap(),
+            target_zinc_structure.get_index("A", &257).unwrap(),
+            target_zinc_structure.get_index("A", &262).unwrap(),
+            target_zinc_structure.get_index("A", &275).unwrap(),
+            target_zinc_structure.get_index("A", &279).unwrap(),
         ];
         println!("Target indices: {:?}", target_indices);
         let target_coords = vec![

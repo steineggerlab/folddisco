@@ -1,5 +1,8 @@
 use crate::structure::atom::Atom;
 
+/// PDB fixed-width format column range for chain ID (single character, column 22)
+pub const PDB_CHAIN_ID_COL: std::ops::Range<usize> = 21..22;
+
 pub fn parse_line(line: &String) -> Result<Atom, &str> {
     // Not failing due to line length
     // Parse line
@@ -8,7 +11,7 @@ pub fn parse_line(line: &String) -> Result<Atom, &str> {
     let z = line[46..54].trim().parse::<f32>();
     let atom_name = parse_atom(&line[12..16]);
     let atom_serial = line[6..11].trim().parse::<u64>();
-    let chain = line[21..22].as_bytes()[0];
+    let chain = line[PDB_CHAIN_ID_COL].as_bytes()[0];
     let res_name = parse_residue(&line[17..20]);
     let res_serial = line[22..26].trim().parse::<u64>();
     // If line contains 60..66, parse b_factor

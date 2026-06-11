@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader, Read};
 use std::path::Path;
 
 use flate2::read::GzDecoder;
@@ -8,6 +8,44 @@ use flate2::read::GzDecoder;
 use super::super::core::*;
 use super::parser::*;
 use super::*;
+
+fn parse_pdb_lines<I>(lines: I) -> Result<Structure, &'static str>
+where
+    I: Iterator<Item = io::Result<String>>,
+{
+    let mut structure = Structure::new();
+    let mut record = (b' ', 0);
+    let mut model = 0;
+
+    // Read each line, parse ATOM records, and keep only the first model.
+    for line in lines {
+        let atomline = line.map_err(|_| "Error reading line")?;
+
+        if model > 1 {
+            // Current version does not support multiple models in one PDB file.
+            break;
+        }
+
+        // Skip short lines (e.g., END) before record slicing.
+        if atomline.len() < 6 {
+            continue;
+        }
+
+        match &atomline[..6] {
+            "MODEL " => {
+                model += 1;
+            }
+            "ATOM  " => {
+                if let Ok(atom) = parse_line(&atomline) {
+                    structure.update(atom, &mut record);
+                }
+            }
+            _ => continue,
+        }
+    }
+
+    Ok(structure)
+}
 
 /// A PDB reader
 #[derive(Debug)]
@@ -36,88 +74,20 @@ impl Reader<File> {
 
     pub fn read_structure(&self) -> Result<Structure, &str> {
         let reader = BufReader::new(&self.reader);
-        let mut structure = Structure::new(); // revise
-        let mut record = (b' ', 0);
-        let mut model = 0;
-        // Reading each line of PDB, parse and build atomvector.
-        for (_idx, line) in reader.lines().enumerate() {
-            if let Ok(atomline) = line {
-                if model > 1 {
-                    // Current version does not support multiple models in one PDB file
-                    break;
-                }
-                // If line is less than 6 characters, skip the line
-                if atomline.len() < 6 {
-                    continue;
-                }
-                match &atomline[..6] {
-                    "MODEL " => {
-                        model += 1;
-                    }
-                    "ATOM  " => {
-                        let atom = parse_line(&atomline);
-                        match atom {
-                            Ok(atom) => {
-                                structure.update(atom, &mut record);
-                            }
-                            Err(_e) => {
-                                continue;
-                            }
-                        }
-                    }
-                    _ => continue,
-                }
-            } else {
-                return Err("Error reading line");
-            };
-        }
-        // println!("{structure:?}");
-        Ok(structure)
+        parse_pdb_lines(reader.lines())
     }
 
     pub fn read_structure_from_gz(&self) -> Result<Structure, &str> {
-        // Load whole file and close the file
+        // Load whole gz file and decode into memory.
         let mut decoder = GzDecoder::new(&self.reader);
         let mut binary = Vec::new();
-        decoder.read_to_end(&mut binary).unwrap();
-        // Close the decoder after flushing
-        decoder.flush().unwrap();
-        // Drop the decoder
-        drop(decoder);
+        decoder
+            .read_to_end(&mut binary)
+            .map_err(|_| "Error reading gz file")?;
 
-        // Create a new Structure
-        let mut structure = Structure::new();
-        let mut record = (b' ', 0);
-        
-        // Read binary as a string. Conver
+        // Parse decoded lines with the same logic as plain PDB reads.
         let reader = BufReader::new(&binary[..]);
-        // Convert to string
-        for (_idx, line) in reader.lines().enumerate() {
-            if let Ok(atomline) = line {
-                match &atomline[..6] {
-                    "ATOM  " => {
-                        let atom = parse_line(&atomline);
-                        match atom {
-                            Ok(atom) => {
-                                structure.update(atom, &mut record);
-                            }
-                            Err(_e) => {
-                                // Conversion error. Jusk skip the line.
-                                // If verbose, print message (NOT IMPLEMENTED)
-                                // println!("Skipping line{}: {}", idx, e);
-                                continue;
-                            }
-                        }
-                    }
-                    _ => continue,
-                }
-            } else {
-                return Err("Error reading line");
-            };
-        }
-        // Drop the binary
-        drop(binary);
-        Ok(structure)
+        parse_pdb_lines(reader.lines())
     }
     
 }
@@ -125,12 +95,55 @@ impl Reader<File> {
 #[cfg(test)]
 mod tests {
     use crate::prelude::load_path;
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
 
     use super::*;
     use std::fs::File;
-    
+    use std::io::Write;
     use std::path::Path;
-    
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn write_temp_file(prefix: &str, ext: &str, contents: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("{}_{}.{}", prefix, unique, ext));
+        std::fs::write(&path, contents).unwrap();
+        path
+    }
+
+    fn write_temp_gz_file(prefix: &str, ext: &str, contents: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("{}_{}.{}", prefix, unique, ext));
+        let file = File::create(&path).unwrap();
+        let mut encoder = GzEncoder::new(file, Compression::default());
+        encoder.write_all(contents.as_bytes()).unwrap();
+        encoder.finish().unwrap();
+        path
+    }
+
+    fn model_test_pdb() -> &'static str {
+        "MODEL        1\n\
+ATOM      1  N   ILE A  77      14.206  47.471   5.277  1.00 45.79           N  \n\
+ATOM      2  CA  ILE A  77      14.689  46.123   5.703  1.00 45.28           C  \n\
+ENDMDL\n\
+MODEL        2\n\
+ATOM      3  N   SER A  78      13.087  44.282   5.538  1.00 50.16           N  \n\
+ATOM      4  CA  SER A  78      11.858  43.505   5.819  1.00 50.17           C  \n\
+ENDMDL\n\
+END\n"
+    }
+
+    fn end_terminated_pdb() -> &'static str {
+        "ATOM      1  N   ILE A  77      14.206  47.471   5.277  1.00 45.79           N  \n\
+ATOM      2  CA  ILE A  77      14.689  46.123   5.703  1.00 45.28           C  \n\
+END\n"
+    }
     
     #[test]
     fn test_read_pdb() {
@@ -197,5 +210,39 @@ mod tests {
             let compact = structure.to_compact();
             println!("{}:{}", pdb_path, compact.num_residues);
         }
+    }
+
+    #[test]
+    fn test_read_pdb_gz_with_end_record() {
+        let plain_path = write_temp_file("folddisco_pdb_end", "pdb", end_terminated_pdb());
+        let gz_path = write_temp_gz_file("folddisco_pdb_end", "pdb.gz", end_terminated_pdb());
+
+        let plain_reader = Reader::new(File::open(&plain_path).unwrap());
+        let plain_compact = plain_reader.read_structure().unwrap().to_compact();
+
+        let gz_reader = Reader::new(File::open(&gz_path).unwrap());
+        let gz_compact = gz_reader.read_structure_from_gz().unwrap().to_compact();
+
+        assert_eq!(plain_compact.num_residues, gz_compact.num_residues);
+
+        std::fs::remove_file(plain_path).unwrap();
+        std::fs::remove_file(gz_path).unwrap();
+    }
+
+    #[test]
+    fn test_plain_and_gz_model_handling_match() {
+        let plain_path = write_temp_file("folddisco_pdb_models", "pdb", model_test_pdb());
+        let gz_path = write_temp_gz_file("folddisco_pdb_models", "pdb.gz", model_test_pdb());
+
+        let plain_reader = Reader::new(File::open(&plain_path).unwrap());
+        let plain_compact = plain_reader.read_structure().unwrap().to_compact();
+
+        let gz_reader = Reader::new(File::open(&gz_path).unwrap());
+        let gz_compact = gz_reader.read_structure_from_gz().unwrap().to_compact();
+
+        assert_eq!(plain_compact.num_residues, gz_compact.num_residues);
+
+        std::fs::remove_file(plain_path).unwrap();
+        std::fs::remove_file(gz_path).unwrap();
     }
 }

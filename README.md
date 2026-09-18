@@ -12,6 +12,8 @@ It is designed to handle large-scale protein databases with efficiency, enabling
 ## Publications
 [Kim H, Kim RS, Mirdita M, Yoon J, Steinegger M. Structural motif search across the protein-universe with Folddisco. Nature Biotechnology, (2026)](https://www.nature.com/articles/s41587-026-03162-9)
 
+What 3.0 changed: [docs/v3_report.md](docs/v3_report.md) ([PDF](docs/folddisco_3.0_report.pdf)).
+
 [![BioConda Install](https://img.shields.io/conda/dn/bioconda/folddisco.svg?style=flag&label=BioConda%20install)](https://anaconda.org/bioconda/folddisco) [![Github All Releases](https://img.shields.io/github/downloads/steineggerlab/folddisco/total.svg)](https://github.com/steineggerlab/folddisco/releases/latest) 
 
 ## Webserver 
@@ -74,8 +76,8 @@ Download pre-built index files:
 - [ESM30](https://opendata.mmseqs.org/folddisco/highquality_clust30_folddisco.tar.lz4)
 - [PDB](https://opendata.mmseqs.org/folddisco/pdb_folddisco.tar.lz4)
 - To get the old version of Folddisco indices, please **visit** https://opendata.mmseqs.org/folddisco/
-  - `*.tar.gz` indices are legacy indices (version 1.0), which are not compatible with version 2.0. 
-    Please use `*.tar.lz4` indices for version 2.0.
+  - `*.tar.gz` indices are legacy indices (version 1.0), which are not compatible with version 2.0 or later.
+    Please use `*.tar.lz4` indices; version 3.0 reads them unchanged.
   - **AFDB50** (`afdb50_v4_folddisco*` + `afdb50_v4*`)
   - **ESM30** (`highquality_clust30_folddisco*` + `highquality_clust30*`)
 
@@ -99,8 +101,15 @@ folddisco query -i index/serine_peptidases_folddisco -p query/4CHA.pdb -q B57,B1
 ```
 #### Residue & motif syntax
 We allow to customize the query motif using some motif syntax.
-* **Residues:** `B57` = chain `B`, residue number `57`. Ranges are inclusive: `1-10`.
+* **Residues:** `B57` = chain `B`, residue number `57`. Ranges are inclusive and may
+  repeat the chain on the end: `1-10`, `F204-215` and `F204-F215` all work. A range
+  cannot span two chains.
 * **Lists:** comma-separated: `B57,B102,C195`.
+* **Multi-character and numeric chain IDs:** large mmCIF entries use chain IDs
+  such as `AA` or `10`, which cannot be pasted straight onto a residue number
+  (`AA250` and `10250` are unreadable). Separate them with `_`:
+  `-q 10_250,AA_312,AA_318`. The separator is optional for ordinary
+  single-letter chains, so `B57` and `B_57` mean the same thing.
 * **Substitutions:** `:<ALT>` allows alternatives:
   * Single amino acid: `164:H`
   * Set: `247:ND` (Asp or Asn)
@@ -110,7 +119,8 @@ We allow to customize the query motif using some motif syntax.
     * `n`: negatively charged (Asp, Glu)
     * `h`: polar (Asn, Gln, Ser, Thr, Tyr)
     * `b`: hydrophobic (Ala, Cys, Gly, Ile, Leu, Met, Phe, Pro, Val)
-    * `a`: aromatic (His, Phe, Trp, Ty)
+    * `a`: aromatic (His, Phe, Trp, Tyr)
+  * Scheme: `102:*` uses the `--aa-subst` scheme (default `blosum62`) for the observed residue
 
 ### Searching Multiple Motifs (Batch Mode)
 To search for many motifs at once, you can provide a single query file to the **`-q`** flag (and omit the `-p` flag).
@@ -133,8 +143,13 @@ folddisco query -i <INDEX> -p <QUERY_PDB> [-q <QUERY_RESIDUES> -d <DISTANCE_THRE
 ```
 
 **Important parameter:**
-- `-d`: Distance threshold in Å increase sensitivity during the prefilter (default: 0.5)
-- `-a`: Angle threshold in degrees, increase sensitivity during the prefilter (default: 5)
+- `-d`: Distance tolerance in Å, increase sensitivity during the prefilter (default: 0.5)
+- `-a`: Angle tolerance in degrees, increase sensitivity during the prefilter (default: 5)
+- `--sensitive`: Wider, slower search for deformed motifs (see [Sensitive search](#sensitive-search))
+- `--expand-radius`: How many geometric features may fall in a neighbouring bin at once (default: 1)
+- `--confident`: Keep only confident, full matches (see [Confident hits](#confident-hits))
+- `--aa-subst`: Substitute every query residue by scheme (see [Amino acid substitution](#amino-acid-substitution))
+- `--novelty-mode`: One KNOWN/PARTIAL/NOVEL row per query instead of a hit list (see [Novelty screening](#novelty-screening))
 - `--skip-match`: Skips residue matching and RMSD calculation (prefilter only, much faster with same ranking)
 - `--top`: Only report top N hits from the prefilter (controls speed and size of result)
 - `-t`: Threads used for search
@@ -142,7 +157,7 @@ folddisco query -i <INDEX> -p <QUERY_PDB> [-q <QUERY_RESIDUES> -d <DISTANCE_THRE
 
 #### Example Querying
 ```bash
-# Search with default settings. This will print out matching motifs with sorting by RMSD.
+# Search with default settings (sorted by IDF, then RMSD)
 folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6
 folddisco query -p query/1G2F.pdb -q F207,F212,F225,F229 -i index/h_sapiens_folddisco -d 0.5 -a 5 -t 6
 folddisco query -p query/1LAP.pdb -q 250,255,273,332,334 -i index/h_sapiens_folddisco --skip-match -t 6 # Skip residue matching
@@ -174,41 +189,141 @@ folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --con
 folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 3 --top 1000 --per-structure --skip-match
 
 # Print top 100 structures with sorting by score
-folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by-score
-folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 4 --top 100 --sort-by-score --per-structure --skip-match
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --top 100 --per-structure --sort-by idf
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 --covered-node 4 --top 100 --sort-by idf --per-structure --skip-match
 
 # Comprehensive filtering with multiple criteria
-folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 10.0 --ca-distance 1.0 --covered-node-ratio 0.3 --max-node-ratio 0.35 --rmsd 5.0 --tm-score 0.2 --gdt-ts 0.25 --gdt-ha 0.15 --chamfer-distance 5.5 --hausdorff-distance 12.0 --sort-by node_count,gdt_ts,rmsd,idf --format-output tid,node_count,gdt_ts,rmsd,idf,matching_residues,query_residues
+folddisco query -q query/zinc_finger.txt -i index/h_sapiens_folddisco -t 6 -d 0.5 -a 10.0 --ca-distance 1.0 --covered-node-ratio 0.3 --max-node-ratio 0.35 --rmsd 5.0 --tm-score 0.2 --gdt-ts 0.25 --gdt-ha 0.15 --chamfer 5.5 --hausdorff 12.0 --sort-by node_count,gdt_ts,rmsd,idf --format-output tid,node_count,gdt_ts,rmsd,idf,matching_residues,query_residues
 ```
 
-### Indexing
+### Sensitive search
+
+A residue pair whose distance or angle drifts across a bin boundary gets a different hash.
+`--expand-radius` sets how many features of a pair may sit in a neighbouring bin at once
+(default 1, 0 = observed bins only); `--sensitive` is `--expand-radius 2`.
+
+```bash
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --sensitive --max-node 3
+```
+
+- Pair it with `--max-node <n_residues>`: without it the extra recall costs more precision than it gains.
+- Not for long segment queries, which are already saturated.
+- `-d`/`-a` move one feature further; `--sensitive` lets more features move together.
+- Rank deformed motifs by `drmsd` (superposition-free); `drmsd` and `max_dist_deviation` work in
+  `--format-output`, `--sort-by` and as filters.
+
+F1 on the human proteome (details in [feature_evaluation.md](docs/feature_evaluation.md)):
+
+| query | default | `--sensitive` |
+| --- | --- | --- |
+| 4-residue zinc finger, matched | 0.9421 | **0.9641** |
+| 3-residue zinc finger, matched | 0.9418 | **0.9577** |
+| Ser-His-Asp triad, prefilter (MEROPS S01) | 0.8831 | **0.9160** |
+| 23-residue two-segment query, matched | **0.9204** | 0.9117 |
+
+### Confident hits
+
+By default a query returns every structure that matched any part of the motif, partial matches
+included. `--confident` keeps only the confident, full ones: at least 80% of the query residues
+matched — all of them for a 3-4 residue motif, one may be missing from five residues up — within
+1 Å RMSD. Past 12 residues only the coverage is required, because such matches are assembled
+from several parts and run to several Å while the coverage alone is already precise. Filters you
+give explicitly are left alone, so `--confident --rmsd 0.5` tightens only the RMSD. With
+`--skip-match` there is no superposition, so only the coverage applies.
+
+```bash
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --confident
+```
+
+On the M-CSA benchmark (250 catalytic sites, 3-21 residues) it raises precision from 0.06 to
+0.76 and cuts the median hit list from 1,804 to 21, keeping 0.48 of the answers (0.74 unfiltered);
+92% of queries still return something. See [feature_evaluation.md](docs/feature_evaluation.md) §15.
+
+### Amino acid substitution
+
+`--aa-subst <MODE>` lets every query residue without an explicit `:ALT` match similar residues;
+`:*` does the same for one residue. Substitutions compose with the geometric tolerance.
+A substituted residue scores 0.75 of an exact one and never above the query's own residue pair,
+so exact matches rank first. Prefer `:*` on the residues expected to vary.
+
+| mode | alternatives for the observed residue |
+| --- | --- |
+| `blosum62` | positive BLOSUM62 score (default for `:*`) |
+| `group` | same class: RHK, DE, NQST, FWY, AVLIMC, GP |
+| `size` | same IMGT side-chain volume class: GAS, CDPNT, QEHV, MILKR, FWY |
+
+```bash
+folddisco query -p query/4CHA.pdb -q B57,B102:*,C195 -i index/h_sapiens_folddisco -t 6
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/h_sapiens_folddisco -t 6 --aa-subst group
+```
+
+### Novelty screening
+
+`--novelty-mode` prints one verdict row per query instead of a hit list, with the evidence
+behind the verdict.
+
+```bash
+folddisco query -q designs.txt -i index/pdb_folddisco -t 6 --novelty-mode --header
+```
+
+| column | meaning |
+| --- | --- |
+| `verdict` | `KNOWN` (best hit covers ≥ `--novelty-coverage` of the query within `--novelty-rmsd`), `PARTIAL` (covered but under either threshold), `NOVEL` (nothing covered), `NO_HASHES` (residues too far apart to search) |
+| `candidates` | structures the index returned, before filters |
+| `hits` | structures left after filters and matching |
+| `index_coverage` | best hash-level residue coverage among candidates |
+| `best_hit`, `best_coverage`, `best_rmsd` | highest-coverage hit after filters; RMSD is `NA` with `--skip-match` |
+| `best_residues` | residues that hit matched, `_` where the query residue went unmatched |
+
+Defaults are `--novelty-coverage 0.8` and `--novelty-rmsd 2.0`. A 3-4 residue motif covers
+1.0 against something almost anywhere, so tighten `--novelty-rmsd` when screening short motifs.
+
+Rows append to `-o`, so batch queries can share one file; rerunning replaces it. Filters
+such as a high `--max-node` drop partial matches, which are often the most useful evidence.
+A residue listed twice counts twice in coverage denominators.
+
+### Lookup cache
+
+The first load of an index writes `<index>.lookup.cache`; later loads decode it instead of
+parsing the text lookup. It is validated against the lookup's size and mtime, falls back to
+parsing when stale, and is safe to delete.
 
 ### Usage of Index Module
 ```bash
-folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> [-d <DISTANCE_BINS> -a <ANGLE_BINS> -y <FEATURE_TYPE>]
+folddisco index -p <PDB_DIR|FOLDCOMP_DB> -i <INDEX_PATH> -t <THREADS> [-d <DISTANCE_BINS> -a <ANGLE_BINS> -y <HASH_TYPE>]
 ```
 
 **Important parameter:**
-- `-d`: Distance threshold in Å for pairs to be included (default: 16)
-- `-a`: Bin size of Angle (default: 4)
-- `-m`: For big databases (>65k structures) enable -m big for efficiency. Mode `big`, generates an 8GB fixed-size offset.
-- `-t`: Threads used for search
+- `-d`: Number of distance bins (default for `default` type: 16)
+- `-a`: Number of angle bins (default for `default` type: 4)
+- `-y`, `--type`: Hash type: `default`, `pdb`, `trrosetta`, `ppf`, `3di`
+- `-t`: Threads
 - `-v`: Verbose output
-- `--type`: Define which features sets are stored in the index; `default` (Folddisco), `pdb` (RCSB feature sets), or `tr` (trRosetta).
 
 #### Examples
 ```bash
-# Default indexing for a small dataset
-# h_sapiens directory or foldcomp database is indexed with default parameters
+# Default indexing; a directory or a Foldcomp database
 folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12
 
-# Indexing big protein dataset
-folddisco index -p swissprot -i index/swissprot_folddisco -t 64 -m big -v
-
-# Indexing with custom hash type and parameters
-folddisco index -p h_sapiens -i index/h_sapiens_folddisco -t 12 --type default -d 16 -a 4 # Default
-folddisco index -p h_sapiens -i index/h_sapiens_pdbtype -t 12 --type pdb -d 8 -a 3 # PDB
+# Custom hash type and bins
+folddisco index -p h_sapiens -i index/h_sapiens_pdbtype -t 12 -y pdb -d 8 -a 3
 ```
+
+### Index-time expansion
+
+For small databases, the query expansion can be stored in the index instead:
+each target pair is also indexed under its neighbouring bins and substituted residue pairs.
+The index grows several-fold, so this is off by default.
+
+```bash
+folddisco index -p data/serine_peptidases -i index/serine_expanded -t 12 --expand-radius 1 --aa-subst blosum62
+folddisco query -p query/4CHA.pdb -q B57,B102,C195 -i index/serine_expanded
+```
+
+`--expand-radius`, `--expand-distance` (0.5 Å) and `--expand-angle` (5°) mirror the query
+options. Settings are stored in `<index>.type`. On such an index, query lookup uses exact
+hashes unless `-d`, `-a`, `--expand-radius` or `--aa-subst` are given, and residue matching
+applies the combined expansion.
 
 ## Output
 ### Match Result
@@ -229,6 +344,12 @@ data/serine_peptidases/1azw.pdb	2	4.6439	0.9234	A179,_,B176	B57,B102,C195
 - `rmsd`: Root mean square deviation
 - `matching_residues`: Residue indices in the match (comma-separated, _ for no match)
 - `query_residues`: Residue indices in the query (comma-separated)
+
+Residues are written as chain + residue number (`B57`), which is what the `-q`
+grammar accepts. When a chain ID would make that unreadable -- a multi-character
+`AA` or a numeric `10` -- the whole field switches to `AA_250` / `10_250`
+instead, which `-q` also accepts. Pass `--chain-sep` to get the separated form
+for every structure, if you would rather parse one fixed format.
 
 ### Structure Result
 Output with one structure per line (`--per-structure`)
@@ -256,7 +377,13 @@ data/serine_peptidases/1azw.pdb	0.1856	2	2	2	2	0.9234	626	34.2399	A179,_,B176:0.
 ### Display Options
 - `--per-structure`: Outputs results per structure.
 - `--per-match`: Outputs results per match.
-- `--sort-by`: Sorts results by given columns (comma-separated).
+- `--sort-by`: Sorts results by given columns (comma-separated). Defaults:
+  `match_score:desc,rmsd:asc` per match, where `match_score` is `idf` × (matched fraction of the
+  query)² × TM-score, and `structure_score:desc,min_rmsd:asc` per structure, where
+  `structure_score` is matched residues² × √`idf` / (1 + RMSD). Both are also output columns.
+  With `--skip-match` there is no match to score, so results stay in IDF order. For a family-level
+  search whose filters already fix the coverage, `--sort-by max_node_count,min_rmsd` ranks by
+  geometry alone.
 - `--format-output`: Custom output format using column names.
 - `--top <N>`: Outputs top N results.
 - `--header`: Outputs header for the result.

@@ -1,3 +1,4 @@
+/// Parse `16-4,8-3` into `[(16, 4), (8, 3)]`; malformed pairs are skipped.
 pub fn parse_distance_angle_pairs(input: &str) -> Vec<(usize, usize)> {
     input
         .split(',')

@@ -1,13 +1,12 @@
 // File: lms_qcp.rs
 // Created: 2025-08-16
 // Author: Hyunbin Kim (khb7840@gmail.com)
-// Description:
-//   Reference: https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-10-29
-//   - Find subset of residues with minimal RMSD instead of all matching residues
-//   - Tunable quantiles: q_seed (default 0.5), q_report (default 0.75).
+// Description: Least-median-of-squares superposition over a best-fitting core subset
+//   (https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-10-29).
 
 use crate::structure::coordinate::Coordinate;
 
+/// Tuning for [`LmsQcpSuperimposer`].
 #[derive(Debug, Clone, Copy)]
 pub struct LmsQcpParams {
     /// Å cutoff to stop forward growth once min_core is reached.
@@ -40,6 +39,7 @@ impl Default for LmsQcpParams {
     }
 }
 
+/// Robust superposition: seeds on random triplets, then grows a core of inliers.
 #[derive(Debug)]
 pub struct LmsQcpSuperimposer {
     pub reference_coords: Option<Vec<[f32; 3]>>,
@@ -88,6 +88,7 @@ impl LmsQcpSuperimposer {
         self.rms_inliers = None; self.q_report_residual_all = None; self.core_indices.clear();
     }
 
+    /// Seed by the q_seed residual quantile, then grow the core up to `r_max`.
     pub fn run(&mut self) {
         let n = self.natoms;
         let mut rng = SmallRng::new(self.params.seed);
@@ -95,8 +96,7 @@ impl LmsQcpSuperimposer {
         let t_init = self.params.t_init.max(1);
         let q_seed = self.params.q_seed.clamp(0.0, 1.0);
 
-        // ---------- 1) Seed by minimizing q_seed quantile over residuals ----------
-        // We implement a fast path for k=3 (recommended).
+        // 1) Seed: minimize the q_seed residual quantile (fast path for k=3)
         let mut best_seed: [usize; 3] = [0, 1, 2];
         let mut best_qval = f32::INFINITY;
 
@@ -136,7 +136,7 @@ impl LmsQcpSuperimposer {
             }
         } // short-lived borrow ends here
 
-        // ---------- 2) Forward-search LMS: grow core until r_max (once min_core reached) ----------
+        // 2) Forward search: grow the core until r_max, once min_core is reached
         let min_core = self.params.min_core.unwrap_or(n / 2).max(3);
         let r2_max = self.params.r_max * self.params.r_max;
 
@@ -208,21 +208,24 @@ impl LmsQcpSuperimposer {
         self.transformed_coords.clone().unwrap()
     }
 
+    /// RMSD over the final core.
     #[inline]
     pub fn get_rms_inliers(&self) -> f32 { self.rms_inliers.expect("run() not called") }
 
+    /// q_report quantile of residuals over all pairs.
     #[inline]
     pub fn get_q_report_all(&self) -> f32 { self.q_report_residual_all.expect("run() not called") }
 
     #[inline]
     pub fn inliers(&self) -> &[usize] { &self.core_indices }
 
+    /// Fraction of pairs in the core.
     #[inline(always)]
     pub fn core_percent(&self) -> f32 {
         (self.core_indices.len() as f32) / (self.natoms as f32)
     }
 
-    // finalize metrics & caches; reads coords/refs internally (no external borrows)
+    // Store the transform, core RMSD, all-pair quantile and transformed coordinates
     fn finish(&mut self, r: [[f32; 3]; 3], t: [f32; 3]) {
         self.rot = Some(r);
         self.tran = Some(t);

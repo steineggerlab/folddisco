@@ -3,9 +3,7 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2025 Hyunbin Kim, All rights reserved
 
-// Graph representation of residue indices to match positions in the structure
-// Current implementation:
-// Find both strong and weakly connected components with same node count as query graph
+// Residue graphs for matching: nodes are residue indices, edges are matched hashes.
 
 use std::collections::HashMap;
 
@@ -13,6 +11,7 @@ use petgraph::graph::DiGraph;
 use crate::geometry::core::GeometricHash;
 
 
+/// Directed graph with one edge per `(i, j, hash)`.
 pub fn create_index_graph(ind_vec: &Vec<(usize, usize, GeometricHash)>) -> DiGraph<usize, GeometricHash> {
     let mut graph = DiGraph::<usize, GeometricHash>::new();
     let mut node_indices = HashMap::new();
@@ -26,20 +25,18 @@ pub fn create_index_graph(ind_vec: &Vec<(usize, usize, GeometricHash)>) -> DiGra
 }
 
 
+/// Unique strongly and weakly connected components with at least `node_count`
+/// nodes, as sorted residue indices.
 pub fn connected_components_with_given_node_count(
     graph: &DiGraph<usize, GeometricHash>, node_count: usize
 ) -> Vec<Vec<usize>> {
-    // Current implementation.
-    // Return both strong and weakly connected components with the same node count
     let mut scc = petgraph::algo::tarjan_scc(graph);
     let undirected_graph = graph.clone().into_edge_type::<petgraph::Undirected>();
     let mut wcc = petgraph::algo::kosaraju_scc(&undirected_graph);
-    // Concat
     scc.append(&mut wcc);
-    // Filter components with the node count greater than or equal to the given node count
     scc.retain(|component| component.len() >= node_count); 
 
-    // Uniqueness cheking. Sort all inner vectors and dedup
+    // Deduplicate
     scc.iter_mut().for_each(|component| component.sort());
     scc.sort();
     scc.dedup();

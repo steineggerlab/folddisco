@@ -10,17 +10,17 @@ pub mod index;
 pub mod structure;
 pub mod utils;
 
-/* re-export: pub use */
 pub use structure::io::pdb::Reader as PDBReader;
 pub use structure::io::cif::Reader as CIFReader;
 
+/// Common imports for the CLI workflows.
 pub mod prelude {
     pub use crate::PDBReader;
     pub use crate::measure_time;
 
     pub use crate::controller::Folddisco;
     pub use crate::controller::io::{read_offset_map, save_offset_map, write_usize_vector};
-    pub use crate::controller::query::{make_query_map, parse_query_string};
+    pub use crate::controller::query::{make_query_map, parse_query_string, parse_query_string_checked};
 
     pub use crate::geometry::core::{GeometricHash, HashType};
     

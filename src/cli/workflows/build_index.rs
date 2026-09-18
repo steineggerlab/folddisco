@@ -3,9 +3,7 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
-//! This file contains the workflow for building index table
-//! For building index table, we need a directory containing PDB files, 
-//! and the path to save the index table.
+//! `folddisco index`: hash a structure directory or Foldcomp database into an index.
 
 
 use crate::cli::config::{write_index_config_to_file, IndexConfig};
@@ -15,15 +13,14 @@ use crate::controller::io::default_index_path;
 use crate::prelude::*;
 use crate::structure::io::StructureFileFormat;
 use crate::utils::cli::parse_distance_angle_pairs;
+use crate::controller::expand::IndexExpansion;
+use crate::controller::substitution::SubstitutionScheme;
 
 #[cfg(feature = "foldcomp")]
 use std::path::PathBuf;
 
 #[cfg(feature= "foldcomp")] 
 use crate::structure::io::fcz::*;
-
-#[cfg(feature = "foldcomp")]
-use rayon::prelude::ParallelSliceMut;
 
 pub const HELP_INDEX: &str = "\
 usage: folddisco index -p <i:PDB_DIR>|<i:FOLDCOMP_DB> -i <o:INDEX_PATH> [OPTIONS]
@@ -45,6 +42,13 @@ hashing parameters:
  --multiple-bins STR              Multiple bins for distance and angle (dist1-ang1,dist2-ang2 e.g. 16-4,8-3)
                                   While increasing sensitivity, this option increases the size of the index.
 
+index-time expansion (for small databases; grows the index several-fold):
+ --expand-radius <INT>            Also index each pair's neighbouring bins, as query --expand-radius does [0: off]
+ --expand-distance <FLOAT>        Distance tolerance in Angstroms for --expand-radius [0.5]
+ --expand-angle <FLOAT>           Angle tolerance in degrees for --expand-radius [5.0]
+ --aa-subst <MODE>                Also index substituted residue pairs: blosum62, group or size (see query -h)
+                                  Queries against an expanded index look up exact hashes by default
+
 general options:
  -v, --verbose                    Print verbose messages
  -h, --help                       Print this help menu
@@ -59,8 +63,12 @@ folddisco index -p swissprot -i index/swissprot -t 64 -v
 # Indexing with custom hash type and parameters
 folddisco index -p h_sapiens -i index/h_sapiens -t 12 -y default -d 16 -a 4 # Default
 folddisco index -p h_sapiens -i index/h_sapiens -t 12 -y pdb -d 8 -a 3 # PDB
+
+# Small database with expansion baked in: geometric neighbours and BLOSUM62 substitutions
+folddisco index -p data/serine_peptidases -i index/serine_expanded -t 12 --expand-radius 1 --aa-subst blosum62
 ";
 
+/// Run `folddisco index` for parsed `AppArgs::Index`.
 pub fn build_index(env: AppArgs) {
     match env {
         AppArgs::Index {
@@ -76,6 +84,10 @@ pub fn build_index(env: AppArgs) {
             recursive,
             mmap_on_disk,
             id_type,
+            expand_radius,
+            expand_distance,
+            expand_angle,
+            aa_subst,
             verbose,
             help: _,
         } => {
@@ -99,8 +111,6 @@ pub fn build_index(env: AppArgs) {
             let mut input_format: StructureFileFormat = StructureFileFormat::PDB;
             // Load PDB files
             let pdb_path_vec = if pdb_container.is_some() {
-                // Check if pdb_dir is a directory or db file
-                // If not foldcomp, just load
                 #[cfg(not(feature = "foldcomp"))]
                 { load_path(&pdb_container.unwrap(), recursive) }
                 #[cfg(feature = "foldcomp")]
@@ -111,16 +121,15 @@ pub fn build_index(env: AppArgs) {
                     if is_dir {
                         load_path(&pdb_container, recursive)
                     } else {
-                        let mut lookup_vec = read_foldcomp_db_lookup(&pdb_container).expect(
+                        // Mapped and key-sorted; the first build writes the caches queries map
+                        let lookup = FoldcompLookup::load(&pdb_container).expect(
                             &log_msg(FAIL, "Failed to read Foldcomp DB lookup")
                         );
-                        lookup_vec.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
-                        let mut index_vec = read_foldcomp_db_index(&pdb_container).expect(
+                        let index = FoldcompIndex::load(&pdb_container).expect(
                             &log_msg(FAIL, "Failed to read Foldcomp DB index")
                         );
-                        index_vec.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
                         input_format = StructureFileFormat::FCZDB;
-                        get_path_vector_out_of_lookup_and_index(&lookup_vec, &index_vec)
+                        get_path_vector_out_of_lookup_and_index(&lookup, &index)
                     }
                 }
             } else {
@@ -129,7 +138,7 @@ pub fn build_index(env: AppArgs) {
                 std::process::exit(1);
             };
             
-            // Always use Big mode - set chunk_size to total number of files
+            // Single chunk covering every file
             let chunk_size = pdb_path_vec.len();
             let num_chunks = if pdb_path_vec.len() <= chunk_size { 1 } else { (pdb_path_vec.len() as f64 / chunk_size as f64).ceil() as usize };
             if verbose { 
@@ -146,6 +155,19 @@ pub fn build_index(env: AppArgs) {
             let pdb_path_chunks = pdb_path_vec.chunks(chunk_size);
             let id_type = IdType::get_with_str(id_type.as_str());
             
+            let scheme = aa_subst.as_ref().map(|mode| SubstitutionScheme::from_str(mode).unwrap_or_else(|| {
+                print_log_msg(FAIL, &format!("Unknown --aa-subst '{}'; use blosum62, group or size", mode));
+                std::process::exit(1);
+            }));
+            let expansion = IndexExpansion::new(expand_radius, expand_distance, expand_angle, scheme);
+            if expansion.is_some() && verbose {
+                print_log_msg(INFO, &format!(
+                    "Index-time expansion: radius {}, distance {} A, angle {} deg, substitution {}",
+                    expand_radius, expand_distance, expand_angle,
+                    scheme.map_or("none".to_string(), |s| s.to_string())
+                ));
+            }
+
             let multiple_bins = if let Some(multiple_bins) = multiple_bins {
                 Some(parse_distance_angle_pairs(&multiple_bins))
             } else {
@@ -184,6 +206,8 @@ pub fn build_index(env: AppArgs) {
                     )
                 };
                 
+                folddisco.set_expansion(expansion.clone());
+
                 // Indexing
                 if verbose {
                     print_log_msg(INFO, "Collecting ids of the structures");
@@ -228,6 +252,8 @@ pub fn build_index(env: AppArgs) {
                     grid_width, chunk_size, max_residue, input_format.clone(), 
                     Some(pdb_container_name.to_string()), multiple_bins.clone(),
                 );
+                let mut index_config = index_config;
+                index_config.expansion = expansion.clone();
                 write_index_config_to_file(&hash_type_path, index_config);
                 if verbose { print_log_msg(DONE, &format!("Indexing done for chunk {} - {}", i+1, index_path)); }
             });
@@ -262,6 +288,10 @@ mod tests {
             recursive: true,
             mmap_on_disk: false,
             id_type: "relpath".to_string(),
+            expand_radius: 0,
+            expand_distance: 0.5,
+            expand_angle: 5.0,
+            aa_subst: None,
             verbose: true,
             help: false,
         };
@@ -285,6 +315,10 @@ mod tests {
                 recursive: true,
                 mmap_on_disk: false,
                 id_type: "relpath".to_string(),
+                expand_radius: 0,
+                expand_distance: 0.5,
+                expand_angle: 5.0,
+                aa_subst: None,
                 verbose: true,
                 help: false,
             };

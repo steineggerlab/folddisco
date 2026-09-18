@@ -1,8 +1,7 @@
-// A utility module defining traits used across the project.
 
 use std::hash::{Hash, Hasher};
 use std::fmt::Debug;
-// Declare a new trait that supports required traits
+/// Key types usable in hashed, thread-shared collections; `hash_u32` is an Fx hash.
 pub trait HashableSync: Clone + Copy + Hash + Sync + Send + Eq + PartialEq + Ord + Debug + 'static {
     fn hash_u32(&self) -> u32 {
         use rustc_hash::FxHasher;

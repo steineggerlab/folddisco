@@ -2,7 +2,8 @@
 // Created: 2024-03-27 17:35:35
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
-// PDB motif + 2 torsion angles
+// Default hash type: PDB motif features (residue pair, Ca/Cb distances, Ca-Cb angle)
+// plus two torsions.
 
 use std::fmt;
 use crate::geometry::core::HashType;
@@ -10,24 +11,30 @@ use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
 use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 use crate::utils::convert::*;
 
+/// 30-bit PDBTrRosetta hash.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
 pub const PDBTR_NBIN_DIST: f32 = 16.0;
 pub const PDBTR_NBIN_SIN_COS: f32 = 4.0;
+// Widest bin counts the bit layout below can hold
+pub const PDBTR_MAX_NBIN_DIST: f32 = 16.0;
+pub const PDBTR_MAX_NBIN_SIN_COS: f32 = 4.0;
 
 impl HashValue {
+    /// Hash `[aa1, aa2, ca_dist, cb_dist, ca_cb_angle, theta1, theta2]` (angles in
+    /// radians). Bin counts are clamped to the layout; 0 means the default.
     #[inline]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
-        let nbin_dist = if nbin_dist > 16 {
-            16.0
+        let nbin_dist = if nbin_dist > PDBTR_MAX_NBIN_DIST as usize {
+            PDBTR_MAX_NBIN_DIST
         } else if nbin_dist == 0 {
             PDBTR_NBIN_DIST
         } else {
             nbin_dist as f32
         };
-        let nbin_angle = if nbin_angle > 4 {
-            4.0
+        let nbin_angle = if nbin_angle > PDBTR_MAX_NBIN_SIN_COS as usize {
+            PDBTR_MAX_NBIN_SIN_COS
         } else if nbin_angle == 0 {
             PDBTR_NBIN_SIN_COS
         } else {
@@ -50,7 +57,7 @@ impl HashValue {
         let cos_ca_cb_angle = discretize_value(
             cos_ca_cb_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         );
-        // Two torsion angles: 
+        // Two torsion angles
         let sin_phi1 = feature[5].sin();
         let cos_phi1 = feature[5].cos();
         let sin_phi2 = feature[6].sin();
@@ -68,30 +75,32 @@ impl HashValue {
             cos_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         );
 
+        // res1 5b | res2 5b | ca_dist 4b | cb_dist 4b | sin,cos of ca_cb, phi1, phi2 2b each
         let hashvalue = res1 << 25 | res2 << 20 | ca_dist << 16 
             | cb_dist << 12 | sin_ca_cb_angle << 10 | cos_ca_cb_angle << 8
             | sin_phi1 << 6 | cos_phi1 << 4 | sin_phi2 << 2 | cos_phi2;
         hashvalue
     }
 
+    /// Floor-binned index of `value + shift`, clamped to 4 bits.
     #[inline(always)]
     fn discretize_with_shift(value: f32, min_val: f32, max_val: f32, nbins: f32, shift: f32) -> u32 {
         let bin_width = (max_val - min_val) / nbins;
-        // Apply shift by moving the bin boundaries
         let shifted_value = value + shift; // Note: we shift the value, not the boundaries
         let clamped_value = shifted_value.max(min_val).min(max_val - 1e-6);
         let bin_index = ((clamped_value - min_val) / bin_width).floor() as u32;
         bin_index.min(15) // 4-bit constraint for distances
     }
-    
+
     pub fn perfect_hash_default(feature: &Vec<f32>) -> u32 {
         HashValue::perfect_hash(feature, PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
     }
-    
+
     pub fn reverse_hash_default(&self) -> [f32; 7] {
         self.reverse_hash(PDBTR_NBIN_DIST as usize, PDBTR_NBIN_SIN_COS as usize)
     }
-    
+
+    /// Decode to approximate features; angles come back in degrees.
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 7] {
         let res1 = ((self.0 >> 25) & BITMASK32_5BIT)as f32;
         let res2 = ((self.0 >> 20) & BITMASK32_5BIT) as f32;
@@ -157,26 +166,25 @@ impl HashValue {
     
     pub fn is_symmetric(&self) -> bool {
         let values = self.reverse_hash_default();
-        // Residue pair is symmetric and phi is symmetric
+        // Same residue on both ends and same torsions
         (values[0] == values[1]) && (values[5] == values[6])
     }
-    
-    /// deduplication: inline during generation
-    /// Returns (unique_count, unique_hashes_array)
+
+    /// Hash plus variants with distances shifted by +-0.6 A and angles by +-PI/8,
+    /// deduplicated. Covers 8 of the 9 shift combinations (no dist-/angle-).
+    /// Returns `(count, hashes)`; only the first `count` entries are valid.
     #[inline]
     pub fn perfect_hash_with_shifts_dedup_inline(feature: &Vec<f32>) -> (u8, [u32; 8]) {
         const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
         const NBIN_ANGLE: f32 = PDBTR_NBIN_SIN_COS;
-        
-        // Optimized shift amounts
+
         const DIST_SHIFT: f32 = 0.6;
         const ANGLE_SHIFT_RAD: f32 = std::f32::consts::PI / 8.0;
-        
+
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
-        
-        // Precompute ALL trigonometric values we need (only 3 sets total)
-        // Original angles (0 shift)
+
+        // Unshifted angles
         let sin_ca_cb_0 = feature[4].sin();
         let cos_ca_cb_0 = feature[4].cos();
         let sin_phi1_0 = feature[5].sin();
@@ -184,23 +192,23 @@ impl HashValue {
         let sin_phi2_0 = feature[6].sin();
         let cos_phi2_0 = feature[6].cos();
         
-        // Positive angle shift (+ANGLE_SHIFT_RAD)
+        // +ANGLE_SHIFT_RAD
         let sin_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).sin();
         let cos_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).cos();
         let sin_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).sin();
         let cos_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).cos();
         let sin_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).sin();
         let cos_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).cos();
-        
-        // Negative angle shift (-ANGLE_SHIFT_RAD)
+
+        // -ANGLE_SHIFT_RAD
         let sin_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).sin();
         let cos_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).cos();
         let sin_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).sin();
         let cos_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).cos();
         let sin_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).sin();
         let cos_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).cos();
-        
-        // Precompute distance shifts (3 variants: 0, +DIST_SHIFT, -DIST_SHIFT)
+
+        // Distance bins at 0, +DIST_SHIFT, -DIST_SHIFT
         let ca_dist_0 = Self::discretize_with_shift(
             feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0
         );
@@ -222,7 +230,7 @@ impl HashValue {
             feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, -DIST_SHIFT
         );
         
-        // Precompute discretized angle values for each angle shift
+        // Angle bins for each shift
         let sin_ca_cb_disc_0 = discretize_value(sin_ca_cb_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
         let cos_ca_cb_disc_0 = discretize_value(cos_ca_cb_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
         let sin_phi1_disc_0 = discretize_value(sin_phi1_0, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
@@ -246,10 +254,7 @@ impl HashValue {
         
         let mut unique_hashes = [0u32; 8];
         let mut count = 0u8;
-        
-        // Now generate hashes by simply selecting precomputed values
-        // Each combination just picks the right precomputed distance and angle values
-        
+
         // 0: Original (0 dist, 0 angle)
         let hashvalue = res1 << 25 | res2 << 20 | ca_dist_0 << 16 
             | cb_dist_0 << 12 | sin_ca_cb_disc_0 << 10 | cos_ca_cb_disc_0 << 8
@@ -302,33 +307,33 @@ impl HashValue {
         (count, unique_hashes)
     }
 
+    /// Append `hashvalue` unless already present (linear scan) or the array is full.
     #[inline]
     fn add_unique_hash(unique_hashes: &mut [u32; 8], count: &mut u8, hashvalue: u32) {
-        // Linear search for duplicates (very fast for small arrays)
         for i in 0..*count as usize {
             if unique_hashes[i] == hashvalue {
                 return; // Duplicate found, don't add
             }
         }
-        
-        // Add new unique hash
+
         if (*count as usize) < unique_hashes.len() {
             unique_hashes[*count as usize] = hashvalue;
             *count += 1;
         }
     }
 
+    /// Every combination of 0/+/- shifts applied independently to each of the five
+    /// geometric values (up to 3^5 = 243 hashes, duplicates of a value skipped).
     #[inline]
     pub fn perfect_hash_with_all_shifts_exhaustive(feature: &Vec<f32>) -> (usize, Vec<u32>) {
         const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
         const NBIN_ANGLE: f32 = PDBTR_NBIN_SIN_COS;
         const DIST_SHIFT: f32 = 0.6;
         const ANGLE_SHIFT_RAD: f32 = std::f32::consts::PI / 8.0;
-        
+
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
-        
-        // Precompute all values (same as before)
+
         let sin_ca_cb_0 = feature[4].sin();
         let cos_ca_cb_0 = feature[4].cos();
         let sin_phi1_0 = feature[5].sin();
@@ -349,8 +354,7 @@ impl HashValue {
         let cos_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).cos();
         let sin_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).sin();
         let cos_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).cos();
-        
-        // Pre-deduplicate discretized values
+
         let ca_dists = [
             Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0),
             Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT),
@@ -390,7 +394,7 @@ impl HashValue {
              discretize_value(cos_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
         ];
         
-        // OPTIMIZATION 4: Pre-detect duplicate ranges to skip redundant combinations
+        // Distinct bins per value, so the product below has no repeats
         let unique_ca_dists: Vec<u32> = {
             let mut temp = Vec::with_capacity(3);
             for &dist in &ca_dists {
@@ -445,7 +449,6 @@ impl HashValue {
                                                    unique_ca_cb_angles.len() * unique_phi1_angles.len() * 
                                                    unique_phi2_angles.len());
         
-        // OPTIMIZATION 5: Only iterate over unique discretized values
         for &ca_dist in &unique_ca_dists {
             for &cb_dist in &unique_cb_dists {
                 for &(sin_ca_cb_disc, cos_ca_cb_disc) in &unique_ca_cb_angles {
@@ -465,6 +468,7 @@ impl HashValue {
         (unique_hashes.len(), unique_hashes)
     }
     
+    /// Duplicate of `perfect_hash_with_all_shifts_exhaustive`.
     #[inline]
     pub fn perfect_hash_with_all_shifts_exhaustive_optimized(feature: &Vec<f32>) -> (usize, Vec<u32>) {
         const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
@@ -475,7 +479,6 @@ impl HashValue {
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         
-        // Precompute trigonometric values (same as before)
         let sin_ca_cb_0 = feature[4].sin();
         let cos_ca_cb_0 = feature[4].cos();
         let sin_phi1_0 = feature[5].sin();
@@ -497,7 +500,6 @@ impl HashValue {
         let sin_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).sin();
         let cos_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).cos();
         
-        // Precompute distance and angle discretizations (same as before)
         let ca_dists = [
             Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0),
             Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT),
@@ -537,7 +539,7 @@ impl HashValue {
              discretize_value(cos_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE)),
         ];
         
-        // OPTIMIZATION 4: Pre-detect duplicate ranges to skip redundant combinations
+        // Distinct bins per value, so the product below has no repeats
         let unique_ca_dists: Vec<u32> = {
             let mut temp = Vec::with_capacity(3);
             for &dist in &ca_dists {
@@ -592,7 +594,6 @@ impl HashValue {
                                                    unique_ca_cb_angles.len() * unique_phi1_angles.len() * 
                                                    unique_phi2_angles.len());
         
-        // OPTIMIZATION 5: Only iterate over unique discretized values
         for &ca_dist in &unique_ca_dists {
             for &cb_dist in &unique_cb_dists {
                 for &(sin_ca_cb_disc, cos_ca_cb_disc) in &unique_ca_cb_angles {
@@ -612,11 +613,8 @@ impl HashValue {
         (unique_hashes.len(), unique_hashes)
     }
 
-    /// Single efficient function that generates up to 32 unique hashes (2^5) by analyzing 
-    /// which of the 5 key values (ca_dist, cb_dist, ca_cb_angle, phi1, phi2) change when shifted.
-    /// Minimizes trigonometric operations through early termination: if positive shift changes 
-    /// discretized value, negative shift is still checked for completeness but with smart optimization.
-    /// Combines direction checking and hash generation in one pass to eliminate redundant operations.
+    /// Same hash set as `perfect_hash_with_all_shifts_exhaustive`, sorted and deduplicated.
+    /// Each value keeps its distinct 0/+/- bins; despite the name this can exceed 32.
     #[inline]
     pub fn perfect_hash_with_max_32_shifts(feature: &Vec<f32>) -> (usize, Vec<u32>) {
         const NBIN_DIST: f32 = PDBTR_NBIN_DIST;
@@ -627,7 +625,6 @@ impl HashValue {
         let res1 = feature[0] as u32;
         let res2 = feature[1] as u32;
         
-        // === DISTANCE VALUE ANALYSIS (no trigonometry needed) ===
         let ca_dist_orig = Self::discretize_with_shift(feature[2], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0);
         let cb_dist_orig = Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, 0.0);
         
@@ -636,7 +633,7 @@ impl HashValue {
         let cb_dist_pos = Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, DIST_SHIFT);
         let cb_dist_neg = Self::discretize_with_shift(feature[3], MIN_DIST, MAX_DIST, NBIN_DIST, -DIST_SHIFT);
         
-        // Collect unique distance values
+        // Distinct distance bins
         let mut ca_dist_values = vec![ca_dist_orig];
         if ca_dist_pos != ca_dist_orig { ca_dist_values.push(ca_dist_pos); }
         if ca_dist_neg != ca_dist_orig && ca_dist_neg != ca_dist_pos { ca_dist_values.push(ca_dist_neg); }
@@ -645,8 +642,7 @@ impl HashValue {
         if cb_dist_pos != cb_dist_orig { cb_dist_values.push(cb_dist_pos); }
         if cb_dist_neg != cb_dist_orig && cb_dist_neg != cb_dist_pos { cb_dist_values.push(cb_dist_neg); }
         
-        // === ANGLE VALUE ANALYSIS (minimize trigonometric operations) ===
-        // Always compute original trigonometric values (6 operations - required)
+        // Distinct angle bins: unshifted, then +shift and -shift when they differ
         let sin_ca_cb_orig = feature[4].sin();
         let cos_ca_cb_orig = feature[4].cos();
         let sin_phi1_orig = feature[5].sin();
@@ -661,10 +657,8 @@ impl HashValue {
         let sin_phi2_disc_orig = discretize_value(sin_phi2_orig, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
         let cos_phi2_disc_orig = discretize_value(cos_phi2_orig, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
         
-        // CA-CB angle analysis with early termination optimization
         let mut ca_cb_angle_values = vec![(sin_ca_cb_disc_orig, cos_ca_cb_disc_orig)];
         
-        // Check positive shift first (2 additional trig operations)
         let sin_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).sin();
         let cos_ca_cb_pos = (feature[4] + ANGLE_SHIFT_RAD).cos();
         let sin_ca_cb_disc_pos = discretize_value(sin_ca_cb_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
@@ -675,7 +669,6 @@ impl HashValue {
             ca_cb_angle_values.push((sin_ca_cb_disc_pos, cos_ca_cb_disc_pos));
         }
         
-        // Check negative shift (2 more trig operations) - but can optimize based on positive result
         let sin_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).sin();
         let cos_ca_cb_neg = (feature[4] - ANGLE_SHIFT_RAD).cos();
         let sin_ca_cb_disc_neg = discretize_value(sin_ca_cb_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
@@ -686,10 +679,8 @@ impl HashValue {
             ca_cb_angle_values.push((sin_ca_cb_disc_neg, cos_ca_cb_disc_neg));
         }
         
-        // PHI1 angle analysis with early termination optimization
         let mut phi1_angle_values = vec![(sin_phi1_disc_orig, cos_phi1_disc_orig)];
         
-        // Check positive shift first (2 additional trig operations)
         let sin_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).sin();
         let cos_phi1_pos = (feature[5] + ANGLE_SHIFT_RAD).cos();
         let sin_phi1_disc_pos = discretize_value(sin_phi1_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
@@ -700,7 +691,6 @@ impl HashValue {
             phi1_angle_values.push((sin_phi1_disc_pos, cos_phi1_disc_pos));
         }
         
-        // Check negative shift (2 more trig operations) - but can optimize based on positive result
         let sin_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).sin();
         let cos_phi1_neg = (feature[5] - ANGLE_SHIFT_RAD).cos();
         let sin_phi1_disc_neg = discretize_value(sin_phi1_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
@@ -711,10 +701,8 @@ impl HashValue {
             phi1_angle_values.push((sin_phi1_disc_neg, cos_phi1_disc_neg));
         }
         
-        // PHI2 angle analysis with early termination optimization
         let mut phi2_angle_values = vec![(sin_phi2_disc_orig, cos_phi2_disc_orig)];
         
-        // Check positive shift first (2 additional trig operations)
         let sin_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).sin();
         let cos_phi2_pos = (feature[6] + ANGLE_SHIFT_RAD).cos();
         let sin_phi2_disc_pos = discretize_value(sin_phi2_pos, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
@@ -725,7 +713,6 @@ impl HashValue {
             phi2_angle_values.push((sin_phi2_disc_pos, cos_phi2_disc_pos));
         }
         
-        // Check negative shift (2 more trig operations) - but can optimize based on positive result
         let sin_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).sin();
         let cos_phi2_neg = (feature[6] - ANGLE_SHIFT_RAD).cos();
         let sin_phi2_disc_neg = discretize_value(sin_phi2_neg, MIN_SIN_COS, MAX_SIN_COS, NBIN_ANGLE);
@@ -736,8 +723,7 @@ impl HashValue {
             phi2_angle_values.push((sin_phi2_disc_neg, cos_phi2_disc_neg));
         }
         
-        // === HASH GENERATION ===
-        // Generate all combinations of the collected unique values
+        // Cross the distinct bins
         let max_combinations = ca_dist_values.len() * cb_dist_values.len() * 
                               ca_cb_angle_values.len() * phi1_angle_values.len() * phi2_angle_values.len();
         let mut unique_hashes = Vec::with_capacity(max_combinations);
@@ -758,7 +744,6 @@ impl HashValue {
             }
         }
         
-        // Remove any potential duplicates (should be rare with proper shifting)
         unique_hashes.sort_unstable();
         unique_hashes.dedup();
         

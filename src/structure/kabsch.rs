@@ -2,14 +2,11 @@
 // Created: 2025-07-11 10:16:18
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2025 Hyunbin Kim, All rights reserved
-// Kabsch algorithm implementation for optimal superposition of two coordinate sets
-// Original code from TM-align ()
-// Translated to Rust by Martin Steinegger & Hyunbin Kim
+// Kabsch superposition, translated from TM-align by Martin Steinegger & Hyunbin Kim.
 
 
 use crate::structure::coordinate::Coordinate;
 
-// Higher precision constants for f64 version
 const EPSILON: f64 = 1.0e-8;
 const TOLERANCE: f64 = 0.01;
 const SQRT3: f64 = 1.7320508075688772; // sqrt(3)
@@ -18,6 +15,7 @@ const IP: [usize; 9] = [0, 1, 3, 1, 2, 4, 3, 4, 5]; // Index permutation for 3x3
 const IP2312: [usize; 4] = [1, 2, 0, 1]; // Index permutation for 2x2 matrix
 
 
+/// Least-squares superposition of `coords` onto `reference_coords` (Kabsch).
 #[derive(Debug)]
 pub struct KabschSuperimposer {
     pub reference_coords: Option<Vec<[f32; 3]>>,
@@ -44,6 +42,7 @@ impl KabschSuperimposer {
         }
     }
 
+    /// Set coordinates, run, and store the RMSD.
     pub fn set_atoms(&mut self, fixed: &[Coordinate], moving: &[Coordinate]) {
         assert!(fixed.len() == moving.len(), "Fixed and moving atom lists differ in size");
 
@@ -70,6 +69,7 @@ impl KabschSuperimposer {
         );
     }
 
+    /// Superpose; a failed fit yields the identity transform and RMSD `f32::MAX`.
     pub fn run(&mut self) {
         let coords = self.coords.clone().unwrap();
         let reference_coords = self.reference_coords.clone().unwrap();
@@ -83,7 +83,6 @@ impl KabschSuperimposer {
         self.tran = Some(tran);
         self.rms = Some(rmsd);
         
-        // Get transformed coordinates
         self.transformed_coords = Some(
             coords.iter()
                 .map(|&coord| {
@@ -117,11 +116,11 @@ impl KabschSuperimposer {
         (self.rot.unwrap(), self.tran.unwrap())
     }
 
+    /// RMSD before superposition.
     pub fn get_init_rms(&mut self) -> f32 {
         if self.init_rms.is_none() {
             let coords = self.coords.clone().unwrap();
             let reference_coords = self.reference_coords.clone().unwrap();
-            // without superposition, calculate initial RMSD
             self.init_rms = Some(
                 (0..coords.len())
                     .map(|i| {
@@ -153,23 +152,19 @@ fn add_vec(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }
 
-/// High-precision version of the Kabsch algorithm using f64 for better numerical stability
+/// Kabsch fit of `x` onto `y` in f64, returning `(U, t, rmsd)`.
+/// `mode` as in TM-align: 0 = RMSD only, 1 = transform only, 2 = both.
 pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3], [f32; 3], f32)> {
-    // Convert input f32 arrays to f64 for computation
     let x_f64: Vec<[f64; 3]> = x.iter().map(|arr| [arr[0] as f64, arr[1] as f64, arr[2] as f64]).collect();
     let y_f64: Vec<[f64; 3]> = y.iter().map(|arr| [arr[0] as f64, arr[1] as f64, arr[2] as f64]).collect();
     
-    // -----------------------------------------------------------------------
-    // 1. Basic sanity checks -------------------------------------------------
-    // -----------------------------------------------------------------------
+    // 1. Basic sanity checks
     let n = x_f64.len();
     if n == 0 || y_f64.len() != n {
         return Some(([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], [0.0, 0.0, 0.0], f32::MAX));
     }
 
-    // -----------------------------------------------------------------------
-    // 3. Scratch scalars / arrays -------------------------------------------
-    // -----------------------------------------------------------------------
+    // 3. Scratch scalars / arrays
     let mut rms = 0.0_f64;
     let mut e0 = 0.0_f64;
     let mut _rms1 = 0.0_f64;
@@ -200,9 +195,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
     let mut rr: [f64; 6] = [0.0; 6];
     let mut ss: [f64; 6] = [0.0; 6];
 
-    // -----------------------------------------------------------------------
-    // 4. Accumulate first‑ and second‑order sums ----------------------------
-    // -----------------------------------------------------------------------
+    // 4. Accumulate first‑ and second‑order sums
     for i in 0..n {
         let c1 = [x_f64[i][0], x_f64[i][1], x_f64[i][2]];
         let c2 = [y_f64[i][0], y_f64[i][1], y_f64[i][2]];
@@ -240,9 +233,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
         }
     }
 
-    // -----------------------------------------------------------------------
-    // 5. Build cross‑covariance matrix r ------------------------------------
-    // -----------------------------------------------------------------------
+    // 5. Build cross‑covariance matrix r
     for j in 0..3 {
         r[j][0] = sx[j] - s1[0] * s2[j] / (n as f64);
         r[j][1] = sy[j] - s1[1] * s2[j] / (n as f64);
@@ -255,9 +246,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
         + r[0][2] * (r[1][0] * r[2][1] - r[1][1] * r[2][0]);
     sigma = det_r;
 
-    // -----------------------------------------------------------------------
-    // 6. Build transpose(r) * r (upper triangular in rr[0..6]) --------------
-    // -----------------------------------------------------------------------
+    // 6. Build transpose(r) * r (upper triangular in rr[0..6])
     let mut m = 0;
     for j in 0..3 {
         for i in 0..=j {
@@ -266,9 +255,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
         }
     }
 
-    // -----------------------------------------------------------------------
-    // 7. Characteristic equation of transpose(r) * r -------------------------
-    // -----------------------------------------------------------------------
+    // 7. Characteristic equation of transpose(r) * r
     let spur = (rr[0] + rr[2] + rr[5]) / 3.0;
     let cof = (
         ((rr[2] * rr[5] - rr[4] * rr[4])
@@ -280,9 +267,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
     e.fill(spur);
 
     if spur > 0.0 {
-        // -------------------------------------------------------------------
-        // 7a. Eigen‑decomposition branch ----
-        // -------------------------------------------------------------------
+        // 7a. Eigen‑decomposition branch
         let d = spur * spur;
         let h = d - cof;
         let g = (spur * cof - det) / 2.0 - spur * h;
@@ -317,7 +302,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
                 let mut a_failed = false;
                 let mut b_failed = false;
                 
-                // ------- assemble eigen‑vectors in A ------------------------
+                // assemble eigen‑vectors in A
                 for &l in &[0usize, 2usize] {
                     let d_local = e[l];
                     ss[0] = (d_local - rr[2]) * (d_local - rr[5]) - rr[4] * rr[4];
@@ -356,7 +341,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
                     }
                 }
 
-                // ---------- orthogonalise the middle column -----------------
+                // orthogonalise the middle column
                 let dot = a[0][0] * a[0][2] + a[1][0] * a[1][2] + a[2][0] * a[2][2];
 
                 let (m1, m) = if e[0] - e[1] > e[1] - e[2] {
@@ -404,7 +389,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
                     a[2][1] = a[0][2] * a[1][0] - a[0][0] * a[1][2];
                 }
 
-                // ------------- Build B --------------------------------------
+                // Build B
                 if !a_failed {
                     for l in 0..2 {
                         let mut d_b = 0.0;
@@ -490,9 +475,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
         }
     }
 
-    // -----------------------------------------------------------------------
-    // 8. Convert eigen‑values to singular values; compute RMSD --------------
-    // -----------------------------------------------------------------------
+    // 8. Convert eigen‑values to singular values; compute RMSD
     for ev in &mut e {
         if *ev < 0.0 {
             *ev = 0.0;
@@ -513,7 +496,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
         }
     }
 
-    // Simple RMSD calculation as fallback
+    // RMSD from the applied transform, more robust than the eigenvalue form above
     if mode == 0 || mode == 2 {
         let mut sum_sq = 0.0;
         
@@ -534,11 +517,8 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
 
     // rms = rms1.sqrt();
 
-    // -----------------------------------------------------------------------
-    // 9. Convert back to f32 and deliver results ----------------------------
-    // -----------------------------------------------------------------------
+    // 9. Convert back to f32 and deliver results
     
-    // Convert f64 results back to f32
     let u_f32: [[f32; 3]; 3] = [
         [u[0][0] as f32, u[0][1] as f32, u[0][2] as f32],
         [u[1][0] as f32, u[1][1] as f32, u[1][2] as f32],

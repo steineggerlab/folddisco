@@ -1,4 +1,4 @@
-//!
+//! Structure file readers (PDB, mmCIF, Foldcomp) and format detection.
 
 use std::fmt;
 pub mod parser;
@@ -8,6 +8,7 @@ pub mod cif;
 #[cfg(feature = "foldcomp")]
 pub mod fcz;
 
+/// Input structure format.
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructureFileFormat {
     PDB,
@@ -32,6 +33,7 @@ impl StructureFileFormat {
         }
     }
     
+    /// Parse a format name or its numeric code.
     pub fn get_with_string(s: &str) -> StructureFileFormat {
         match s {
             "0" | "PDB" | "pdb" => StructureFileFormat::PDB,

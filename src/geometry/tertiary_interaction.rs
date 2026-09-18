@@ -1,11 +1,10 @@
-// Hash based on feature to build 3Di character in Foldseek
-// Main features are angles from neighboring C-alpha atoms
+// Hash from the features behind Foldseek's 3Di alphabet: angles between neighbouring
+// Ca atoms, Ca distance and sequence separation.
 
-// File: pdb_tr.rs
+// File: tertiary_interaction.rs
 // Created: 2024-03-27 17:35:35
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
-// PDB motif + 2 torsion angles
 
 use std::fmt;
 use crate::geometry::core::HashType;
@@ -13,22 +12,26 @@ use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
 use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 use crate::utils::convert::*;
 
+// Widest bin counts the bit layout below can hold
+pub const MAX_NBIN_DIST: f32 = 16.0;
+pub const MAX_NBIN_SIN_COS: f32 = 8.0;
+
+/// 29-bit TertiaryInteraction hash.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
 impl HashValue {
     #[inline]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
-        // Added one more quantization for distance
-        let nbin_dist = if nbin_dist > 16 {
-            16.0
+        let nbin_dist = if nbin_dist > MAX_NBIN_DIST as usize {
+            MAX_NBIN_DIST
         } else if nbin_dist == 0 {
             NBIN_DIST
         } else {
             nbin_dist as f32
         };
-        let nbin_angle = if nbin_angle > 8 {
-            8.0
+        let nbin_angle = if nbin_angle > MAX_NBIN_SIN_COS as usize {
+            MAX_NBIN_SIN_COS
         } else if nbin_angle == 0 {
             NBIN_SIN_COS
         } else {
@@ -74,6 +77,7 @@ impl HashValue {
         };
         // let seq_dist = 0u32;
 
+        // cos of 7 angles 3b each | ca_dist 4b | seq_dist 4b (clamped to [-4, 4], offset by 4)
         let hashvalue = (cos_phi_12 << 26) | (cos_phi_34 << 23) | (cos_phi_15 << 20) |
                         (cos_phi_35 << 17) | (cos_phi_14 << 14) | (cos_phi_23 << 11) |
                         (cos_phi_13 << 8) | (ca_dist << 4) | (seq_dist);
@@ -88,9 +92,10 @@ impl HashValue {
         self.reverse_hash(NBIN_DIST as usize, NBIN_SIN_COS as usize)
     }
     
+    /// Decode to approximate features; angles come back in degrees.
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 9] {
-        let nbin_dist = if nbin_dist > 16 { 16.0 } else { nbin_dist as f32 };
-        let nbin_angle = if nbin_angle > 8 { 8.0 } else { nbin_angle as f32 };
+        let nbin_dist = if nbin_dist > MAX_NBIN_DIST as usize { MAX_NBIN_DIST } else { nbin_dist as f32 };
+        let nbin_angle = if nbin_angle > MAX_NBIN_SIN_COS as usize { MAX_NBIN_SIN_COS } else { nbin_angle as f32 };
         let cos_phi_12 = continuize_value(
             (self.0 >> 26) & BITMASK32_3BIT, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         ).acos().to_degrees();
@@ -143,9 +148,7 @@ impl HashValue {
     }
     
     pub fn is_symmetric(&self) -> bool {
-        // NOT sure same phi_14 and phi_23 is necessary to be symmetric
-        // phi12, 34; phi15, 35; phi25, 45
-        // TODO: Check if this is correct
+        // TODO: symmetry of these angle pairs is undefined; treated as never symmetric
         false
     }
 }

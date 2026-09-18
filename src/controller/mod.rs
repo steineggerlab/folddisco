@@ -1,10 +1,9 @@
 // File: mod.rs
 // Created: 2024-01-18 15:47:16
-// Description:
-//    a new controller implementation that supports multiple hash types
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
+pub mod expand;
 pub mod feature;
 pub mod filter;
 pub mod graph;
@@ -16,17 +15,18 @@ pub mod count_query;
 pub mod mode;
 pub mod sort;
 pub mod summary;
+pub mod substitution;
 
 use std::cell::UnsafeCell;
 use std::io::Write;
 use std::sync::Arc;
-use feature::get_geometric_hash_as_u32_from_structure;
+use feature::{get_expanded_geometric_hash_as_u32_from_structure, get_geometric_hash_as_u32_from_structure};
+use expand::IndexExpansion;
+use crate::structure::core::CompactStructure;
 use io::read_structure_from_path;
-// External imports
 use rayon::prelude::*;
 
 use crate::index::indextable::FolddiscoIndex;
-// Internal imports
 use crate::PDBReader;
 use crate::geometry::core::HashType;
 use crate::utils::log::{ print_log_msg, log_msg, FAIL, WARN, INFO };
@@ -34,18 +34,18 @@ use crate::utils::log::{ print_log_msg, log_msg, FAIL, WARN, INFO };
 #[cfg(feature = "foldcomp")]
 use crate::structure::io::fcz::FoldcompDbReader;
 
-// Constants
 const DEFAULT_NUM_THREADS: usize = 4;
 // const DEFAULT_HASH_TYPE: HashType = HashType::PDBTrRosetta;
 const DEFAULT_MAX_RESIDUE: usize = 65535;
 const DEFAULT_DIST_CUTOFF: f32 = 20.0;
 
-// Module specific types
-pub type ResidueMatch = Option<(u8, u64)>;
+/// Matched (chain, residue) for one query residue, `None` if unmatched.
+pub type ResidueMatch = Option<(crate::structure::ChainId, u64)>;
 
 unsafe impl Send for Folddisco {}
 unsafe impl Sync for Folddisco {}
 
+/// Index builder: structure paths, hashing settings, per-structure stats and the index.
 pub struct Folddisco {
     pub path_vec: Vec<String>,
     pub numeric_id_vec: Vec<usize>,
@@ -68,10 +68,12 @@ pub struct Folddisco {
     #[cfg(feature = "foldcomp")]
     pub foldcomp_db_reader: FoldcompDbReader,
     pub is_foldcomp_enabled: bool,
+    /// Query-style expansion applied to every indexed pair; `None` for a plain index.
+    pub expansion: Option<IndexExpansion>,
 }
 
 impl Folddisco {
-    // Constructors
+    /// Builder with default settings and an in-memory index for `hash_type`.
     pub fn create_with_hash_type(path_vec: Vec<String>, hash_type: HashType) -> Folddisco {
         let length = path_vec.len();
         let total_hashes = 2usize.pow(hash_type.encoding_bits() as u32);
@@ -97,9 +99,11 @@ impl Folddisco {
             #[cfg(feature = "foldcomp")]
             foldcomp_db_reader: FoldcompDbReader::empty(),
             is_foldcomp_enabled: false,
+            expansion: None,
         }
     }
 
+    /// Builder over structure files, writing the index to `output_path`.
     pub fn new(
         path_vec: Vec<String>, hash_type: HashType, num_threads: usize,
         num_bin_dist: usize, num_bin_angle: usize, output_path: String,
@@ -130,9 +134,11 @@ impl Folddisco {
             #[cfg(feature = "foldcomp")]
             foldcomp_db_reader: FoldcompDbReader::empty(),
             is_foldcomp_enabled: false,
+            expansion: None,
         }
     }
 
+    /// Builder reading structures from a Foldcomp database.
     #[cfg(feature = "foldcomp")]
     pub fn new_with_foldcomp_db(
         path_vec: Vec<String>, hash_type: HashType, num_threads: usize,
@@ -164,10 +170,10 @@ impl Folddisco {
             foldcomp_db_path: foldcomp_db_path.to_string(),
             foldcomp_db_reader: foldcomp_db_reader,
             is_foldcomp_enabled: true,
+            expansion: None,
         }
     }
 
-    // Setters
     pub fn set_path_vec(&mut self, path_vec: Vec<String>) {
         self.path_vec = path_vec;
     }
@@ -189,25 +195,39 @@ impl Folddisco {
     pub fn set_max_residue(&mut self, max_residue: usize) {
         self.max_residue = max_residue;
     }
+    pub fn set_expansion(&mut self, expansion: Option<IndexExpansion>) {
+        self.expansion = expansion;
+    }
+
+    /// Hashes of one structure with this index's binning and expansion.
+    fn hash_structure(&self, compact: &CompactStructure) -> Vec<u32> {
+        match &self.expansion {
+            Some(expansion) => get_expanded_geometric_hash_as_u32_from_structure(
+                compact, self.hash_type, self.num_bin_dist, self.num_bin_angle,
+                self.dist_cutoff, &self.multiple_bins, expansion,
+            ),
+            None => get_geometric_hash_as_u32_from_structure(
+                compact, self.hash_type, self.num_bin_dist, self.num_bin_angle,
+                self.dist_cutoff, &self.multiple_bins,
+            ),
+        }
+    }
     
-    // Main methods
+    /// Assign numeric ids 0..n in path order.
     pub fn fill_numeric_id_vec(&mut self) {
         string_vec_to_numeric_id_vec(&self.path_vec, &mut self.numeric_id_vec);
     }
 
+    /// Collect deduplicated (hash, structure) pairs of all structures into `hash_id_vec`.
     pub fn collect_hash_vec(&mut self) { // THISONE
-        // Mutex free version
         let shared_data = SharedData::new(self.path_vec.len());
         
-        // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating files");
-        // For iterating files, apply multi-threading with num_threads_for_file
 
         let collected: Vec<(u32, usize)> = pool.install(|| {
-            // Preserve locality for multi-threading
             self.path_vec
                 .par_iter()
                 .enumerate()
@@ -232,16 +252,12 @@ impl Folddisco {
 
                     if compact.num_residues > self.max_residue {
                         print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
-                        // skip this file
-                        // Drop intermediate variables
                         drop(compact);
                         return Vec::new();
                     }
                     let compact = compact.to_compact();
-                    // Directly write num_residues and avg_plddt to the vectors
                     let nres = compact.num_residues;
                     let plddt = compact.get_avg_plddt();
-                    // Mutex free version
                     unsafe {
                         let nres_vec = shared_data.get_nres_vec();
                         let plddt_vec = shared_data.get_plddt_vec();
@@ -251,15 +267,9 @@ impl Folddisco {
                         plddt_vec[pdb_pos] = plddt;
                     }
 
-                    let mut hash_vec = get_geometric_hash_as_u32_from_structure(
-                        &compact, self.hash_type,
-                        self.num_bin_dist, self.num_bin_angle,
-                        self.dist_cutoff, &self.multiple_bins,
-                    );
-                    // Drop intermediate variables
+                    let mut hash_vec = self.hash_structure(&compact);
                     drop(compact);
 
-                    // If remove_redundancy is true, remove duplicates
                     hash_vec.sort_unstable();
                     hash_vec.dedup();
                     hash_vec.iter().map(|x| (*x, pdb_pos)).collect()
@@ -271,20 +281,17 @@ impl Folddisco {
         drop(pool);
     }
     
+    /// First indexing pass: hash every structure and count entries per hash, in chunks.
     pub fn collect_and_count(&mut self) {
         let shared_data = SharedData::new(self.path_vec.len());
-        // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating hashes");
-        // For iterating files, apply multi-threading with num_threads_for_file
         let chunk_size = self.num_threads * 128;
-        // Chunk pdb paths
         let chunked_paths = self.path_vec.chunks(chunk_size);
         let total_chunks = chunked_paths.len();
         chunked_paths.enumerate().for_each(|(chunk_index, chunk)| {
-            // Print percentage of completion
             print_log_msg(INFO, &format!("Processing chunk {}/{}", chunk_index + 1, total_chunks));
             let collected: Vec<(u32, usize)> = pool.install(|| {
                 chunk
@@ -312,16 +319,12 @@ impl Folddisco {
                         };
                         if compact.num_residues > self.max_residue {
                             print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
-                            // skip this file
-                            // Drop intermediate variables
                             drop(compact);
                             return Vec::new();
                         }
                         let compact = compact.to_compact();
-                        // Directly write num_residues and avg_plddt to the vectors
                         let nres = compact.num_residues;
                         let plddt = compact.get_avg_plddt();
-                        // Mutex free version
                         unsafe {
                             let nres_vec = shared_data.get_nres_vec();
                             let plddt_vec = shared_data.get_plddt_vec();
@@ -331,14 +334,8 @@ impl Folddisco {
                             plddt_vec[pdb_pos] = plddt;
                         }
 
-                        let mut hash_vec = get_geometric_hash_as_u32_from_structure(
-                            &compact, self.hash_type, 
-                            self.num_bin_dist, self.num_bin_angle,
-                            self.dist_cutoff, &self.multiple_bins,
-                        );
-                        // Drop intermediate variables
+                        let mut hash_vec = self.hash_structure(&compact);
                         drop(compact);
-                        // If remove_redundancy is true, remove duplicates
 
                         hash_vec.sort_unstable();
                         hash_vec.dedup();
@@ -348,7 +345,7 @@ impl Folddisco {
                 });
             pool.install(|| {
                 (0..self.num_threads).into_par_iter().for_each(| tid | {
-                    // Thread only saves hashes with same modulos
+                    // Each thread owns the hashes congruent to its id
                     let _ = &collected.iter().for_each(|(hash, pdb_pos)| {
                         if hash % self.num_threads as u32 == tid as u32 {
                             self.fold_disco_index.count_single_entry(*hash, *pdb_pos);
@@ -364,15 +361,13 @@ impl Folddisco {
         drop(pool);
     }
     
+    /// Second indexing pass: rehash every structure and write entries into allocated slots.
     pub fn add_entries(&mut self) {
-        // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating hashes");
-        // For iterating files, apply multi-threading with num_threads_for_file
         let chunk_size = self.num_threads * 128;
-        // Chunk pdb paths
         let chunked_paths = self.path_vec.chunks(chunk_size);
         let total_chunks = chunked_paths.len();
         chunked_paths.enumerate().for_each(|(chunk_index, chunk)| {
@@ -404,20 +399,12 @@ impl Folddisco {
 
                         if compact.num_residues > self.max_residue {
                             print_log_msg(WARN, &format!("{} has too many residues. Skipping", pdb_path));
-                            // skip this file
-                            // Drop intermediate variables
                             drop(compact);
                             return Vec::new();
                         }
                         let compact = compact.to_compact();
-                        // Directly write num_residues and avg_plddt to the vectors
-                        let mut hash_vec = get_geometric_hash_as_u32_from_structure(
-                            &compact, self.hash_type, self.num_bin_dist, self.num_bin_angle,
-                            self.dist_cutoff, &self.multiple_bins,
-                        );
-                        // Drop intermediate variables
+                        let mut hash_vec = self.hash_structure(&compact);
                         drop(compact);
-                        // If remove_redundancy is true, remove duplicates
                         hash_vec.sort_unstable();
                         hash_vec.dedup();
                         hash_vec.iter().map(|x| (x.clone(), pdb_pos)).collect()
@@ -426,7 +413,7 @@ impl Folddisco {
                 });
             pool.install(|| {
                 (0..self.num_threads).into_par_iter().for_each(| tid | {
-                    // Thread only saves hashes with same modulos
+                    // Each thread owns the hashes congruent to its id
                     let mut bit_containers = Vec::with_capacity(8);
                     let _ = &collected.iter().for_each(|(hash, pdb_pos)| {
                         if hash % self.num_threads as u32 == tid as u32 {
@@ -440,6 +427,7 @@ impl Folddisco {
         drop(pool);
     }
     
+    /// Sort `hash_id_vec` by hash in parallel.
     pub fn sort_hash_vec(&mut self) {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
@@ -451,6 +439,7 @@ impl Folddisco {
         drop(pool);
     }
     
+    /// Sum of n * (n - 1) residue pairs over all PDB files.
     pub fn get_allocation_size(&self) -> usize {
         let mut allocation_size = 0usize;
         self.path_vec.iter().for_each(|pdb_path| {
@@ -465,8 +454,8 @@ impl Folddisco {
         allocation_size
     }
 
+    /// Write `numeric_id<TAB>path` lines without a header.
     pub fn save_id_vec(&self, path: &str) {
-        // Save numeric_id_vec & path_vec as headerless tsv
         let mut file = std::fs::File::create(path).expect("Unable to create file");
         for i in 0..self.numeric_id_vec.len() {
             let numeric_id = self.numeric_id_vec[i];

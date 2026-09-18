@@ -1,15 +1,16 @@
 use crate::structure::atom::{Atom, AtomVector};
+use crate::structure::chain_id::ChainId;
 use crate::structure::coordinate::{approx_cb, CarbonCoordinateVector, Coordinate};
 use crate::structure::feature::{Torsion, TorsionType};
 use crate::utils::convert::map_aa_to_u8;
 
 use super::coordinate::{calc_torsion_radian, calc_angle_radian};
 
-/// Structure is the main data structure for storing the information of a protein structure.
+/// A parsed protein structure: every atom, plus chain and residue counts.
 #[derive(Debug)]
 pub struct Structure {
     pub num_chains: usize,
-    pub chains: Vec<u8>,
+    pub chains: Vec<ChainId>,
     pub atom_vector: AtomVector,
     pub num_atoms: usize,
     pub num_residues: usize,
@@ -26,12 +27,19 @@ impl Structure {
         }
     }
 
-    pub fn update(&mut self, atom: Atom, record: &mut (u8, u64)) {
-        // record store previous chain ID and residue serial
-        if record.0 != atom.chain {
-            self.chains.push(atom.chain);
+    /// Add an atom whose chain ID fits in one byte (PDB records, Foldcomp).
+    pub fn update(&mut self, atom: Atom, record: &mut (ChainId, u64)) {
+        let chain = ChainId::from_byte(atom.chain);
+        self.update_with_chain(atom, chain, record)
+    }
+
+    /// Add an atom with its full chain ID (mmCIF `auth_asym_id`).
+    /// `record` holds the previous (chain, residue serial) to count new chains and residues.
+    pub fn update_with_chain(&mut self, atom: Atom, chain: ChainId, record: &mut (ChainId, u64)) {
+        if record.0 != chain {
+            self.chains.push(chain);
             self.num_chains += 1;
-            record.0 = atom.chain;
+            record.0 = chain;
         }
         if record.1 != atom.res_serial {
             self.num_residues += 1;
@@ -39,7 +47,7 @@ impl Structure {
         }
         self.num_atoms += 1;
 
-        self.atom_vector.push_atom(atom);
+        self.atom_vector.push_atom_with_chain(atom, chain);
     }
 
     pub fn to_compact(&self) -> CompactStructure {
@@ -52,11 +60,12 @@ impl Structure {
 
 }
 
+/// Per-residue backbone view (N, CA, CB) used for hashing and matching.
 #[derive(Debug, Clone)]
 pub struct CompactStructure {
     pub num_chains: usize,
-    pub chains: Vec<u8>,
-    pub chain_per_residue: Vec<u8>,
+    pub chains: Vec<ChainId>,
+    pub chain_per_residue: Vec<ChainId>,
     pub num_residues: usize,
     pub residue_serial: Vec<u64>,
     pub residue_name: Vec<[u8; 3]>,
@@ -67,8 +76,8 @@ pub struct CompactStructure {
 }
 
 impl CompactStructure {
+    /// Keep N, CA and CB per residue; a missing CB (e.g. Gly) is approximated from N, CA, C.
     pub fn build(origin: &Structure) -> CompactStructure {
-        // Store only backbone atoms
         let model = &origin.atom_vector;
 
         let mut res_serial_vec: Vec<u64> = Vec::with_capacity(origin.num_residues);
@@ -89,9 +98,11 @@ impl CompactStructure {
         let mut cb_vec_z: Vec<f32> = Vec::with_capacity(origin.num_residues);
         
 
-        let mut chain_per_residue: Vec<u8> = Vec::with_capacity(origin.num_residues);
+        let mut chain_per_residue: Vec<ChainId> = Vec::with_capacity(origin.num_residues);
         let mut prev_res_serial: Option<u64> = None;
         let mut prev_res_name: Option<&[u8; 3]> = None;
+        // A residue is flushed when the next one starts, so its chain must be tracked too.
+        let mut prev_chain: Option<ChainId> = None;
         let mut n: Option<Coordinate> = None;
         let mut ca: Option<Coordinate> = None;
         let mut cb: Option<Coordinate> = None;
@@ -113,7 +124,7 @@ impl CompactStructure {
                         cb_vec.push(&cb);
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
-                        chain_per_residue.push(origin.atom_vector.chain[idx]);
+                        chain_per_residue.push(prev_chain.expect("expected chain id"));
                         b_factors.push(origin.atom_vector.b_factor[idx]);
                         n_vec_x.push(n.x);
                         n_vec_y.push(n.y);
@@ -133,7 +144,7 @@ impl CompactStructure {
                         ca_vec.push(&ca);
                         res_serial_vec.push(resi);
                         res_name_vec.push(*resn);
-                        chain_per_residue.push(origin.atom_vector.chain[idx]);
+                        chain_per_residue.push(prev_chain.expect("expected chain id"));
                         b_factors.push(origin.atom_vector.b_factor[idx]);
                         if let (Some(b"GLY"), Some(gly_n), Some(gly_c)) =
                             (prev_res_name, &gly_n, &gly_c)
@@ -174,6 +185,7 @@ impl CompactStructure {
                 n = None;
                 prev_res_serial = Some(model.get_res_serial(idx));
                 prev_res_name = model.res_name.get(idx);
+                prev_chain = Some(origin.atom_vector.chain[idx]);
             }
 
             if model.is_ca(idx) {
@@ -212,8 +224,9 @@ impl CompactStructure {
             b_factors: b_factors,
         }
     }
+    /// Residue index of (chain, residue serial), by linear scan.
     #[inline(always)]
-    pub fn get_index(&self, chain: &u8, res_serial: &u64) -> Option<usize> {
+    pub fn get_index(&self, chain: &ChainId, res_serial: &u64) -> Option<usize> {
         for i in 0..self.num_residues {
             if self.chain_per_residue[i] == *chain && self.residue_serial[i] == *res_serial {
                 return Some(i);
@@ -278,6 +291,7 @@ impl CompactStructure {
         }
     }
 
+    /// Angle between the CA->CB vectors of two residues.
     pub fn get_ca_cb_angle(&self, idx1: usize, idx2: usize, return_radian: bool) -> Option<f32> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -307,6 +321,7 @@ impl CompactStructure {
         (self.residue_serial[idx1], self.residue_serial[idx2])
     }
 
+    /// Point pair feature of the two CBs relative to CA1; `None` beyond `dist_cutoff`.
     pub fn get_ppf(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<[f32; 4]> {
         let ca1 = self.get_ca(idx1);
         let cb1 = self.get_cb(idx1);
@@ -324,6 +339,7 @@ impl CompactStructure {
         }
     }
 
+    /// trRosetta orientations: (cb_dist, omega, theta1, theta2, phi1, phi2), radians.
     pub fn get_trrosetta_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -349,6 +365,7 @@ impl CompactStructure {
         }
     }
 
+    /// trRosetta orientations plus CB distance and signed log sequence separation.
     pub fn get_trrosetta_feature2(&self, idx1: usize, idx2: usize) -> Option<[f32; 7]> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -375,6 +392,8 @@ impl CompactStructure {
         }
     }
 
+    /// Default feature: (ca_dist, cb_dist, ca_cb_angle, theta1, theta2), radians.
+    /// `None` when CA distance exceeds `dist_cutoff`.
     pub fn get_pdb_tr_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -402,6 +421,7 @@ impl CompactStructure {
         }
     }
     
+    /// `get_pdb_tr_feature` plus backbone torsions phi1, phi2. Needs both chain neighbours.
     pub fn get_hybrid_feature(&self, idx1: usize, idx2: usize, dist_cutoff: f32) -> Option<(f32, f32, f32, f32, f32, f32, f32)> {
         let ca1 = self.get_ca(idx1);
         let ca2 = self.get_ca(idx2);
@@ -442,6 +462,7 @@ impl CompactStructure {
     pub fn get_bfactor(&self, idx: usize) -> f32 {
         self.b_factors[idx]
     }
+    /// pLDDT, stored in the B-factor column for predicted models.
     #[inline(always)]
     pub fn get_plddt(&self, idx: usize) -> f32 {
         self.get_bfactor(idx)
@@ -459,8 +480,8 @@ impl CompactStructure {
         self.get_avg_bfactor()
     }
 
+    /// `(aa_i, aa_j, CA distance)`.
     pub fn get_list_amino_acids_and_distances(&self, i: usize, j: usize) -> Option<(u8, u8, f32)> {
-        // Return i, j, aa_i, aa_j, distance
         let aa_i = map_aa_to_u8(self.get_res_name(i));
         let aa_j = map_aa_to_u8(self.get_res_name(j));
         let distance = self.get_ca_distance(i, j);
@@ -480,6 +501,9 @@ impl CompactStructure {
 
 #[cfg(test)]
 mod structure_tests {
+    use crate::structure::chain_id::ChainId;
+    use crate::structure::io::pdb::Reader as PdbReader;
+
     #[test]
     fn test_gly_integration() {
         let data = crate::structure::io::pdb::Reader::from_file("data/homeobox/1akha-.pdb")
@@ -507,6 +531,28 @@ mod structure_tests {
         assert_eq!(compact.num_residues, structure.num_residues);
     }
     
+    /// The last residue of a chain keeps its own chain. In 4cha.pdb chain A is 1-11 and B starts at 16.
+    #[test]
+    fn last_residue_of_a_chain_keeps_its_own_chain() {
+        let compact = PdbReader::from_file("data/serine_peptidases/4cha.pdb")
+            .unwrap().read_structure().unwrap().to_compact();
+
+        let chain_a = ChainId::from_byte(b'A');
+        let chain_b = ChainId::from_byte(b'B');
+
+        let a_residues: Vec<u64> = (0..compact.num_residues)
+            .filter(|&i| compact.chain_per_residue[i] == chain_a)
+            .map(|i| compact.residue_serial[i])
+            .collect();
+        assert_eq!(a_residues, (1..=11).collect::<Vec<u64>>());
+
+        // Residue 11 is the last of chain A and must be reachable as such...
+        assert!(compact.get_index(&chain_a, &11).is_some());
+        // ...and must not have leaked into chain B, which starts at 16.
+        assert_eq!(compact.get_index(&chain_b, &11), None);
+        assert!(compact.get_index(&chain_b, &16).is_some());
+    }
+
     #[test]
     fn test_avg_bfactor() {
         let data = crate::structure::io::pdb::Reader::from_file("data/homeobox/1akha-.pdb")

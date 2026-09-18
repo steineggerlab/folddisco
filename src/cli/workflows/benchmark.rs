@@ -10,20 +10,8 @@ use crate::prelude::*;
 use crate::cli::config::read_index_config_from_file;
 use crate::utils::benchmark::{compare_target_answer_neutral_vec, compare_target_answer_vec, measure_up_to_k_fp_vec, measure_up_to_k_fp_with_neutral_vec};
 
-// usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f tsv
-// usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> -f default
-// 2025-01-24 17:57:19
-// TODO list
-// 1. DONE: [ ] consider sep character based on extension (csv -> ',', tsv -> '\t')
-// 2. DONE: [ ] id column index for all input files; result, answer, neutral
-// 3. TODO: [ ] header option for all input files; result, answer, neutral; Default: false
-// 4. TODO: [ ] add documentation.
-
-// EXAMPLE pyScoMotif result
-// ,matched_motif,similar_motif_found,RMSD,n_mutations,PDB_ID,header_description
-// 0,A49L A143V A77C A103F A136R,A49L A143V A77C A103F A136R,0.002,0,d1iapa_,
-// ,matched_motif,similar_motif_found,RMSD,n_mutations,PDB_ID,header_description
-// 0,A360L A397N A365G A363E A400I A391R A402G A388G A413K,A360L A397N A365G A363E A400I A391R A402G A388G A413K,0.005,0,d6c3ma3,
+// `folddisco benchmark`: precision/recall of a result ID list against an answer list,
+// using the index lookup as the universe of IDs. Output: `-f tsv` (one row) or `-f default`.
 
 pub const HELP_BENCHMARK: &str = "\
 usage: folddisco benchmark -r <result.tsv> -a <answer.tsv> -i <index> [options]
@@ -47,6 +35,7 @@ options:
 ";
 
 
+/// Entry point for `folddisco benchmark`.
 pub fn benchmark(env: AppArgs) {
     match env {
         AppArgs::Benchmark {
@@ -73,7 +62,7 @@ pub fn benchmark(env: AppArgs) {
                     std::process::exit(1);
                 }
             }
-            // If input is given, read from file
+            // --input lists (result, answer[, neutral]) per line
             let input_vector = if input.is_none() {
                 if neutral.is_some() {
                     vec![(result.unwrap(), answer.unwrap(), neutral)]
@@ -110,14 +99,15 @@ pub fn benchmark(env: AppArgs) {
             let config_path = format!("{}.type", index_path);
             let format = format.as_str();
             let raw_lookup = load_lookup_from_file(&lookup_path);
-            let mut lookup = raw_lookup.into_iter().map(|(id, _, _, _, _)| parse_path(&id, afdb_to_uniprot).to_string()).collect::<Vec<_>>();
+            let mut lookup = raw_lookup.names()
+                .map(|name| parse_path(name, afdb_to_uniprot).to_string())
+                .collect::<Vec<_>>();
             lookup.sort();
             lookup.dedup();
             let config = read_index_config_from_file(&config_path);
             
             pool.install(|| {
                 input_vector.par_iter().for_each(|(result_path, answer_path, neutral)| {
-                    // Parse path by id type
                     let result = read_one_column_as_vec(&result_path, column_result, header_result, afdb_to_uniprot);
 
                     let answer = read_one_column_as_vec(&answer_path, column_answer, header_answer, afdb_to_uniprot);
@@ -140,9 +130,8 @@ pub fn benchmark(env: AppArgs) {
 
                     match format {
                         "tsv" => {
-                            // lookup, result, answer, lookup_len, result_len, answer_len,
-                            // hash_type, num_bin_dist, num_bin_angle,
-                            // true_pos, true_neg, false_pos, false_neg, precision, recall, accuracy, f1_score, 
+                            // index, result, answer, n_ids, n_result, n_answer, hash_type, nbin_dist,
+                            // nbin_angle, TP, TN, FP, FN, precision, recall, accuracy, F1
                             println!(
                                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}",
                                 index_path,
@@ -178,7 +167,6 @@ pub fn benchmark(env: AppArgs) {
                             println!("TN: {}", metric.true_neg);
                             println!("FP: {}", metric.false_pos);
                             println!("FN: {}", metric.false_neg);
-                            // Print float with 4 decimal places
                             println!("Precision: {:.4}", metric.precision());
                             println!("Recall: {:.4}", metric.recall());
                             println!("Accuracy: {:.4}", metric.accuracy());
@@ -199,17 +187,16 @@ pub fn benchmark(env: AppArgs) {
     }
 }
 
+/// Unique IDs from one column of a csv/tsv file, in first-seen order.
 fn read_one_column_as_vec(file: &str, col_index: usize, header: bool, afdb_to_uniprot: bool) -> Vec<String> {
     let mut vec = Vec::new();
     let mut seen = HashSet::new();
     let sep = get_sep_character_from_filename(file);
-    // Open file and get specific column
     let file = std::fs::File::open(file).expect(
         &log_msg(FAIL, &format!("Failed to open tsv file: {}", file))
     );
     let reader = std::io::BufReader::new(file);
     
-    // If header is true, skip first line
     let lines = reader.lines().skip(if header { 1 } else { 0 });
     for line in lines {
         let line = line.expect(&log_msg(FAIL, "Failed to read line"));
@@ -225,6 +212,7 @@ fn read_one_column_as_vec(file: &str, col_index: usize, header: bool, afdb_to_un
     vec
 }
 
+/// `,` for .csv, tab otherwise.
 #[inline]
 fn get_sep_character_from_filename(file: &str) -> char {
     let ext = file.split('.').last().unwrap();
@@ -238,14 +226,13 @@ fn get_sep_character_from_filename(file: &str) -> char {
     }
 }
 
+/// File stem of a structure path; with `afdb_to_uniprot`, `AF-P12345-F1-...` -> `P12345`.
 #[inline]
 fn parse_path(path: &str, afdb_to_uniprot: bool) -> &str {
     let path = path.split('/').last().unwrap();
     let path = if path.ends_with(".pdb") || path.ends_with(".cif") || path.ends_with(".fcz") || path.ends_with(".ent") {
-        // Return slice of string from start to end-4
         &path[..path.len()-4]
     } else if path.ends_with(".pdb.gz") || path.ends_with(".cif.gz") || path.ends_with(".fcz.gz") || path.ends_with(".ent.gz") {
-        // Return slice of string from start to end-7
         &path[..path.len()-7]
     } else {
         path

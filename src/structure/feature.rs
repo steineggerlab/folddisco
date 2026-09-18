@@ -1,6 +1,7 @@
 use crate::structure::coordinate::Coordinate;
 use crate::structure::core::Structure;
 
+/// Backbone torsion kind.
 #[derive(Debug, Clone)]
 pub enum TorsionType {
     Psi,
@@ -8,6 +9,7 @@ pub enum TorsionType {
     None,
 }
 
+/// Per-residue backbone torsions of one kind, in degrees.
 #[derive(Debug, Clone)]
 pub struct Torsion {
     pub torsion_type: TorsionType,
@@ -24,6 +26,7 @@ impl Torsion {
         }
     }
 
+    /// Compute torsions for every residue. Only psi is implemented, whatever `torsiontype` says.
     pub fn build(structure: &Structure, torsiontype: TorsionType) -> Self {
         let mut torsion = Torsion::new();
         torsion.set_torsion_type(torsiontype);
@@ -50,6 +53,7 @@ impl Torsion {
         self.torsion.push(torsion);
     }
 
+    /// Dihedral angle of four points, in degrees.
     pub fn calc_torsion_angle(
         atom1: &Coordinate,
         atom2: &Coordinate,
@@ -60,12 +64,10 @@ impl Torsion {
         /* If psi angle, b: N(i), ca: CA(i), c: C(i), d: N(i+1)
         If phi angle, b: C(i-1), c: N(i), ca: CA(i), d: C(i) */
 
-        // Form vectors
         let v1 = b.sub(a);
         let v2 = c.sub(b);
         let v3 = d.sub(c);
 
-        // Form normal vectors via cross products
         let r = v1.cross(&v2).normalize();
         let s = v2.cross(&v3).normalize();
         let t = r.cross(&v2.normalize()).normalize();
@@ -74,6 +76,7 @@ impl Torsion {
         -y.atan2(x).to_degrees()
     }
 
+    /// Psi of the 0-based `nth` residue: N(i), CA(i), C(i), N(i+1).
     pub fn calc_psi_angle(structure: &Structure, nth: usize) -> f32 {
         let _psi_vec: Vec<f32> = Vec::new();
 

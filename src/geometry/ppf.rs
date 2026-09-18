@@ -1,4 +1,5 @@
-// Point Pair Features (PPF):
+// Point pair features (PPF) in 32 bits:
+// aa1 5b | aa2 5b | dist 4b | sin,cos of 3 angles 3b each
 
 use std::fmt;
 use crate::geometry::core::HashType;
@@ -7,23 +8,26 @@ use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 use crate::utils::convert::map_u8_to_aa;
 use crate::utils::convert::*;
 
-// 5 bit for AA, 4 bit for distance, 3 bit for sin & cos
+// Widest bin counts the bit layout above can hold
+pub const MAX_NBIN_DIST: f32 = 16.0;
+pub const MAX_NBIN_SIN_COS: f32 = 8.0;
 
+/// 32-bit point pair feature hash.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
 impl HashValue {
     #[inline]
     pub fn perfect_hash(ppf: &Vec<f32>, nbin_dist: usize, nbin_sincos: usize) -> u32 {
-        let nbin_dist = if nbin_dist > 16 { 
-            16.0
+        let nbin_dist = if nbin_dist > MAX_NBIN_DIST as usize {
+            MAX_NBIN_DIST
         } else if nbin_dist == 0 {
             NBIN_DIST
         } else {
             nbin_dist as f32
         };
-        let nbin_sincos = if nbin_sincos > 8 {
-            8.0
+        let nbin_sincos = if nbin_sincos > MAX_NBIN_SIN_COS as usize {
+            MAX_NBIN_SIN_COS
         } else if nbin_sincos == 0 {
             NBIN_SIN_COS
         } else {
@@ -54,6 +58,7 @@ impl HashValue {
         HashValue::perfect_hash(ppf, NBIN_DIST as usize, NBIN_SIN_COS as usize)
     }
     
+    /// Decode to approximate features; angles come back in degrees.
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_sincos: usize) -> [f32; 6] {
         let aa1 = (self.0 >> 27) & BITMASK32_5BIT as u32;
         let aa2 = (self.0 >> 22) & BITMASK32_5BIT as u32;

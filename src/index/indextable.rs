@@ -1,3 +1,14 @@
+//! Inverted index: hash -> sorted structure ids.
+//!
+//! Files: `<prefix>` (or `<prefix>.value`) holds the entries, delta-encoded ids as
+//! 7-bit varints; `<prefix>.offset` is `count: usize | hashes: [u32; count] |
+//! offsets: [usize; count + 1]`, all little-endian.
+//!
+//! Build is two-pass: `count_*` sizes each hash's entry run, `allocate_entries`
+//! turns sizes into offsets, `add_*` writes the bytes, then
+//! `wrapup_offset_and_save_entries`, `prune_to_sparse` and `save_offset_to_file`.
+//! Concurrent writers must touch disjoint hashes (callers shard by `hash % threads`).
+
 use std::cell::UnsafeCell;
 use std::io::Write;
 use std::mem::ManuallyDrop;
@@ -5,11 +16,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use memmap2::{Mmap, MmapMut};
 
+/// Inverted index over geometric hashes, either being built or loaded from disk.
 pub struct FolddiscoIndex {
-    hashes: UnsafeCell<Vec<u32>>, // This is deduplicated hash list
+    hashes: UnsafeCell<Vec<u32>>, // Deduplicated, sorted hash list (after pruning)
     offsets: UnsafeCell<Vec<usize>>,
     last_id: UnsafeCell<Vec<usize>>,
+    /// Hash list mapped from `.offset` when loaded.
     pub loaded_hashes: ManuallyDrop<Vec<u32>>,
+    /// Offsets mapped from `.offset` when loaded.
     pub loaded_offsets: ManuallyDrop<Vec<usize>>,
     pub total_hashes: usize,
     entries: UnsafeCell<MmapMut>,
@@ -20,6 +34,7 @@ pub struct FolddiscoIndex {
 unsafe impl Sync for FolddiscoIndex {}
 
 impl FolddiscoIndex {
+    /// Empty dense index over `total_hashes` hash values, to be built into `path`.
     pub fn new(total_hashes: usize, path: String, mmap_on_disk: bool) -> Self {
         let hashes = vec![0u32; total_hashes];
         let offsets = vec![0usize; total_hashes + 1];
@@ -50,6 +65,7 @@ impl FolddiscoIndex {
         hashes.binary_search(&hash).ok()
     }
     
+    /// Encoded entry bytes for `hash`; empty if absent.
     pub fn get_raw_entries(&self, hash: u32) -> &[u8] {
         let offsets = if self.loaded_offsets.is_empty() {
             unsafe { &*self.offsets.get() }
@@ -60,7 +76,7 @@ impl FolddiscoIndex {
 
         match self.find_hash_index(hash) {
             Some(idx) => {
-                // offsets[0] is always 0, offsets[idx] is start for hashes[idx-1]
+                // offsets[idx]..offsets[idx + 1] is the entry run of hashes[idx]
                 let start = offsets[idx];
                 let end = if idx + 1 < offsets.len() {
                     offsets[idx + 1]
@@ -80,11 +96,14 @@ impl FolddiscoIndex {
         }
     }
     
+    /// Decoded structure ids containing `hash`.
     pub fn get_entries(&self, hash: u32) -> Vec<usize> {
         let raw_entries = self.get_raw_entries(hash);
         merge_usize_vec_from_bytes(raw_entries)
     }
-    
+
+    /// Pass 1: add the varint size of `id` to `hash`'s run. Ids must arrive in
+    /// increasing order per hash.
     pub fn count_single_entry(&self, hash: u32, id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
@@ -104,6 +123,7 @@ impl FolddiscoIndex {
         last_id[hash as usize] = id;
     }
     
+    /// Pass 1 for all `hashes` of one structure.
     pub fn count_entries(&self, hashes: &Vec<u32>, id: usize) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
@@ -128,6 +148,7 @@ impl FolddiscoIndex {
         }
     }
 
+    /// Pass 2 for all `hashes` of one structure: write delta-encoded `id`.
     pub fn add_entries(&self, hashes: &[u32], id: usize, bit_container: &mut Vec<u8>) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
@@ -154,8 +175,7 @@ impl FolddiscoIndex {
             let prev = last_id[hash as usize];
             last_id[hash as usize] = id;
 
-            // TODO: write entry compressed
-            // Split id bytes into 7-bit chunks
+            // Delta from the previous id, as a 7-bit varint
             let id_to_split: usize = match prev {
                 usize::MAX => id,
                 _ => id - prev,
@@ -168,6 +188,7 @@ impl FolddiscoIndex {
         }
     }
     
+    /// Pass 2: write delta-encoded `id` into `hash`'s run.
     pub fn add_single_entry(&self, hash: u32, id: usize, bit_container: &mut Vec<u8>) {
         let last_id = unsafe { &mut *self.last_id.get() };
         // let atomic_offsets = unsafe { &mut *self.atomic_offsets.get() };
@@ -201,6 +222,8 @@ impl FolddiscoIndex {
         }
     }
     
+    /// Convert counted sizes to start offsets and allocate the entry buffer
+    /// (on disk with `mmap_on_disk`, else anonymous memory).
     pub fn allocate_entries(&self) {
         let offsets = unsafe { &mut *self.offsets.get() };
         let last_id = unsafe { &mut *self.last_id.get() };
@@ -236,6 +259,8 @@ impl FolddiscoIndex {
         }
     }
 
+    /// After pass 2 offsets point at run ends; shift them back to starts and write
+    /// in-memory entries to `index_path`.
     pub fn wrapup_offset_and_save_entries(&self) {
         let offsets = unsafe { &mut *self.offsets.get() };
         let entries = unsafe { &*self.entries.get() };
@@ -263,7 +288,7 @@ impl FolddiscoIndex {
         }
     }
 
-    // Prune dense index to sparse representation
+    /// Keep only hashes with entries: sorted `hashes` plus `hashes.len() + 1` offsets.
     pub fn prune_to_sparse(&mut self) {
         let offsets = unsafe { &*self.offsets.get() };
         
@@ -294,6 +319,7 @@ impl FolddiscoIndex {
         self.offsets = UnsafeCell::new(sparse_offsets);
     }
     
+    /// Write `<index_path>.offset` (see module docs for the layout).
     pub fn save_offset_to_file(&self) {
         let hashes = unsafe { &*self.hashes.get() };
         let offsets = unsafe { &*self.offsets.get() };
@@ -328,6 +354,8 @@ impl FolddiscoIndex {
 }
 
 
+/// Map a built index read-only. The returned `Mmap` backs `loaded_hashes` and
+/// `loaded_offsets` and must outlive the index.
 pub fn load_folddisco_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
     let offset_path = format!("{}.offset", index_prefix);
     let index_path = if std::path::Path::new(&format!("{}.value", index_prefix)).exists() {
@@ -342,7 +370,6 @@ pub fn load_folddisco_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
     // Read count (number of hashes)
     let count = usize::from_le_bytes(offset_mmap[0..8].try_into().unwrap());
     
-    // Calculate expected file size for new format
     let expected_size = 8 + count * std::mem::size_of::<u32>() + (count + 1) * std::mem::size_of::<usize>();
     
     if offset_mmap.len() < expected_size {
@@ -375,9 +402,9 @@ pub fn load_folddisco_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
         .write(false)
         .open(&index_path)
         .expect("Unable to open index file");
-    // Use regular map() for read-only access - works with files larger than physical RAM
+    // Read-only mapping; works for files larger than RAM
     let entries_mmap_ro = unsafe { Mmap::map(&entries_file).expect("Unable to map index file") };
-    // Transmute just for API consistency
+    // Stored as MmapMut only to share the field type; never written after load
     let entries_mmap = unsafe { std::mem::transmute::<Mmap, MmapMut>(entries_mmap_ro) };
     
     (FolddiscoIndex {
@@ -393,6 +420,7 @@ pub fn load_folddisco_index(index_prefix: &str) -> (FolddiscoIndex, Mmap) {
     }, offset_mmap)
 }
 
+/// Encode `id` as a little-endian 7-bit varint into `bit_container`; returns its length.
 #[inline(always)]
 fn split_by_seven_bits(mut id: usize, bit_container: &mut Vec<u8>) -> usize {
     let mut length = 0usize;
@@ -417,6 +445,7 @@ fn split_by_seven_bits(mut id: usize, bit_container: &mut Vec<u8>) -> usize {
     length
 }
 
+/// Decode one varint (all of `bytes`).
 #[inline(always)]
 fn merge_seven_bits(bytes: &[u8]) -> usize {
     let mut result = 0;
@@ -425,7 +454,6 @@ fn merge_seven_bits(bytes: &[u8]) -> usize {
     loop {
         let byte = bytes[i];
         result |= ((byte & 0x7F) as usize) << shift;
-        // If first bit is set to 1, break
         if i == 0 {
             break;
         }
@@ -435,6 +463,7 @@ fn merge_seven_bits(bytes: &[u8]) -> usize {
     result
 }
 
+/// Decode a run of delta-encoded varints back to absolute ids.
 #[inline(always)]
 fn merge_usize_vec_from_bytes(bytes: &[u8]) -> Vec<usize> {
     let mut result = vec![];
@@ -446,7 +475,7 @@ fn merge_usize_vec_from_bytes(bytes: &[u8]) -> Vec<usize> {
             end += 1;
             continue;
         } else {
-            // If first bit is set to 1, merge bytes
+            // Continuation bit clear: varint ends here
             let merged = merge_seven_bits(&bytes[start..=end]);
             if prev != usize::MAX {
                 prev += merged;

@@ -6,6 +6,7 @@ use std::{fmt, hash::Hash, io::{BufRead, Write}};
 
 use crate::utils::traits::HashableSync;
 
+/// Feature set and bit layout used to hash a residue pair.
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum HashType {
     PDBMotif,
@@ -22,7 +23,8 @@ pub enum HashType {
 }
 
 impl HashType {
-    
+
+    /// Hash type by numeric ID; unknown IDs give `Other`.
     pub fn get_with_index(index: usize) -> Self {
         match index {
             0 => HashType::PDBMotif,
@@ -38,7 +40,8 @@ impl HashType {
             _ => HashType::Other,
         }
     }
-    
+
+    /// Hash type by CLI name, alias or numeric ID; unknown names give `Other`.
     pub fn get_with_str(hash_type: &str) -> Self {
         match hash_type {
             "0" | "PDBMotif" | "pyscomotif" | "orig_pdb" => HashType::PDBMotif,
@@ -71,11 +74,12 @@ impl HashType {
         }
     }
 
+    /// Width of the stored integer; every type is packed into a u32.
     pub fn encoding_type(&self) -> usize {
-        // Unified to u32 encoding
         32usize
     }
 
+    /// Bits the hash value actually occupies.
     pub fn encoding_bits(&self) -> usize {
         match self {
             HashType::PDBMotif => 25usize,
@@ -91,12 +95,15 @@ impl HashType {
             HashType::Other => 32usize,
         }
     }
-    
+
+    /// Write the type name to `path`.
     pub fn save_to_file(&self, path: &str) {
         let mut file = std::fs::File::create(path).unwrap();
         file.write_all(format!("{:?}", self).as_bytes()).unwrap();
     }
 
+    /// Read a type name written by `save_to_file`. The last line wins; an empty file
+    /// gives `PDBTrRosetta`.
     pub fn load_from_file(path: &str) -> Self {
         let file = std::fs::File::open(path).unwrap();
         let reader = std::io::BufReader::new(file);
@@ -119,7 +126,8 @@ impl HashType {
         }
         hash_type
     }
-    
+
+    /// Distance bin count used when none is given (`-d 0`).
     pub fn default_dist_bin(&self) -> usize {
         match self {
             HashType::PDBMotif => super::pdb_motif::NBIN_DIST as usize,
@@ -133,7 +141,8 @@ impl HashType {
             HashType::Other => 0,
         }
     }
-    
+
+    /// Angle bin count used when none is given (`-a 0`).
     pub fn default_angle_bin(&self) -> usize {
         match self {
             HashType::PDBMotif => super::pdb_motif::NBIN_ANGLE as usize,
@@ -147,7 +156,147 @@ impl HashType {
             HashType::Other => 0,
         }
     }
-    
+
+    /// Widest distance bin count the bit layout holds; `perfect_hash` clamps to it.
+    pub fn max_dist_bin(&self) -> usize {
+        match self {
+            HashType::PDBMotif => super::pdb_motif::MAX_NBIN_DIST as usize,
+            HashType::PDBMotifSinCos => super::pdb_motif_sincos::MAX_NBIN_DIST as usize,
+            HashType::TrRosetta => super::trrosetta::MAX_NBIN_DIST as usize,
+            HashType::PDBTrRosetta => super::pdb_tr::PDBTR_MAX_NBIN_DIST as usize,
+            HashType::PointPairFeature => super::ppf::MAX_NBIN_DIST as usize,
+            HashType::TertiaryInteraction => super::tertiary_interaction::MAX_NBIN_DIST as usize,
+            HashType::Hybrid => super::hybrid::HYBRID_MAX_NBIN_DIST as usize,
+            // These two clamp against their own default bin count
+            HashType::FolddiscoAngle => super::folddisco_angle::NBIN_DIST as usize,
+            HashType::FolddiscoDist => super::folddisco_dist::NBIN_DIST as usize,
+            // append new hash type here
+            HashType::Other => 0,
+        }
+    }
+
+    /// Widest angle bin count the bit layout holds; `perfect_hash` clamps to it.
+    pub fn max_angle_bin(&self) -> usize {
+        match self {
+            HashType::PDBMotif => super::pdb_motif::MAX_NBIN_ANGLE as usize,
+            HashType::PDBMotifSinCos => super::pdb_motif_sincos::MAX_NBIN_SIN_COS as usize,
+            HashType::TrRosetta => super::trrosetta::MAX_NBIN_SIN_COS as usize,
+            HashType::PDBTrRosetta => super::pdb_tr::PDBTR_MAX_NBIN_SIN_COS as usize,
+            HashType::PointPairFeature => super::ppf::MAX_NBIN_SIN_COS as usize,
+            HashType::TertiaryInteraction => super::tertiary_interaction::MAX_NBIN_SIN_COS as usize,
+            HashType::Hybrid => super::hybrid::HYBRID_MAX_NBIN_SIN_COS as usize,
+            // These two clamp against their own default bin count
+            HashType::FolddiscoAngle => super::folddisco_angle::NBIN_ANGLE_360 as usize,
+            HashType::FolddiscoDist => super::folddisco_dist::NBIN_ANGLE_360 as usize,
+            // append new hash type here
+            HashType::Other => 0,
+        }
+    }
+
+    /// Distance bin count `perfect_hash` actually uses; 0 means the default.
+    pub fn effective_dist_bin(&self, nbin_dist: usize) -> usize {
+        if nbin_dist == 0 { self.default_dist_bin() } else { nbin_dist.min(self.max_dist_bin()) }
+    }
+
+    /// Angle bin count `perfect_hash` actually uses; 0 means the default.
+    pub fn effective_angle_bin(&self, nbin_angle: usize) -> usize {
+        if nbin_angle == 0 { self.default_angle_bin() } else { nbin_angle.min(self.max_angle_bin()) }
+    }
+
+    /// Distance window `(min, max)` this hash type discretizes over.
+    pub fn dist_range(&self) -> (f32, f32) {
+        match self {
+            HashType::PDBMotif => (super::pdb_motif::MIN_DIST, super::pdb_motif::MAX_DIST),
+            // append new hash type here if it uses its own window
+            _ => (crate::utils::convert::MIN_DIST, crate::utils::convert::MAX_DIST),
+        }
+    }
+
+    /// Width of one distance bin, in Angstroms.
+    pub fn dist_bin_width(&self, nbin_dist: usize) -> f32 {
+        let nbin = self.effective_dist_bin(nbin_dist);
+        if nbin < 2 {
+            return f32::INFINITY;
+        }
+        let (min_dist, max_dist) = self.dist_range();
+        (max_dist - min_dist) / (nbin as f32 - 1.0)
+    }
+
+    /// Angular step that cannot skip a bin, in this type's angle unit. For sin-cos
+    /// types it is one sin-cos bin, which is safe since `|d sin/d theta| <= 1`.
+    pub fn angle_bin_width(&self, nbin_angle: usize) -> f32 {
+        let nbin = self.effective_angle_bin(nbin_angle);
+        if nbin < 2 {
+            return f32::INFINITY;
+        }
+        let span = match self {
+            HashType::PDBMotif => super::pdb_motif::MAX_ANGLE - super::pdb_motif::MIN_ANGLE,
+            HashType::FolddiscoAngle => {
+                super::folddisco_angle::MAX_ANGLE_RAD - super::folddisco_angle::MIN_ANGLE_RAD
+            }
+            HashType::FolddiscoDist => {
+                super::folddisco_dist::MAX_ANGLE_RAD - super::folddisco_dist::MIN_ANGLE_RAD
+            }
+            // sin-cos encoded types
+            _ => crate::utils::convert::MAX_SIN_COS - crate::utils::convert::MIN_SIN_COS,
+        };
+        span / (nbin as f32 - 1.0)
+    }
+
+    /// True when angles are stored in degrees (only `PDBMotif`; the rest use radians).
+    pub fn angle_in_degrees(&self) -> bool {
+        matches!(self, HashType::PDBMotif)
+    }
+
+    /// Feature indices of torsions on `[-PI, PI]`. Tolerance offsets past a bound wrap
+    /// around; this matters for types that bin the raw angle and is a no-op for sin-cos.
+    pub fn periodic_angle_index(&self) -> Option<Vec<usize>> {
+        match self {
+            // omega, theta1, theta2
+            HashType::TrRosetta => Some(vec![3, 4, 5]),
+            // theta1, theta2
+            HashType::PDBTrRosetta | HashType::FolddiscoAngle | HashType::FolddiscoDist => Some(vec![5, 6]),
+            // theta1, theta2 and the two backbone torsions
+            HashType::Hybrid => Some(vec![5, 6, 7, 8]),
+            // append new hash type here
+            _ => None,
+        }
+    }
+
+    /// `(index, lo, hi)` of `acos`-derived angles; offsets past a bound are reflected.
+    pub fn bounded_angle_index(&self) -> Option<Vec<(usize, f32, f32)>> {
+        const PI: f32 = std::f32::consts::PI;
+        match self {
+            HashType::PDBMotif => Some(vec![
+                (4, super::pdb_motif::MIN_ANGLE, super::pdb_motif::MAX_ANGLE)
+            ]),
+            // Ca-Cb angle
+            HashType::PDBMotifSinCos | HashType::PDBTrRosetta | HashType::Hybrid |
+            HashType::FolddiscoAngle | HashType::FolddiscoDist => Some(vec![(4, 0.0, PI)]),
+            // phi1, phi2
+            HashType::TrRosetta => Some(vec![(6, 0.0, PI), (7, 0.0, PI)]),
+            HashType::PointPairFeature => Some(vec![(3, 0.0, PI), (4, 0.0, PI), (5, 0.0, PI)]),
+            HashType::TertiaryInteraction => Some((0..=6).map(|i| (i, 0.0, PI)).collect()),
+            // append new hash type here
+            _ => None,
+        }
+    }
+
+    /// Wrap torsions and reflect bounded angles of a perturbed feature, so a wide angle
+    /// tolerance cannot overflow a bit field. Distances are left as-is on purpose: the
+    /// index holds out-of-window distances too, and a query must encode them the same way.
+    pub fn sanitize_perturbed_feature(&self, feature: &mut [f32]) {
+        if let Some(periodic) = self.periodic_angle_index() {
+            for idx in periodic {
+                feature[idx] = crate::utils::convert::wrap_to_pi(feature[idx]);
+            }
+        }
+        if let Some(bounded) = self.bounded_angle_index() {
+            for (idx, lo, hi) in bounded {
+                feature[idx] = crate::utils::convert::reflect_into_range(feature[idx], lo, hi);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -176,6 +325,7 @@ mod tests {
     }
 }
 
+/// Hash value tagged with its hash type.
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum GeometricHash {
     PDBMotif(super::pdb_motif::HashValue),
@@ -193,6 +343,7 @@ pub enum GeometricHash {
 impl HashableSync for GeometricHash {}
 
 impl GeometricHash {
+    /// Raw hash of a feature vector with the type's default bins.
     pub fn perfect_hash_default_as_u32(feature: &Vec<f32>, hash_type: HashType) -> u32 {
         match hash_type {
             HashType::PDBMotif => super::pdb_motif::HashValue::perfect_hash_default(feature),
@@ -209,6 +360,7 @@ impl GeometricHash {
         }
     }
 
+    /// Raw hash of a feature vector with the given bin counts.
     pub fn perfect_hash_as_u32(
         feature: &Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
     ) -> u32 {
@@ -245,15 +397,17 @@ impl GeometricHash {
         }
     }
 
+    /// Hash plus shifted-bin variants, deduplicated. PDBTrRosetta only; panics otherwise.
     pub fn perfect_hash_with_shifts_dedup_inline(feature: &Vec<f32>, hash_type: HashType) -> (u8, [u32; 8]) {
         match hash_type {
             HashType::PDBTrRosetta => super::pdb_tr::HashValue::perfect_hash_with_shifts_dedup_inline(feature),
-            // Use exhaustive deduplication for now
+            // Exhaustive alternative:
             // HashType::PDBTrRosetta => super::pdb_tr::HashValue::perfect_hash_with_all_shifts_exhaustive(feature),
             _ => panic!("Hash type does not support shift deduplication"),
         }
     }
-    
+
+    /// Typed hash of a feature vector with the type's default bins.
     pub fn perfect_hash_default(feature: &Vec<f32>, hash_type: HashType) -> Self {
         match hash_type {
             HashType::PDBMotif => GeometricHash::PDBMotif(
@@ -306,6 +460,7 @@ impl GeometricHash {
         }
     }
 
+    /// Typed hash of a feature vector with the given bin counts.
     pub fn perfect_hash(
         feature: &Vec<f32>, hash_type: HashType, nbin_dist: usize, nbin_angle: usize
     ) -> Self {
@@ -360,6 +515,7 @@ impl GeometricHash {
         }
     }
 
+    /// Decode into approximate feature values (angles in degrees), written to `output`.
     pub fn reverse_hash_default(&self, output: &mut Vec<f32>) {
         match self {
             GeometricHash::PDBMotif(hash) => {
@@ -422,6 +578,7 @@ impl GeometricHash {
     }
 
 
+    /// `reverse_hash_default` for a hash built with the given bin counts.
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize, output: &mut Vec<f32>) {
         match self {
             GeometricHash::PDBMotif(hash) => {
@@ -501,6 +658,7 @@ impl GeometricHash {
     }
 
 
+    /// Wrap a raw value as a hash of `hash_type`.
     pub fn from_u32(hashvalue: u32, hash_type: HashType) -> Self {
         match hash_type {
             HashType::PDBMotif => GeometricHash::PDBMotif(
@@ -597,7 +755,8 @@ impl GeometricHash {
             // append new hash type here
         }
     }
-    
+
+    /// True when swapping the two residues would give the same hash.
     pub fn is_symmetric(&self) -> bool {
         match self {
             GeometricHash::PDBMotif(hash) => hash.is_symmetric(),
@@ -612,7 +771,8 @@ impl GeometricHash {
             // append new hash type here
         }
     }
-    
+
+    // Downcasts panic when the hash is of another type.
     pub fn downcast_pdb_motif(&self) -> super::pdb_motif::HashValue {
         match self {
             GeometricHash::PDBMotif(hash) => hash.clone(),

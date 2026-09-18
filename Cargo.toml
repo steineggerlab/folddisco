@@ -1,6 +1,6 @@
 [package]
 name = "folddisco"
-version = "2.0.0"
+version = "3.0.0"
 edition = "2021"
 authors = ["Hyunbin Kim <khb7840@gmail.com>", "Rachel Kim <seamustard52@gmail.com>", "Milot Mirdita <milot@mirdita.de>"]
 description = "A bioinformatics tool for finding discontinuous motifs in protein structures"
@@ -17,6 +17,14 @@ opt-level = 3
 [[bin]]
 name = "folddisco"
 path = "src/cli/main.rs"
+
+[[example]]
+name = "seqdump"
+required-features = ["foldcomp"]
+
+[[example]]
+name = "fc_lookup_bench"
+required-features = ["foldcomp"]
 
 [dependencies]
 pico-args = { version = "0.5.0", features = ["combined-flags"], path = "lib/pico-args" }

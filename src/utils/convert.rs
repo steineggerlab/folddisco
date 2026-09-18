@@ -1,9 +1,8 @@
-// Constants
-// 1. for cb_dist
+// Distance range and bins
 pub const MIN_DIST: f32 = 2.0;
 pub const MAX_DIST: f32 = 20.0;
 pub const NBIN_DIST: f32 = 8.0;
-// 2. NEW IDEA for encoding angles; represent as sin and cos
+// Angles encoded as sin and cos
 pub const MIN_SIN_COS: f32 = -1.0;
 pub const MAX_SIN_COS: f32 = 1.0;
 pub const NBIN_TORSION_SIN_COS: f32 = 3.0;
@@ -20,7 +19,7 @@ pub const BITMASK32_9BIT: u32 = 0x000001FF;
 pub const BITMASK64_4BIT: u64 = 0x000000000000000F;
 pub const BITMASK64_5BIT: u64 = 0x000000000000001F;
 
-// Discretizers 
+/// Nearest bin of `val` among `num_bin` evenly spaced centres over [min, max].
 #[inline(always)]
 pub fn discretize_f32_value_into_u64(val: f32, min: f32, max: f32, num_bin: f32) -> u64 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
@@ -28,31 +27,72 @@ pub fn discretize_f32_value_into_u64(val: f32, min: f32, max: f32, num_bin: f32)
     ((val - min) * (disc_f) + 0.5) as u64
 }
 
+/// `u32` variant of `discretize_f32_value_into_u64`.
 #[inline(always)]
 pub fn discretize_f32_value_into_u32(val: f32, min: f32, max: f32, num_bin: f32) -> u32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     let disc_f = 1.0_f32 / cont_f;
     ((val - min) * (disc_f) + 0.5) as u32
 }
+/// Centre value of bin `val`; inverse of discretization.
 #[inline(always)]
 pub fn continuize_u64_value_into_f32(val: u64, min: f32, max: f32, num_bin: f32) -> f32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     (val as f32) * (cont_f) + min
 }
+/// `u32` variant of `continuize_u64_value_into_f32`.
 #[inline(always)]
 pub fn continuize_u32_value_into_f32(val: u32, min: f32, max: f32, num_bin: f32) -> f32 {
     let cont_f = (max - min) / (num_bin - 1.0_f32);
     (val as f32) * (cont_f) + min
 }
+/// Scale `val` from [min, max] to [0, 1].
 #[inline(always)]
 pub fn normalize_f32_value(val: f32, min: f32, max: f32) -> f32 {
     (val - min) / (max - min)
 }
 
+/// Wrap a periodic angle (torsion) into [-PI, PI].
+#[inline]
+pub fn wrap_to_pi(angle: f32) -> f32 {
+    const TWO_PI: f32 = 2.0 * std::f32::consts::PI;
+    if !angle.is_finite() {
+        return angle;
+    }
+    let mut wrapped = angle % TWO_PI;
+    if wrapped > std::f32::consts::PI {
+        wrapped -= TWO_PI;
+    } else if wrapped < -std::f32::consts::PI {
+        wrapped += TWO_PI;
+    }
+    wrapped
+}
+
+/// Reflect a value back into `[lo, hi]`, as for `acos`-derived angles.
+#[inline]
+pub fn reflect_into_range(value: f32, lo: f32, hi: f32) -> f32 {
+    if value >= lo && value <= hi {
+        return value;
+    }
+    let span = hi - lo;
+    if span <= 0.0 || !value.is_finite() {
+        return lo;
+    }
+    // Reflect repeatedly for offsets larger than the range itself
+    let mut folded = (value - lo) % (2.0 * span);
+    if folded < 0.0 {
+        folded += 2.0 * span;
+    }
+    if folded > span {
+        folded = 2.0 * span - folded;
+    }
+    lo + folded
+}
+
+/// Three-letter residue name to code 0-19 (ARNDCQEGHILKMFPSTWYV); 255 if unknown.
 #[inline(always)]
 pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
-    // Applied to handle the case of non-standard amino acids
-    // reference: gemmi/blob/master/src/resinfo.cpp (https://github.com/project-gemmi/gemmi)
+    // Modified residues map to their parent; see gemmi src/resinfo.cpp
     match aa {
         b"ALA" | b"ABA" | b"ORN" | b"DAL" | b"AIB" | b"ALC" | b"MDO" | b"MAA" | b"DAB" => 0, // ALA, A, total 9
         b"ARG" | b"DAR" | b"CIR" | b"AGM" => 1, // ARG, R, total 4
@@ -81,27 +121,11 @@ pub fn map_aa_to_u8(aa: &[u8; 3]) -> u8 {
 }
 
 
+/// Three-letter residue name to a coarse class 0-3; 255 if unknown.
 #[inline(always)]
 pub fn map_aa_to_u8_group(aa: &[u8; 3]) -> u8 {
-    // Applied to handle the case of non-standard amino acids
-    // 0: Small & Aliphatic Amino Acids; 1: Hydrophobic (Nonpolar) Amino Acids; 2: Polar (Hydrophilic) Amino Acids; 3: Charged Amino Acids
-    // 1. Small & Aliphatic Amino Acids
-    //     G, A, S, C, P
-    //     (Glycine, Alanine, Serine, Cysteine, Proline)
-    //     Small and flexible (Gly, Ala), sometimes reactive (Cys), or structurally rigid (Pro).
-    // 2. Hydrophobic (Nonpolar) Amino Acids
-    //     V, L, I, M, F, W
-    //     (Valine, Leucine, Isoleucine, Methionine, Phenylalanine, Tryptophan)
-    //     Typically buried in the protein core; important for stability.    
-    // 3. Polar (Hydrophilic) Amino Acids
-    //     T, N, Q, Y
-    //     (Threonine, Asparagine, Glutamine, Tyrosine)
-    //     Can participate in hydrogen bonding; often found on the protein surface.    
-    // 4. Charged Amino Acids
-    //     Basic: K, R, H (Lysine, Arginine, Histidine)
-    //     Acidic: D, E (Aspartic Acid, Glutamic Acid)
-    //     Charged residues are usually on the protein surface and form ionic interactions.
-    // reference: gemmi/blob/master/src/resinfo.cpp (https://github.com/project-gemmi/gemmi)
+    // 0 small (GASCP), 1 hydrophobic (VLIMFW), 2 polar (TNQY), 3 charged (KRHDE);
+    // modified residues map to their parent (gemmi src/resinfo.cpp)
     match aa {
         b"ALA" | b"ABA" | b"ORN" | b"DAL" | b"AIB" | b"ALC" | b"MDO" | b"MAA" | b"DAB" => 0, // ALA, A, total 9
         b"ARG" | b"DAR" | b"CIR" | b"AGM" => 3, // ARG, R, total 4
@@ -165,6 +189,7 @@ mod tests {
     }
 }
 
+/// Residue code 0-19 to its three-letter name; `UNK` otherwise.
 #[inline(always)]
 pub fn map_u8_to_aa(aa: u8) -> &'static str {
     match aa {
@@ -192,6 +217,7 @@ pub fn map_u8_to_aa(aa: u8) -> &'static str {
     }
 }
 
+/// Residue name pair to `code1 * 20 + code2`.
 #[inline(always)]
 pub fn map_aa_pair_to_u32(aa1: &[u8; 3], aa2: &[u8; 3]) -> u32 {
     let output = (map_aa_to_u8(aa1) as u32) * 20 + map_aa_to_u8(aa2) as u32;
@@ -199,6 +225,7 @@ pub fn map_aa_pair_to_u32(aa1: &[u8; 3], aa2: &[u8; 3]) -> u32 {
     output
 }
 
+/// Residue code pair to `aa1 * 20 + aa2`.
 #[inline(always)]
 pub fn map_aa_u32_pair_to_u32(aa1: u32, aa2: u32) -> u32 {
     let output = aa1 * 20 + aa2;
@@ -206,6 +233,7 @@ pub fn map_aa_u32_pair_to_u32(aa1: u32, aa2: u32) -> u32 {
     output
 }
 
+/// Inverse of `map_aa_u32_pair_to_u32`.
 #[inline(always)]
 pub fn map_u32_to_aa_u32_pair(pair: u32) -> (u32, u32) {
     let aa1 = (pair / 20) as u32;
@@ -213,12 +241,14 @@ pub fn map_u32_to_aa_u32_pair(pair: u32) -> (u32, u32) {
     (aa1, aa2)
 }
 
+/// Pair index to three-letter names.
 #[inline(always)]
 pub fn map_u32_to_aa_pair(pair: u32) -> (String, String) {
     let aa1 = (pair / 20) as u8;
     let aa2 = (pair % 20) as u8;
     (map_u8_to_aa(aa1).to_string() , map_u8_to_aa(aa2).to_string())
 }
+/// One-letter code, ambiguity code or group letter (`p n h b a x`) to residue codes; `[255]` if unknown.
 #[inline(always)]
 pub fn map_one_letter_to_u8_vec(aa: char) -> Vec<u8> {
     match aa {
@@ -242,15 +272,14 @@ pub fn map_one_letter_to_u8_vec(aa: char) -> Vec<u8> {
         'W' => vec![17],
         'Y' => vec![18],
         'V' => vec![19],
-        // Handle the case of non-standard amino acids
+        // Ambiguity and non-standard codes
         'B' => vec![2, 3], // Asn, Asp
         'Z' => vec![5, 6], // Gln, Glu
         'X' => vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // All
         'J' => vec![9, 10], // Ile, Leu
         'U' => vec![4], // Selenocysteine 
         'O' => vec![11], // Pyrrolysine
-        // Custom characters to represent groups of amino acids. Lower cases to avoid shell conflicts
-        // Positively charged: p, Negatively charged: n, Polar or hydrophilic: h, Non-polar or hydrophobic: b, Aromatic: a
+        // Group letters (lower case avoids shell conflicts): positive, negative, polar, hydrophobic, aromatic
         'p' => vec![1, 8, 11], // Arg, His, Lys
         'n' => vec![3, 6], // Asp, Glu
         'h' => vec![2, 5, 15, 16, 18], // Asn, Gln, Ser, Thr, Tyr
@@ -261,6 +290,7 @@ pub fn map_one_letter_to_u8_vec(aa: char) -> Vec<u8> {
     }
 }
 
+/// Whether `c` may appear in a `:ALT` substitution list.
 #[inline(always)]
 pub fn is_aa_group_char(c: char) -> bool {
     if c.is_ascii_alphabetic() {

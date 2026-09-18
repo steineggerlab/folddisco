@@ -1,8 +1,9 @@
-
+// Structure ID formats for index lookups, and query output modes.
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
+/// How a structure path is turned into the ID stored in the lookup (`--id`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IdType {
     Pdb,
@@ -66,18 +67,17 @@ impl IdType {
     }
 }
 
+/// Structure ID for `path`: e.g. `pdb1abc.ent` -> `1abc` (Pdb), `AF-P17538-F1-model_v4` (Afdb),
+/// `P17538` (UniProt). Unmatched AFDB/UniProt names fall back to the file stem.
 #[inline]
 pub fn parse_path_by_id_type(path: &str, id_type: &IdType) -> String {
-    // TODO: 2024-04-04 15:07:54 Fill in this function to ease benchmarking
     let afdb_regex = regex::Regex::new(r"AF-.+-model_v\d").unwrap();
     match id_type {
         IdType::Pdb => {
-            // Get the basename of the path
             let path = Path::new(path);
             let file_name = path.file_stem().unwrap();
-            // Remove extension
             let file_name = file_name.to_str().unwrap();
-            // Remove extension, If startswith "pdb" remove "pdb" from the start
+            // Strip the `pdb` prefix of wwPDB file names
             if file_name.starts_with("pdb") {
                 file_name[3..].to_string()
             } else {
@@ -87,7 +87,6 @@ pub fn parse_path_by_id_type(path: &str, id_type: &IdType) -> String {
         IdType::Afdb => {
             let path = Path::new(path);
             let file_name = path.file_stem().unwrap().to_str().unwrap();
-            // Find the matching pattern
             let afdb_id = afdb_regex.find(file_name);
             if afdb_id.is_none() {
                 return file_name.to_string();
@@ -97,7 +96,6 @@ pub fn parse_path_by_id_type(path: &str, id_type: &IdType) -> String {
         IdType::UniProt => {
             let path = Path::new(path);
             let file_name = path.file_stem().unwrap().to_str().unwrap();
-            // Find the matching pattern
             let afdb_id = afdb_regex.find(file_name);
             if afdb_id.is_none() {
                 return file_name.to_string();
@@ -125,19 +123,17 @@ pub fn parse_path_by_id_type(path: &str, id_type: &IdType) -> String {
     }
 }
 
+/// `parse_path_by_id_type` writing into a reused buffer.
 #[inline]
 pub fn parse_path_by_id_type_with_string(path: &str, id_type: &IdType, string: &mut String) {
-    // TODO: 2024-04-04 15:07:54 Fill in this function to ease benchmarking
     string.clear();
     let afdb_regex = regex::Regex::new(r"AF-.+-model_v\d").unwrap();
     match id_type {
         IdType::Pdb => {
-            // Get the basename of the path
             let path = Path::new(path);
             let file_name = path.file_stem().unwrap();
-            // Remove extension
             let file_name = file_name.to_str().unwrap();
-            // Remove extension, If startswith "pdb" remove "pdb" from the start
+            // Strip the `pdb` prefix of wwPDB file names
             if file_name.starts_with("pdb") {
                 // &file_name[3..]
                 string.push_str(&file_name[3..]);
@@ -149,7 +145,6 @@ pub fn parse_path_by_id_type_with_string(path: &str, id_type: &IdType, string: &
         IdType::Afdb => {
             let path = Path::new(path);
             let file_name = path.file_stem().unwrap().to_str().unwrap();
-            // Find the matching pattern
             let afdb_id = afdb_regex.find(file_name);
             if afdb_id.is_none() {
                 // return file_name;
@@ -162,7 +157,6 @@ pub fn parse_path_by_id_type_with_string(path: &str, id_type: &IdType, string: &
         IdType::UniProt => {
             let path = Path::new(path);
             let file_name = path.file_stem().unwrap().to_str().unwrap();
-            // Find the matching pattern
             let afdb_id = afdb_regex.find(file_name);
             if afdb_id.is_none() {
                 // return file_name;
@@ -202,6 +196,7 @@ pub fn parse_path_by_id_type_with_string(path: &str, id_type: &IdType, string: &
 }
 
 
+/// `parse_path_by_id_type` over a list.
 pub fn parse_path_vec_by_id_type(path_vec: &Vec<String>, id_type: &IdType) -> Vec<String> {
     let mut parsed_path_vec = Vec::with_capacity(path_vec.len());
     for path in path_vec {
@@ -210,6 +205,7 @@ pub fn parse_path_vec_by_id_type(path_vec: &Vec<String>, id_type: &IdType) -> Ve
     parsed_path_vec
 }
 
+/// `parse_path_by_id_type` over a set.
 pub fn parse_path_set_by_id_type(path_set: &HashSet<String>, id_type: &IdType) -> HashSet<String> {
     let mut parsed_path_set = HashSet::with_capacity(path_set.len());
     for path in path_set {
@@ -218,13 +214,14 @@ pub fn parse_path_set_by_id_type(path_set: &HashSet<String>, id_type: &IdType) -
     parsed_path_set
 }
 
+/// Query output mode, derived from the output flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryMode {
-    PerMatch,      // Default mode: print per match with residue matching
-    PerStructure,  // Print per structure (aggregated results)
-    SkipMatch,     // No residue matching, print per structure
-    Web,           // Web mode with top N matches applied
-    ContradictoryPrintError, // Error: both per-structure and per-match specified
+    PerMatch,      // Default: one line per residue match
+    PerStructure,  // One line per structure
+    SkipMatch,     // Per structure, without residue matching
+    Web,           // Per match, capped and with superposition
+    ContradictoryPrintError, // --per-structure and --per-match together
 }
 
 impl QueryMode {
@@ -235,14 +232,11 @@ impl QueryMode {
         per_match: bool,
     ) -> Self {
         match (skip_match, is_web, per_structure, per_match) {
-            // Cannot print per match and per structure at the same time -> error
             (_, _, true, true) => Self::ContradictoryPrintError,
-            // Special modes
             (_, true, _, _) => Self::Web,
             (true, _, _, _) => Self::SkipMatch,
-            // Normal modes
             (false, false, true, false) => Self::PerStructure,
-            (false, false, false, _) => Self::PerMatch, // Default or explicit per-match
+            (false, false, false, _) => Self::PerMatch,
         }
     }
 

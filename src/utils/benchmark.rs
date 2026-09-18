@@ -2,10 +2,9 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2023 Hyunbin Kim, All rights reserved
 
-// Requirements
-// 1. Folder of PDB files
-// 2. TSV for wanted PDB files & active sites
+// Confusion-matrix metrics for comparing search results against answer sets.
 
+/// Confusion-matrix counts.
 pub struct Metrics {
     pub true_pos: f64,
     pub true_neg: f64,
@@ -42,37 +41,30 @@ impl Metrics {
     }
 }
 
+/// Metrics of `target` (results) against `answer` (true set) within `all`.
 pub fn compare_target_answer_vec<T: Eq + PartialEq>(target: &Vec<T>, answer: &Vec<T>, all: &Vec<T>) -> Metrics {
-    // True Positive: Elements in both target and answer
     let true_pos = target.iter().filter(|&x| answer.contains(x)).count() as f64;
-    // True Negative: Elements in neither target nor answer
     let true_neg = all.iter().filter(|&x| !target.contains(x) && !answer.contains(x)).count() as f64;
-    // False Positive: Elements in target but not in answer
     let false_pos = target.iter().filter(|&x| !answer.contains(x)).count() as f64;
-    // False Negative: Elements in answer but not in target
     let false_neg = answer.iter().filter(|&x| !target.contains(x)).count() as f64;
 
     Metrics::new(true_pos, true_neg, false_pos, false_neg)
 }
 
+/// Like `compare_target_answer_vec`, but `neutral` items are neither FP nor TN.
 pub fn compare_target_answer_neutral_vec<T: Eq + PartialEq>(target: &Vec<T>, answer: &Vec<T>, neutral: &Vec<T>, all: &Vec<T>) -> Metrics {
-    // True Positive: Elements in both target and answer
     let true_pos = target.iter().filter(|&x| answer.contains(x)).count() as f64;
-    // True Negative: Elements in neither target nor answer
     let true_neg = all.iter().filter(|&x| !target.contains(x) && !answer.contains(x) && !neutral.contains(x)).count() as f64;
-    // False Positive: Elements in target but not in answer
     let false_pos = target.iter().filter(|&x| !answer.contains(x) && !neutral.contains(x)).count() as f64;
-    // False Negative: Elements in answer but not in target
     let false_neg = answer.iter().filter(|&x| !target.contains(x)).count() as f64;
 
     Metrics::new(true_pos, true_neg, false_pos, false_neg)
 }
 
+/// Metrics over the ranked `target` prefix that ends at the `k`-th false positive.
 pub fn measure_up_to_k_fp_vec<T: Eq + PartialEq>(target: &Vec<T>, answer: &Vec<T>, all: &Vec<T>, k: f64) -> Metrics {
-    // Iter until k false positives are found
     let mut true_pos = 0.0;
     let mut false_pos = 0.0;
-    // Iterate over target
     for t in target {
         if answer.contains(t) {
             true_pos += 1.0;
@@ -83,18 +75,15 @@ pub fn measure_up_to_k_fp_vec<T: Eq + PartialEq>(target: &Vec<T>, answer: &Vec<T
             break;
         }
     }
-    // False negatives
     let false_neg = answer.len() as f64 - true_pos;
-    // True negatives
     let true_neg = all.len() as f64 - (true_pos + false_pos + false_neg);
     Metrics::new(true_pos, true_neg, false_pos, false_neg)
 }
 
+/// Like `measure_up_to_k_fp_vec`, skipping `neutral` items.
 pub fn measure_up_to_k_fp_with_neutral_vec<T: Eq + PartialEq>(target: &Vec<T>, answer: &Vec<T>, neutral: &Vec<T>, all: &Vec<T>, k: f64) -> Metrics {
-    // Iter until k false positives are found
     let mut true_pos = 0.0;
     let mut false_pos = 0.0;
-    // Iterate over target
     for t in target {
         if answer.contains(t) {
             true_pos += 1.0;
@@ -105,9 +94,7 @@ pub fn measure_up_to_k_fp_with_neutral_vec<T: Eq + PartialEq>(target: &Vec<T>, a
             break;
         }
     }
-    // False negatives
     let false_neg = answer.len() as f64 - true_pos;
-    // True negatives
     let true_neg = all.len() as f64 - (true_pos + false_pos + false_neg);
     Metrics::new(true_pos, true_neg, false_pos, false_neg)
 }

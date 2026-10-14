@@ -4,10 +4,14 @@
 // Enrichment analysis idea from Alex Bott
 // Copyright © 2025 Hyunbin Kim, All rights reserved
 
+// `folddisco analyze`: index encoding statistics and hash enrichment of a structure set.
+
 use crate::controller::DEFAULT_DIST_CUTOFF;
 use crate::controller::Folddisco;
 use crate::controller::feature::get_single_feature;
 use crate::controller::io::read_structure_from_path;
+use crate::controller::retrieve::res_index_to_char;
+use crate::structure::chain_id::split_chain_and_rest;
 use crate::geometry::core::HashType;
 use crate::geometry::core::GeometricHash;
 use crate::index::indextable::FolddiscoIndex;
@@ -26,12 +30,14 @@ use rayon::iter::IndexedParallelIterator;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator as _};
 use rayon::slice::ParallelSliceMut;
 
+/// 20x20 amino acid pair counts, updated concurrently.
 pub struct AAPairCounts {
     pub counts: Vec<Vec<AtomicUsize>>,
 }
 unsafe impl Send for AAPairCounts {}
 unsafe impl Sync for AAPairCounts {}
 
+/// Occupancy statistics of an index's hash space.
 pub struct EncodingStat {
     pub hash_type: HashType,
     pub dist_bin_given: usize,
@@ -48,6 +54,7 @@ pub struct EncodingStat {
 }
 
 impl EncodingStat {
+    /// Totals and density for `index`; per-feature counts are filled by `count_encodings`.
     pub fn new(
         hash_type: HashType, dist_bin_given: usize, angle_bin_given: usize,
         index: &FolddiscoIndex,
@@ -118,10 +125,12 @@ impl EncodingStat {
     }
 }
 
+/// Size of the hash space for the given bins.
 pub fn total_possible_encodings(hash_type: HashType, dist_bin_given: usize, angle_bin_given: usize) -> usize {
     hash_type.total_bins(dist_bin_given, angle_bin_given)
 }
 
+/// Encoding statistics of `index`, with hashes sorted by count and AA pair counts filled.
 pub fn count_encodings(
     index: &FolddiscoIndex, hash_type: HashType, nbin_dist: usize, nbin_angle: usize, verbose: bool
 ) -> EncodingStat {
@@ -136,7 +145,6 @@ pub fn count_encodings(
         0 => hash_type.default_angle_bin(),
         _ => nbin_angle,
     };
-    // todo!("Calculate total, empty, non-empty encodings, density, etc.");
     let mut stats = EncodingStat::new(
         hash_type,
         nbin_dist,
@@ -144,25 +152,21 @@ pub fn count_encodings(
         index,
     );
 
-    stats.hash_count_vec.par_sort_by(|a, b| b.1.cmp(&a.1)); // Descending order by count
+    stats.hash_count_vec.par_sort_by(|a, b| b.1.cmp(&a.1)); // Descending by count
     
     if verbose {
         print_log_msg(INFO, &format!("Hash count vector loaded: {} entries", stats.hash_count_vec.len()));
     }
     
-    // todo!("Count features: AA pairs, counts per bin (distance, angle)");
-    // DONE: naively count AA pairs from hash_count_vec
-    // TODO: Count dist_bin_counts and angle_bin_counts
+    // TODO: fill dist_bin_counts and angle_bin_counts
     stats.hash_count_vec.par_iter().for_each(|(hash, count)| {
         let mut feature_container = vec![0.0f32; 7];
         let geometric_hash = GeometricHash::from_u32(*hash, hash_type);
-        // Decode features
         GeometricHash::reverse_hash(
             &geometric_hash, nbin_dist, nbin_angle, &mut feature_container
         );
         let aa1 = feature_container[0] as usize;
         let aa2 = feature_container[1] as usize;
-        // Update AA pair counts
         stats.aa_pair_counts.counts[aa1][aa2].fetch_add(
             *count, std::sync::atomic::Ordering::Relaxed
         );
@@ -170,6 +174,7 @@ pub fn count_encodings(
     stats
 }
 
+/// Write `<prefix>_stats.tsv`, `_top<N>.tsv`, `_aa_pairs.csv` and `_count_distribution.tsv`.
 pub fn save_summary(
     encoding_stat: &EncodingStat, output_prefix: &str, 
     top_n: usize, verbose: bool
@@ -259,6 +264,9 @@ pub fn save_summary(
     Ok(())
 }
 
+/// Hypergeometric enrichment of the hashes of `pdb_container` against `index` as
+/// background. Writes `<prefix>_enriched_hashes.tsv`, `_enriched_positions.tsv`
+/// and `_query_summary.tsv`.
 pub fn analyze_enrichment(
     index: &FolddiscoIndex, pdb_container: &str,
     hash_type: HashType, nbin_dist: usize, nbin_angle: usize, 
@@ -271,7 +279,6 @@ pub fn analyze_enrichment(
             pdb_container
         ));
     }
-    // Test if the default hashing schemes are working
     let pdb_paths = load_path(pdb_container, false);
     let mut query_handler = Folddisco::new(
         pdb_paths, hash_type, threads,
@@ -282,7 +289,7 @@ pub fn analyze_enrichment(
     
     let mut hashes = query_handler.hash_id_vec.clone();
     hashes.par_sort_unstable();
-    // Count ids per hash. Hashes is sorted.
+    // Structures per hash (input is sorted)
     let mut hash_counts = hashes.iter().fold(
         Vec::new(),
         |mut acc: Vec<(u32, usize)>, &hash| {
@@ -298,14 +305,11 @@ pub fn analyze_enrichment(
             acc
         }
     );
-    // Sort by hash.
     hash_counts.par_sort_by(|a, b| a.0.cmp(&b.0));
 
     let hash_id_pos_map = measure_time!(query_handler.collect_hash_id_pos(), verbose);
     
-    // Load index and get hash_count_vec
     let mut bg_hash_count_vec = get_hash_count_vec(index);
-    // Sort by hash.
     bg_hash_count_vec.par_sort_by(|a, b| a.0.cmp(&b.0));
     
     let enriched_hashes = get_enriched_hashes(
@@ -319,7 +323,6 @@ pub fn analyze_enrichment(
         ));
     }
 
-    // Determine actual bin sizes
     let nbin_dist = match nbin_dist {
         0 => hash_type.default_dist_bin(),
         _ => nbin_dist,
@@ -329,7 +332,7 @@ pub fn analyze_enrichment(
         _ => nbin_angle,
     };
 
-    // Build auxiliary maps for position and query summaries using DashMap
+    // Position and per-structure maps for the later tables
     let pos_hash_map: DashMap<(usize, String), Vec<u32>> = DashMap::new();
     let pdb_positions: DashMap<usize, Vec<String>> = DashMap::new();
 
@@ -339,7 +342,6 @@ pub fn analyze_enrichment(
     writeln!(f, "hash\tp_value\tfeatures\tpositions")?;
     
     for (hash, p_value) in enriched_hashes.iter() {
-        // Decode features
         let mut feature_container = vec![0.0f32; 7];
         let geometric_hash = GeometricHash::from_u32(*hash, hash_type);
         GeometricHash::reverse_hash(
@@ -357,7 +359,6 @@ pub fn analyze_enrichment(
             feature_container[6],
         );
 
-        // Collect positions
         let mut positions_vec = Vec::new();
         if let Some(entry) = hash_id_pos_map.get(hash) {
             for (pdb_pos, pos1, pos2) in entry.iter() {
@@ -365,13 +366,11 @@ pub fn analyze_enrichment(
                     query_handler.path_vec[*pdb_pos], pos1, pos2);
                 positions_vec.push(pos_str);
                 
-                // Build position map - split pairs into individual positions
                 let key1 = (*pdb_pos, pos1.clone());
                 pos_hash_map.entry(key1).or_insert_with(Vec::new).push(*hash);
                 let key2 = (*pdb_pos, pos2.clone());
                 pos_hash_map.entry(key2).or_insert_with(Vec::new).push(*hash);
                 
-                // Build PDB position map - split pairs into individual positions
                 pdb_positions.entry(*pdb_pos).or_insert_with(Vec::new).push(pos1.clone());
                 pdb_positions.entry(*pdb_pos).or_insert_with(Vec::new).push(pos2.clone());
             }
@@ -390,9 +389,8 @@ pub fn analyze_enrichment(
     let mut f = File::create(&pos_file)?;
     writeln!(f, "id\tpos\tcount\thash_list")?;
     
-    // Convert DashMap to Vec for sorting
     let mut pos_list: Vec<((usize, String), Vec<u32>)> = pos_hash_map.into_iter().collect();
-    // Sort by pdb id first, then by count (descending)
+    // By structure, then count descending
     pos_list.par_sort_by(|a, b| {
         a.0.0.cmp(&b.0.0)
             .then_with(|| b.1.len().cmp(&a.1.len()))
@@ -400,7 +398,6 @@ pub fn analyze_enrichment(
     
     for ((pdb_pos, pos), hash_list) in pos_list.iter() {
         let count = hash_list.len();
-        // Apply count cutoff
         if count <= count_cutoff {
             continue;
         }
@@ -421,11 +418,9 @@ pub fn analyze_enrichment(
     let mut f = File::create(&query_file)?;
     writeln!(f, "pdb_path\tpositions")?;
     
-    // Convert DashMap to Vec for sorting
     let mut pdb_list: Vec<(usize, Vec<String>)> = pdb_positions.into_iter().collect();
     pdb_list.par_sort_by_key(|(pdb_pos, _)| *pdb_pos);
     
-    // Build position lookup map from pos_list
     let pos_count_map: DashMap<(usize, String), usize> = DashMap::new();
     pos_list.par_iter().for_each(|((pdb_pos, pos), hash_list)| {
         pos_count_map.insert((*pdb_pos, pos.clone()), hash_list.len());
@@ -433,11 +428,9 @@ pub fn analyze_enrichment(
     
     for (pdb_pos, positions) in pdb_list.iter() {
         let pdb_path = &query_handler.path_vec[*pdb_pos];
-        // Deduplicate positions and apply count cutoff
         let mut unique_positions = positions.clone();
         unique_positions.sort();
         unique_positions.dedup();
-        // Filter positions by count cutoff and collect with their counts
         let mut filtered_with_counts: Vec<(String, usize)> = unique_positions.into_iter()
             .filter_map(|pos| {
                 pos_count_map.get(&(*pdb_pos, pos.clone()))
@@ -446,23 +439,23 @@ pub fn analyze_enrichment(
             })
             .collect();
         
-        // Sort by count (descending) and apply max residue count limit
+        // Keep the `max_residue_count` most frequent positions
         filtered_with_counts.par_sort_by(|a, b| b.1.cmp(&a.1));
         if filtered_with_counts.len() > max_residue_count {
             filtered_with_counts.truncate(max_residue_count);
         }
         
-        // Sort final positions by chain id (alphabetically) and residue index (numerically)
+        // Output order: chain, then residue number
         let mut final_positions: Vec<String> = filtered_with_counts.iter()
             .map(|(pos, _)| pos.clone())
             .collect();
         final_positions.sort_by(|a, b| {
-            // Extract chain id (first char) and residue index (remaining chars)
-            let a_chain = a.chars().next().unwrap_or(' ');
-            let b_chain = b.chars().next().unwrap_or(' ');
-            let a_idx: i32 = a.chars().skip(1).collect::<String>().parse().unwrap_or(0);
-            let b_idx: i32 = b.chars().skip(1).collect::<String>().parse().unwrap_or(0);
-            
+            // Handles both `A21` and `AA_21` spellings
+            let (a_chain, a_rest) = split_chain_and_rest(a);
+            let (b_chain, b_rest) = split_chain_and_rest(b);
+            let a_idx: i32 = a_rest.parse().unwrap_or(0);
+            let b_idx: i32 = b_rest.parse().unwrap_or(0);
+
             a_chain.cmp(&b_chain).then_with(|| a_idx.cmp(&b_idx))
         });
         
@@ -487,6 +480,8 @@ pub fn analyze_enrichment(
 //     todo!("Save enrichment analysis result to output files");
 // }
 
+/// `(hash, entry byte length)` per hash of a loaded index. Entries are varint-encoded,
+/// so this approximates, but is not exactly, the number of structures.
 pub fn get_hash_count_vec(
     index: &FolddiscoIndex,
 ) -> Vec<(u32, usize)> {
@@ -499,23 +494,21 @@ pub fn get_hash_count_vec(
     hash_count_vec
 }
 
+/// Histogram of hash counts over `borders` (default: powers of two up to the max).
+/// `hash_count_vec` must be sorted by count, descending.
 pub fn get_counts_from_hash_count_vec(
     hash_count_vec: &Vec<(u32, usize)>, borders: Option<&Vec<usize>>,
 ) -> Vec<(usize, usize)> {
-    // hash_count vector is sorted by count in descending order
     let max_count = hash_count_vec.first().unwrap().1;
     let borders = match borders {
         Some(b) => b.clone(),
         None => {
-            // Starting from 1, include power of twos until max_count
             let mut b: Vec<usize> = vec![];
             let mut next_base = 1;
-            // Generate borders like 10, 100, 1000, ,,,
             while next_base <= max_count {
                 b.push(next_base);
                 next_base *= 2;
             }
-            // Add max_count if not already included
             if *b.last().unwrap() < max_count {
                 b.push(max_count);
             }
@@ -525,7 +518,6 @@ pub fn get_counts_from_hash_count_vec(
     let mut counts: Vec<(usize, usize)> = Vec::with_capacity(borders.len());
     for (i, &border) in borders.iter().enumerate() {
         let count = if i == 0 {
-            // Using partition_point to speed up
             let upper_bound = hash_count_vec.len();
             let lower_bound = hash_count_vec.partition_point(|&(_, c)| c > border);
             upper_bound - lower_bound
@@ -540,6 +532,8 @@ pub fn get_counts_from_hash_count_vec(
     counts
 }
 
+/// Hashes over-represented in the query set (right-tail hypergeometric p < cutoff),
+/// sorted by p-value. Both inputs must be sorted by hash.
 fn get_enriched_hashes(
     query_hash_counts: &Vec<(u32, usize)>, bg_hash_counts: &Vec<(u32, usize)>, 
     p_value_cutoff: f64
@@ -547,22 +541,18 @@ fn get_enriched_hashes(
     let total_query: usize = query_hash_counts.iter().map(|(_, c)| c).sum();
     let total_bg: usize = bg_hash_counts.iter().map(|(_, c)| c).sum();
     
-    // Parallel processing for enrichment testing
     let mut enriched: Vec<(u32, f64)> = query_hash_counts.par_iter()
         .filter_map(|(hash, query_count)| {
-            // Binary search for the hash in background
             let bg_count = match bg_hash_counts.binary_search_by_key(hash, |(h, _)| *h) {
                 Ok(idx) => bg_hash_counts[idx].1,
                 Err(_) => 0, // Hash not found in background
             };
             
-            // Hypergeometric test parameters
             let n = total_query; // Sample size (query)
             let k = bg_count + query_count; // Total successes in population
             let n_total = total_bg + total_query; // Population size
             let x = *query_count; // Observed successes in sample
             
-            // Calculate p-value (right-tail test for enrichment)
             let p_value = hypergeometric_test(x, n, k, n_total);
             
             if p_value < p_value_cutoff {
@@ -573,13 +563,11 @@ fn get_enriched_hashes(
         })
         .collect();
     
-    // Sort enriched by p-value ascending
     enriched.par_sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
     enriched
 }
 
-/// Hypergeometric test p-value (right-tail)
-/// P(X >= x) where X ~ Hypergeometric(n_total, k, n)
+/// Right-tail hypergeometric p-value P(X >= x), X ~ Hypergeometric(n_total, k, n).
 fn hypergeometric_test(x: usize, n: usize, k: usize, n_total: usize) -> f64 {
     let mut p_value = 0.0;
     let max_x = n.min(k);
@@ -591,7 +579,7 @@ fn hypergeometric_test(x: usize, n: usize, k: usize, n_total: usize) -> f64 {
     p_value.min(1.0) // Clamp to [0, 1]
 }
 
-/// Hypergeometric probability mass function using log-space to avoid overflow
+/// Hypergeometric PMF, computed in log space.
 fn hypergeometric_pmf(x: usize, n: usize, k: usize, n_total: usize) -> f64 {
     // P(X = x) = C(k, x) * C(N-k, n-x) / C(N, n)
     let log_prob = log_binomial(k, x) 
@@ -613,13 +601,12 @@ fn log_binomial(n: usize, k: usize) -> f64 {
     log_factorial(n) - log_factorial(k) - log_factorial(n - k)
 }
 
-/// Log factorial using Stirling's approximation for large n
+/// ln(n!), exact below 20, Stirling's approximation above.
 fn log_factorial(n: usize) -> f64 {
     if n <= 1 {
         return 0.0;
     }
     if n < 20 {
-        // Exact for small n
         (2..=n).map(|i| (i as f64).ln()).sum()
     } else {
         // Stirling's approximation: ln(n!) ≈ n*ln(n) - n + 0.5*ln(2πn)
@@ -629,18 +616,16 @@ fn log_factorial(n: usize) -> f64 {
 }
 
 impl Folddisco {
+    /// Map each hash to its `(structure index, residue 1, residue 2)` occurrences.
     pub fn collect_hash_id_pos(&self) -> DashMap<u32, Vec<(usize, String, String)>> {
-        // Set file threads
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .expect("Failed to build thread pool for iterating files");
-        // For iterating files, apply multi-threading with num_threads_for_file
 
         let output_map: DashMap<u32, Vec<(usize, String, String)>> = DashMap::new();
         
         pool.install(|| {
-            // Preserve locality for multi-threading
             self.path_vec
                 .par_iter()
                 .enumerate()
@@ -676,20 +661,19 @@ impl Folddisco {
                         if has_feature {
                             if self.num_bin_dist == 0 || self.num_bin_angle == 0 {
                                 let hash = GeometricHash::perfect_hash_default_as_u32(&feature, self.hash_type);
-                                let pos1 = format!("{}{}", compact.chain_per_residue[i] as char, compact.residue_serial[i]);
-                                let pos2 = format!("{}{}", compact.chain_per_residue[j] as char, compact.residue_serial[j]);
+                                let pos1 = res_index_to_char(&compact.chain_per_residue[i], compact.residue_serial[i]);
+                                let pos2 = res_index_to_char(&compact.chain_per_residue[j], compact.residue_serial[j]);
                                 output_map.entry(hash).or_default().push((pdb_pos, pos1, pos2));
                             } else {
                                 let hash = GeometricHash::perfect_hash_as_u32(
                                     &feature, self.hash_type, self.num_bin_dist, self.num_bin_angle
                                 );
-                                let pos1 = format!("{}{}", compact.chain_per_residue[i] as char, compact.residue_serial[i]);
-                                let pos2 = format!("{}{}", compact.chain_per_residue[j] as char, compact.residue_serial[j]);
+                                let pos1 = res_index_to_char(&compact.chain_per_residue[i], compact.residue_serial[i]);
+                                let pos2 = res_index_to_char(&compact.chain_per_residue[j], compact.residue_serial[j]);
                                 output_map.entry(hash).or_default().push((pdb_pos, pos1, pos2));
                             }
                         }
                     });
-                    // Drop intermediate variables
                     drop(compact);
                 })
         });

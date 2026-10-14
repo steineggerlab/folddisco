@@ -17,6 +17,7 @@ use std::mem::size_of;
 use crate::structure::io::fcz::FoldcompDbReader;
 
 
+/// Write a hash -> (offset, length) map as fixed-width little-endian records.
 pub fn save_offset_map(
     path: &str, offset_map: &DashMap<GeometricHash, (usize, usize)>
 ) -> Result<(), Error> {
@@ -26,7 +27,6 @@ pub fn save_offset_map(
         .create(true)
         .open(path)?;
 
-    // Get hash type
     let hash_type = offset_map.iter().next().unwrap().key().hash_type();
     let total_size = match hash_type.encoding_type() {
         32 => 20 * offset_map.len() as u64,
@@ -34,9 +34,7 @@ pub fn save_offset_map(
         _ => { panic!("Invalid hash type"); }
     };
     file.set_len(total_size as u64)?;
-    // Write as whole
     let mut writer = BufWriter::new(file);
-    // Iterate through dashmap
     offset_map.iter().for_each(|entry| {
         let key = entry.key();
         let value = entry.value();
@@ -51,6 +49,7 @@ pub fn save_offset_map(
     Ok(())
 }
 
+/// `save_offset_map` for a vector of `(hash, offset, length)`.
 pub fn save_offset_vec(
     path: &str, offset_map: &Vec<(GeometricHash, usize, usize)>
 ) -> Result<(), Error> {
@@ -60,7 +59,6 @@ pub fn save_offset_vec(
         .create(true)
         .open(path)?;
 
-    // Get hash type
     let hash_type = offset_map[0].0.hash_type();
     let total_size = match hash_type.encoding_type() {
         32 => 20 * offset_map.len() as u64,
@@ -68,9 +66,7 @@ pub fn save_offset_vec(
         _ => { panic!("Invalid hash type"); }
     };
     file.set_len(total_size as u64)?;
-    // Write as whole
     let mut writer = BufWriter::new(file);
-    // Iterate through vector
     offset_map.iter().for_each(|(key, offset, length)| {
         match key.hash_type().encoding_type() {
             32 => { writer.write_all(&key.as_u32().to_le_bytes()).unwrap(); },
@@ -84,6 +80,7 @@ pub fn save_offset_vec(
     Ok(())
 }
 
+/// Read an offset map serially.
 pub fn read_offset_map_single(path: &str, hash_type: HashType) -> Result<DashMap<GeometricHash, (usize, usize)>, Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
@@ -116,6 +113,7 @@ pub fn read_offset_map_single(path: &str, hash_type: HashType) -> Result<DashMap
     Ok(offset_map)
 }
 
+/// Read an offset map in parallel.
 pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<GeometricHash, (usize, usize)>, Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
@@ -123,7 +121,6 @@ pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<Geomet
     let chunk_size = 16 + (hash_encoding_type / 8) as usize;
     let chunks: Vec<_> = mmap.chunks(chunk_size).collect();
 
-    // Set number of threads
     // rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
     let offset_map: DashMap<_, _> = chunks.into_par_iter().filter_map(|chunk| {
         let (key, w): (GeometricHash, usize) = match hash_encoding_type {
@@ -153,6 +150,7 @@ pub fn read_offset_map(path: &str, hash_type: HashType) -> Result<DashMap<Geomet
 
 
 
+/// Write raw native-endian `usize` values.
 pub fn write_usize_vector(path: &str, vec: &Vec<usize>) -> Result<(), Error> {
     let file = OpenOptions::new()
         .read(true)
@@ -162,7 +160,6 @@ pub fn write_usize_vector(path: &str, vec: &Vec<usize>) -> Result<(), Error> {
     // let total_size: u64 = 8 * vec.len() as u64;
     let total_size: u64 = (size_of::<usize>() * vec.len()) as u64;
     file.set_len(total_size as u64)?;
-    // Write as whole
     let mut writer = BufWriter::new(file);
     let vec_bytes = unsafe { 
         std::slice::from_raw_parts(vec.as_ptr() as *const u8, 
@@ -172,6 +169,8 @@ pub fn write_usize_vector(path: &str, vec: &Vec<usize>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Map a file written by `write_usize_vector`. The slice is only valid while
+/// the returned `Mmap` lives, despite its `'static` type.
 pub fn read_usize_vector(path: &str)-> Result<(Mmap, &'static [u64]), Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
@@ -201,6 +200,7 @@ pub fn get_values_with_offset_u8(vec: &[u8], offset: usize, length: usize) -> &[
     &vec[offset..offset + length]
 }
 
+/// Write values truncated to 8, 16, 24 (big-endian 3 bytes) or 32 bits.
 pub fn write_usize_vector_in_bits(path: &str, vec: &Vec<usize>, num_bits: usize) -> Result<(), Error> {
     let file = OpenOptions::new()
         .read(true)
@@ -216,7 +216,6 @@ pub fn write_usize_vector_in_bits(path: &str, vec: &Vec<usize>, num_bits: usize)
         _ => { panic!("Invalid number of bits"); }
     };
     file.set_len(total_size as u64)?;
-    // Write after converting usize to matched integer type
     let mut writer = BufWriter::new(file);
     match num_bits {
         8 => {
@@ -236,9 +235,7 @@ pub fn write_usize_vector_in_bits(path: &str, vec: &Vec<usize>, num_bits: usize)
             writer.write_all(vec_bytes)?;
         },
         24 => {
-            // Extract 3 bytes from usize as Vec<u8>
             let vec_u8 = vec.iter().flat_map(|&x| {
-                // endianess is not considered. first 2bytes: id, last byte: grid index
                 let mut bytes = Vec::new();
                 bytes.push(((x >> 16) & 0xFF) as u8);
                 bytes.push(((x >> 8) & 0xFF) as u8);
@@ -271,6 +268,7 @@ pub fn write_usize_vector_in_bits(path: &str, vec: &Vec<usize>, num_bits: usize)
     Ok(())
 }
 
+/// Map a file as `u8`s; same lifetime caveat as `read_usize_vector`.
 pub fn read_u8_vector(path: &str)-> Result<(Mmap, &'static [u8]), Error> {
     let file = File::open(path)?;
     let mmap = unsafe { Mmap::map(&file)? };
@@ -300,6 +298,8 @@ pub fn read_u32_vector(path: &str)-> Result<(Mmap, &'static [u32]), Error> {
     Ok((mmap, vec))
 }
 
+/// Read a structure file, or `db:name` from a Foldcomp DB. Returns the structure
+/// and whether Foldcomp was used.
 pub fn read_compact_structure(path: &str) -> Result<(CompactStructure, bool), ()> {
     #[cfg(not(feature="foldcomp"))]
     let use_foldcomp = false;
@@ -321,8 +321,8 @@ pub fn read_compact_structure(path: &str) -> Result<(CompactStructure, bool), ()
         let mut split = path.split(':');
         let db_path = split.next().unwrap();
         let name = split.next().unwrap();
-        let mut foldcomp_db_reader = FoldcompDbReader::new(db_path);
-        foldcomp_db_reader.sort_lookup_by_name();
+        // No re-sorting: the mapped lookup serves both name and key access.
+        let foldcomp_db_reader = FoldcompDbReader::new(db_path);
         let structure_io_result = foldcomp_db_reader.read_single_structure(name);
         if let Ok(structure) = structure_io_result {
             structure.to_compact()
@@ -334,6 +334,7 @@ pub fn read_compact_structure(path: &str) -> Result<(CompactStructure, bool), ()
 }
 
 
+/// Read a `.pdb`/`.ent`/`.cif` file, optionally gzipped; `None` for other extensions.
 pub fn read_structure_from_path(path: &str) -> Option<Structure> {
     if path.ends_with(".gz") {
         if path.ends_with(".pdb.gz") || path.ends_with(".ent.gz") {
@@ -379,7 +380,7 @@ pub fn read_structure_from_path(path: &str) -> Option<Structure> {
 }
 
 
-// Functions to load index files
+/// `<index>.lookup` and `<index>.type`; panics if either is missing.
 pub fn get_lookup_and_type(index_path: &str) -> (String, String) {
     let lookup_path = format!("{}.lookup", index_path.to_string());
     let hash_type_path = format!("{}.type", index_path.to_string());
@@ -389,11 +390,9 @@ pub fn get_lookup_and_type(index_path: &str) -> (String, String) {
     (lookup_path, hash_type_path)
 }
 
-// Functions to load index files
+/// Index prefixes to load: `<index>_0`, `<index>_1`, ... if chunked, else `<index>`.
 pub fn check_and_get_indices(index_path: Option<String>, verbose: bool) -> Vec<String> {
-    // Get path. formatting without quotation marks
     let index_path = index_path.unwrap();
-    // Check if index_path_0 is a file.
     let _index_chunk_prefix = format!("{}_0", index_path.clone());
     let index_chunk_path = format!("{}_0.offset", index_path.clone());
     let mut index_paths = Vec::new();
@@ -420,24 +419,18 @@ pub fn check_and_get_indices(index_path: Option<String>, verbose: bool) -> Vec<S
 
 
 #[cfg(feature = "foldcomp")]
+/// Find a Foldcomp DB next to an index: `X_foldcomp` or `X` for index prefix `X_folddisco`.
 pub fn get_foldcomp_db_path_with_prefix(prefix: &str) -> Option<String> {
-    // If prefix format is like "*_folddisco", use "*" as prefix. 
-    // Candidate paths with the prefix: parsed_prefix, parsed_prefix_foldcomp
-    // Check if db_path, db_path.index, db_path.lookup exists.
-    
-    // Parse prefix - remove _folddisco if present
     let parsed_prefix = if prefix.ends_with("_folddisco") {
         prefix.trim_end_matches("_folddisco").to_string()
     } else {
         prefix.to_string()
     };
     
-    // Create candidate prefixes
     let candidate_prefixes = vec![
         format!("{}_foldcomp", parsed_prefix),
         parsed_prefix.clone(),
     ];
-    // Check each candidate prefix for foldcomp database files
     for candidate in candidate_prefixes {
         if is_valid_foldcomp_db(&candidate) {
             return Some(candidate);
@@ -448,8 +441,8 @@ pub fn get_foldcomp_db_path_with_prefix(prefix: &str) -> Option<String> {
 }
 
 #[cfg(feature = "foldcomp")]
+/// True if `db_path`, `.index` and `.lookup` all exist.
 fn is_valid_foldcomp_db(db_path: &str) -> bool {
-    // Check if the required foldcomp database files exist
     let db_file = std::path::Path::new(db_path);
     let index_path = format!("{}.index", db_path);
     let lookup_path = format!("{}.lookup", db_path);
@@ -458,9 +451,8 @@ fn is_valid_foldcomp_db(db_path: &str) -> bool {
     db_file.is_file() && index_file.is_file() && lookup_file.is_file()
 }
 
+/// `X_foldcomp` -> `X_folddisco`; anything else gets `_folddisco` appended.
 pub fn default_index_path(input_path: &str) -> String {
-    // If input_path ends with "_foldcomp", remove it and add "_folddisco"
-    // Else, return input_path + "_folddisco"
     if input_path.ends_with("_foldcomp") {
         input_path.replace("_foldcomp", "_folddisco")
     } else {
@@ -469,6 +461,7 @@ pub fn default_index_path(input_path: &str) -> String {
 }
 
 
+/// Path suffix starting at the last component named `anchor`.
 fn extract_tail_from_anchor(path: &std::path::Path, anchor: &str) -> Option<std::path::PathBuf> {
     if anchor.is_empty() {
         return None;
@@ -485,6 +478,8 @@ fn extract_tail_from_anchor(path: &std::path::Path, anchor: &str) -> Option<std:
     tail_from_anchor
 }
 
+/// Locate a target structure whose lookup path is stale: try paths relative to the
+/// index directory; falls back to the first candidate if none exists.
 pub fn resolve_tid_path_from_index_prefix(tid: &str, index_prefix: &str) -> String {
     let tid_path = std::path::Path::new(tid);
     if tid_path.is_file() {
@@ -546,7 +541,6 @@ mod tests {
             let value = entry.value();
             println!("{:?} -> {:?}", key, value);
         });
-        // Delete test file
         std::fs::remove_file("test_offset_map_io.offset").unwrap();
     }
     #[test]
@@ -555,7 +549,6 @@ mod tests {
         write_usize_vector("test_usize_vector_io.value", &vec).unwrap();
         let (_mmap, vec) = read_usize_vector("test_usize_vector_io.value").unwrap();
         assert_eq!(vec, &[1, 2, 3, 4, 5]);
-        // Delete test file
         std::fs::remove_file("test_usize_vector_io.value").unwrap();
     }
 }

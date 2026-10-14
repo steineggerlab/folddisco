@@ -1,5 +1,4 @@
-///! TSV Formatter Utility
-///! This module provides a generic TSV formatter.
+//! Generic TSV formatter: columns pair a key with a value extractor.
 
 use std::io::{self, Write};
 use std::sync::Arc;

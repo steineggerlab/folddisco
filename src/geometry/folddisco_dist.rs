@@ -9,12 +9,14 @@ use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
 use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 use crate::utils::convert::*;
 
+// Angles are binned directly in radians rather than as sin/cos.
 pub const NBIN_DIST: f32 = 32.0;
 pub const MIN_ANGLE_RAD: f32 = -std::f32::consts::PI;
 pub const MAX_ANGLE_RAD: f32 = std::f32::consts::PI;
 pub const NBIN_ANGLE_180: f32 = 8.0;
 pub const NBIN_ANGLE_360: f32 = 16.0;
 
+/// FolddiscoDist hash: finer distances (5 bits) at the cost of angle resolution.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
@@ -45,11 +47,11 @@ impl HashValue {
         let cb_dist = discretize_value(
             feature[3], MIN_DIST, MAX_DIST, nbin_dist
         );
-        // Angle is expected to be in radians
+        // Radians; Ca-Cb angle spans [0, PI], so it gets at most NBIN_ANGLE_180 bins
         let ca_cb_angle = discretize_value(
             feature[4], 0.0, MAX_ANGLE_RAD, nbin_angle.min(NBIN_ANGLE_180)
         );
-        // Two torsion angles:        
+        // Two torsion angles
         let phi1 = discretize_value(
             feature[5], MIN_ANGLE_RAD, MAX_ANGLE_RAD, nbin_angle
         );
@@ -57,7 +59,7 @@ impl HashValue {
             feature[6], MIN_ANGLE_RAD, MAX_ANGLE_RAD, nbin_angle
         );
 
-        // Bit map: 9 for residue pairs, 5 for ca_dist, 5 for cb_dist, 3 for ca-cb angle, 4 for phi1, 4 for phi2            
+        // res_pair 9b | ca_dist 5b | cb_dist 5b | ca_cb_angle 3b | phi1 4b | phi2 4b
         let hashvalue = res_pair << 21 | ca_dist << 16 | cb_dist << 11 
             | ca_cb_angle << 8 | phi1 << 4 | phi2;
         hashvalue
@@ -71,6 +73,7 @@ impl HashValue {
         self.reverse_hash(NBIN_DIST as usize, NBIN_ANGLE_360 as usize)
     }
     
+    /// Decode to approximate features; angles come back in degrees.
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 7] {
         let res_pair = ((self.0 >> 21) & BITMASK32_9BIT) as u32;
         let (res1, res2) = map_u32_to_aa_u32_pair(res_pair);
@@ -125,7 +128,7 @@ impl HashValue {
     
     pub fn is_symmetric(&self) -> bool {
         let values = self.reverse_hash_default();
-        // Residue pair is symmetric and phi is symmetric
+        // Same residue on both ends and same torsions
         (values[0] == values[1]) && (values[5] == values[6])
     }
 }

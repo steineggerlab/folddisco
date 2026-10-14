@@ -1,8 +1,5 @@
-// 32 bit implementation of TrRosetta features
-
-// Implementation
-// 5bit aa1, 5bit aa2, cbeta distance - 16 bins; 4 bits
-// Angles - 6 bins each for sin and cos; total 25 bins; 4 bits for sin and cos each
+// TrRosetta features in 32 bits:
+// res_pair 9b | cb_dist 3b | sin,cos of omega, theta1, theta2, phi1, phi2 2b each
  
 use std::fmt;
 use crate::geometry::core::HashType;
@@ -11,10 +8,11 @@ use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 use crate::utils::convert::map_u32_to_aa_u32_pair;
 use crate::utils::convert::*;
 
-// TODO: IMPORTANT: Implement this to reduce execution time
-// 9 bit for AA pairs, 3 bit for distance, 2 bits for sin & cos (4 bits for one angle)
-// TOTAL: 9 + 3 + (2 * 2 * 5) = 32 bits
+// Widest bin counts the bit layout above can hold
+pub const MAX_NBIN_DIST: f32 = 8.0;
+pub const MAX_NBIN_SIN_COS: f32 = 4.0;
 
+/// 32-bit TrRosetta hash.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
@@ -56,14 +54,13 @@ impl HashValue {
         res1: u32, res2: u32, cb_dist: f32, omega: f32, theta1: f32, theta2: f32,
         phi1: f32, phi2: f32, nbin_dist: f32, nbin_angle: f32
     ) -> u32 {
-        // By default, bit for the distance is 3 and angle is 2
-        let nbin_dist = if nbin_dist > 8.0 { 8.0 } else { nbin_dist };
-        let nbin_angle = if nbin_angle > 4.0 { 4.0 } else { nbin_angle };
+        // Clamp to the layout: 3-bit distance, 2-bit sin/cos
+        let nbin_dist = if nbin_dist > MAX_NBIN_DIST { MAX_NBIN_DIST } else { nbin_dist };
+        let nbin_angle = if nbin_angle > MAX_NBIN_SIN_COS { MAX_NBIN_SIN_COS } else { nbin_angle };
         
         let res_pair = map_aa_u32_pair_to_u32(res1, res2);
         let h_cb_dist = discretize_value(cb_dist, MIN_DIST, MAX_DIST, nbin_dist);
         
-        // Convert angles to sin and cos
         // let angles = [omega, theta1, theta2, phi1, phi2];
         let sin_cos_angles = [
             (omega.sin(), omega.cos()), (theta1.sin(), theta1.cos()),
@@ -71,7 +68,6 @@ impl HashValue {
             (phi2.sin(), phi2.cos())
         ];
 
-        // Discretize sin and cos
         let sin_cos_angles = [
             discretize_value(sin_cos_angles[0].0, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // sin_omega
             discretize_value(sin_cos_angles[0].1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_omega
@@ -85,7 +81,6 @@ impl HashValue {
             discretize_value(sin_cos_angles[4].1, MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_phi2
         ];
         
-        // Combine all the hash values
         let hashvalue = res_pair << 23 | h_cb_dist << 20
             | sin_cos_angles[0] << 18 | sin_cos_angles[1] << 16 // sin_omega, cos_omega
             | sin_cos_angles[2] << 14 | sin_cos_angles[3] << 12 // sin_theta1, cos_theta1
@@ -98,7 +93,7 @@ impl HashValue {
     fn _reverse_hash(&self, _nbin_dist: f32, nbin_angle: f32) -> [f32; 8] {
         let res_pair = ((self.0 >> 23) & BITMASK32_9BIT) as u32;
         let (res1, res2) = map_u32_to_aa_u32_pair(res_pair);
-        // Mask bits
+        // cb_dist is returned as its raw bin index
         let cb_dist = ((self.0 >> 20) & BITMASK32_3BIT) as f32;
         let sin_cos_vec = [
             ((self.0 >> 18) & BITMASK32_2BIT), // sin_omega
@@ -126,7 +121,7 @@ impl HashValue {
             continuize_value(sin_cos_vec[9], MIN_SIN_COS, MAX_SIN_COS, nbin_angle), // cos_phi2
         ];
 
-        // Restores original angles
+        // Angles back from sin/cos, in degrees
         let omega = sin_cos_vec[0].atan2(sin_cos_vec[1]).to_degrees();
         let theta1 = sin_cos_vec[2].atan2(sin_cos_vec[3]).to_degrees();
         let theta2 = sin_cos_vec[4].atan2(sin_cos_vec[5]).to_degrees();
@@ -157,7 +152,7 @@ impl HashValue {
     
     pub fn is_symmetric(&self) -> bool {
         let values = self.reverse_hash_default();
-        // Residue pair is symmetric and theta, phi are symmetric
+        // Same residue on both ends, same thetas and same phis
         (values[0] == values[1]) && (values[4] == values[5]) && (values[6] == values[7])
     }
 }
@@ -199,7 +194,6 @@ mod tests {
             raw_feature.6.to_radians(), raw_feature.7.to_radians(),
         ];
         let hash = GeometricHash::perfect_hash_default(&feature_input, HashType::TrRosetta);
-        //
         println!("{:?}", hash);
         let mut rev = vec![0.0; 8];
         hash.reverse_hash_default(&mut rev);

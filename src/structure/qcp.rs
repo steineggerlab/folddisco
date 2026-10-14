@@ -3,13 +3,13 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
 
-// Original code from BioPython. Implemented in Rust.
-// reference: https://github.com/biopython/biopython/blob/master/Bio/PDB/qcprot.py
-// C reference: https://theobald.brandeis.edu/qcp/
+// QCP superposition, ported from BioPython's qcprot.py
+// (https://github.com/biopython/biopython/blob/master/Bio/PDB/qcprot.py; C: https://theobald.brandeis.edu/qcp/).
 
 use crate::structure::coordinate::Coordinate;
 
 
+/// Least-squares superposition of `coords` onto `reference_coords` (QCP).
 #[derive(Debug)]
 pub struct QCPSuperimposer {
     pub reference_coords: Option<Vec<[f32; 3]>>,
@@ -36,6 +36,7 @@ impl QCPSuperimposer {
         }
     }
 
+    /// Set coordinates, run, and store the RMSD.
     pub fn set_atoms(&mut self, fixed: &[Coordinate], moving: &[Coordinate]) {
         assert!(fixed.len() == moving.len(), "Fixed and moving atom lists differ in size");
 
@@ -94,7 +95,6 @@ impl QCPSuperimposer {
 
         self.rot = Some(rot);
         
-        // Correct translation calculation
         let rotated_com_coords = rotate(com_coords, rot);
         let tran = [
             com_ref[0] - rotated_com_coords[0],
@@ -103,7 +103,6 @@ impl QCPSuperimposer {
         ];
         self.tran = Some(tran);
 
-        // Recalculate rmsd with rot, tran
         self.transformed_coords = Some(
             coords.iter()
                 .map(|&coord| {
@@ -117,7 +116,7 @@ impl QCPSuperimposer {
                 .collect()
         );
         
-        // Calculate final RMSD with transformed coordinates and reference coordinates
+        // RMSD from the applied transform
         let transformed_coords = self.transformed_coords.clone().unwrap();
         let diff: Vec<f32> = transformed_coords.iter()
             .zip(reference_coords.iter())
@@ -154,6 +153,7 @@ impl QCPSuperimposer {
         (self.rot.unwrap(), self.tran.unwrap())
     }
 
+    /// RMSD before superposition.
     pub fn get_init_rms(&mut self) -> f32 {
         if self.init_rms.is_none() {
             let coords = self.coords.clone().unwrap();

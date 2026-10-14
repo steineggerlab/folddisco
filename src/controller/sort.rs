@@ -16,6 +16,10 @@ pub enum SortKey {
     NodeCount,
     /// IDF score
     Idf,
+    /// IDF scaled by the fraction of query residues matched
+    CoverageIdf,
+    /// Default score: IDF x coverage^2 x TM-score
+    MatchScore,
     /// E-value (from IDF)
     Evalue,
     /// RMSD
@@ -30,26 +34,20 @@ pub enum SortKey {
     ChamferDistance,
     /// Hausdorff distance
     HausdorffDistance,
+    /// Distance-matrix RMSD: deformation without superposition
+    Drmsd,
+    /// Worst single internal-distance deviation
+    MaxDistDeviation,
 }
 
 impl SortKey {
-    /// Parse from string (case-insensitive)
-    /// 
-    /// # Valid key names
-    /// - `node_count`, `nodes`, `n` -> NodeCount
-    /// - `idf` -> Idf
-    /// - `rmsd` -> Rmsd
-    /// - `tm_score`, `tmscore`, `tm` -> TmScore
-    /// - `tm_score_strict`, `tmscore_strict`, `tm_strict` -> TmScoreStrict
-    /// - `gdt_ts`, `gdtts`, `gdt` -> GdtTs
-    /// - `gdt_ha`, `gdtha` -> GdtHa
-    /// - `gdt_strict`, `gdtstrict` -> GdtStrict
-    /// - `chamfer`, `chamfer_distance` -> ChamferDistance
-    /// - `hausdorff`, `hausdorff_distance` -> HausdorffDistance
+    /// Parse a key name (case-insensitive; common aliases such as `n`, `tm`, `gdt` accepted).
     pub fn from_str(s: &str) -> Result<Self, String> {
         match s.trim().to_lowercase().as_str() {
             "node_count" | "node-count" | "nodes" | "node" | "n" => Ok(Self::NodeCount),
             "idf" | "score" => Ok(Self::Idf),
+            "coverage_idf" | "coverage-idf" | "cov_idf" | "cidf" => Ok(Self::CoverageIdf),
+            "match_score" | "match-score" | "score2" => Ok(Self::MatchScore),
             "evalue" | "e_value" | "e-value" => Ok(Self::Evalue),
             "rmsd" => Ok(Self::Rmsd),
             "tm_score" | "tm-score" | "tmscore" | "tm" => Ok(Self::TmScore),
@@ -57,6 +55,8 @@ impl SortKey {
             "gdt_ha" | "gdt-ha" | "gdtha" => Ok(Self::GdtHa),
             "chamfer" | "chamfer-distance" | "chamfer_distance" => Ok(Self::ChamferDistance),
             "hausdorff" | "hausdorff-distance" | "hausdorff_distance" => Ok(Self::HausdorffDistance),
+            "drmsd" | "d_rmsd" | "dist_rmsd" => Ok(Self::Drmsd),
+            "max_dist_deviation" | "max-dist-deviation" | "max_dist_dev" => Ok(Self::MaxDistDeviation),
             _ => Err(format!(
                 "Unknown sort key: '{}'. Valid keys: {}",
                 s,
@@ -67,19 +67,16 @@ impl SortKey {
 
     /// Get all valid key names for help text
     pub fn valid_keys() -> &'static str {
-        "node_count, idf, evalue, rmsd, tm_score, tm_score_strict, gdt_ts, gdt_ha, gdt_strict, chamfer_distance, hausdorff_distance"
+        "match_score, node_count, idf, coverage_idf, evalue, rmsd, tm_score, gdt_ts, gdt_ha, chamfer_distance, hausdorff_distance, drmsd, max_dist_deviation"
     }
 
-    /// Get the default sort order for this key
-    /// 
-    /// Higher is better: NodeCount, IDF, TM-score, GDT scores -> Descending
-    /// Lower is better: RMSD, Chamfer, Hausdorff -> Ascending
+    /// Descending for scores (higher is better), ascending for distances and E-value.
     pub fn default_order(&self) -> SortOrder {
         match self {
-            // Descending order for NodeCount, IDF, TM-score, GDT scores
-            Self::NodeCount | Self::Idf | Self::TmScore | Self::GdtTs | Self::GdtHa => SortOrder::Desc,
-            // Ascending order for distance metrics: RMSD, Chamfer, Hausdorff, E-value
-            Self::Evalue | Self::Rmsd | Self::ChamferDistance | Self::HausdorffDistance => SortOrder::Asc,
+            Self::NodeCount | Self::Idf | Self::CoverageIdf | Self::MatchScore | Self::TmScore
+            | Self::GdtTs | Self::GdtHa => SortOrder::Desc,
+            Self::Evalue | Self::Rmsd | Self::ChamferDistance | Self::HausdorffDistance |
+            Self::Drmsd | Self::MaxDistDeviation => SortOrder::Asc,
         }
     }
 
@@ -88,6 +85,8 @@ impl SortKey {
         match self {
             Self::NodeCount => result.node_count as f64,
             Self::Idf => result.idf as f64,
+            Self::CoverageIdf => result.coverage_idf() as f64,
+            Self::MatchScore => result.match_score() as f64,
             Self::Evalue => result.evalue,
             Self::Rmsd => result.rmsd as f64,
             Self::TmScore => result.metrics.tm_score as f64,
@@ -95,6 +94,8 @@ impl SortKey {
             Self::GdtHa => result.metrics.gdt_ha as f64,
             Self::ChamferDistance => result.metrics.chamfer_distance as f64,
             Self::HausdorffDistance => result.metrics.hausdorff_distance as f64,
+            Self::Drmsd => result.metrics.drmsd as f64,
+            Self::MaxDistDeviation => result.metrics.max_dist_deviation as f64,
         }
     }
 
@@ -102,8 +103,7 @@ impl SortKey {
     pub fn compare(&self, a: &MatchResult, b: &MatchResult, order: SortOrder) -> Ordering {
         let val_a = self.extract_value(a);
         let val_b = self.extract_value(b);
-        // Less comes first, Greater comes last
-        // a partial cmp b means: a < b -> Less, a == b -> Equal, a > b -> Greater. 
+        // NaN compares equal
         match order {
             SortOrder::Asc => val_a.partial_cmp(&val_b).unwrap_or(Ordering::Equal),
             SortOrder::Desc => val_b.partial_cmp(&val_a).unwrap_or(Ordering::Equal),
@@ -158,12 +158,7 @@ impl MatchSortStrategy {
         self
     }
 
-    /// Parse from comma-separated string
-    ///
-    /// Format options:
-    /// 1. `"key1,key2,key3"` - Uses default order for each key
-    /// 2. `"key1:order1,key2:order2"` - Custom order for each key
-    /// 3. Mixed: `"key1,key2:desc,key3"` - Mix default and custom
+    /// Parse `key[:asc|desc],...`; keys without an order use their default. Empty -> default.
     pub fn from_str(s: &str) -> Result<Self, String> {
         if s.trim().is_empty() {
             return Ok(Self::default());
@@ -177,7 +172,6 @@ impl MatchSortStrategy {
                 continue;
             }
 
-            // Check if it contains order specification (key:order)
             if part.contains(':') {
                 let components: Vec<&str> = part.split(':').collect();
                 if components.len() != 2 {
@@ -190,7 +184,6 @@ impl MatchSortStrategy {
                 let order = SortOrder::from_str(components[1])?;
                 strategy = strategy.then_by(key, order);
             } else {
-                // Just key, use default order
                 let key = SortKey::from_str(part)?;
                 strategy = strategy.then_by_default(key);
             }
@@ -214,15 +207,14 @@ impl MatchSortStrategy {
         Ordering::Equal
     }
 
-    /// Default: IDF (desc) -> RMSD (asc)
+    /// Default: `match_score` (desc) -> RMSD (asc). Chosen in docs/feature_evaluation.md §15.
     pub fn default() -> Self {
         Self::new()
-            .then_by_default(SortKey::Idf)
+            .then_by_default(SortKey::MatchScore)
             .then_by_default(SortKey::Rmsd)
     }
 
     /// NodeCount (desc) -> RMSD (asc)
-    /// This matches the legacy behavior
     pub fn by_node_count_rmsd() -> Self {
         Self::new()
             .then_by_default(SortKey::NodeCount)
@@ -230,7 +222,6 @@ impl MatchSortStrategy {
     }
 
     /// NodeCount (desc) -> IDF (desc)
-    /// Legacy behavior when sort_by_score is true
     pub fn by_node_count_idf() -> Self {
         Self::new()
             .then_by_default(SortKey::NodeCount)
@@ -238,14 +229,12 @@ impl MatchSortStrategy {
     }
     
     /// IDF (desc)
-    /// Pure IDF sorting
     pub fn by_idf() -> Self {
         Self::new()
             .then_by_default(SortKey::Idf)
     }
 
     /// NodeCount (desc) -> TM-score (desc) -> RMSD (asc)
-    /// Recommended for motif matching quality
     pub fn by_node_count_tm_score() -> Self {
         Self::new()
             .then_by_default(SortKey::NodeCount)
@@ -254,7 +243,6 @@ impl MatchSortStrategy {
     }
 
     /// NodeCount (desc) -> GDT-TS (desc) -> RMSD (asc)
-    /// Alternative quality metric
     pub fn by_node_count_gdt_ts() -> Self {
         Self::new()
             .then_by_default(SortKey::NodeCount)
@@ -269,7 +257,6 @@ impl Default for MatchSortStrategy {
     }
 }
 
-// Display implementation for MatchSortStrategy
 impl std::fmt::Display for MatchSortStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let parts: Vec<String> = self.keys.iter().map(|(key, order)| {
@@ -299,6 +286,10 @@ pub enum StructureSortKey {
     Idf,
     /// Minimum RMSD with max match
     MinRmsd,
+    /// Minimum dRMSD with max match: deformation without superposition
+    MinDrmsd,
+    /// Default score: matched residues^2 x sqrt(IDF) / (1 + RMSD)
+    StructureScore,
     /// Total match count
     TotalMatchCount,
     /// Edge count
@@ -317,6 +308,8 @@ impl StructureSortKey {
             "node_count" | "node-count" | "nodes" | "node" | "n" => Ok(Self::NodeCount),
             "idf" | "score" => Ok(Self::Idf),
             "min_rmsd" | "min-rmsd" | "rmsd" => Ok(Self::MinRmsd),
+            "min_drmsd" | "min-drmsd" | "drmsd" => Ok(Self::MinDrmsd),
+            "structure_score" | "structure-score" | "score2" => Ok(Self::StructureScore),
             "total_match_count" | "total-match-count" | "total_match" | "total-match" | "matches" | "match" => Ok(Self::TotalMatchCount),
             "edge_count" | "edge-count" | "edges" | "edge" | "e" => Ok(Self::EdgeCount),
             "nres" | "num_residues" | "num-residues" | "length" | "residues" | "residue" | "l" => Ok(Self::Nres),
@@ -331,17 +324,17 @@ impl StructureSortKey {
 
     /// Get all valid key names for help text
     pub fn valid_keys() -> &'static str {
-        "max_node_count, node_count, idf, min_rmsd, total_match_count, edge_count, nres, plddt"
+        "structure_score, max_node_count, node_count, idf, min_rmsd, min_drmsd, total_match_count, edge_count, nres, plddt"
     }
 
     /// Get the default sort order for this key
     pub fn default_order(&self) -> SortOrder {
         match self {
             // Higher is better
-            Self::MaxNodeCount | Self::NodeCount | Self::Idf | Self::TotalMatchCount | 
-            Self::EdgeCount | Self::Nres | Self::Plddt => SortOrder::Desc,
+            Self::MaxNodeCount | Self::NodeCount | Self::Idf | Self::StructureScore
+            | Self::TotalMatchCount | Self::EdgeCount | Self::Nres | Self::Plddt => SortOrder::Desc,
             // Lower is better
-            Self::MinRmsd => SortOrder::Asc,
+            Self::MinRmsd | Self::MinDrmsd => SortOrder::Asc,
         }
     }
 
@@ -352,6 +345,8 @@ impl StructureSortKey {
             Self::NodeCount => result.node_count as f32,
             Self::Idf => result.idf,
             Self::MinRmsd => result.min_rmsd_with_max_match,
+            Self::MinDrmsd => result.min_drmsd_with_max_match,
+            Self::StructureScore => result.structure_score(),
             Self::TotalMatchCount => result.total_match_count as f32,
             Self::EdgeCount => result.edge_count as f32,
             Self::Nres => result.nres as f32,
@@ -394,12 +389,7 @@ impl StructureSortStrategy {
         self
     }
 
-    /// Parse from comma-separated string
-    ///
-    /// Format options:
-    /// 1. `"key1,key2,key3"` - Uses default order for each key
-    /// 2. `"key1:order1,key2:order2"` - Custom order for each key
-    /// 3. Mixed: `"key1,key2:desc,key3"` - Mix default and custom
+    /// Parse `key[:asc|desc],...`; keys without an order use their default. Empty -> default.
     pub fn from_str(s: &str) -> Result<Self, String> {
         if s.trim().is_empty() {
             return Ok(Self::default());
@@ -413,7 +403,6 @@ impl StructureSortStrategy {
                 continue;
             }
 
-            // Check if it contains order specification (key:order)
             if part.contains(':') {
                 let components: Vec<&str> = part.split(':').collect();
                 if components.len() != 2 {
@@ -426,7 +415,6 @@ impl StructureSortStrategy {
                 let order = SortOrder::from_str(components[1])?;
                 strategy = strategy.then_by(key, order);
             } else {
-                // Just key, use default order
                 let key = StructureSortKey::from_str(part)?;
                 strategy = strategy.then_by_default(key);
             }
@@ -450,15 +438,15 @@ impl StructureSortStrategy {
         Ordering::Equal
     }
 
-    /// Default strategy: IDF (desc) -> MinRmsd (asc)
+    /// Default: `structure_score` (desc) -> RMSD of the best match (asc). Chosen in
+    /// docs/feature_evaluation.md §15.
     pub fn default() -> Self {
         Self::new()
-            .then_by_default(StructureSortKey::Idf)
+            .then_by_default(StructureSortKey::StructureScore)
             .then_by_default(StructureSortKey::MinRmsd)
     }
     
     /// MaxNodeCount (desc) -> MinRmsd (asc)
-    /// This matches the legacy behavior
     pub fn by_max_node_count_rmsd() -> Self {
         Self::new()
             .then_by_default(StructureSortKey::MaxNodeCount)
@@ -484,8 +472,6 @@ impl Default for StructureSortStrategy {
         Self::default()
     }
 }
-
-// Implementation for printing with formatter
 
 impl std::fmt::Display for StructureSortStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -577,6 +563,8 @@ mod tests {
                 gdt_ha: 0.4,
                 chamfer_distance: 1.2,
                 hausdorff_distance: 2.5,
+                drmsd: 0.3,
+                max_dist_deviation: 0.6,
             },
         };
         let result_b = MatchResult {
@@ -597,6 +585,8 @@ mod tests {
                 gdt_ha: 0.3,
                 chamfer_distance: 2.9,
                 hausdorff_distance: 3.0,
+                drmsd: 0.9,
+                max_dist_deviation: 1.4,
             },
         };
         let result_c = MatchResult {
@@ -617,6 +607,8 @@ mod tests {
                 gdt_ha: 0.1,
                 chamfer_distance: 1.2,
                 hausdorff_distance: 8.0,
+                drmsd: 1.8,
+                max_dist_deviation: 3.2,
             },
         };
         
@@ -718,6 +710,7 @@ mod tests {
             matching_residues_processed: vec![],
             max_matching_node_count: 10,
             min_rmsd_with_max_match: 0.5,
+            min_drmsd_with_max_match: 0.4,
         };
 
         let result_b = StructureResult {
@@ -734,6 +727,7 @@ mod tests {
             matching_residues_processed: vec![],
             max_matching_node_count: 8,
             min_rmsd_with_max_match: 0.3,
+            min_drmsd_with_max_match: 0.6,
         };
 
         let result_c = StructureResult {
@@ -750,6 +744,7 @@ mod tests {
             matching_residues_processed: vec![],
             max_matching_node_count: 10,
             min_rmsd_with_max_match: 0.7,
+            min_drmsd_with_max_match: 0.2,
         };
 
         // MaxNodeCount (desc) -> MinRmsd (asc)

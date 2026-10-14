@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 
+/// All ordered pairs `(i, j)` over `0..n`, diagonal included (callers skip `i == j`).
 pub struct CombinationIterator {
     n: usize,
     i: usize,
@@ -71,6 +72,7 @@ mod tests {
 
 }
 
+/// Cartesian product of two index lists.
 #[derive(Hash, PartialEq, Eq)]
 pub struct CombinationVecIterator {
     vec1: Vec<usize>,

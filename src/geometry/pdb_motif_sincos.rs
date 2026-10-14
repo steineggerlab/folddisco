@@ -9,22 +9,26 @@ use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
 use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 use crate::utils::convert::*;
 
+// Widest bin counts the bit layout below can hold
+pub const MAX_NBIN_DIST: f32 = 16.0;
+pub const MAX_NBIN_SIN_COS: f32 = 16.0;
+
+/// 26-bit PDBMotif hash with the angle sin/cos encoded.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
 impl HashValue {
     #[inline]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
-        // Added one more quantization for distance
-        let nbin_dist = if nbin_dist > 16 { 
-            16.0
+        let nbin_dist = if nbin_dist > MAX_NBIN_DIST as usize {
+            MAX_NBIN_DIST
         } else if nbin_dist == 0 {
             NBIN_DIST
         } else { 
             nbin_dist as f32 
         };
-        let nbin_angle = if nbin_angle > 16 {
-            16.0
+        let nbin_angle = if nbin_angle > MAX_NBIN_SIN_COS as usize {
+            MAX_NBIN_SIN_COS
         } else if nbin_angle == 0 {
             NBIN_SIN_COS
         } else {
@@ -47,6 +51,7 @@ impl HashValue {
         let cos_angle = discretize_value(
             cos_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         );
+        // res1 5b | res2 5b | ca_dist 4b | cb_dist 4b | sin 4b | cos 4b
         let hashvalue = res1 << 21 | res2 << 16 | ca_dist << 12 
             | cb_dist << 8 | sin_angle << 4 | cos_angle;
         hashvalue

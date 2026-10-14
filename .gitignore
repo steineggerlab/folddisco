@@ -9,14 +9,18 @@ analysis/
 *_index_table.tsv
 *.log
 *.bin
+
 # index files
 *.value
 *.offset
 *.lookup
+*.lookup.cache
+*.fdcache
 *.type
 *_folddisco
 *.tar.gz
 temp
+
 # Pre-built indices
 index/afdb*
 index/e_coli*
@@ -25,3 +29,6 @@ bin/folddisco
 data/serine_peptidases_pdbtr_small
 data/example_db_folddisco_db
 test.index
+
+# Dev
+.vscode

@@ -8,32 +8,35 @@ use crate::geometry::core::HashType;
 use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
 use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 
-// Residue 1: 5 bits; Residue 2: 5 bits; Distances: 16 bins 4 bits; 
-// Angle: 32 bins 5 bits; total: 23 bits
+// res1 5b | res2 5b | ca_dist 5b | cb_dist 5b | angle 5b (25 bits). Angle in degrees.
 pub const MIN_DIST: f32 = 2.0;
 pub const MAX_DIST: f32 = 20.0;
 pub const NBIN_DIST: f32 = 18.0;
 pub const MIN_ANGLE: f32 = 0.0;
 pub const MAX_ANGLE: f32 = 180.0;
 pub const NBIN_ANGLE: f32 = 9.0;
+// Widest bin counts the bit layout below can hold
+pub const MAX_NBIN_DIST: f32 = 32.0;
+pub const MAX_NBIN_ANGLE: f32 = 32.0;
 // Bitmasks
 pub const BITMASK32_5BIT: u32 = 0x0000001F;
 
+/// 25-bit PDBMotif hash.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
 impl HashValue {
     #[inline]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
-        let nbin_dist = if nbin_dist > 32 { 
-            32.0
+        let nbin_dist = if nbin_dist > MAX_NBIN_DIST as usize {
+            MAX_NBIN_DIST
         } else if nbin_dist == 0 {
             NBIN_DIST
         } else { 
             nbin_dist as f32 
         };
-        let nbin_angle = if nbin_angle > 32 { 
-            32.0
+        let nbin_angle = if nbin_angle > MAX_NBIN_ANGLE as usize {
+            MAX_NBIN_ANGLE
         } else if nbin_angle == 0 {
             NBIN_ANGLE
         } else { 

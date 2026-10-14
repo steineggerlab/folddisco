@@ -1,8 +1,7 @@
 use crate::structure::atom::Atom;
 
+/// Parse a fixed-column PDB ATOM record. B-factor defaults to 1.0 when the line is too short.
 pub fn parse_line(line: &String) -> Result<Atom, &str> {
-    // Not failing due to line length
-    // Parse line
     let x = line[30..38].trim().parse::<f32>();
     let y = line[38..46].trim().parse::<f32>();
     let z = line[46..54].trim().parse::<f32>();
@@ -11,7 +10,6 @@ pub fn parse_line(line: &String) -> Result<Atom, &str> {
     let chain = line[21..22].as_bytes()[0];
     let res_name = parse_residue(&line[17..20]);
     let res_serial = line[22..26].trim().parse::<u64>();
-    // If line contains 60..66, parse b_factor
     let b_factor = if line.len() >= 66 {
         line[60..66].trim().parse::<f32>()
     } else {
@@ -19,7 +17,6 @@ pub fn parse_line(line: &String) -> Result<Atom, &str> {
     };
     // let occupancy = &line[54..60]; // NOT USING occupancy yet
 
-    // Check if all the parsing was successful
     match (
         x,
         y,
@@ -54,18 +51,18 @@ pub fn parse_line(line: &String) -> Result<Atom, &str> {
     }
 }
 
+/// Atom name field (columns 13-16) as 4 bytes.
 pub fn parse_atom(name: &str) -> Result<[u8; 4], &str> {
     let bytes = name.as_bytes();
-    // Check atom name is 4 ASCII characters
     match bytes.len() {
         4 => Ok([bytes[0], bytes[1], bytes[2], bytes[3]]),
         _ => Err("Atom name is not 4 characters long"),
     }
 }
 
+/// Residue name field (columns 18-20) as 3 bytes.
 pub fn parse_residue(name: &str) -> Result<[u8; 3], &str> {
     let bytes = name.as_bytes();
-    // Check residue name is 3 ASCII characters
     match bytes.len() {
         3 => Ok([bytes[0], bytes[1], bytes[2]]),
         _ => Err("Residue name is not 3 characters long"),

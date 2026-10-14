@@ -1,6 +1,8 @@
 
+/// Ideal CA-CB bond length in Angstroms, used to place a virtual CB.
 pub const CA_CB_DIST: f32 = 1.5336;
 
+/// A 3D point or vector.
 #[derive(Debug, Clone, Copy)]
 pub struct Coordinate {
     pub x: f32,
@@ -12,6 +14,7 @@ impl Coordinate {
     pub fn new(x: f32, y: f32, z: f32) -> Coordinate {
         Coordinate { x, y, z }
     }
+    /// Panics if any component is `None`.
     pub fn build(x: &Option<f32>, y: &Option<f32>, z: &Option<f32>) -> Self {
         Coordinate {
             x: x.expect("Unable to get coordinate"),
@@ -90,6 +93,7 @@ impl Coordinate {
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
 
+    /// Point pair feature of two vectors: `[|d|, angle(n1, d), angle(n2, d), angle(n1, n2)]`.
     pub fn get_ppf(&self, other: &Coordinate) -> [f32; 4] {
         let n1 = self.normalize();
         let n2 = other.normalize();
@@ -114,10 +118,10 @@ impl Coordinate {
         dist
     }
 
+    /// Angle between vectors `self->atom2` and `atom3->atom4`.
     #[inline(always)]
     pub fn calc_angle(&self, atom2: &Coordinate, atom3: &Coordinate, atom4: &Coordinate, return_radian: bool) -> f32 {
         let (a, b, c, d) = (self, atom2, atom3, atom4);
-        // Form vectors
         let v1 = (b.x - a.x, b.y - a.y, b.z - a.z); // vector 1
         let v2 = (d.x - c.x, d.y - c.y, d.z - c.z); // vector 2
         let dot = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2; // dot product
@@ -133,10 +137,10 @@ impl Coordinate {
     }
 }
 
+/// Angle at `atom2` formed by three points, in degrees.
 #[inline(always)]
 pub fn calc_angle_point(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordinate) -> f32 {
     let (a, b, c) = (atom1, atom2, atom3);
-    // Form vectors
     let v1 = (a.x - b.x, a.y - b.y, a.z - b.z); // vector 1
     let v2 = (c.x - b.x, c.y - b.y, c.z - b.z); // vector 2
     let dot = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2; // dot product
@@ -147,10 +151,10 @@ pub fn calc_angle_point(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordina
     let degree = radian.to_degrees(); // angle in degrees
     degree
 }
+/// Angle at `atom2` formed by three points, in radians.
 #[inline(always)]
 pub fn calc_angle_radian(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordinate) -> f32 {
     let (a, b, c) = (atom1, atom2, atom3);
-    // Form vectors
     let v1 = (a.x - b.x, a.y - b.y, a.z - b.z); // vector 1
     let v2 = (c.x - b.x, c.y - b.y, c.z - b.z); // vector 2
     let dot = v1.0 * v2.0 + v1.1 * v2.1 + v1.2 * v2.2; // dot product
@@ -161,11 +165,10 @@ pub fn calc_angle_radian(atom1: &Coordinate, atom2: &Coordinate, atom3: &Coordin
     radian
 }
 
-// Originally from foldseek StructureTo3DiBase::approxCBetaPosition
-// link: https://github.com/steineggerlab/foldseek/blob/master/lib/3di/structureto3di.cpp
+/// Virtual CB assuming tetrahedral CA geometry. From foldseek's
+/// `StructureTo3DiBase::approxCBetaPosition` (lib/3di/structureto3di.cpp).
 #[inline(always)]
 pub fn approx_cb(ca: &Coordinate, n: &Coordinate, c: &Coordinate) -> Coordinate {
-    // Assumption: CA forms with its four ligands a tetrahedral.
     let v1 = c.sub(ca).normalize();
     let v2 = n.sub(ca).normalize();
 
@@ -185,6 +188,7 @@ pub fn approx_cb(ca: &Coordinate, n: &Coordinate, c: &Coordinate) -> Coordinate 
     cb
 }
 
+/// `cos(2 * torsion)` of four points.
 #[inline(always)]
 pub fn calc_cos2_torsion_angle(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate) -> f32 {
     let v1 = b.sub(a);
@@ -200,6 +204,7 @@ pub fn calc_cos2_torsion_angle(a: &Coordinate, b: &Coordinate, c: &Coordinate, d
     (2.0 * out).cos()
 }
 
+/// Dihedral angle of four points, in radians.
 #[inline(always)]
 pub fn calc_torsion_radian(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &Coordinate) -> f32 {
     let v1 = b.sub(a);
@@ -214,6 +219,7 @@ pub fn calc_torsion_radian(a: &Coordinate, b: &Coordinate, c: &Coordinate, d: &C
     -y.atan2(x)
 }
 
+/// Coordinates stored column-wise.
 #[derive(Debug, Clone)]
 pub struct CoordinateVector {
     pub x: Vec<f32>,
@@ -234,6 +240,7 @@ impl CoordinateVector {
     pub fn get(&self, idx: usize) -> (f32, f32, f32) {
         (self.x[idx], self.y[idx], self.z[idx])
     }
+    /// `cos(2 * torsion)` of points a, b, c, d (not the angle itself).
     pub fn calc_torsion_angle(&self, a: usize, b: usize, c: usize, d: usize) -> f32 {
         let (a_x, a_y, a_z) = self.get(a);
         let (b_x, b_y, b_z) = self.get(b);
@@ -293,6 +300,7 @@ impl CoordinateVector {
     }
 }
 
+/// Column-wise coordinates with gaps for missing atoms.
 #[derive(Debug, Clone)]
 pub struct CarbonCoordinateVector {
     pub x: Vec<Option<f32>>,
@@ -357,6 +365,7 @@ impl CarbonCoordinateVector {
         self.z.push(None);
     }
 
+    /// `cos(2 * torsion)` of points a, b, c, d; `None` if any point is missing.
     pub fn calc_torsion_angle(&self, a: usize, b: usize, c: usize, d: usize) -> Option<f32> {
         let (a_x, a_y, a_z) = self.get(a);
         let (b_x, b_y, b_z) = self.get(b);

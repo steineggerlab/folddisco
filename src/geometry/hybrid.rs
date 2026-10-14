@@ -1,8 +1,8 @@
-// File: pdb_tr.rs
+// File: hybrid.rs
 // Created: 2024-03-27 17:35:35
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2024 Hyunbin Kim, All rights reserved
-// PDB motif + 2 torsion angles
+// Residue groups + PDBTrRosetta geometry + two backbone torsions, all sin/cos encoded.
 
 use std::fmt;
 use crate::geometry::core::HashType;
@@ -10,24 +10,28 @@ use crate::utils::convert::discretize_f32_value_into_u32 as discretize_value;
 use crate::utils::convert::continuize_u32_value_into_f32 as continuize_value;
 use crate::utils::convert::*;
 
+/// 32-bit Hybrid hash.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct HashValue(pub u32);
 
 pub const HYBRID_NBIN_DIST: f32 = 16.0;
 pub const HYBRID_NBIN_SIN_COS: f32 = 4.0;
+// Widest bin counts the bit layout below can hold
+pub const HYBRID_MAX_NBIN_DIST: f32 = 16.0;
+pub const HYBRID_MAX_NBIN_SIN_COS: f32 = 4.0;
 
 impl HashValue {
     #[inline]
     pub fn perfect_hash(feature: &Vec<f32>, nbin_dist: usize, nbin_angle: usize) -> u32 {
-        let nbin_dist = if nbin_dist > 16 {
-            16.0
+        let nbin_dist = if nbin_dist > HYBRID_MAX_NBIN_DIST as usize {
+            HYBRID_MAX_NBIN_DIST
         } else if nbin_dist == 0 {
             HYBRID_NBIN_DIST
         } else {
             nbin_dist as f32
         };
-        let nbin_angle = if nbin_angle > 4 {
-            4.0
+        let nbin_angle = if nbin_angle > HYBRID_MAX_NBIN_SIN_COS as usize {
+            HYBRID_MAX_NBIN_SIN_COS
         } else if nbin_angle == 0 {
             HYBRID_NBIN_SIN_COS
         } else {
@@ -50,7 +54,7 @@ impl HashValue {
         let cos_ca_cb_angle = discretize_value(
             cos_ca_cb_angle, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         );
-        // Two torsion angles: 
+        // Two torsion angles
         let sin_phi1 = feature[5].sin();
         let cos_phi1 = feature[5].cos();
         let sin_phi2 = feature[6].sin();
@@ -85,6 +89,7 @@ impl HashValue {
             cos_bb_phi2, MIN_SIN_COS, MAX_SIN_COS, nbin_angle
         );
         
+        // group1 2b | group2 2b | ca_dist 4b | cb_dist 4b | sin,cos of 5 angles 2b each
         let hashvalue = res1_group << 30 | res2_group << 28 | ca_dist << 24
             | cb_dist << 20 | sin_ca_cb_angle << 18 | cos_ca_cb_angle << 16
             | sin_phi1 << 14 | cos_phi1 << 12 | sin_phi2 << 10 | cos_phi2 << 8 
@@ -100,6 +105,7 @@ impl HashValue {
         self.reverse_hash(HYBRID_NBIN_DIST as usize, HYBRID_NBIN_SIN_COS as usize)
     }
     
+    /// Decode to approximate features; angles come back in degrees.
     pub fn reverse_hash(&self, nbin_dist: usize, nbin_angle: usize) -> [f32; 9] {
         let res1_group = ((self.0 >> 30) & BITMASK32_2BIT)as f32;
         let res2_group = ((self.0 >> 28) & BITMASK32_2BIT) as f32;
@@ -184,7 +190,7 @@ impl HashValue {
     
     pub fn is_symmetric(&self) -> bool {
         let values = self.reverse_hash_default();
-        // Residue pair is symmetric and phi is symmetric
+        // Same group on both ends and same torsions
         (values[0] == values[1]) && (values[5] == values[6])
     }
 }

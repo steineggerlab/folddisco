@@ -7,7 +7,12 @@ use crate::utils::convert::{map_aa_to_u8, map_aa_to_u8_group};
 use crate::structure::core::CompactStructure;
 use crate::geometry::core::{GeometricHash, HashType};
 use crate::utils::combination::CombinationIterator;
+use super::expand::{for_each_expanded_feature, FeatureExpander, IndexExpansion};
+use super::query::MAX_HASHES_PER_PAIR;
+use super::substitution::substitution_variants;
 
+/// Fill `feature_container` with the pair feature of residues `i`, `j` for `hash_type`.
+/// False when the pair has no feature (same residue, unknown residue, beyond `dist_cutoff`).
 pub fn get_single_feature(
     i: usize, j: usize, structure: &CompactStructure, hash_type: HashType, 
     dist_cutoff: f32, feature_container: &mut Vec<f32>
@@ -188,13 +193,13 @@ pub fn get_single_feature(
                 return false;
             }
         },
-        // append new hash type here
         _ => {
             return false;
         }
     }
 }
 
+/// Hashes of every residue pair of `structure` with a feature, one per bin setting.
 pub fn get_geometric_hash_as_u32_from_structure(
     structure: &CompactStructure, hash_type: HashType, 
     nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
@@ -230,6 +235,60 @@ pub fn get_geometric_hash_as_u32_from_structure(
     hash_vec
 }
 
+/// Hash one feature with the index's binning: every `multiple_bins` entry, or the single
+/// `nbin_dist`/`nbin_angle` pair (0 meaning the hash type's default).
+fn push_binned_hashes(
+    hash_vec: &mut Vec<u32>, feature: &Vec<f32>, hash_type: HashType,
+    nbin_dist: usize, nbin_angle: usize, multiple_bins: &Option<Vec<(usize, usize)>>,
+) {
+    if let Some(multiple_bins) = multiple_bins {
+        for (nbin_dist, nbin_angle) in multiple_bins.iter() {
+            hash_vec.push(GeometricHash::perfect_hash_as_u32(feature, hash_type, *nbin_dist, *nbin_angle));
+        }
+    } else if nbin_dist == 0 || nbin_angle == 0 {
+        hash_vec.push(GeometricHash::perfect_hash_default_as_u32(feature, hash_type));
+    } else {
+        hash_vec.push(GeometricHash::perfect_hash_as_u32(feature, hash_type, nbin_dist, nbin_angle));
+    }
+}
+
+/// Same as `get_geometric_hash_as_u32_from_structure`, plus every hash the pair reaches
+/// under `expansion`, built with the same routine the query side uses.
+pub fn get_expanded_geometric_hash_as_u32_from_structure(
+    structure: &CompactStructure, hash_type: HashType,
+    nbin_dist: usize, nbin_angle: usize, dist_cutoff: f32,
+    multiple_bins: &Option<Vec<(usize, usize)>>, expansion: &IndexExpansion,
+) -> Vec<u32> {
+    let mut expander = FeatureExpander::new(hash_type, nbin_dist, nbin_angle, &expansion.tolerance);
+    let aa_indices = hash_type.amino_acid_index().map(|idx| (idx[0], idx[1]));
+    let alternatives: Option<Vec<Vec<u8>>> = expansion.scheme
+        .map(|scheme| (0..20u8).map(|aa| scheme.alternatives(aa)).collect());
+    let mut hash_vec = Vec::new();
+    let mut feature = vec![0.0; 9];
+    let mut variant = vec![0.0; 9];
+    CombinationIterator::new(structure.num_residues).for_each(|(i, j)| {
+        if i == j || !get_single_feature(i, j, structure, hash_type, dist_cutoff, &mut feature) {
+            return;
+        }
+        push_binned_hashes(&mut hash_vec, &feature, hash_type, nbin_dist, nbin_angle, multiple_bins);
+        let aa_variants = match (aa_indices, &alternatives) {
+            (Some((a0, a1)), Some(alternatives)) => substitution_variants(
+                (feature[a0], feature[a1]),
+                Some(&alternatives[feature[a0] as usize]),
+                Some(&alternatives[feature[a1] as usize]),
+            ),
+            _ => Vec::new(),
+        };
+        for_each_expanded_feature(
+            &mut expander, &feature, aa_indices, &aa_variants, MAX_HASHES_PER_PAIR, &mut variant,
+            |variant| push_binned_hashes(&mut hash_vec, variant, hash_type, nbin_dist, nbin_angle, multiple_bins),
+        );
+    });
+    hash_vec.shrink_to_fit();
+    hash_vec
+}
+
+/// Hashes of every pair plus their bin-shifted variants, deduplicated per pair.
 pub fn get_geometric_hash_as_u32_from_structure_with_shifts(
     structure: &CompactStructure, hash_type: HashType, 
     dist_cutoff: f32,
@@ -257,6 +316,7 @@ pub fn get_geometric_hash_as_u32_from_structure_with_shifts(
 }
 
 impl HashType {
+    /// Feature positions of the two residue identities, if encoded.
     pub fn amino_acid_index(&self) -> Option<Vec<usize>> {
         match self {
             HashType::PDBMotif | HashType::PDBMotifSinCos | 
@@ -266,6 +326,7 @@ impl HashType {
         }
     }
 
+    /// Feature positions of distances, if any.
     pub fn dist_index(&self) -> Option<Vec<usize>> {
         match self {
             HashType::PDBMotif | HashType::PDBMotifSinCos | HashType::PDBTrRosetta | 
@@ -276,6 +337,7 @@ impl HashType {
         }
     }
     
+    /// Feature positions of angles, if any.
     pub fn angle_index(&self) -> Option<Vec<usize>> {
         match self {
             HashType::PDBMotif | HashType::PDBMotifSinCos => Some(vec![4]),
@@ -288,6 +350,7 @@ impl HashType {
         }
     }
     
+    /// Combined distance bins over all distance dimensions (0 = type default).
     pub fn dist_bins(&self, nbin_dist: usize) -> Option<usize> {
         let nbin_dist = if nbin_dist == 0 {
             self.default_dist_bin()
@@ -300,6 +363,7 @@ impl HashType {
         }
     }
     
+    /// Combined angle bins over all angle dimensions (0 = type default).
     pub fn angle_bins(&self, nbin_angle: usize) -> Option<usize> {
         let nbin_angle = if nbin_angle == 0 {
             self.default_angle_bin()
@@ -328,6 +392,7 @@ impl HashType {
         }
     }
     
+    /// Size of the hash space: distance x angle x residue-pair bins.
     pub fn total_bins(&self, nbin_dist: usize, nbin_angle: usize) -> usize {
         let angle_bins = match self.angle_bins(nbin_angle) {
             Some(num_bins) => num_bins,
@@ -353,8 +418,45 @@ mod tests {
     use std::time::Instant;
 
     #[test]
+    fn expanded_index_reaches_what_an_expanded_query_reaches() {
+        use crate::controller::expand::ToleranceConfig;
+        use crate::controller::query::{make_query_map, resolve_query_substitutions};
+        use crate::controller::substitution::SubstitutionScheme;
+        use crate::structure::chain_id::ChainId;
+        use rustc_hash::FxHashSet as HashSet;
+
+        let path = String::from("query/1G2F.pdb");
+        let compact = read_structure_from_path(&path).unwrap().to_compact();
+        let hash_type = HashType::PDBTrRosetta;
+        let plain: HashSet<u32> = get_geometric_hash_as_u32_from_structure(
+            &compact, hash_type, 16, 4, 20.0, &None,
+        ).into_iter().collect();
+
+        let residues: Vec<(ChainId, u64)> = [207, 212, 225].iter().map(|&r| (ChainId::from_byte(b'F'), r)).collect();
+        for (radius, scheme) in [(1, None), (0, Some(SubstitutionScheme::Group)), (2, Some(SubstitutionScheme::Blosum62))] {
+            let expansion = IndexExpansion::new(radius, 0.5, 5.0, scheme).unwrap();
+            let expanded: HashSet<u32> = get_expanded_geometric_hash_as_u32_from_structure(
+                &compact, hash_type, 16, 4, 20.0, &None, &expansion,
+            ).into_iter().collect();
+            assert!(plain.is_subset(&expanded));
+            assert!(expanded.len() > plain.len(), "radius {} {:?} added nothing", radius, scheme);
+
+            let substitutions = match scheme {
+                Some(scheme) => resolve_query_substitutions(&compact, &residues, &vec![None; 3], scheme, true, false),
+                None => vec![None; 3],
+            };
+            let tolerance = ToleranceConfig::new(vec![0.5], vec![5.0], radius);
+            let (query_map, _, _) = make_query_map(
+                &path, &residues, hash_type, 16, 4, &None, &tolerance, &substitutions, 20.0, false, &None, 1.0,
+            );
+            for hash in query_map.keys() {
+                assert!(expanded.contains(&hash.as_u32()), "radius {} {:?}: query hash missing from index", radius, scheme);
+            }
+        }
+    }
+
+    #[test]
     fn test_get_geometric_hash_with_shifts() {
-        // Load a test structure
         let structure_path = "data/AF-P17538-F1-model_v4.pdb";
         if let Some(structure) = read_structure_from_path(structure_path) {
             let compact_structure = CompactStructure::build(&structure);

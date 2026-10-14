@@ -5,20 +5,19 @@ use std::path::Path;
 use flate2::read::GzDecoder;
 
 
+use crate::structure::chain_id::ChainId;
+
 use super::super::core::*;
 use super::parser::*;
 use super::*;
 
-/// A PDB reader
+/// A PDB reader. Only ATOM records of the first model are read.
 #[derive(Debug)]
 pub struct Reader<R: io::Read> {
-    /// The underlying reader
     pub reader: R,
-    ///
     pub input_type: StructureFileFormat,
 }
 
-// ??? trait Read -> impl Read for __ ???
 impl Reader<File> {
     pub fn new(file: File) -> Self {
         Reader {
@@ -27,26 +26,24 @@ impl Reader<File> {
         }
     }
 
-    /// Read from a file path
     pub fn from_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<Self, &'static str> {
         File::open(&path)
             .map(Reader::new)
             .map_err(|_e| "Error opening file")
     }
 
+    /// Parse a plain-text PDB file; unparsable ATOM lines are skipped.
     pub fn read_structure(&self) -> Result<Structure, &str> {
         let reader = BufReader::new(&self.reader);
         let mut structure = Structure::new(); // revise
-        let mut record = (b' ', 0);
+        let mut record = (ChainId::from_byte(b' '), 0);
         let mut model = 0;
-        // Reading each line of PDB, parse and build atomvector.
         for (_idx, line) in reader.lines().enumerate() {
             if let Ok(atomline) = line {
                 if model > 1 {
-                    // Current version does not support multiple models in one PDB file
+                    // First model only
                     break;
                 }
-                // If line is less than 6 characters, skip the line
                 if atomline.len() < 6 {
                     continue;
                 }
@@ -75,23 +72,18 @@ impl Reader<File> {
         Ok(structure)
     }
 
+    /// Parse a gzipped PDB file. Unlike `read_structure`, all models are read.
     pub fn read_structure_from_gz(&self) -> Result<Structure, &str> {
-        // Load whole file and close the file
         let mut decoder = GzDecoder::new(&self.reader);
         let mut binary = Vec::new();
         decoder.read_to_end(&mut binary).unwrap();
-        // Close the decoder after flushing
         decoder.flush().unwrap();
-        // Drop the decoder
         drop(decoder);
 
-        // Create a new Structure
         let mut structure = Structure::new();
-        let mut record = (b' ', 0);
+        let mut record = (ChainId::from_byte(b' '), 0);
         
-        // Read binary as a string. Conver
         let reader = BufReader::new(&binary[..]);
-        // Convert to string
         for (_idx, line) in reader.lines().enumerate() {
             if let Ok(atomline) = line {
                 match &atomline[..6] {
@@ -102,8 +94,6 @@ impl Reader<File> {
                                 structure.update(atom, &mut record);
                             }
                             Err(_e) => {
-                                // Conversion error. Jusk skip the line.
-                                // If verbose, print message (NOT IMPLEMENTED)
                                 // println!("Skipping line{}: {}", idx, e);
                                 continue;
                             }
@@ -115,7 +105,6 @@ impl Reader<File> {
                 return Err("Error reading line");
             };
         }
-        // Drop the binary
         drop(binary);
         Ok(structure)
     }

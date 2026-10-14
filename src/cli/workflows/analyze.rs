@@ -3,9 +3,8 @@
 // Author: Hyunbin Kim (khb7840@gmail.com)
 // Copyright © 2025 Hyunbin Kim, All rights reserved
 
-//! This workflow handles distribution analysis of given index.
-//! If only index is given, it summarizes the overall distribution of the hash values in the index.
-//! If PDB files or query motifs are also given, it analyzes the distribution of matches for
+//! `folddisco analyze`: summarize an index's hash distribution, or with `-p`, find
+//! hashes enriched in a structure set relative to the index.
 
 
 use crate::cli::config::read_index_config_from_file;
@@ -38,6 +37,7 @@ general options:
     -h, --help                   Print this help menu
 ";
 
+/// Entry point for `folddisco analyze`.
 pub fn analyze(env: AppArgs) {
     match env {
         AppArgs::Analyze {
@@ -54,23 +54,19 @@ pub fn analyze(env: AppArgs) {
         } => {
             if verbose { print_logo(); }
 
-            // index_path is required
             if index_path.is_none() {
                 eprintln!("{}", HELP_ANALYZE);
                 std::process::exit(1);
             }
  
-            // Check if pdb_container is provided
-            // If provided, compare the hash distributions of the PDBs against the index
-            // If not provided, just summarize the index distribution
+            // With -p: enrichment against the index; otherwise: index summary
             let compare_with_pdbs = pdb_container.is_some();
             let index_path = index_path.unwrap();
             let output_prefix = match output {
                 Some(p) => p,
                 None => {
                     if compare_with_pdbs {
-                        // output prefix: pdb_container_vs_index
-                        // use basename of index_path
+                        // <pdb_container>_vs_<index basename>
                         format!("{}_vs_{}", pdb_container.as_ref().unwrap(),
                             index_path.split('/').last().unwrap_or(&index_path)
                         )
@@ -92,22 +88,18 @@ pub fn analyze(env: AppArgs) {
                     ));
                 }
             }
-            // Set thread pool
             rayon::ThreadPoolBuilder::new().num_threads(threads).build_global().expect(
                 &log_msg(FAIL, "Failed to build thread pool")
             );
-            // Load index
             let (index, _offset_mmap) = measure_time!(
                 load_folddisco_index(&index_path), verbose
             );
-            // Load lookup and config
             let (_, hash_type_path) = get_lookup_and_type(&index_path);
             let config = read_index_config_from_file(&hash_type_path);
             let hash_type = config.hash_type;
             let nbin_dist = config.num_bin_dist;
             let nbin_angle = config.num_bin_angle;
             
-            // Execute workflow
             if compare_with_pdbs {
                 if let Some(pdb_container) = pdb_container {
                     if verbose {

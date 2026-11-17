@@ -275,22 +275,19 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
         if h > 0.0 {
             let sqrth = h.sqrt();
             let mut disc = h * h * h - g * g;
+            // catch the potential inf - inf = NaN case that the guard
+            // was likely used for
+            assert!(
+                g.is_finite() && disc.is_finite(),
+                "Non-finite value in Kabsch eigensolver"
+            );
             if disc < 0.0 {
                 disc = 0.0;
             }
             let sqrt_disc = disc.sqrt();
             
-            // Robust angle computation to avoid NaN from extreme values
-            let d_ang = if g.abs() > 1e18 {  // Higher threshold for f64
-                if g > 0.0 {
-                    std::f64::consts::PI / 3.0
-                } else {
-                    0.0
-                }
-            } else {
-                sqrt_disc.atan2(-g) / 3.0
-            };
-            
+            let d_ang = sqrt_disc.atan2(-g) / 3.0;
+
             let cth = sqrth * d_ang.cos();
             let sth = sqrth * SQRT3 * d_ang.sin();
 

@@ -274,11 +274,14 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
 
         if h > 0.0 {
             let sqrth = h.sqrt();
-            let mut disc = h * h * h - g * g;
+            // normalize the angle inputs without forming h^3 or g^2
+            let g_scaled = (g / h) / sqrth;
+            let mut disc = 1.0 - g_scaled * g_scaled;
+
             // catch the potential inf - inf = NaN case that the guard
             // was likely used for
             assert!(
-                g.is_finite() && disc.is_finite(),
+                h.is_finite() && g_scaled.is_finite() && disc.is_finite(),
                 "Non-finite value in Kabsch eigensolver"
             );
             if disc < 0.0 {
@@ -286,7 +289,7 @@ pub fn kabsch(x: &[[f32; 3]], y: &[[f32; 3]], mode: u8) -> Option<([[f32; 3]; 3]
             }
             let sqrt_disc = disc.sqrt();
             
-            let d_ang = sqrt_disc.atan2(-g) / 3.0;
+            let d_ang = sqrt_disc.atan2(-g_scaled) / 3.0;
 
             let cth = sqrth * d_ang.cos();
             let sth = sqrth * SQRT3 * d_ang.sin();
